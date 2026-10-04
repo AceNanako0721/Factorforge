@@ -1,5 +1,6 @@
 """Official protocol mappings are exercised with a fake HTTP transport only."""
 from datetime import timedelta
+from datetime import datetime, timezone
 import httpx
 
 from factorforge.trading.adapters.binance.market import BinanceMarket
@@ -39,3 +40,23 @@ def test_public_rules_require_verified_multiplier_and_parse_kline(harness):
     assert len(candles) == 1 and candles[0].final
     assert (candles[0].available_at - candles[0].close_at).total_seconds() == 0.05
     assert BinanceMarket("", 1, {}, 50, client=client).instrument_specs() == []
+
+
+def test_public_last_trades_and_unchanged_rules_keep_original_effective_time(harness):
+    h = harness
+    now = int(datetime.now(timezone.utc).timestamp() * 1000)
+    def response(request):
+        if request.url.path.endswith("bookTicker"):
+            return httpx.Response(200, json={"bidPrice": "99", "askPrice": "101", "time": now})
+        if request.url.path.endswith("premiumIndex"):
+            return httpx.Response(200, json={"markPrice": "100", "indexPrice": "100", "time": now})
+        if request.url.path.endswith("price"):
+            return httpx.Response(200, json={"price": "100", "time": now})
+        return httpx.Response(200, json=[{"id": 7, "price": "100", "qty": "2", "time": now}])
+    client = httpx.Client(base_url="https://fixture.invalid", transport=httpx.MockTransport(response))
+    adapter = BinanceMarket("", 1, {"ALPHAUSD": "1"}, 0, client)
+    adapter.specs = dict(h.run().specs)
+    points = adapter.latest_points(h.instrument)
+    assert {p.kind for p in points} == {"BID", "ASK", "MARK", "INDEX", "LAST"}
+    trades = adapter.trades(h.instrument, 10)
+    assert trades[0].external_id == "7" and trades[0].quantity == 2

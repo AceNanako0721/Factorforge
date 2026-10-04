@@ -22,6 +22,8 @@ def advance(service: TradingService, principal, command, frame):
                 run.day_external_flow = run.day_external_flow * 0
                 run.risk_day = new_day
             run.clock = frame.at
+            if service.health:
+                run.health_issues, run.health_checked_at = service.health.check(run), run.clock
             spec = run.specs.get(frame.instrument_key.code())
             if not spec:
                 raise TradingError("INSTRUMENT_RULES_UNVERIFIED", 423)
@@ -43,9 +45,13 @@ def advance(service: TradingService, principal, command, frame):
                         if old:
                             run.candles.remove(old)
                         run.candles.append(candle)
+            from factorforge.trading.domain.market import check_quotes
+            check_quotes(run)
             assess_loss_gates(run)
             if service.simulator is None:
                 raise TradingError("SIMULATION_ADAPTER_REQUIRED", 503)
             service.simulator.advance_frame(run, frame.instrument_key, frame.liquidity, frame.candle)
+            from factorforge.trading.application.emergency import apply_breach_action
+            apply_breach_action(run)
             response.update(resource_id=run.run_key.run_id, state=run.state)
     return response

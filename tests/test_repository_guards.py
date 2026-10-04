@@ -85,12 +85,12 @@ class RepositoryGuards(unittest.TestCase):
     def test_legacy_template_allowed_only_in_frozen_history(self):
         path = self.root / "config/config.example.toml"
         current = path.read_bytes()
-        legacy = current
+        legacy = current.split(b'storage_path = ""')[0].replace(b'execution_database_url = ""', b"")
         for field in (b'account_id = ""', b'principal_id = ""', b'permissions = []'):
             legacy = legacy.replace(field, b"")
         path.write_bytes(legacy)
         self.commit("legacy empty template")
-        self.assertIn(("config/config.example.toml", "unrecognized-template-field"),
+        self.assertIn(("config/config.example.toml", "nonempty-template-service-settings"),
                       scan(self.root, history=True)[0])
         path.write_bytes(current)
         self.commit("add empty identity bindings")

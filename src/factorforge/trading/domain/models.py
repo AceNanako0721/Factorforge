@@ -49,6 +49,57 @@ class RunKey(Model):
     run_id: ID
 
 
+class Session(Model):
+    opens_at: UTC
+    closes_at: UTC
+
+    @model_validator(mode="after")
+    def ordered(self):
+        if self.closes_at <= self.opens_at:
+            raise ValueError("session must have positive duration")
+        return self
+
+
+class FxRate(Model):
+    currency: ID
+    rate: D = Field(gt=0)
+    observed_at: UTC
+    available_at: UTC
+    source_id: ID
+
+
+class StressScenario(Model):
+    scenario_id: ID
+    shocks: dict[str, D]
+    loss_limit: D = Field(gt=0)
+    exit_cost_rate: D = Field(ge=0, lt=1)
+
+
+class OperationalPolicy(Model):
+    min_disk_bytes: int = Field(gt=0)
+    max_clock_skew_seconds: D = Field(gt=0)
+    max_audit_records: int = Field(gt=0)
+    max_pending_commands: int = Field(gt=0)
+    max_command_age_seconds: int = Field(gt=0)
+    lease_seconds: int = Field(gt=0)
+
+
+class ExternalFact(Model):
+    external_id: ID
+    kind: Literal["MANUAL", "LIQUIDATION", "ADL", "SETTLEMENT", "INSTRUMENT_CHANGE"]
+    instrument_key: InstrumentKey
+    happened_at: UTC
+    received_at: UTC
+    before_quantity: D
+    after_quantity: D
+    average_entry: D | None = Field(default=None, gt=0)
+    cash_delta: D
+    currency: ID
+    evidence_ref: str = Field(min_length=1)
+    rule_version: ID
+    replacement_spec: "InstrumentSpec | None" = None
+
+
 class InstrumentSpec(Model):
     key: InstrumentKey
     version: ID
@@ -61,6 +112,10 @@ class InstrumentSpec(Model):
     min_notional: D = Field(ge=0)
     capabilities: set[str]
     price_roles: set[str]
+    sessions: list[Session] | None = None
+    halted: bool = False
+    risk_group: ID | None = None
+    margin_tiers: list[tuple[D, D]] = Field(default_factory=list)
 
 
 class MarketPoint(Model):
@@ -79,6 +134,24 @@ class MarketPoint(Model):
     def causal(self):
         if self.available_at < self.observed_at or self.available_at < self.received_at:
             raise ValueError("availability cannot precede observation or receipt")
+        return self
+
+
+class MarketTrade(Model):
+    external_id: ID
+    instrument_key: InstrumentKey
+    source_id: ID
+    observed_at: UTC
+    received_at: UTC
+    available_at: UTC
+    price: D = Field(gt=0)
+    quantity: D = Field(gt=0)
+    spec_version: ID
+
+    @model_validator(mode="after")
+    def causal(self):
+        if self.available_at < max(self.observed_at, self.received_at):
+            raise ValueError("trade availability cannot precede observation or receipt")
         return self
 
 
@@ -132,6 +205,10 @@ class AccountPolicy(Model):
     breach_action: Literal["KEEP_PROTECTION", "ORDERLY_REDUCE", "EXIT_WHEN_TRADABLE"]
     recovery_policy: Literal["MANUAL_RECONCILE"]
     max_market_age_seconds: int = Field(gt=0)
+    net_notional_limit: D | None = Field(default=None, gt=0)
+    group_notional_limits: dict[str, D] = Field(default_factory=dict)
+    stress_scenarios: list[StressScenario] = Field(default_factory=list)
+    operational: OperationalPolicy | None = None
 
     @model_validator(mode="after")
     def usable_gates(self):
@@ -144,6 +221,8 @@ class AccountPolicy(Model):
             raise ValueError("loss/drawdown require amount or fraction thresholds")
         if self.consecutive_loss.count is None or self.consecutive_loss.amount is not None or self.consecutive_loss.fraction is not None:
             raise ValueError("consecutive loss requires a count threshold")
+        if any(limit <= 0 for limit in self.group_notional_limits.values()):
+            raise ValueError("group limits must be positive")
         return self
 
 
@@ -155,6 +234,15 @@ class SimConfig(Model):
     latency_seconds: int = Field(ge=0)
     maintenance_margin_rate: D = Field(gt=0, lt=1)
     ohlc_rule: Literal["CONSERVATIVE", "REJECT_AMBIGUOUS"]
+    leverage: D = Field(default=Decimal("1"), ge=1)
+    liquidation_fee_rate: D | None = Field(default=None, ge=0, lt=1)
+    queue_ahead_quantity: D = Field(default=ZERO, ge=0)
+
+    @model_validator(mode="after")
+    def leveraged_cost_required(self):
+        if self.leverage > 1 and self.liquidation_fee_rate is None:
+            raise ValueError("leveraged simulation requires liquidation costs")
+        return self
 
 
 class ProtectionPlan(Model):
@@ -217,6 +305,7 @@ class Order(Model):
     created_at: UTC
     last_fill_at: UTC | None = None
     target_version: int | None = None
+    source_protection_id: ID | None = None
 
     @property
     def remaining(self):
@@ -252,14 +341,20 @@ class Protection(Model):
     plan: ProtectionPlan
     state: str
     verified_at: UTC | None = None
+    external_id: str | None = None
+    replaces_id: ID | None = None
+    exit_order_id: ID | None = None
+    cancel_requested: bool = False
 
 
 class Income(Model):
     external_id: ID
-    kind: Literal["FUNDING", "TRANSFER", "CORPORATE_ACTION"]
+    kind: Literal["FUNDING", "SPECIAL_FUNDING", "TRANSFER", "SETTLEMENT", "CORPORATE_ACTION"]
     amount: D
     currency: ID
     happened_at: UTC
+    instrument_key: InstrumentKey | None = None
+    evidence_ref: str | None = None
 
 
 class OutboxItem(Model):
@@ -270,6 +365,7 @@ class OutboxItem(Model):
     expires_at: UTC
     executor_epoch: int
     state: Literal["PENDING", "DISPATCHING", "DONE", "UNKNOWN"] = "PENDING"
+    claimed_by: ID | None = None
 
 
 class Target(Model):
@@ -279,11 +375,18 @@ class Target(Model):
     target_quantity: D
     owner_epoch: int
     state: str
+    expires_at: UTC | None = None
+    policy_version: ID | None = None
+    spec_version: ID | None = None
+    protection_plan: ProtectionPlan | None = None
+    source_decision_id: ID | None = None
+    reasons: list[str] = Field(default_factory=list)
+    generation: int = 0
 
 
 class Aggregate(Model):
     run_key: RunKey
-    execution_mode: Literal["REPLAY", "SHADOW"]
+    execution_mode: Literal["REPLAY", "SHADOW", "LIVE"]
     version: int = 0
     state: str = "NORMAL"
     policy: AccountPolicy
@@ -315,3 +418,28 @@ class Aggregate(Model):
     outbox: list[OutboxItem] = Field(default_factory=list)
     dedup: dict[str, dict] = Field(default_factory=dict)
     audit: list[dict] = Field(default_factory=list)
+    external_facts: dict[str, ExternalFact] = Field(default_factory=dict)
+    fx_rates: dict[str, FxRate] = Field(default_factory=dict)
+    converted_fees: dict[str, D] = Field(default_factory=dict)
+    converted_income: dict[str, D] = Field(default_factory=dict)
+    cash_balances: dict[str, D] = Field(default_factory=dict)
+    fx_revaluation: D = ZERO
+    rule_history: list[InstrumentSpec] = Field(default_factory=list)
+    queue_remaining: dict[str, D] = Field(default_factory=dict)
+    health_issues: list[str] = Field(default_factory=list)
+    health_checked_at: UTC | None = None
+    alerts: list[dict] = Field(default_factory=list)
+    emergency_orders: dict[str, str] = Field(default_factory=dict)
+    lease_holder: ID | None = None
+    lease_until: UTC | None = None
+    lease_epoch: int = 0
+    isolated_epoch: int = 0
+    isolation_evidence: str | None = None
+    rejected_requests: list[dict] = Field(default_factory=list)
+    market_trades: dict[str, MarketTrade] = Field(default_factory=dict)
+    facts_start_at: UTC | None = None
+    venue_reconciled_version: int | None = None
+    venue_facts_cursor_at: UTC | None = None
+
+
+ExternalFact.model_rebuild()

@@ -13,6 +13,7 @@ exchange_api_url = ""
 jev_api_url = ""
 search_api_url = ""
 database_url = ""
+execution_database_url = ""
 
 [credentials]
 exchange_api_key = ""
@@ -32,3 +33,40 @@ allow_live = false
 account_id = ""
 principal_id = ""
 permissions = []
+storage_path = ""
+account_currency = ""
+reconciliation_tolerance = ""
+# Populate from registered policy/cost records, never production defaults.
+account_policy = {}
+cost_model = {}
+
+[trading.runtime_health]
+storage_path = ""
+clock_probe_url = ""
+timeout_seconds = 0
+
+[trading.signed_transport]
+recv_window_ms = 0
+request_budget = 0
+priority_request_reserve = 0
+budget_window_seconds = 0
+timeout_seconds = 0
+poll_seconds = 0
+request_weights = {}
+
+[trading.live_readiness]
+account_id = ""
+approved_endpoint = ""
+valid_until = ""
+policy_version = ""
+account_probe_ref = ""
+ordinary_probe_ref = ""
+protection_probe_ref = ""
+egress_isolation_ref = ""
+official_runbook_exercise_ref = ""
+risk_calibration_ref = ""
+operator_id = ""
+reviewer_id = ""
+approved_instrument_versions = {}
+overlapping_protections = false
+atomic_protection_modify = false

@@ -32,6 +32,14 @@ class MemoryStore:
                 raise TradingError("RUN_NOT_FOUND", 404)
             return result.model_copy(deep=True)
 
+    def bound_run(self, account_id):
+        with self.lock:
+            record = self.records.get(account_id)
+            if record:
+                self._check(record.run_key)
+                return record.run_key.model_copy(deep=True)
+            return None
+
     @contextmanager
     def transaction(self, key):
         with self.lock:

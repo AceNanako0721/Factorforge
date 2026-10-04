@@ -18,6 +18,7 @@ pytestmark = pytest.mark.postgres
 
 def test_standalone_api_cli_worker_and_restart(postgres, tmp_path):
     h = Harness(PostgresStore(postgres, "SIM"))
+    h.principal.permissions |= {"external:import", "external:resolve", "executor:fence"}
     root = Path(__file__).resolve().parents[2]
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
@@ -28,7 +29,7 @@ def test_standalone_api_cli_worker_and_restart(postgres, tmp_path):
                       "trading_api_url": base, "trading_api_token": "process-test", "account_id": h.key.account_id,
                       "principal_id": h.principal.principal_id}
     for key, value in private_values.items():
-        config = config.replace(key + ' = ""', key + " = " + json.dumps(value))
+        config = config.replace("\n" + key + ' = ""', "\n" + key + " = " + json.dumps(value))
     config = config.replace("permissions = []", "permissions = " + json.dumps(sorted(h.principal.permissions)))
     private_path = tmp_path / "config.toml"
     private_path.write_text(config)
@@ -70,6 +71,21 @@ def test_standalone_api_cli_worker_and_restart(postgres, tmp_path):
             assert h.run().orders[receipt["resource_id"]].state == "FILLED"
             assert json.loads(cli("account-show").stdout)["equity"] == "999.900"
             assert json.loads(cli("order-submit", body).stdout) == receipt
+            # Rehearse the official-channel recovery sequence with synthetic
+            # manual facts, across the actual API/CLI/DB process boundary.
+            cli("stop", h.command().model_dump(mode="json"))
+            from factorforge.trading.domain.models import ExternalFact
+            fact = ExternalFact(external_id="manual-drill", kind="MANUAL", instrument_key=h.instrument,
+                happened_at=h.run().clock, received_at=h.run().clock, before_quantity="1", after_quantity="0",
+                cash_delta="-2", currency="USD", evidence_ref="LOCAL_SIM_DRILL_ONLY", rule_version="rules-test")
+            cli("external-import", {**h.command().model_dump(mode="json"), "fact": fact.model_dump(mode="json")})
+            with pytest.raises(subprocess.CalledProcessError):
+                cli("resume", h.command().model_dump(mode="json"))
+            cli("external-resolve", {**h.command().model_dump(mode="json"), "instrument_key": h.instrument.model_dump(mode="json"),
+                "owner_id": "owner-test", "owner_epoch": 1, "evidence_ref": "LOCAL_SIM_DRILL_ONLY"})
+            cli("reconcile", h.command().model_dump(mode="json"))
+            cli("resume", h.command().model_dump(mode="json"))
+            assert h.run().state == "NORMAL" and h.run().positions[h.instrument.code()].quantity == 0
     finally:
         server.terminate()
         server.wait(timeout=10)

@@ -5,7 +5,7 @@ from pydantic import Field
 
 from factorforge.trading.domain.models import (
     Model, AccountPolicy, SimConfig, RunKey, ID, UTC, D, Command, OrderRequest,
-    InstrumentSpec, InstrumentKey, MarketPoint, Candle, ProtectionPlan, Income,
+    InstrumentSpec, InstrumentKey, MarketPoint, MarketTrade, Candle, ProtectionPlan, Income, ExternalFact, FxRate,
 )
 
 
@@ -63,3 +63,30 @@ class TargetRequest(Command):
     source_decision_id: ID
     protection_plan: ProtectionPlan | None = None
     owner_epoch: int = Field(ge=0)
+
+
+class ImportExternal(Command):
+    fact: ExternalFact
+
+
+class RegisterFx(Command):
+    rate: FxRate
+
+
+class ResolveExternal(Command):
+    instrument_key: InstrumentKey
+    owner_id: ID
+    owner_epoch: int = Field(ge=0)
+    evidence_ref: str = Field(min_length=1)
+
+
+class FenceExecutor(Command):
+    epoch: int = Field(gt=0)
+    evidence_ref: str = Field(min_length=1)
+
+
+class MarketSnapshot(Command):
+    at: UTC
+    points: list[MarketPoint] = Field(min_length=1)
+    candles: list[Candle] = Field(default_factory=list)
+    trades: list[MarketTrade] = Field(default_factory=list)

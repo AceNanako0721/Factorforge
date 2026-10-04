@@ -8,7 +8,7 @@ import time
 import httpx
 
 from factorforge.trading.domain.errors import TradingError
-from factorforge.trading.domain.models import InstrumentKey, InstrumentSpec, MarketPoint, Candle
+from factorforge.trading.domain.models import InstrumentKey, InstrumentSpec, MarketPoint, MarketTrade, Candle
 
 
 class BinanceMarket:
@@ -31,7 +31,7 @@ class BinanceMarket:
         observed = datetime.now(timezone.utc)
         results = []
         for item in payload.get("symbols", []):
-            if item.get("contractType") != "PERPETUAL" or item.get("status") != "TRADING":
+            if item.get("contractType") != "PERPETUAL":
                 continue
             multiplier = self.multipliers.get(item["symbol"])
             if multiplier is None:
@@ -40,14 +40,19 @@ class BinanceMarket:
             needed = {"PRICE_FILTER", "LOT_SIZE", "MIN_NOTIONAL"}
             if not needed <= filters.keys():
                 continue
-            digest = sha256(json.dumps({"filters": filters, "multiplier": multiplier}, sort_keys=True).encode()).hexdigest()[:24]
+            digest = sha256(json.dumps({"filters": filters, "multiplier": multiplier,
+                "status": item.get("status")}, sort_keys=True).encode()).hexdigest()[:24]
             key = InstrumentKey(venue="BINANCE", product="LINEAR_PERPETUAL", instrument_id=item["symbol"])
             spec = InstrumentSpec(key=key, version="bn-" + digest, valid_from=observed,
                                   price_tick=filters["PRICE_FILTER"]["tickSize"], quantity_step=filters["LOT_SIZE"]["stepSize"],
                                   contract_multiplier=multiplier, quote_currency=item["quoteAsset"], settlement_currency=item["marginAsset"],
                                   min_notional=filters["MIN_NOTIONAL"]["notional"],
+                                  halted=item.get("status") != "TRADING",
                                   capabilities=set(item.get("orderTypes", [])) & {"LIMIT", "MARKET"},
                                   price_roles={"BID", "ASK", "MARK", "LAST", "INDEX"})
+            old = self.specs.get(key.code())
+            if old and old.version == spec.version:
+                spec = old
             self.specs[key.code()] = spec
             results.append(spec)
         return results
@@ -57,16 +62,28 @@ class BinanceMarket:
             raise TradingError("INSTRUMENT_RULES_UNVERIFIED", 423)
         book = self._get("/fapi/v1/ticker/bookTicker", {"symbol": key.instrument_id})
         mark = self._get("/fapi/v1/premiumIndex", {"symbol": key.instrument_id})
+        last = self._get("/fapi/v2/ticker/price", {"symbol": key.instrument_id})
         received = datetime.now(timezone.utc)
         spec = self.specs[key.code()]
         result = []
         for kind, raw, stamp in (("BID", book["bidPrice"], book["time"]), ("ASK", book["askPrice"], book["time"]),
-                                 ("MARK", mark["markPrice"], mark["time"]), ("INDEX", mark["indexPrice"], mark["time"])):
+                                 ("MARK", mark["markPrice"], mark["time"]), ("INDEX", mark["indexPrice"], mark["time"]),
+                                 ("LAST", last["price"], last["time"])):
             observed = datetime.fromtimestamp(stamp / 1000, timezone.utc)
             result.append(MarketPoint(instrument_key=key, source_id="binance-public", kind=kind,
                                      observed_at=observed, received_at=received, available_at=max(received, observed),
                                      value=raw, currency=spec.quote_currency, quality="VALID", spec_version=spec.version))
         return result
+
+    def trades(self, key, limit):
+        if key.code() not in self.specs or not 1 <= limit <= 1000:
+            raise TradingError("TRADE_QUERY_POLICY_INVALID")
+        rows = self._get("/fapi/v1/trades", {"symbol": key.instrument_id, "limit": limit})
+        received = datetime.now(timezone.utc)
+        return [MarketTrade(external_id=str(row["id"]), instrument_key=key, source_id="binance-public",
+            observed_at=datetime.fromtimestamp(row["time"] / 1000, timezone.utc), received_at=received,
+            available_at=max(received, datetime.fromtimestamp(row["time"] / 1000, timezone.utc)),
+            price=row["price"], quantity=row["qty"], spec_version=self.specs[key.code()].version) for row in rows]
 
     def candles(self, key, interval, start, end):
         if key.code() not in self.specs:

@@ -68,8 +68,11 @@ def template_issue(path, content, *, historical_templates=False):
                 return "nonempty-or-invalid-template-credentials"
             services = value.get("services", {})
             expected_services = {"trading_api_url", "framework_api_url", "exchange_api_url",
-                                 "jev_api_url", "search_api_url", "database_url"}
-            if set(services) != expected_services or any(v != "" for v in services.values()):
+                                 "jev_api_url", "search_api_url", "database_url", "execution_database_url"}
+            service_shape = set(services) == expected_services
+            if historical_templates:
+                service_shape |= set(services) == expected_services - {"execution_database_url"}
+            if not service_shape or any(v != "" for v in services.values()):
                 return "nonempty-template-service-settings"
             if value.get("application", {}).get("prompt_file") != "prompts/prompts.local.json":
                 return "unsafe-prompt-path"
@@ -77,13 +80,24 @@ def template_issue(path, content, *, historical_templates=False):
             if set(value) != allowed:
                 return "unrecognized-template-section"
             trading = {"adapter": "mock", "allow_live": False,
-                       "account_id": "", "principal_id": "", "permissions": []}
+                       "account_id": "", "principal_id": "", "permissions": [],
+                       "storage_path": "", "account_currency": "", "reconciliation_tolerance": "",
+                       "account_policy": {}, "cost_model": {},
+                       "runtime_health": {"storage_path": "", "clock_probe_url": "", "timeout_seconds": 0},
+                       "signed_transport": {"recv_window_ms": 0, "request_budget": 0, "priority_request_reserve": 0, "budget_window_seconds": 0,
+                           "timeout_seconds": 0, "poll_seconds": 0, "request_weights": {}},
+                       "live_readiness": {**{k: "" for k in ("account_id", "approved_endpoint", "valid_until", "policy_version",
+                           "account_probe_ref", "ordinary_probe_ref", "protection_probe_ref", "egress_isolation_ref",
+                           "official_runbook_exercise_ref", "risk_calibration_ref", "operator_id", "reviewer_id")},
+                           "approved_instrument_versions": {}, "overlapping_protections": False, "atomic_protection_modify": False}}
             valid_trading = value["trading"] == trading
             # Frozen releases predate the empty principal/account bindings.
             # Accept only their exact safe shape when scanning older commits;
             # the index and current HEAD still require the complete template.
             if historical_templates:
                 valid_trading |= value["trading"] == {"adapter": "mock", "allow_live": False}
+                valid_trading |= value["trading"] == {"adapter": "mock", "allow_live": False,
+                    "account_id": "", "principal_id": "", "permissions": []}
             if (value["runtime"] != {"environment": "SIM", "instance_id": "soxl-jev"}
                     or not valid_trading
                     or value["application"] != {"prompt_file": "prompts/prompts.local.json"}):

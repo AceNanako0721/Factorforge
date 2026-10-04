@@ -27,13 +27,22 @@ def verify_protection(run, key, plan, replace_id=None):
     if old and ((position.quantity > 0 and plan.trigger_price < old.plan.trigger_price)
                 or (position.quantity < 0 and plan.trigger_price > old.plan.trigger_price)):
         raise TradingError("PROTECTION_CANNOT_LOOSEN")
-    # SIM permits overlapping protections. LIVE is never admitted by this service.
+    for active in run.protections.values():
+        if active.instrument_key == key and active.state == "ACTIVE_VERIFIED" and (
+            (position.quantity > 0 and plan.trigger_price < active.plan.trigger_price)
+            or (position.quantity < 0 and plan.trigger_price > active.plan.trigger_price)):
+            raise TradingError("PROTECTION_CANNOT_LOOSEN")
+    # LIVE persists an intent; its isolated worker must confirm physical cover.
     identity = f"{run.run_key.model_dump_json()}:{run.clock.isoformat()}:{code}:{len(run.protections)}:{plan.model_dump_json()}"
+    if replace_id is None and run.run_key.environment == "LIVE":
+        replace_id = next((p.protection_id for p in reversed(list(run.protections.values()))
+            if p.instrument_key == key and p.state == "ACTIVE_VERIFIED"), None)
     new = Protection(protection_id="prot-" + sha256(identity.encode()).hexdigest()[:28], instrument_key=key, owner_id=position.owner_id,
-                     plan=plan, state="ACTIVE_VERIFIED", verified_at=run.clock)
+                     plan=plan, state="ACTIVE_VERIFIED" if run.run_key.environment == "SIM" else "PENDING",
+                     verified_at=run.clock if run.run_key.environment == "SIM" else None, replaces_id=replace_id)
     run.protections[new.protection_id] = new
     position.protection_state = new.state
-    if old:
+    if old and new.state == "ACTIVE_VERIFIED":
         old.state = "CLOSED"
     return new
 
@@ -44,7 +53,8 @@ def protect_actual_position(run, order):
     active = [p for p in run.protections.values() if p.instrument_key.code() == code and p.state == "ACTIVE_VERIFIED"]
     if not position.quantity:
         for old in active:
-            old.state = "CLOSED"
+            old.state = "CLOSED" if run.run_key.environment == "SIM" else "CANCEL_PENDING"
+            old.cancel_requested = run.run_key.environment == "LIVE"
         return
     template = order.request.protection_plan or (active[-1].plan if active else None)
     if template is None:
@@ -59,5 +69,5 @@ def protect_actual_position(run, order):
         run.state = "DEGRADED"
     else:
         for old in active:
-            if old.protection_id != new.protection_id:
+            if old.protection_id != new.protection_id and new.state == "ACTIVE_VERIFIED":
                 old.state = "CLOSED"

@@ -17,7 +17,7 @@ Factorforge/
 │   │   │   └── postgres/
 │   │   │       └── migrations/  # 本适配器独占的数据库迁移
 │   │   ├── api/                 # HTTP DTO、认证、路由
-│   │   ├── workers/             # 出站执行进程
+│   │   ├── workers/             # 出站执行、保护工作池、成交查询与行情采集
 │   │   ├── bootstrap.py         # 本层配置、依赖装配、入口
 │   │   └── cli.py               # HTTP 客户端
 │   ├── strategy/                # P2 实现时才创建

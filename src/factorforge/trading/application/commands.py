@@ -50,8 +50,8 @@ def audit(run, action, principal, request_id, detail):
 
 
 class TradingService:
-    def __init__(self, store, simulator=None):
-        self.store, self.simulator = store, simulator
+    def __init__(self, store, simulator=None, health=None):
+        self.store, self.simulator, self.health = store, simulator, health
 
     def create_run(self, principal, body):
         require(principal, body.run_key, "run:create")
@@ -61,9 +61,6 @@ class TradingService:
             raise TradingError("REQUEST_EXPIRED", 409)
         if body.account_policy.valid_from > body.clock:
             raise TradingError("POLICY_NOT_EFFECTIVE")
-        if (body.account_policy.breach_action != "KEEP_PROTECTION" and any(g.mode == "ENFORCE" for g in
-                (body.account_policy.daily_loss, body.account_policy.drawdown, body.account_policy.consecutive_loss))):
-            raise TradingError("BREACH_ACTION_CAPABILITY_UNVERIFIED", 423)
         # Check persisted creation identity before recreating an account on retry.
         identity = principal.principal_id + ":" + body.idempotency_key
         fingerprint = request_hash(body)
@@ -104,6 +101,8 @@ class TradingService:
                 raise TradingError("VERSION_CONFLICT", 409)
             if command.expires_at_utc < run.clock:
                 raise TradingError("REQUEST_EXPIRED", 409)
+            if self.health:
+                run.health_issues, run.health_checked_at = self.health.check(run), run.clock
             response = {}
             yield run, response, False
             run.version += 1
@@ -149,12 +148,26 @@ class TradingService:
     def register_spec(self, principal, command, spec):
         with self.command(principal, command, "SPEC_REGISTER", spec, "market:write") as (run, response, repeated):
             if not repeated:
-                if spec.valid_from > run.clock:
+                if spec.valid_from > command.expires_at_utc:
                     raise TradingError("SPEC_NOT_EFFECTIVE")
-                if spec.settlement_currency != run.currency or spec.quote_currency != run.currency:
-                    raise TradingError("ACCOUNT_CURRENCY_CAPABILITY_UNVERIFIED", 423)
+                if spec.valid_from > run.clock:
+                    from factorforge.trading.domain.risk import risk_day
+                    day = risk_day(spec.valid_from, run.policy.risk_day_zone)
+                    if day != run.risk_day:
+                        run.day_start_equity, run.day_external_flow, run.risk_day = equity(run), ZERO, day
+                    run.clock = spec.valid_from
+                from factorforge.trading.domain.accounting import convert
+                if spec.quote_currency != spec.settlement_currency:
+                    raise TradingError("ACCOUNTING_CAPABILITY_UNVERIFIED", 423)
+                convert(run, spec.contract_multiplier, spec.settlement_currency)
+                if spec.margin_tiers:
+                    if any(cap <= 0 or not 0 < rate < 1 for cap, rate in spec.margin_tiers) or any(
+                            a[0] >= b[0] or a[1] > b[1] for a, b in zip(spec.margin_tiers, spec.margin_tiers[1:])):
+                        raise TradingError("MARGIN_TIERS_INVALID")
                 code = spec.key.code()
                 existing = run.specs.get(code)
+                if any(old.key == spec.key and old.version == spec.version and old != spec for old in run.rule_history):
+                    raise TradingError("HISTORICAL_SPEC_VERSION_CONFLICT", 409)
                 if existing and existing.contract_multiplier != spec.contract_multiplier and (
                     (code in run.positions and run.positions[code].quantity) or any(o.request.instrument_key == spec.key
                         and o.state not in TERMINAL for o in run.orders.values())):
@@ -166,6 +179,8 @@ class TradingService:
                 ):
                     run.state = "RECOVERY_CHECK"
                     run.recovery_issues.append("RULES_CHANGED_WITH_OPEN_ORDERS")
+                if existing and existing != spec:
+                    run.rule_history.append(existing.model_copy(deep=True))
                 run.specs[code] = spec
                 response.update(resource_id=code, state="REGISTERED")
         return response
@@ -190,7 +205,8 @@ class TradingService:
                                 and position and p.plan.covered_quantity >= abs(position.quantity)]
                 if position and position.quantity and not alternatives:
                     raise TradingError("PROTECTION_STILL_REQUIRED", 423)
-                protection.state = "CLOSED"
+                protection.state = "CLOSED" if run.run_key.environment == "SIM" else "CANCEL_PENDING"
+                protection.cancel_requested = run.run_key.environment == "LIVE"
                 response.update(resource_id=protection_id, state=protection.state)
         return response
 
@@ -199,6 +215,8 @@ class TradingService:
             if not repeated:
                 apply_income(run, income)
                 assess_loss_gates(run)
+                from factorforge.trading.application.emergency import apply_breach_action
+                apply_breach_action(run)
                 response.update(resource_id=income.external_id, state="RECORDED")
         return response
 
@@ -218,6 +236,8 @@ class TradingService:
                 elif action == "reconcile":
                     reconcile(run)
                 elif action == "resume":
+                    if run.run_key.environment == "LIVE" and run.venue_reconciled_version != command.expected_version:
+                        raise TradingError("VENUE_RECOVERY_REQUIRED", 423)
                     if run.recovery_issues or run.risk_locks or any(o.state == "UNKNOWN" for o in run.orders.values()):
                         raise TradingError("RECOVERY_NOT_VERIFIED", 423)
                     if any(p.quantity and p.protection_state != "ACTIVE_VERIFIED" for p in run.positions.values()):
@@ -241,3 +261,66 @@ class TradingService:
     def read(self, principal, key):
         require(principal, key, "read")
         return self.store.read(key)
+
+    def import_external(self, principal, command, fact):
+        from factorforge.trading.domain.external import import_external
+        with self.command(principal, command, "EXTERNAL_FACT_IMPORT", fact, "external:import") as (run, response, repeated):
+            if not repeated:
+                import_external(run, fact)
+                response.update(resource_id=fact.external_id, state=run.state)
+        return response
+
+    def register_fx(self, principal, command, rate):
+        with self.command(principal, command, "FX_REGISTER", rate, "market:write") as (run, response, repeated):
+            if not repeated:
+                if rate.observed_at > rate.available_at or rate.available_at > run.clock:
+                    raise TradingError("FX_TIME_INVALID")
+                old = run.fx_rates.get(rate.currency)
+                if old and old.observed_at > rate.observed_at:
+                    raise TradingError("FX_OUT_OF_ORDER", 409)
+                run.fx_rates[rate.currency] = rate
+                from factorforge.trading.domain.accounting import revalue_cash
+                revalue_cash(run)
+                response.update(resource_id=rate.currency, state="REGISTERED")
+        return response
+
+    def resolve_external(self, principal, command, request):
+        with self.command(principal, command, "EXTERNAL_OWNERSHIP_RESOLVE", request, "external:resolve") as (run, response, repeated):
+            if not repeated:
+                code = request.instrument_key.code()
+                if request.owner_epoch != run.owner_epochs.get(code, 0) or run.state != "RECOVERY_CHECK":
+                    raise TradingError("EXTERNAL_RECOVERY_VERSION_CONFLICT", 409)
+                if any(o.request.instrument_key.code() == code and o.state not in TERMINAL for o in run.orders.values()):
+                    raise TradingError("EXTERNAL_OPEN_ORDERS_UNRESOLVED", 423)
+                position = run.positions.get(code)
+                if position and position.quantity and position.protection_state != "ACTIVE_VERIFIED":
+                    raise TradingError("POSITION_UNPROTECTED", 423)
+                run.owners[code] = request.owner_id
+                if position:
+                    position.owner_id = request.owner_id
+                run.venue_reconciled_version = None
+                run.recovery_issues = [i for i in run.recovery_issues if i not in {
+                    "EXTERNAL_OWNERSHIP:" + code, "EXTERNAL_POSITION_DIFFERENCE:" + code}]
+                response.update(resource_id=code, state=run.state)
+        return response
+
+    def fence_executor(self, principal, command, request):
+        from factorforge.trading.domain.lease import isolate
+        with self.command(principal, command, "EXECUTOR_ISOLATED", request, "executor:fence") as (run, response, repeated):
+            if not repeated:
+                isolate(run, request.epoch, request.evidence_ref)
+                response.update(resource_id=run.run_key.account_id, state=run.state)
+        return response
+
+    def record_rejection(self, principal, code, action):
+        """Only bound identity and stable metadata are recorded; never the body."""
+        if principal.environment != self.store.environment:
+            return
+        key = self.store.bound_run(principal.account_id)
+        if key is None:
+            return
+        with self.store.transaction(key) as run:
+            detail = {"code": code, "action": action}
+            run.rejected_requests.append(detail)
+            audit(run, "REQUEST_REJECTED", principal, "rejection-" + str(len(run.audit)), detail)
+            # Rejected input does not consume the command/version of a valid retry.

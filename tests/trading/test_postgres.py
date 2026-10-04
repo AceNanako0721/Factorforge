@@ -12,6 +12,85 @@ from factorforge.trading.application.commands import TradingService
 from factorforge.trading.adapters.sim.broker import SimBroker
 from factorforge.trading.domain.errors import TradingError
 
+
+def test_target_continues_after_real_database_service_restart(postgres):
+    from factorforge.trading.api.dto import TargetRequest
+    from factorforge.trading.application.targets import set_target
+    from factorforge.trading.workers.executor import ExecutionWorker
+    h = Harness(PostgresStore(postgres, "SIM"))
+    body = TargetRequest(**h.command().model_dump(mode="python"), owner_id="owner-test", instrument_key=h.instrument,
+        target_version=1, target_quantity="1", policy_version="policy-test", spec_version="rules-test",
+        source_decision_id="fixture", protection_plan=h.plan(), owner_epoch=0)
+    set_target(h.service, h.principal, body)
+    h.dispatch()
+    h.frame("100")
+    body = TargetRequest(**h.command().model_dump(mode="python"), owner_id="owner-test", instrument_key=h.instrument,
+        target_version=2, target_quantity="-1", policy_version="policy-test", spec_version="rules-test",
+        source_decision_id="fixture", protection_plan=h.plan(stop="110"), owner_epoch=0)
+    set_target(h.service, h.principal, body)
+    h.dispatch()
+    h.frame("100")
+    assert h.run().positions[h.instrument.code()].quantity == 0
+    restarted_store = PostgresStore(postgres, "SIM")
+    ExecutionWorker(restarted_store, SimBroker()).tick(h.key)
+    h.frame("100")
+    assert restarted_store.read(h.key).positions[h.instrument.code()].quantity == -1
+    assert len(restarted_store.read(h.key).orders) == 3
+
+
+def test_database_lease_race_and_outbound_fence_reject_old_holder(postgres):
+    from datetime import timedelta
+    import httpx
+    from factorforge.trading.domain.lease import acquire, assert_lease, isolate
+    from factorforge.trading.adapters.binance.broker import SignedTransport
+    h = Harness(PostgresStore(postgres, "SIM"))
+    now = h.run().clock
+    def contend(holder):
+        try:
+            with PostgresStore(postgres, "SIM").transaction(h.key) as run:
+                return holder, acquire(run, holder, now, 1)
+        except TradingError:
+            return None
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(contend, ("worker-a", "worker-b")))
+    winners = [item for item in results if item]
+    assert len(winners) == 1
+    old, epoch = winners[0]
+    now += timedelta(seconds=2)
+    with h.store.transaction(h.key) as run:
+        with pytest.raises(TradingError, match="NOT_ISOLATED"):
+            acquire(run, "replacement", now, 10)
+        isolate(run, epoch, "fake egress gateway blocked and old process terminated")
+        fresh = acquire(run, "replacement", now, 10)
+    requests = []
+    def sign(holder, generation):
+        client = httpx.Client(base_url="https://venue.invalid", transport=httpx.MockTransport(
+            lambda req: requests.append(req) or httpx.Response(200, json={})))
+        return SignedTransport(client, lambda: ("test-key", "test-secret"), lambda: now, 5000,
+            lambda: assert_lease(PostgresStore(postgres, "SIM").read(h.key), holder, generation, now), 10, 60)
+    with pytest.raises(TradingError, match="LEASE_LOST"):
+        sign(old, epoch).request("POST", "/fapi/v1/order", {}, write=True)
+    sign("replacement", fresh).request("POST", "/fapi/v1/order", {}, write=True)
+    assert len(requests) == 1
+
+
+def test_external_import_remains_blocked_after_database_restart(postgres):
+    from factorforge.trading.domain.models import ExternalFact
+    h = Harness(PostgresStore(postgres, "SIM"))
+    h.principal.permissions.add("external:import")
+    h.submit()
+    h.dispatch()
+    h.frame("100")
+    fact = ExternalFact(external_id="external-official", kind="ADL", instrument_key=h.instrument, happened_at=h.run().clock,
+        received_at=h.run().clock, before_quantity="1", after_quantity="0", cash_delta="-1", currency="USD",
+        evidence_ref="fixture official receipt", rule_version="rules-test")
+    h.service.import_external(h.principal, h.command(), fact)
+    restarted = PostgresStore(postgres, "SIM")
+    assert restarted.read(h.key).owner_epochs[h.instrument.code()] == 1
+    assert restarted.read(h.key).state == "RECOVERY_CHECK"
+    with psycopg.connect(postgres) as connection:
+        assert connection.execute("SELECT count(*) FROM trading_sim.external_fact").fetchone()[0] == 1
+
 pytestmark = pytest.mark.postgres
 
 
