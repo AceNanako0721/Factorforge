@@ -46,7 +46,9 @@ def test_account_probe_only_queries_and_never_claims_approval():
         def request(self, method, path, params):
             calls.append((method, path))
             if path.endswith("account"):
-                return {"canTrade": True}
+                return {"totalWalletBalance": "1000", "totalMarginBalance": "1000", "availableBalance": "1000"}
+            if path.endswith("accountConfig"):
+                return {"canTrade": True, "dualSidePosition": False, "multiAssetsMargin": False}
             if path.endswith("dual"):
                 return {"dualSidePosition": False}
             if path.endswith("multiAssetsMargin"):
@@ -54,6 +56,8 @@ def test_account_probe_only_queries_and_never_claims_approval():
             return []
     result = account_probe(QueryOnly())
     assert result["execution_approved"] is False and result["protection_submit_verified"] is False
+    assert result["account_trading_enabled"] is True
+    assert len(calls) == 6
     assert all(method == "GET" for method, path in calls)
 
 
@@ -248,7 +252,9 @@ def test_testnet_account_probe_has_no_write_fence_and_only_makes_read_queries(tm
     def response(request):
         calls.append(request.method)
         if request.url.path.endswith("account"):
-            data = {"canTrade": True}
+            data = {"totalWalletBalance": "1000", "totalMarginBalance": "1000", "availableBalance": "1000"}
+        elif request.url.path.endswith("accountConfig"):
+            data = {"canTrade": True, "dualSidePosition": False, "multiAssetsMargin": False}
         elif request.url.path.endswith("dual"):
             data = {"dualSidePosition": False}
         elif request.url.path.endswith("multiAssetsMargin"):
@@ -258,5 +264,5 @@ def test_testnet_account_probe_has_no_write_fence_and_only_makes_read_queries(tm
         return httpx.Response(200, json=data)
     client = httpx.Client(base_url="https://demo-fapi.binance.com", transport=httpx.MockTransport(response))
     report = run_probe(config, 1, 5000, 1000, 60, client)
-    assert calls == ["GET"] * 5 and report["production_approved"] is False
+    assert calls == ["GET"] * 6 and report["production_approved"] is False
     assert report["findings"]["execution_approved"] is False

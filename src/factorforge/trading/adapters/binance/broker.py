@@ -239,9 +239,9 @@ class BinanceBroker:
         return result
 
     def get_account(self, run):
+        from factorforge.trading.adapters.binance.probes import require_account_configuration
         raw = self.transport.request("GET", "/fapi/v3/account", {})
-        if raw.get("canTrade") is not True:
-            raise TradingError("VENUE_ACCOUNT_CANNOT_TRADE", 423)
+        require_account_configuration(self.transport)
         return {"equity": Decimal(raw["totalMarginBalance"]), "available_margin": Decimal(raw["availableBalance"]),
                 "cash": Decimal(raw["totalWalletBalance"]), "observed_at": self.transport.clock()}
 
