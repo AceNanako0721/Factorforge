@@ -19,7 +19,7 @@ def test_target_subtracts_pending_and_blocks_overlapping_replacement(harness):
     first = set_target(h.service, h.principal, target(h))
     assert first["delta_quantity"] == "1"
     second = set_target(h.service, h.principal, target(h, version=2, quantity="2"))
-    assert second["state"] == "BLOCKED" and second["pending_quantity"] == "1"
+    assert second["state"] == "RECONCILING" and second["pending_quantity"] == "1"
     assert len(h.run().orders) == 1
 
 

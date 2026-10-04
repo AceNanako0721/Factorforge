@@ -12,7 +12,7 @@ from factorforge.trading.domain.models import Aggregate
 RELATIONS = ("account_policy_version", "instrument_spec", "market_snapshot_ref", "owner_binding",
              "target_request", "order", "protection_order", "fill", "income_entry", "position_lot",
              "position_cycle", "risk_day", "risk_lock", "risk_reservation", "reconciliation_report",
-             "command_dedup", "outbox")
+             "command_dedup", "outbox", "external_fact", "instrument_rule_history", "executor_lease", "runtime_health", "market_trade")
 
 
 def initialize(dsn, environment):
@@ -135,6 +135,11 @@ class PostgresStore:
             "reconciliation_report": {str(run.version): {"issues": run.recovery_issues, "state": run.state}},
             "command_dedup": data["dedup"],
             "outbox": {item["command_id"]: item for item in data["outbox"]},
+            "external_fact": data["external_facts"],
+            "market_trade": data["market_trades"],
+            "instrument_rule_history": {str(index): spec for index, spec in enumerate(data["rule_history"])},
+            "executor_lease": {"account": {name: data[name] for name in ("lease_holder", "lease_until", "lease_epoch", "isolated_epoch", "isolation_evidence")}},
+            "runtime_health": {"current": {"issues": data["health_issues"], "checked_at": data["health_checked_at"]}},
         }
         for table, rows in mapping.items():
             query = sql.SQL("INSERT INTO {}.{} (account_id,resource_id,payload) VALUES(%s,%s,%s) ON CONFLICT(account_id,resource_id) DO UPDATE SET payload=excluded.payload").format(

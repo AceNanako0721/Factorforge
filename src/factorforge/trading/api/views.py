@@ -1,7 +1,7 @@
 """Concrete, versioned response schemas for the generated OpenAPI contract."""
 from typing import Generic, TypeVar
 
-from pydantic import Field
+from pydantic import Field, JsonValue
 
 from factorforge.trading.domain.models import (
     Model, D, UTC, ID, RunKey, InstrumentKey, InstrumentSpec, MarketPoint, Candle,
@@ -71,6 +71,10 @@ class ProtectionView(Model):
     plan: ProtectionPlan
     state: str
     verified_at: UTC | None
+    external_id: str | None = None
+    replaces_id: ID | None = None
+    exit_order_id: ID | None = None
+    cancel_requested: bool = False
 
 
 class AccountView(Model):
@@ -90,6 +94,8 @@ class AccountView(Model):
     would_trigger: list[str]
     risk_locks: list[str]
     observed_at: UTC
+    cash_balances: dict[str, D]
+    fx_revaluation: D
 
 
 class TargetView(Receipt):
@@ -107,6 +113,31 @@ class Problem(Model):
     field: str | None
     correlation_id: str | None
     retryable: bool
+
+
+class AlertView(Model):
+    at: UTC
+    code: str
+    instrument: str | None = None
+    external_id: ID | None = None
+    id: ID | None = None
+
+
+class AuditView(Model):
+    sequence: int = Field(gt=0)
+    action: str
+    principal_id: str
+    request_id: str
+    at: UTC
+    detail: dict[str, JsonValue]
+
+
+class OperationalView(Model):
+    issues: list[str]
+    checked_at: UTC | None
+    executor_epoch: int
+    lease_epoch: int
+    lease_until: UTC | None
 
 
 T = TypeVar("T")

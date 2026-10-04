@@ -19,6 +19,7 @@ trading-api = "factorforge.trading.bootstrap:api_main"
 execution-sim = "factorforge.trading.bootstrap:worker_main"
 execution-live = "factorforge.trading.bootstrap:live_main"
 factorforge-trading = "factorforge.trading.cli:main"
+market-collector = "factorforge.trading.workers.market:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

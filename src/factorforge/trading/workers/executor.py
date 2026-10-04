@@ -1,27 +1,45 @@
 """Network I/O occurs only after the account transaction has committed."""
 
 from factorforge.trading.application.commands import audit
-from factorforge.trading.domain.protection import protect_actual_position
-from factorforge.trading.domain.accounting import apply_fill
+from factorforge.trading.application.execution_facts import merge_order
 from factorforge.trading.domain.errors import AmbiguousResult, TradingError
 from factorforge.trading.domain.models import Principal, TERMINAL, ZERO
 from factorforge.trading.domain.risk import authorize_order
 
 
 class ExecutionWorker:
-    def __init__(self, store, broker):
+    def __init__(self, store, broker, executor_id=None, lease_epoch=None, wall_clock=None, health=None):
         if store.environment != broker.environment:
             raise TradingError("EXECUTOR_ENVIRONMENT_MISMATCH", 403)
-        if broker.environment == "LIVE":
+        if broker.environment == "LIVE" and not getattr(broker, "execution_admitted", False):
             raise TradingError("LIVE_CAPABILITIES_UNVERIFIED", 423)
+        if broker.environment == "LIVE" and (not executor_id or lease_epoch is None or wall_clock is None):
+            raise TradingError("EXECUTOR_FENCE_REQUIRED", 423)
         self.store, self.broker = store, broker
+        self.executor_id, self.lease_epoch, self.wall_clock, self.health = executor_id, lease_epoch, wall_clock, health
 
     def tick(self, key):
         # Claim atomically. A restart sees DISPATCHING and queries the original ID.
         selected = None
         with self.store.transaction(key) as run:
+            if run.lease_holder and not self.executor_id:
+                raise TradingError("EXECUTOR_FENCE_REQUIRED", 423)
+            if self.executor_id:
+                from factorforge.trading.domain.lease import assert_lease
+                assert_lease(run, self.executor_id, self.lease_epoch, self.wall_clock())
+            if self.health:
+                run.health_issues, run.health_checked_at = self.health.check(run), run.clock
+            from factorforge.trading.application.targets import advance_targets
+            from factorforge.trading.application.emergency import apply_breach_action
+            before = len(run.outbox)
+            apply_breach_action(run)
+            advance_targets(run)
+            if len(run.outbox) != before:
+                run.version += 1
+                audit(run, "AUTOMATIC_RECONCILIATION", Principal(principal_id="execution-sim", environment=key.environment,
+                    account_id=key.account_id, permissions=set()), "worker", {"commands_added": len(run.outbox) - before})
             pending = [i for i in run.outbox if i.state != "DONE"]
-            pending.sort(key=lambda i: 0 if i.kind == "CANCEL" else 1)
+            pending.sort(key=lambda i: (0 if i.kind == "CANCEL" else 1 if run.orders[i.order_id].request.reduce_only else 2))
             if not pending:
                 return False
             item = pending[0]
@@ -52,9 +70,15 @@ class ExecutionWorker:
                     run.version += 1
                     return True
             item.state = "DISPATCHING"
+            item.claimed_by = self.executor_id
             selected = (run.model_copy(deep=True), item.model_copy(deep=True), order.model_copy(deep=True), previous)
             run.version += 1
         snapshot, item, order, previous = selected
+        if self.executor_id:
+            # Re-read committed state immediately before outbound; a signed broker
+            # also uses an independent fence at the transport boundary.
+            from factorforge.trading.domain.lease import assert_lease
+            assert_lease(self.store.read(key), self.executor_id, self.lease_epoch, self.wall_clock())
         try:
             if previous in {"DISPATCHING", "UNKNOWN"}:
                 result, fills = self.broker.query_order(snapshot, order.client_order_id)
@@ -77,31 +101,13 @@ class ExecutionWorker:
         with self.store.transaction(key) as run:
             target = next(i for i in run.outbox if i.command_id == item.command_id)
             local = run.orders[item.order_id]
-            if result.client_order_id != local.client_order_id or result.request.instrument_key != local.request.instrument_key:
+            if not merge_order(run, local, result, fills):
                 target.state, local.state, run.state = "UNKNOWN", "UNKNOWN", "DEGRADED"
                 run.version += 1
                 return True
-            local.external_order_id = result.external_order_id or result.order_id
-            for fill in fills:
-                if apply_fill(run, local.order_id, fill):
-                    protect_actual_position(run, local)
-            if result.filled_quantity > local.filled_quantity or (result.state == "FILLED" and local.remaining):
-                # A venue status without matching fill facts is insufficient for the ledger.
-                target.state, local.state, run.state = "UNKNOWN", "UNKNOWN", "DEGRADED"
-                run.version += 1
-                return True
-            # The terminal cumulative fill cannot be overwritten by a late cancel.
-            if local.remaining == 0:
-                local.state, local.reserved_notional = "FILLED", ZERO
-            elif result.state in {"CANCELED", "REJECTED"}:
-                local.state, local.reserved_notional = result.state, ZERO
-            elif local.filled_quantity:
-                local.state = "PARTIALLY_FILLED"
-            else:
-                local.state = result.state
             target.state = "DONE"
             run.version += 1
-            executor = Principal(principal_id="execution-sim", environment="SIM", account_id=key.account_id, permissions=set())
+            executor = Principal(principal_id="executor", environment=key.environment, account_id=key.account_id, permissions=set())
             audit(run, "EXECUTION_CONFIRMED", executor, item.command_id, {"order_id": local.order_id, "state": local.state})
         return True
 
