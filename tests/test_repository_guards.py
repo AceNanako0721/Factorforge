@@ -8,7 +8,7 @@ import unittest
 from zipfile import ZipFile
 
 from tools.check_public_tree import scan, content_issues, template_issue
-from tools.check_repository import expected_version, parse_kind, check_transition
+from tools.check_repository import expected_version, parse_kind, check_transition, check_registered_directories
 from tools.init_private_config import initialize
 from tools.repo_support import ROOT, git
 
@@ -114,6 +114,13 @@ class RepositoryGuards(unittest.TestCase):
         check_transition(self.root, base, "code-only", "2.0.0", manifest)
         with self.assertRaises(ValueError):
             check_transition(self.root, base, "code-only", "2.0.1", manifest)
+
+    def test_unregistered_version_folder_rejected(self):
+        _, manifest = self.base_release()
+        check_registered_directories(self.root, manifest["releases"])
+        (self.root / "doc/v2.0.1").mkdir()
+        with self.assertRaises(ValueError):
+            check_registered_directories(self.root, manifest["releases"])
 
     def test_frozen_baseline_rewrite_rejected(self):
         base, manifest = self.base_release()

@@ -99,6 +99,15 @@ def spec_body(text):
                      if not line.startswith(("版本：", "版本:", "日期：", "日期:"))).strip()
 
 
+def check_registered_directories(root, records):
+    registered = {record["directory"] for record in records}
+    registered |= {"doc/v0.1", "doc/v1.0", "doc/v1.1"}
+    actual = {"doc/" + path.name for path in (root / "doc").iterdir()
+              if path.is_dir() and re.fullmatch(r"v\d+(?:\.\d+)+", path.name)}
+    if actual - registered:
+        raise ValueError("Every version folder must be registered; code-only changes cannot add a new baseline")
+
+
 def check_transition(root, base, kind, current, manifest):
     old = git(root, "show", f"{base}:VERSION").decode().strip()
     if current != expected_version(old, kind):
@@ -144,6 +153,7 @@ def check(root=ROOT, base=None, kind=None):
                 raise ValueError("New version folder must use all three version components")
         if not (root / record["directory"]).is_dir() or not record.get("reason") or not record.get("date"):
             raise ValueError("Release directory, reason and date are required")
+    check_registered_directories(root, records)
     directory = root / records[-1]["directory"]
     if not (directory / "README.md").is_file():
         raise ValueError("Current document index is missing")
