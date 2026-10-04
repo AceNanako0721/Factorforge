@@ -87,4 +87,25 @@ API重启进入RECOVERY_CHECK。SIM经本地对账后用独立resume权限恢复
 
 OBSERVE日损失/回撤/连亏不暂停或间接缩仓；硬名义/保证金/压力约束仍生效。ENFORCE锁定后执行登记的保留保护、有序减险或等待可交易退出；转账、换日和重启不解除锁。停盘/流动性不足可以有残仓，止损不保证触发价成交。
 
-在HTTP接口读取 `/alerts`、`/audit`、`/operational-health`、`/external-facts`、`/targets`、`/fills`、`/income`；它们受环境/账户/只读权限约束。主机失效使用[官方渠道人工预案](TRADING_RECOVERY_RUNBOOK.md)，恢复后导入核账。测试网普通/条件订单、实际出口隔离和官方界面演练仍需测试网账户及现场记录；生产产品/预算/政策和独立复核仍需单独验收。
+在HTTP接口读取 `/alerts`、`/audit`、`/operational-health`、`/external-facts`、`/targets`、`/fills`、`/income`；它们受环境/账户/只读权限约束。主机失效使用[官方渠道人工预案](TRADING_RECOVERY_RUNBOOK.md)，恢复后导入核账。生产产品/预算/政策和独立复核仍需单独验收。
+
+## 有界测试网验收
+
+只需在 `config/config.toml` 填写官方测试网地址及 Key/Secret。以下入口自动准备临时数据库、独立认证的 SIM/LIVE 角色、无密钥 API 配置、短期签名出口许可和实验政策；无需将这些实验值填写到生产配置。Linux、用户/网络命名空间及 Landlock 缺失时停止，不退回无隔离执行。
+
+```sh
+# 仅只读访问交易所，实测进程/文件/出口/数据库/审计隔离。
+python tools/accept_binance_testnet.py --isolation-only
+# 已明确授权且账户没有其他程序操作后，以交易所虚拟资金验收。
+python tools/accept_binance_testnet.py --authorize-testnet-orders --symbol ETHUSDT --max-notional 100
+```
+
+入口是能力探针，不填写或伪造 `live_readiness`，正常 `execution-live` 准入门保持有效。默认标的是可更换的 P1 诊断对象，不是 P3 实例绑定；100 USDT 是实验名义上限，生产政策没有默认值。初始要求全账户平仓、无普通或条件挂单，单向/单资产模式。验收中发现未归属成交立即停止；多个程序共享同一测试账户会使闭环失效，必须先停止其他程序。
+
+API 和签名进程运行在无直接网络的命名空间；API 经 Landlock 无法读取唯一凭据源或签名进程的 `/proc`。数据库使用不同的随机认证凭据，API 不能仅改连接用户名取得管理员权限。签名进程只能通过 Unix 套接字访问固定测试网 TLS 出口；撤权同时关闭现有连接，旧进程退出并记录隔离后才能更换执行 epoch。实验使用单独 LIVE 协议 schema，不接触生产数据库。
+
+探针调用现有 API、订单执行、保护及对账逻辑，核验普通挂单/撤单、真实响应丢失后的原ID查询、市价成交、物理止损与重叠替换、交易所实际触发退出、费用/PnL/资金对账、独立官方 REST 应急减仓、恢复和实际存储失效。替换和撤销须反复查询终态，不能把首个响应当作确认；确定拒绝的保护意图关闭并保留旧保护，未知响应仍只查询原ID。Binance 条件单 REJECTED/EXPIRED 为无有效覆盖的终态，不代表已经成交。
+
+外部事实可通过 `external_fill_ids` 关联其已经包含的官方成交回执。导入仍记录前后仓位、实际现金差、证据和 owner_epoch；持续对账不会将相同回执再次记账或反复列为未归属成交。已入账或已由其他外部事实引用的成交ID拒绝再次关联。
+
+报告、数据库、API派生配置与原始业务回执仅放入忽略的 `runtime/p1-*`，0600/0700保护；公开内容只含源码和脱敏结论。完整报告要求全部场景和最终平仓、无普通/条件挂单均通过。`isolation-only` 报告通过只证明隔离/存储子集，不能登记为全部 P1 交易验收通过。失败报告不被后续清理改写为成功。需要清理已平仓的旧探针条件单时，使用 `--authorize-testnet-orders --cleanup-run runtime/p1-<时间>`，只撤该探针记录中的条件ID，不撤账户其他订单。

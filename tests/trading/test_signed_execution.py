@@ -224,6 +224,10 @@ def test_signed_protection_worker_confirms_physical_cover_on_first_poll(harness)
     saved = store.read(key).protections[item.protection_id]
     assert calls == ["POST", "GET"] and saved.state == "ACTIVE_VERIFIED" and saved.external_id == "42"
     assert saved.exit_order_id is None
+    for terminal in ("REJECTED", "EXPIRED"):
+        response["algoStatus"] = terminal
+        assert broker.query_protection(store.read(key), item.protection_id).state == "CLOSED"
+    response["algoStatus"] = "NEW"
     for field, wrong in (("side", "BUY"), ("workingType", "CONTRACT_PRICE"), ("orderType", "TAKE_PROFIT_MARKET"),
                          ("positionSide", "LONG"), ("algoId", 43), ("quantity", "0.5")):
         original = response[field]

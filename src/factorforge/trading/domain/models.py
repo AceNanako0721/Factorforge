@@ -98,6 +98,9 @@ class ExternalFact(Model):
     evidence_ref: str = Field(min_length=1)
     rule_version: ID
     replacement_spec: "InstrumentSpec | None" = None
+    # Official fill receipts covered by this explicit cash/position adjustment.
+    # They remain external facts and must not be booked again as local fills.
+    external_fill_ids: list[ID] = Field(default_factory=list)
 
 
 class InstrumentSpec(Model):

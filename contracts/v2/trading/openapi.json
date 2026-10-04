@@ -4894,6 +4894,16 @@
                 "type": "null"
               }
             ]
+          },
+          "external_fill_ids": {
+            "items": {
+              "type": "string",
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.-]+$"
+            },
+            "type": "array",
+            "title": "External Fill Ids"
           }
         },
         "additionalProperties": false,
@@ -5002,6 +5012,16 @@
                 "type": "null"
               }
             ]
+          },
+          "external_fill_ids": {
+            "items": {
+              "type": "string",
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.-]+$"
+            },
+            "type": "array",
+            "title": "External Fill Ids"
           }
         },
         "additionalProperties": false,

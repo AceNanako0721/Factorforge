@@ -11,6 +11,15 @@ def import_external(run, fact):
             raise TradingError("EXTERNAL_FACT_ID_CONFLICT", 409)
         return False
     code = fact.instrument_key.code()
+    if len(set(fact.external_fill_ids)) != len(fact.external_fill_ids):
+        raise TradingError("EXTERNAL_FILL_REFERENCE_DUPLICATED", 409)
+    referenced = set(fact.external_fill_ids)
+    if any(f.instrument_key == fact.instrument_key and f.external_fill_id in referenced
+           for f in run.fills.values()) or any(
+        old.instrument_key == fact.instrument_key and referenced.intersection(old.external_fill_ids)
+        for old in run.external_facts.values()
+    ):
+        raise TradingError("EXTERNAL_FILL_ALREADY_ACCOUNTED", 409)
     spec = run.specs.get(code)
     position = run.positions.get(code)
     actual = position.quantity if position else 0
