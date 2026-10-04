@@ -6,6 +6,7 @@ import pytest
 
 from factorforge.trading.adapters.sim.broker import SimBroker
 from factorforge.trading.application.recovery import recover_from_broker
+from factorforge.trading.application.venue import synchronize
 from factorforge.trading.domain.accounting import apply_fill
 from factorforge.trading.domain.errors import TradingError
 from factorforge.trading.domain.models import Fill, Position
@@ -111,6 +112,30 @@ def test_recovery_queries_unknown_terminal_order_and_recomputes_cash_difference(
     assert recover_from_broker(h.store, h.key, channel, Decimal("0")) == []
     assert h.run().orders[order.order_id].state == "CANCELED"
     assert h.run().state == "RECOVERY_CHECK" and h.run().venue_reconciled_version is not None
+
+
+def test_stop_receipt_precedes_algo_order_id_then_reconciles_once(harness):
+    h = harness
+    h.submit()
+    h.dispatch()
+    h.frame("100")
+    old = next(iter(h.run().protections.values()))
+    item = Fill(external_fill_id="early-stop-receipt", external_order_id="venue-exit", instrument_key=h.instrument,
+        side="SELL", quantity="1", price="99", fee="0.05", fee_currency="USD",
+        happened_at=h.run().clock, received_at=h.run().clock)
+    order = next(iter(h.run().orders.values()))
+    channel = Facts(h, order, [item], Decimal("0"), Decimal("998.85"),
+        protection=old.model_copy(update={"state": "ACTIVE_VERIFIED", "exit_order_id": None}))
+    issues = synchronize(h.store, h.key, channel, Decimal("0"))
+    assert any(i.startswith("EXTERNAL_FILL_UNALLOCATED:") for i in issues)
+    assert h.run().state == "RECOVERY_CHECK" and h.run().positions[h.instrument.code()].quantity == 1
+    assert not any(f.external_fill_id == item.external_fill_id for f in h.run().fills.values())
+    channel.protection = old.model_copy(update={"state": "CLOSED", "exit_order_id": "venue-exit"})
+    assert synchronize(h.store, h.key, channel, Decimal("0"), recovery=True) == []
+    assert synchronize(h.store, h.key, channel, Decimal("0"), recovery=True) == []
+    assert h.run().cash == Decimal("998.85") and not h.run().positions[h.instrument.code()].quantity
+    assert sum(f.external_fill_id == item.external_fill_id for f in h.run().fills.values()) == 1
+    assert len(h.run().outbox) == 1  # exchange receipts never create another outbound exit
 
 
 def test_feedback_query_failure_blocks_outbound_and_keeps_reservation(harness):

@@ -360,10 +360,12 @@ class Acceptance:
         self.checked("physical_overlap_replace", current.protections[result["resource_id"]].state == "ACTIVE_VERIFIED"
             and current.protections[old.protection_id].state == "CLOSED")
         active = current.protections[result["resource_id"]]
-        # Natural exchange mark-price movement must produce the trigger.
+        # Natural exchange mark-price movement must produce the trigger. Keep
+        # this experiment-only stop two valid price ticks below the current
+        # mark; a percentage gap can remain untouched on a quiet testnet.
         for _ in range(6):
             quotes = self.refresh()
-            trigger = (quotes["MARK"] * Decimal("0.9998") / self.spec.price_tick).to_integral_value(rounding=ROUND_FLOOR) * self.spec.price_tick
+            trigger = (quotes["MARK"] / self.spec.price_tick).to_integral_value(rounding=ROUND_FLOOR) * self.spec.price_tick - 2 * self.spec.price_tick
             if trigger <= active.plan.trigger_price:
                 break
             result = self.service.maintain_protection(self.principal, self.command(), self.instrument,
@@ -378,6 +380,15 @@ class Acceptance:
         while time.monotonic() < deadline:
             self.refresh()
             issues = synchronize(self.store, self.key, self.broker, Decimal("0.05"))
+            # Algo status and trade history are separate, non-atomic queries.
+            # A stop can fill between them, before its actual order ID appears
+            # in the next algo response. Re-query the physical receipts while
+            # recovery blocks new risk; never infer an association or book it.
+            for _ in range(3):
+                if not any(i.startswith("EXTERNAL_FILL_UNALLOCATED:") for i in issues):
+                    break
+                time.sleep(0.5)
+                issues = synchronize(self.store, self.key, self.broker, Decimal("0.05"), recovery=True)
             if any(i.startswith("EXTERNAL_FILL_UNALLOCATED:") for i in issues):
                 raise TradingError("TESTNET_EXTERNAL_TRADING_INTERFERENCE", 423)
             self.protection.tick(self.key)
@@ -457,10 +468,13 @@ class Acceptance:
             > before.owner_epochs.get(self.instrument.code(), 0))
         # Confirm cancellation of the still-open physical stop after the manual
         # flat position; importing the fact must not pretend it was canceled.
-        for item in self.store.read(self.key).protections.values():
-            raw = self.broker.call("raw", "/fapi/v1/algoOrder", {"clientAlgoId": item.protection_id})
+        known = self.store.read(self.key).protections
+        for raw in self.broker.call("raw", "/fapi/v1/openAlgoOrders", {}):
+            identifier = raw.get("clientAlgoId")
+            if identifier not in known:
+                raise TradingError("TESTNET_EXTERNAL_TRADING_INTERFERENCE", 423)
             if raw["algoStatus"] == "NEW":
-                self.service.cancel_protection(self.principal, self.command(), item.protection_id)
+                self.service.cancel_protection(self.principal, self.command(), identifier)
                 self.protection.tick(self.key)
         command = self.command()
         resolve = ResolveExternal(**command.model_dump(), instrument_key=self.instrument, owner_id="p1-owner",
