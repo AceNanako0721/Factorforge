@@ -95,6 +95,9 @@ def apply_fill(run: Aggregate, order_id: str, fill: Fill):
         if existing.model_dump(exclude={"received_at"}) != fill.model_dump(exclude={"received_at"}):
             raise TradingError("FILL_ID_CONFLICT", 409)
         return False
+    if any(fact.instrument_key == fill.instrument_key and fill.external_fill_id in fact.external_fill_ids
+           for fact in run.external_facts.values()):
+        raise TradingError("EXTERNAL_FILL_ALREADY_ACCOUNTED", 409)
     order = run.orders[order_id]
     request = order.request
     spec = run.specs[request.instrument_key.code()]

@@ -30,6 +30,7 @@ class SignedTransport:
         self.weights = request_weights
         self.budget_lock = Lock()
         self.priority_reserve = priority_request_reserve
+        self.last_rejection_code = None
 
     def _reserve(self, method, path, priority):
         with self.budget_lock:
@@ -81,6 +82,7 @@ class SignedTransport:
                     code = response.json().get("code")
                 except ValueError:
                     code = None
+                self.last_rejection_code = code if isinstance(code, int) else None
                 if code in {-2011, -2013}:
                     raise TradingError("ORDER_NOT_FOUND", 404)
                 if write and code in {-1000, -1001, -1006, -1007}:
@@ -186,6 +188,8 @@ class BinanceBroker:
                     raise TradingError("VENUE_FILL_FORMAT_INVALID", 503)
                 beyond = False
                 for item in page:
+                    if order_id is not None and str(item["orderId"]) != str(order_id):
+                        continue  # a venue must not allocate another order's receipts to this intent
                     at = datetime.fromtimestamp(int(item["time"]) / 1000, timezone.utc)
                     if closing and at > closing:
                         beyond = True
@@ -303,7 +307,8 @@ class BinanceBroker:
                 or Decimal(raw["triggerPrice"]) != item.plan.trigger_price
                 or (item.external_id is not None and str(raw["algoId"]) != item.external_id)):
                 raise AmbiguousResult()
-            states = {"NEW": "ACTIVE_VERIFIED", "TRIGGERED": "TRIGGERED", "FINISHED": "CLOSED", "CANCELED": "CLOSED"}
+            states = {"NEW": "ACTIVE_VERIFIED", "TRIGGERED": "TRIGGERED", "FINISHED": "CLOSED",
+                      "CANCELED": "CLOSED", "REJECTED": "CLOSED", "EXPIRED": "CLOSED"}
             exit_id = raw.get("actualOrderId")
             return item.model_copy(update={"external_id": str(raw["algoId"]), "state": states.get(raw.get("algoStatus"), "UNKNOWN"),
                 "exit_order_id": str(exit_id) if exit_id not in {None, "", 0, "0"} else None,

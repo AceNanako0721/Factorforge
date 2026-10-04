@@ -91,9 +91,25 @@ class ProtectionWorker:
             if (confirmed.state != "ACTIVE_VERIFIED" or confirmed.plan != item.plan
                     or confirmed.instrument_key != item.instrument_key):
                 raise AmbiguousResult()
-        except (AmbiguousResult, TimeoutError, ConnectionError, TradingError):
+        except (AmbiguousResult, TimeoutError, ConnectionError, TradingError) as error:
             with self.store.transaction(key) as current:
                 self._fence(current)
+                if previous == "PENDING" and isinstance(error, TradingError) and error.code == "VENUE_REQUEST_REJECTED":
+                    # A definitive POST rejection created no physical order.
+                    # Preserve confirmed old coverage instead of repeatedly
+                    # querying a nonexistent replacement as UNKNOWN.
+                    current.protections[item.protection_id].state = "CLOSED"
+                    covered = any(p.instrument_key == item.instrument_key and p.state == "ACTIVE_VERIFIED"
+                        and p.plan.covered_quantity == abs(current.positions[item.instrument_key.code()].quantity)
+                        for p in current.protections.values())
+                    current.positions[item.instrument_key.code()].protection_state = "ACTIVE_VERIFIED" if covered else "UNPROTECTED"
+                    if not covered:
+                        current.state = "DEGRADED"
+                    current.alerts.append({"code": "PROTECTION_REJECTED", "id": item.protection_id,
+                                          "at": current.clock.isoformat()})
+                    current.version += 1
+                    self._audit(current, "PROTECTION_REJECTED", current.protections[item.protection_id])
+                    return True
                 current.protections[item.protection_id].state = "UNKNOWN"
                 current.positions[item.instrument_key.code()].protection_state = "UNKNOWN"
                 current.state = "DEGRADED"

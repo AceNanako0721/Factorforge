@@ -67,6 +67,9 @@ def synchronize(store, key, broker, tolerance, recovery=False):
             local = next((o for o in run.orders.values() if o.external_order_id == fill.external_order_id
                 and o.request.instrument_key == fill.instrument_key), None)
             if local is None:
+                if any(fact.instrument_key == fill.instrument_key and fill.external_fill_id in fact.external_fill_ids
+                       for fact in run.external_facts.values()):
+                    continue  # the audited external adjustment already includes this receipt
                 run.recovery_issues.append("EXTERNAL_FILL_UNALLOCATED:" + fill.instrument_key.code() + ":" + fill.external_fill_id)
                 continue
             advance_live_clock(run, max(fill.happened_at, fill.received_at))

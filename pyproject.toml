@@ -9,7 +9,7 @@ description = "Standalone execution layer for Factorforge"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
-dependencies = ["fastapi>=0.115,<1", "pydantic>=2.9,<3", "uvicorn>=0.30,<1", "psycopg[binary]>=3.2,<4", "httpx>=0.27,<1"]
+dependencies = ["fastapi>=0.115,<1", "pydantic>=2.9,<3", "uvicorn>=0.30,<1", "psycopg[binary]>=3.2,<4", "httpx>=0.27,<1", "httpcore>=1,<2"]
 
 [project.optional-dependencies]
 test = ["pytest>=8,<10", "build>=1,<2", "pgserver>=0.1,<1"]
