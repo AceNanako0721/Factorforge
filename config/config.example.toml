@@ -29,3 +29,6 @@ prompt_file = "prompts/prompts.local.json"
 [trading]
 adapter = "mock"
 allow_live = false
+account_id = ""
+principal_id = ""
+permissions = []

@@ -54,3 +54,28 @@ jobs:
         run: python -m pip install -r contracts/requirements.txt
       - name: Lint OpenAPI, validate fixtures and frozen surface, generate stubs
         run: python contracts/check_contract.py
+
+  trading-checks:
+    name: trading-checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+      - name: Install locked trading and test dependencies
+        run: |
+          python -m pip install -r tools/requirements-trading.lock
+          python -m pip install -e . --no-deps
+      - name: Enforce directory tree and layer dependencies
+        run: python tools/check_layout.py
+      - name: Exercise SIM, HTTP, real PostgreSQL, faults and separate processes
+        run: python -m pytest tests/trading -q
+      - name: Check generated current API contract
+        run: |
+          python tools/export_trading_contract.py
+          git diff --exit-code -- contracts/v2/trading/openapi.json
+      - name: Build the independent trading distribution
+        run: python tools/build_trading.py

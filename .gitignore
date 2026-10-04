@@ -26,6 +26,12 @@ backups/
 __pycache__/
 .venv/
 .pytest_cache/
+.ruff_cache/
+*.egg-info/
+/build/
+/dist/
+/htmlcov/
+.coverage
 # Internal document generation can contain workstation paths and private evidence
 doc/.*-build/*
 # Publish all authoring and validation source; exclude inputs and intermediates.

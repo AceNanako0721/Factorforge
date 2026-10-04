@@ -2,6 +2,8 @@
 
 开始工作时读取 VERSION、README、CONTRIBUTING 和当前 doc/releases.json 指向的文档基线，再读取目标层的式样书及对应设计书。式样定义功能/效果，设计定义代码，规划只定义阶段。不得在实现中擅自改变已确认业务规则或填写未标定生产常数。
 
+文件摆放遵守 doc/engineering/REPOSITORY_LAYOUT.md。生产源码只放 src/factorforge 对应层；测试、迁移、工具、配置与运行产物按规范归位。修改源码后运行 tools/check_layout.py，禁止交易层向上导入或把业务代码放入 tools/doc/runtime。
+
 按 framework/specification/design/code-only 分类管理变更。框架变更增加主版本；式样变更增加次版本；仅设计或设计+代码变更增加修订版本；仅代码变更保持版本并在 GitHub PR/合并正文记录。新文档发布使用独立三段版本目录，旧版目录冻结。一次任务包含多类变化时取最高级别。
 
 交易层不依赖上层，框架不绑定具体标的或模型，实例负责 SOXLUSDT/JEV/采集。所有非敏感源码包括工具与测试进入公开仓库。真实配置统一写入被忽略的 config/config.toml；真实提示词由应用层从私有提示词文件加载。config 和 prompts 各只上传一个空内容模板；不得在代码、设计书、PR 或日志复制真实值。
