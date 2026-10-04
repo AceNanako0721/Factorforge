@@ -15,6 +15,8 @@
 
 ## 分支和 PR
 
+源码和辅助文件的位置按 [文件树规范](doc/engineering/REPOSITORY_LAYOUT.md) 执行。新增顶层目录先登记用途；生产代码、测试、数据库迁移和运行产物不可混放。运行包采用 src 布局，测试已安装包；`python tools/check_layout.py` 验证目录和依赖边界。
+
 从最新 `main` 建立 `feat/...`、`fix/...`、`docs/...` 或 `chore/...` 分支。PR 填写一个 `Change-Type`，写明变更内容、原因、涉及的 S/T 编号、验证结果和限制。仅代码变更不修改 VERSION、不新增发布标签；GitHub 合并时以 PR 标题/正文记载此次实现变更。
 
 `main` 要求通过 `repository-checks`、`contract-checks`，解决讨论，禁止强推和删除。项目允许单个维护者合并自己的 PR，不要求虚构第二位批准者。Squash 合并正文使用 PR 正文，合并后删除工作分支。检查不能代替对架构类别、业务效果和实际运行证据的审查。

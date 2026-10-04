@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "factorforge-trading"
+version = "2.0.0"
+description = "Standalone execution layer for Factorforge"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+dependencies = ["fastapi>=0.115,<1", "pydantic>=2.9,<3", "uvicorn>=0.30,<1", "psycopg[binary]>=3.2,<4", "httpx>=0.27,<1"]
+
+[project.optional-dependencies]
+test = ["pytest>=8,<10", "build>=1,<2", "pgserver>=0.1,<1"]
+
+[project.scripts]
+trading-api = "factorforge.trading.bootstrap:api_main"
+execution-sim = "factorforge.trading.bootstrap:worker_main"
+execution-live = "factorforge.trading.bootstrap:live_main"
+factorforge-trading = "factorforge.trading.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["factorforge", "factorforge.trading*"]
+
+[tool.setuptools.package-data]
+"factorforge.trading.adapters.postgres" = ["migrations/*.sql"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = ["postgres: uses an isolated PostgreSQL test database"]

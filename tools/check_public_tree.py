@@ -77,7 +77,7 @@ def template_issue(path, content):
             if set(value) != allowed:
                 return "unrecognized-template-section"
             if (value["runtime"] != {"environment": "SIM", "instance_id": "soxl-jev"}
-                    or value["trading"] != {"adapter": "mock", "allow_live": False}
+                    or value["trading"] != {"adapter": "mock", "allow_live": False, "account_id": "", "principal_id": "", "permissions": []}
                     or value["application"] != {"prompt_file": "prompts/prompts.local.json"}):
                 return "unrecognized-template-field"
         elif path == "prompts/prompts.example.json":

@@ -2,7 +2,7 @@
 
 Factorforge 是分为交易系统、策略化框架、应用实例三层的事件情绪量化交易项目。当前发布基线为 **v2.0.0**，代码与公开文档采用 [MIT](LICENSE) 许可证。
 
-当前仓库已有三层式样书、对应设计书、历史接口契约和文档/仓库管理工具。三层交易服务尚未实现；文档和契约检查通过不代表交易运行或实盘准入通过。
+当前仓库已有三层式样书、对应设计书、仓库管理工具，以及 P1 独立交易层的首个可运行模拟闭环。当前实现包括交易 API/CLI、确定性撮合、保护、账户风险、PostgreSQL 事务与持久化幂等；P2/P3 尚未实现，LIVE 保持未就绪。范围和剩余工作见 [P1 进度](doc/progress/P1.md)，操作见 [交易层运行说明](doc/engineering/TRADING_DEVELOPMENT.md)。
 
 ## 文档与依赖
 
@@ -14,6 +14,10 @@ Factorforge 是分为交易系统、策略化框架、应用实例三层的事�
 | `doc/v2.0` | v2.0.0 三层文档基线；保留原目录名 |
 | `doc/releases.json`、`VERSION` | 文档发布记录及当前基线 |
 | `contracts` | 历史 v1.1 接口契约及检查代码 |
+| `src/factorforge/trading` | P1 独立交易层源码；领域、应用、端口、适配器、API、执行进程 |
+| `tests/trading` | 交易行为、故障注入、真实 PostgreSQL 和独立进程测试 |
+| `contracts/v2/trading` | 当前交易 API 的生成契约 |
+| `doc/engineering`、`doc/progress` | [文件树规范](doc/engineering/REPOSITORY_LAYOUT.md)、运行说明与实现证据 |
 | `tools`、`.githooks`、`.github` | 版本、公开内容、测试及合并管理 |
 | `doc/.*-build` | 公开的文档生成/校验源码；中间产物不入库 |
 | `config/config.example.toml` | 唯一公开配置格式模板 |
