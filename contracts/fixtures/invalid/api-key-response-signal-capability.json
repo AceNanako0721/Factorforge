@@ -1,0 +1,11 @@
+{
+  "_schema": "api-key.json",
+  "data": {
+    "key_id": "key-test",
+    "description": "Forbidden internal capability in query response",
+    "scopes": ["read:risk", "signal:live"],
+    "environment_id": "LIVE",
+    "account_id": "account-test",
+    "expires_at_utc": "2030-01-01T00:00:00Z"
+  }
+}

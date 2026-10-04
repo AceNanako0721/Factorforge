@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "releases": [
+    {
+      "version": "2.0.0",
+      "directory": "doc/v2.0",
+      "change_kind": "framework",
+      "date": "2026-10-04",
+      "reason": "三层框架文档基线；原 v2.0 按三段版本规则登记为 v2.0.0，正文保持不变。"
+    }
+  ]
+}

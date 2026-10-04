@@ -1,0 +1,35 @@
+{
+  "title": "Meta",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "correlation_id",
+    "trace_id",
+    "server_time_utc"
+  ],
+  "properties": {
+    "correlation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "trace_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "server_time_utc": {
+      "type": "string",
+      "format": "date-time",
+      "description": "RFC3339 UTC, suffix Z"
+    },
+    "as_of_utc": {
+      "type": "string",
+      "format": "date-time",
+      "description": "RFC3339 UTC, suffix Z"
+    },
+    "next_cursor": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

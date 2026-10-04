@@ -1,0 +1,47 @@
+{
+  "title": "ProbabilityResult",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "raw_value"
+  ],
+  "properties": {
+    "kind": {
+      "enum": [
+        "Choice",
+        "Score",
+        "Noul"
+      ]
+    },
+    "raw_value": {
+      "oneOf": [
+        {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      ]
+    },
+    "raw_confidence": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

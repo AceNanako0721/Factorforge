@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "WorkloadCapability",
+  "description": "Internal workload identity capabilities; never a public API scope.",
+  "type": "string",
+  "enum": ["signal:sim", "signal:live"]
+}

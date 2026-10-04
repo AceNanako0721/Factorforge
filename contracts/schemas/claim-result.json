@@ -1,0 +1,57 @@
+{
+  "title": "ClaimResult",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "claim_id",
+    "span_ids",
+    "question_id",
+    "model_probability",
+    "program_verification",
+    "verification_reasons"
+  ],
+  "properties": {
+    "claim_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "span_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "question_id": {
+      "type": "string",
+      "pattern": "^claim_supported:[A-Za-z0-9_-]+$"
+    },
+    "model_probability": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "program_verification": {
+      "enum": [
+        "SUPPORTED",
+        "UNSUPPORTED",
+        "UNKNOWN"
+      ]
+    },
+    "verification_reasons": {
+      "type": "array",
+      "minItems": 0,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

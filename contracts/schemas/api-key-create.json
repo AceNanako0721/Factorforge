@@ -1,0 +1,46 @@
+{
+  "title": "ApiKeyCreate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "description",
+    "scopes",
+    "environment_id",
+    "account_id",
+    "expires_at_utc"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.1"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scopes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "./api-scope.json"
+      }
+    },
+    "environment_id": {
+      "enum": [
+        "SIM",
+        "LIVE"
+      ]
+    },
+    "account_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "expires_at_utc": {
+      "type": "string",
+      "format": "date-time",
+      "description": "RFC3339 UTC, suffix Z"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

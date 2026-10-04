@@ -1,0 +1,72 @@
+{
+  "title": "ExtractedEvidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_id",
+    "evidence_hash",
+    "extractor_id",
+    "extractor_version",
+    "claims",
+    "spans",
+    "extraction_status",
+    "completed_at_utc"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.1"
+    },
+    "evidence_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_hash": {
+      "type": "string",
+      "minLength": 1
+    },
+    "extractor_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "extractor_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claims": {
+      "type": "array",
+      "items": {
+        "$ref": "./claim.json"
+      }
+    },
+    "spans": {
+      "type": "array",
+      "items": {
+        "$ref": "./claim-span.json"
+      }
+    },
+    "extraction_status": {
+      "enum": [
+        "COMPLETE",
+        "PARTIAL",
+        "EXTRACTION_UNREADY",
+        "QUARANTINED"
+      ]
+    },
+    "errors": {
+      "type": "array",
+      "minItems": 0,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "completed_at_utc": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

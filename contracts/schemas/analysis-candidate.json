@@ -1,0 +1,210 @@
+{
+  "title": "AnalysisCandidate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "analysis_run_id",
+    "question_set_version",
+    "prompt_version",
+    "requested_model",
+    "resolved_model_version",
+    "evidence_ids",
+    "evidence_hashes",
+    "quoted_span_ids",
+    "claim_results",
+    "raw_probabilities",
+    "unknown_fields",
+    "provider_trace_id",
+    "latency_ms",
+    "cost",
+    "extractor_version",
+    "provenance",
+    "event_type",
+    "direction",
+    "strength_band",
+    "relevance",
+    "novelty",
+    "unexpectedness",
+    "impact_horizon_band",
+    "uncertainties",
+    "available_at_utc"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.1"
+    },
+    "analysis_run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "question_set_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "prompt_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "requested_model": {
+      "type": "string",
+      "minLength": 1
+    },
+    "resolved_model_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "evidence_hashes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "quoted_span_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "claim_results": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "./claim-result.json"
+      }
+    },
+    "raw_probabilities": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "./probability-result.json"
+      }
+    },
+    "unknown_fields": {
+      "type": "array",
+      "minItems": 0,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "provider_trace_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "latency_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cost": {
+      "title": "AnalysisCost",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "amount",
+        "currency"
+      ],
+      "properties": {
+        "amount": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]+)?$"
+        },
+        "currency": {
+          "type": "string",
+          "minLength": 1
+        },
+        "billing_units": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "extractor_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "provenance": {
+      "$ref": "./provider-provenance.json"
+    },
+    "event_type": {
+      "type": "string",
+      "minLength": 1
+    },
+    "direction": {
+      "enum": [
+        "UP",
+        "DOWN",
+        "NEUTRAL",
+        "UNKNOWN"
+      ]
+    },
+    "strength_band": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "relevance": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "novelty": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "unexpectedness": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "impact_horizon_band": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "uncertainties": {
+      "type": "array",
+      "minItems": 0,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "available_at_utc": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

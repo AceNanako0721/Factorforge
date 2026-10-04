@@ -1,0 +1,31 @@
+# Format template only. Copy to config/config.toml; never commit that copy.
+schema_version = 1
+mode = "mock"
+
+[runtime]
+environment = "SIM"
+instance_id = "soxl-jev"
+
+[services]
+trading_api_url = ""
+framework_api_url = ""
+exchange_api_url = ""
+jev_api_url = ""
+search_api_url = ""
+database_url = ""
+
+[credentials]
+exchange_api_key = ""
+exchange_api_secret = ""
+jev_api_key = ""
+search_api_key = ""
+trading_api_token = ""
+framework_api_token = ""
+notification_token = ""
+
+[application]
+prompt_file = "prompts/prompts.local.json"
+
+[trading]
+adapter = "mock"
+allow_live = false

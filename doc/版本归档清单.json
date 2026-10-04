@@ -1,0 +1,128 @@
+{
+  "date": "2026-10-04",
+  "items": [
+    {
+      "from": "doc/用户需求.md",
+      "to": "doc/v0.1/用户需求.md",
+      "original_sha256": "2c9062cbb4b1b1729009c39ab528940447738bd6555b70e6e93222b91d9d0526",
+      "link_changes": [],
+      "archived_sha256": "2c9062cbb4b1b1729009c39ab528940447738bd6555b70e6e93222b91d9d0526"
+    },
+    {
+      "from": "doc/要求分析式样书.md",
+      "to": "doc/v1.0/要求分析式样书.md",
+      "original_sha256": "1fe382be4d7e7d08178f0aee8c80809c32bafe84daba222b3aac9602cfd4fd88",
+      "link_changes": [],
+      "archived_sha256": "1fe382be4d7e7d08178f0aee8c80809c32bafe84daba222b3aac9602cfd4fd88"
+    },
+    {
+      "from": "doc/要求分析式样书.docx",
+      "to": "doc/v1.0/要求分析式样书.docx",
+      "original_sha256": "d1cb043243bd19456a7d75ebb82560f87ee0dc7a2bde9ac6c6b538ecbed89b27",
+      "link_changes": [],
+      "archived_sha256": "d1cb043243bd19456a7d75ebb82560f87ee0dc7a2bde9ac6c6b538ecbed89b27"
+    },
+    {
+      "from": "doc/SOXLUSDT实盘系统完整开发规划书.md",
+      "to": "doc/v1.0/SOXLUSDT实盘系统完整开发规划书.md",
+      "original_sha256": "3fa0989991123dd248ed8c8524e64920f26895bd35e14607f4719a4b2b9a7eb8",
+      "link_changes": [],
+      "archived_sha256": "3fa0989991123dd248ed8c8524e64920f26895bd35e14607f4719a4b2b9a7eb8"
+    },
+    {
+      "from": "doc/SOXLUSDT实盘系统完整开发规划书.docx",
+      "to": "doc/v1.0/SOXLUSDT实盘系统完整开发规划书.docx",
+      "original_sha256": "e94b4f2f7b6ec5da42a18362875173a54524f8f4d9197254b1081746ad964b9b",
+      "link_changes": [],
+      "archived_sha256": "e94b4f2f7b6ec5da42a18362875173a54524f8f4d9197254b1081746ad964b9b"
+    },
+    {
+      "from": "doc/详细设计书_v1.0.md",
+      "to": "doc/v1.0/详细设计书_v1.0.md",
+      "original_sha256": "72d4e57cbfc73fa00a9440c82cb602ab438ac40488f9db92be0249ad2aedb376",
+      "link_changes": [],
+      "archived_sha256": "72d4e57cbfc73fa00a9440c82cb602ab438ac40488f9db92be0249ad2aedb376"
+    },
+    {
+      "from": "doc/要求分析式样书_v1.1.md",
+      "to": "doc/v1.1/要求分析式样书_v1.1.md",
+      "original_sha256": "c8a5390c760f85db2609d4c241b26692eb1add18a3bab2957f240754d66e94bc",
+      "link_changes": [],
+      "archived_sha256": "c8a5390c760f85db2609d4c241b26692eb1add18a3bab2957f240754d66e94bc"
+    },
+    {
+      "from": "doc/要求分析式样书_v1.1.docx",
+      "to": "doc/v1.1/要求分析式样书_v1.1.docx",
+      "original_sha256": "c0ded98015403637893f072a86878f5ac39f88735643377979faee60c7bd0585",
+      "link_changes": [],
+      "archived_sha256": "c0ded98015403637893f072a86878f5ac39f88735643377979faee60c7bd0585"
+    },
+    {
+      "from": "doc/SOXLUSDT实盘系统完整开发规划书_v1.1.md",
+      "to": "doc/v1.1/SOXLUSDT实盘系统完整开发规划书_v1.1.md",
+      "original_sha256": "4ae3e102827b65ddefa1525a2524e3e22393225c54d505cf3994fc0becfc1dbb",
+      "link_changes": [],
+      "archived_sha256": "4ae3e102827b65ddefa1525a2524e3e22393225c54d505cf3994fc0becfc1dbb"
+    },
+    {
+      "from": "doc/SOXLUSDT实盘系统完整开发规划书_v1.1.docx",
+      "to": "doc/v1.1/SOXLUSDT实盘系统完整开发规划书_v1.1.docx",
+      "original_sha256": "727a685ff2fd4ba8860ae77a29eeb8b0060edfbce0b5c5b5bca3df86bbcbbe64",
+      "link_changes": [],
+      "archived_sha256": "727a685ff2fd4ba8860ae77a29eeb8b0060edfbce0b5c5b5bca3df86bbcbbe64"
+    },
+    {
+      "from": "doc/详细设计书_v1.1.md",
+      "to": "doc/v1.1/详细设计书_v1.1.md",
+      "original_sha256": "ae5bc49aafefc88378a2a59dbc8f4d369725c77843900bffc67395f1f9ee3c52",
+      "link_changes": [
+        {
+          "from": "../contracts/schemas/api-scope.json",
+          "to": "../../contracts/schemas/api-scope.json"
+        },
+        {
+          "from": "../contracts/schemas/workload-capability.json",
+          "to": "../../contracts/schemas/workload-capability.json"
+        },
+        {
+          "from": "../contracts/openapi/v1.json",
+          "to": "../../contracts/openapi/v1.json"
+        },
+        {
+          "from": "../contracts/schemas/",
+          "to": "../../contracts/schemas/"
+        },
+        {
+          "from": "../contracts/schemas/analysis-candidate.json",
+          "to": "../../contracts/schemas/analysis-candidate.json"
+        },
+        {
+          "from": "../contracts/schemas/analysis-request.json",
+          "to": "../../contracts/schemas/analysis-request.json"
+        },
+        {
+          "from": "../contracts/schemas/claim.json",
+          "to": "../../contracts/schemas/claim.json"
+        },
+        {
+          "from": "../contracts/schemas/signal-eligibility.json",
+          "to": "../../contracts/schemas/signal-eligibility.json"
+        },
+        {
+          "from": "../contracts/schemas/trade-request.json",
+          "to": "../../contracts/schemas/trade-request.json"
+        },
+        {
+          "from": "../contracts/check_contract.py",
+          "to": "../../contracts/check_contract.py"
+        },
+        {
+          "from": "../.github/workflows/contracts.yml",
+          "to": "../../.github/workflows/contracts.yml"
+        }
+      ],
+      "archived_sha256": "2441bd205ea89bb151e59e722ebdd7c5d06371adfbef5aa7ebcc4bec0290b0d4"
+    }
+  ],
+  "policy": "Historical bodies unchanged; Markdown repository links rebased only; original bytes retained for changed files."
+}

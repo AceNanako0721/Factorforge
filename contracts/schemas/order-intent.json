@@ -1,0 +1,76 @@
+{
+  "title": "OrderIntent",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "environment_id",
+    "account_id",
+    "decision_id",
+    "status",
+    "quantity",
+    "client_order_id"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.1"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "environment_id": {
+      "enum": [
+        "SIM",
+        "LIVE"
+      ]
+    },
+    "account_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "created_at_utc": {
+      "type": "string",
+      "format": "date-time",
+      "description": "RFC3339 UTC, suffix Z"
+    },
+    "decision_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "PREPARED",
+        "PERSISTED",
+        "SENDING",
+        "ACCEPTED",
+        "PARTIAL",
+        "FILLED",
+        "CANCEL_PENDING",
+        "CANCELED",
+        "REJECTED",
+        "EXPIRED",
+        "UNKNOWN"
+      ]
+    },
+    "quantity": {
+      "type": "string",
+      "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$"
+    },
+    "client_order_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "approved_risk_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "expires_at_utc": {
+      "type": "string",
+      "format": "date-time",
+      "description": "RFC3339 UTC, suffix Z"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

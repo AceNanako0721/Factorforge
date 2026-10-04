@@ -1,0 +1,2774 @@
+{
+  "operations": {
+    "GET /environments": {
+      "operationId": "listEnvironments",
+      "scopes": [
+        "read:risk"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "GET /environments/{E}/runs": {
+      "operationId": "listRuns",
+      "scopes": [
+        "read:risk"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "GET /market/instruments": {
+      "operationId": "listInstruments",
+      "scopes": [
+        "read:market"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "GET /market/snapshots": {
+      "operationId": "listMarketSnapshots",
+      "scopes": [
+        "read:market"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "GET /market/calendar": {
+      "operationId": "listCalendar",
+      "scopes": [
+        "read:market"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "GET /evidence": {
+      "operationId": "listEvidence",
+      "scopes": [
+        "read:events"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "GET /evidence/{id}": {
+      "operationId": "getEvidence",
+      "scopes": [
+        "read:events"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "GET /events": {
+      "operationId": "listEvents",
+      "scopes": [
+        "read:events"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "GET /events/{id}": {
+      "operationId": "getEvent",
+      "scopes": [
+        "read:events"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "GET /event-families/{id}": {
+      "operationId": "getEventFamily",
+      "scopes": [
+        "read:events"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "GET /environments/{E}/accounts/{A}/portfolio": {
+      "operationId": "getPortfolio",
+      "scopes": [
+        "read:portfolio"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "GET /environments/{E}/accounts/{A}/positions": {
+      "operationId": "listPositions",
+      "scopes": [
+        "read:portfolio"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "GET /environments/{E}/accounts/{A}/orders": {
+      "operationId": "listOrders",
+      "scopes": [
+        "read:portfolio"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "GET /environments/{E}/accounts/{A}/intents": {
+      "operationId": "listIntents",
+      "scopes": [
+        "read:portfolio"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "GET /environments/{E}/accounts/{A}/protections": {
+      "operationId": "listProtections",
+      "scopes": [
+        "read:portfolio"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "GET /environments/{E}/accounts/{A}/risk": {
+      "operationId": "getRisk",
+      "scopes": [
+        "read:risk"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "GET /environments/{E}/accounts/{A}/risk-events": {
+      "operationId": "listRiskEvents",
+      "scopes": [
+        "read:risk"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "GET /environments/{E}/accounts/{A}/time-windows": {
+      "operationId": "listTimeWindows",
+      "scopes": [
+        "read:risk"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "GET /environments/{E}/accounts/{A}/decisions": {
+      "operationId": "listDecisions",
+      "scopes": [
+        "read:portfolio"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "GET /environments/{E}/accounts/{A}/decisions/{id}": {
+      "operationId": "getDecision",
+      "scopes": [
+        "read:portfolio"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "GET /environments/{E}/accounts/{A}/sentiment": {
+      "operationId": "getSentiment",
+      "scopes": [
+        "read:events"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "GET /environments/{E}/accounts/{A}/cases": {
+      "operationId": "listCases",
+      "scopes": [
+        "read:portfolio"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "GET /environments/{E}/accounts/{A}/labels": {
+      "operationId": "listLabels",
+      "scopes": [
+        "read:events"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "GET /environments/{E}/accounts/{A}/attributions": {
+      "operationId": "listAttributions",
+      "scopes": [
+        "read:events"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "GET /parameters": {
+      "operationId": "listParameters",
+      "scopes": [
+        "read:risk"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "GET /parameter-versions": {
+      "operationId": "listParameterVersions",
+      "scopes": [
+        "read:risk"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "GET /learning-candidates": {
+      "operationId": "listLearningCandidates",
+      "scopes": [
+        "read:risk"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "POST /learning-candidates": {
+      "operationId": "createLearningCandidate",
+      "scopes": [
+        "write:parameters"
+      ],
+      "success": [
+        "202"
+      ],
+      "body_schema": "WriteProposal"
+    },
+    "GET /reports": {
+      "operationId": "listReports",
+      "scopes": [
+        "read:risk"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "GET /replay-runs": {
+      "operationId": "listReplayRuns",
+      "scopes": [
+        "read:risk"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "POST /replay-runs": {
+      "operationId": "createReplayRun",
+      "scopes": [
+        "trade:simulate"
+      ],
+      "success": [
+        "202"
+      ],
+      "body_schema": "WriteProposal"
+    },
+    "GET /audit": {
+      "operationId": "listAudit",
+      "scopes": [
+        "read:audit"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "GET /audit/{id}": {
+      "operationId": "getAudit",
+      "scopes": [
+        "read:audit"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "GET /reconciliations": {
+      "operationId": "listReconciliations",
+      "scopes": [
+        "read:audit"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "GET /jobs/{id}": {
+      "operationId": "getJob",
+      "scopes": [
+        "read:audit"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "GET /jobs/{id}/events": {
+      "operationId": "listJobEvents",
+      "scopes": [
+        "read:audit"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "GET /api-keys": {
+      "operationId": "listApiKeys",
+      "scopes": [
+        "admin:apikey"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "POST /api-keys": {
+      "operationId": "createApiKey",
+      "scopes": [
+        "admin:apikey"
+      ],
+      "success": [
+        "201"
+      ],
+      "body_schema": "ApiKeyCreate"
+    },
+    "GET /api-keys/{id}": {
+      "operationId": "getApiKey",
+      "scopes": [
+        "admin:apikey"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "GET /permissions/{id}": {
+      "operationId": "getPermissions",
+      "scopes": [
+        "admin:permissions"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "PATCH /permissions/{id}": {
+      "operationId": "updatePermissions",
+      "scopes": [
+        "admin:permissions"
+      ],
+      "success": [
+        "202"
+      ],
+      "body_schema": "PermissionUpdate"
+    },
+    "POST /analysis/jobs": {
+      "operationId": "createAnalysisJob",
+      "scopes": [
+        "analysis:request"
+      ],
+      "success": [
+        "202"
+      ],
+      "body_schema": "AnalysisJobRequest"
+    },
+    "POST /analysis-candidates": {
+      "operationId": "submitAnalysisCandidate",
+      "scopes": [
+        "analysis:submit-research"
+      ],
+      "success": [
+        "202"
+      ],
+      "body_schema": "ResearchCandidateSubmission"
+    },
+    "POST /evidence/import-jobs": {
+      "operationId": "importEvidence",
+      "scopes": [
+        "analysis:submit-research"
+      ],
+      "success": [
+        "202"
+      ],
+      "body_schema": "WriteProposal"
+    },
+    "POST /events/{id}/review": {
+      "operationId": "reviewEvent",
+      "scopes": [
+        "analysis:submit-research"
+      ],
+      "success": [
+        "202"
+      ],
+      "body_schema": "WriteProposal"
+    },
+    "POST /environments/{E}/accounts/{A}/simulations": {
+      "operationId": "createSimulation",
+      "scopes": [
+        "trade:simulate"
+      ],
+      "success": [
+        "202"
+      ],
+      "body_schema": "WriteProposal"
+    },
+    "POST /environments/{E}/accounts/{A}/trade-requests": {
+      "operationId": "createTradeRequest",
+      "scopes": [
+        "trade:simulate",
+        "trade:live"
+      ],
+      "success": [
+        "202"
+      ],
+      "body_schema": "TradeRequest"
+    },
+    "POST /environments/{E}/accounts/{A}/positions/{id}/reduce-requests": {
+      "operationId": "requestReduce",
+      "scopes": [
+        "trade:simulate",
+        "trade:live"
+      ],
+      "success": [
+        "202"
+      ],
+      "body_schema": "TradeRequest"
+    },
+    "POST /learning-candidates/{id}/validate": {
+      "operationId": "validateLearningCandidate",
+      "scopes": [
+        "write:parameters"
+      ],
+      "success": [
+        "202"
+      ],
+      "body_schema": "CommandRequest"
+    },
+    "POST /environments/{E}/accounts/{A}/learning/freeze": {
+      "operationId": "freezeLearning",
+      "scopes": [
+        "write:strategy-control"
+      ],
+      "success": [
+        "202"
+      ],
+      "body_schema": "CommandRequest"
+    },
+    "POST /environments/{E}/accounts/{A}/learning/resume": {
+      "operationId": "resumeLearning",
+      "scopes": [
+        "write:strategy-control"
+      ],
+      "success": [
+        "202"
+      ],
+      "body_schema": "CommandRequest"
+    },
+    "POST /environments/{E}/accounts/{A}/start": {
+      "operationId": "startRun",
+      "scopes": [
+        "ops:start",
+        "trade:live"
+      ],
+      "success": [
+        "202"
+      ],
+      "body_schema": "CommandRequest"
+    },
+    "POST /environments/{E}/accounts/{A}/stop": {
+      "operationId": "stopRun",
+      "scopes": [
+        "ops:stop"
+      ],
+      "success": [
+        "202"
+      ],
+      "body_schema": "CommandRequest"
+    },
+    "POST /environments/{E}/accounts/{A}/emergency-stop": {
+      "operationId": "emergencyStop",
+      "scopes": [
+        "ops:emergency-stop"
+      ],
+      "success": [
+        "202"
+      ],
+      "body_schema": "CommandRequest"
+    },
+    "POST /environments/{E}/accounts/{A}/recover": {
+      "operationId": "recoverRun",
+      "scopes": [
+        "ops:recover"
+      ],
+      "success": [
+        "202"
+      ],
+      "body_schema": "CommandRequest"
+    },
+    "POST /environments/{E}/accounts/{A}/reconcile": {
+      "operationId": "reconcileRun",
+      "scopes": [
+        "ops:recover"
+      ],
+      "success": [
+        "202"
+      ],
+      "body_schema": "CommandRequest"
+    },
+    "POST /api-keys/{id}/rotate": {
+      "operationId": "rotateApiKey",
+      "scopes": [
+        "admin:apikey"
+      ],
+      "success": [
+        "201"
+      ],
+      "body_schema": "CommandRequest"
+    },
+    "POST /api-keys/{id}/revoke": {
+      "operationId": "revokeApiKey",
+      "scopes": [
+        "admin:apikey"
+      ],
+      "success": [
+        "202"
+      ],
+      "body_schema": "CommandRequest"
+    },
+    "POST /config-proposals": {
+      "operationId": "createConfigProposal",
+      "scopes": [
+        "admin:permissions"
+      ],
+      "success": [
+        "202"
+      ],
+      "body_schema": "WriteProposal"
+    },
+    "POST /config-proposals/{id}/activate": {
+      "operationId": "activateConfigProposal",
+      "scopes": [
+        "admin:permissions"
+      ],
+      "success": [
+        "202"
+      ],
+      "body_schema": "CommandRequest"
+    },
+    "POST /phase-gates/{id}/attest": {
+      "operationId": "attestPhaseGate",
+      "scopes": [
+        "admin:permissions"
+      ],
+      "success": [
+        "202"
+      ],
+      "body_schema": "WriteProposal"
+    },
+    "GET /health/live": {
+      "operationId": "healthLive",
+      "scopes": [],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "GET /health/ready": {
+      "operationId": "healthReady",
+      "scopes": [],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "GET /events/stream": {
+      "operationId": "streamEvents",
+      "scopes": [
+        "read:market",
+        "read:events",
+        "read:portfolio",
+        "read:risk"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    },
+    "GET /analysis-candidates/{id}": {
+      "operationId": "getAnalysisCandidate",
+      "scopes": [
+        "read:events"
+      ],
+      "success": [
+        "200"
+      ],
+      "body_schema": ""
+    }
+  },
+  "schemas": {
+    "Problem": {
+      "required": [
+        "code",
+        "correlation_id",
+        "retryable",
+        "status",
+        "title",
+        "trace_id",
+        "type",
+        "unknown_outcome"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "correlation_id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "detail": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "field_errors": {
+          "type": "array",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "retryable": {
+          "type": "boolean",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "status": {
+          "type": "integer",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "title": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "trace_id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "type": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "unknown_outcome": {
+          "type": "boolean",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        }
+      }
+    },
+    "Meta": {
+      "required": [
+        "correlation_id",
+        "server_time_utc",
+        "trace_id"
+      ],
+      "properties": {
+        "as_of_utc": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "correlation_id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "next_cursor": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "server_time_utc": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "trace_id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        }
+      }
+    },
+    "Job": {
+      "required": [
+        "job_id",
+        "schema_version",
+        "status",
+        "status_url"
+      ],
+      "properties": {
+        "created_at_utc": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "error": {
+          "type": "object",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "job_id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "result_url": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "schema_version": {
+          "type": null,
+          "enum": null,
+          "items_enum": null,
+          "const": "1.1"
+        },
+        "status": {
+          "type": null,
+          "enum": [
+            "QUEUED",
+            "RUNNING",
+            "SUCCEEDED",
+            "FAILED",
+            "UNKNOWN",
+            "CANCELED"
+          ],
+          "items_enum": null,
+          "const": null
+        },
+        "status_url": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "updated_at_utc": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        }
+      }
+    },
+    "Run": {
+      "required": [
+        "account_id",
+        "environment_id",
+        "phase",
+        "schema_version",
+        "state",
+        "state_version"
+      ],
+      "properties": {
+        "account_fingerprint": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "account_id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "created_at_utc": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "environment_id": {
+          "type": null,
+          "enum": [
+            "SIM",
+            "LIVE"
+          ],
+          "items_enum": null,
+          "const": null
+        },
+        "id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "last_healthy_at_utc": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "phase": {
+          "type": null,
+          "enum": [
+            "R0",
+            "R1",
+            "R2",
+            "R3",
+            "R4"
+          ],
+          "items_enum": null,
+          "const": null
+        },
+        "schema_version": {
+          "type": null,
+          "enum": null,
+          "items_enum": null,
+          "const": "1.1"
+        },
+        "state": {
+          "type": null,
+          "enum": [
+            "INITIALIZING",
+            "NORMAL",
+            "DEGRADED",
+            "RISK_LOCKED",
+            "EMERGENCY",
+            "RECOVERY_CHECK"
+          ],
+          "items_enum": null,
+          "const": null
+        },
+        "state_version": {
+          "type": "integer",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        }
+      }
+    },
+    "MarketSnapshot": {
+      "required": [
+        "as_of_utc",
+        "instrument_id",
+        "prices",
+        "quality",
+        "schema_version"
+      ],
+      "properties": {
+        "as_of_utc": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "exchange_business_date": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "input_manifest_hash": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "instrument_id": {
+          "type": null,
+          "enum": null,
+          "items_enum": null,
+          "const": "SOXLUSDT"
+        },
+        "prices": {
+          "type": "object",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "quality": {
+          "type": null,
+          "enum": [
+            "VALID",
+            "STALE",
+            "GAP",
+            "UNKNOWN"
+          ],
+          "items_enum": null,
+          "const": null
+        },
+        "schema_version": {
+          "type": null,
+          "enum": null,
+          "items_enum": null,
+          "const": "1.1"
+        }
+      }
+    },
+    "Event": {
+      "required": [
+        "available_at_utc",
+        "evidence_ids",
+        "family_id",
+        "id",
+        "schema_version",
+        "status"
+      ],
+      "properties": {
+        "available_at_utc": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "direction": {
+          "type": null,
+          "enum": [
+            "UP",
+            "DOWN",
+            "NEUTRAL",
+            "UNKNOWN"
+          ],
+          "items_enum": null,
+          "const": null
+        },
+        "event_type": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "evidence_ids": {
+          "type": "array",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "family_id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "revision_of": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "schema_version": {
+          "type": null,
+          "enum": null,
+          "items_enum": null,
+          "const": "1.1"
+        },
+        "status": {
+          "type": null,
+          "enum": [
+            "CANDIDATE",
+            "QUARANTINED",
+            "VALIDATED",
+            "INACTIVE"
+          ],
+          "items_enum": null,
+          "const": null
+        },
+        "uncertainties": {
+          "type": "array",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        }
+      }
+    },
+    "Portfolio": {
+      "required": [
+        "account_id",
+        "as_of_utc",
+        "environment_id",
+        "pending_exposure",
+        "positions",
+        "schema_version"
+      ],
+      "properties": {
+        "account_id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "as_of_utc": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "environment_id": {
+          "type": null,
+          "enum": [
+            "SIM",
+            "LIVE"
+          ],
+          "items_enum": null,
+          "const": null
+        },
+        "equity": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "equity_unit": {
+          "type": null,
+          "enum": null,
+          "items_enum": null,
+          "const": "USDT"
+        },
+        "pending_exposure": {
+          "type": "array",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "positions": {
+          "type": "array",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "reconciliation_status": {
+          "type": null,
+          "enum": [
+            "MATCHED",
+            "DIFFERENCE",
+            "UNKNOWN"
+          ],
+          "items_enum": null,
+          "const": null
+        },
+        "schema_version": {
+          "type": null,
+          "enum": null,
+          "items_enum": null,
+          "const": "1.1"
+        }
+      }
+    },
+    "Position": {
+      "required": [
+        "as_of_utc",
+        "id",
+        "instrument_id",
+        "quantity_unit",
+        "signed_quantity"
+      ],
+      "properties": {
+        "as_of_utc": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "instrument_id": {
+          "type": null,
+          "enum": null,
+          "items_enum": null,
+          "const": "SOXLUSDT"
+        },
+        "protected_quantity": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "quantity_unit": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "signed_quantity": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "target_quantity": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        }
+      }
+    },
+    "RiskState": {
+      "required": [
+        "account_id",
+        "as_of_utc",
+        "environment_id",
+        "risk_version",
+        "schema_version",
+        "state"
+      ],
+      "properties": {
+        "account_id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "account_loss_mode": {
+          "type": null,
+          "enum": [
+            "OBSERVE",
+            "ENFORCE"
+          ],
+          "items_enum": null,
+          "const": null
+        },
+        "as_of_utc": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "environment_id": {
+          "type": null,
+          "enum": [
+            "SIM",
+            "LIVE"
+          ],
+          "items_enum": null,
+          "const": null
+        },
+        "gross_notional_usdt": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "lock_reasons": {
+          "type": "array",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "pending_worst_case_usdt": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "risk_version": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "schema_version": {
+          "type": null,
+          "enum": null,
+          "items_enum": null,
+          "const": "1.1"
+        },
+        "state": {
+          "type": null,
+          "enum": [
+            "NORMAL",
+            "DEGRADED",
+            "RISK_LOCKED",
+            "EMERGENCY",
+            "RECOVERY_CHECK"
+          ],
+          "items_enum": null,
+          "const": null
+        }
+      }
+    },
+    "Decision": {
+      "required": [
+        "account_id",
+        "cycle_id",
+        "environment_id",
+        "id",
+        "input_manifest_hash",
+        "parameter_version",
+        "reason_codes",
+        "risk_decision_id",
+        "schema_version"
+      ],
+      "properties": {
+        "account_id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "actual_quantity": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "created_at_utc": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "cycle_id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "environment_id": {
+          "type": null,
+          "enum": [
+            "SIM",
+            "LIVE"
+          ],
+          "items_enum": null,
+          "const": null
+        },
+        "id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "input_manifest_hash": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "parameter_version": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "pending_quantity": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "reason_codes": {
+          "type": "array",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "risk_decision_id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "schema_version": {
+          "type": null,
+          "enum": null,
+          "items_enum": null,
+          "const": "1.1"
+        },
+        "target_quantity": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        }
+      }
+    },
+    "OrderIntent": {
+      "required": [
+        "account_id",
+        "client_order_id",
+        "decision_id",
+        "environment_id",
+        "id",
+        "quantity",
+        "schema_version",
+        "status"
+      ],
+      "properties": {
+        "account_id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "approved_risk_version": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "client_order_id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "created_at_utc": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "decision_id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "environment_id": {
+          "type": null,
+          "enum": [
+            "SIM",
+            "LIVE"
+          ],
+          "items_enum": null,
+          "const": null
+        },
+        "expires_at_utc": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "quantity": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "schema_version": {
+          "type": null,
+          "enum": null,
+          "items_enum": null,
+          "const": "1.1"
+        },
+        "status": {
+          "type": null,
+          "enum": [
+            "PREPARED",
+            "PERSISTED",
+            "SENDING",
+            "ACCEPTED",
+            "PARTIAL",
+            "FILLED",
+            "CANCEL_PENDING",
+            "CANCELED",
+            "REJECTED",
+            "EXPIRED",
+            "UNKNOWN"
+          ],
+          "items_enum": null,
+          "const": null
+        }
+      }
+    },
+    "AnalysisCandidate": {
+      "required": [
+        "analysis_run_id",
+        "available_at_utc",
+        "claim_results",
+        "cost",
+        "direction",
+        "event_type",
+        "evidence_hashes",
+        "evidence_ids",
+        "extractor_version",
+        "impact_horizon_band",
+        "latency_ms",
+        "novelty",
+        "prompt_version",
+        "provenance",
+        "provider_trace_id",
+        "question_set_version",
+        "quoted_span_ids",
+        "raw_probabilities",
+        "relevance",
+        "requested_model",
+        "resolved_model_version",
+        "schema_version",
+        "strength_band",
+        "uncertainties",
+        "unexpectedness",
+        "unknown_fields"
+      ],
+      "properties": {
+        "analysis_run_id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "available_at_utc": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "claim_results": {
+          "type": "array",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "cost": {
+          "type": "object",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "direction": {
+          "type": null,
+          "enum": [
+            "UP",
+            "DOWN",
+            "NEUTRAL",
+            "UNKNOWN"
+          ],
+          "items_enum": null,
+          "const": null
+        },
+        "event_type": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "evidence_hashes": {
+          "type": "array",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "evidence_ids": {
+          "type": "array",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "extractor_version": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "impact_horizon_band": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "latency_ms": {
+          "type": "integer",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "novelty": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "prompt_version": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "provenance": {
+          "type": "object",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "provider_trace_id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "question_set_version": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "quoted_span_ids": {
+          "type": "array",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "raw_probabilities": {
+          "type": "object",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "relevance": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "requested_model": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "resolved_model_version": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "schema_version": {
+          "type": null,
+          "enum": null,
+          "items_enum": null,
+          "const": "1.1"
+        },
+        "strength_band": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "uncertainties": {
+          "type": "array",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "unexpectedness": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "unknown_fields": {
+          "type": "array",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        }
+      }
+    },
+    "TradeRequest": {
+      "required": [
+        "account_id",
+        "environment_id",
+        "expected_state_version",
+        "intent_type",
+        "reason",
+        "schema_version"
+      ],
+      "properties": {
+        "account_id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "environment_id": {
+          "type": null,
+          "enum": [
+            "SIM",
+            "LIVE"
+          ],
+          "items_enum": null,
+          "const": null
+        },
+        "expected_state_version": {
+          "type": "integer",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "instrument_id": {
+          "type": null,
+          "enum": null,
+          "items_enum": null,
+          "const": "SOXLUSDT"
+        },
+        "intent_type": {
+          "type": null,
+          "enum": [
+            "STRATEGY_REEVALUATE",
+            "REDUCE",
+            "FLATTEN"
+          ],
+          "items_enum": null,
+          "const": null
+        },
+        "max_abs_quantity": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "reason": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "schema_version": {
+          "type": null,
+          "enum": null,
+          "items_enum": null,
+          "const": "1.1"
+        }
+      }
+    },
+    "CommandRequest": {
+      "required": [
+        "expected_state_version",
+        "reason",
+        "schema_version"
+      ],
+      "properties": {
+        "expected_state_version": {
+          "type": "integer",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "policy_version": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "reason": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "schema_version": {
+          "type": null,
+          "enum": null,
+          "items_enum": null,
+          "const": "1.1"
+        }
+      }
+    },
+    "ApiKeyCreate": {
+      "required": [
+        "account_id",
+        "description",
+        "environment_id",
+        "expires_at_utc",
+        "schema_version",
+        "scopes"
+      ],
+      "properties": {
+        "account_id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "description": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "environment_id": {
+          "type": null,
+          "enum": [
+            "SIM",
+            "LIVE"
+          ],
+          "items_enum": null,
+          "const": null
+        },
+        "expires_at_utc": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "schema_version": {
+          "type": null,
+          "enum": null,
+          "items_enum": null,
+          "const": "1.1"
+        },
+        "scopes": {
+          "type": "array",
+          "enum": null,
+          "items_enum": [
+            "read:market",
+            "read:events",
+            "read:portfolio",
+            "read:risk",
+            "read:audit",
+            "analysis:request",
+            "analysis:submit-research",
+            "write:parameters",
+            "write:strategy-control",
+            "trade:simulate",
+            "trade:live",
+            "ops:start",
+            "ops:stop",
+            "ops:recover",
+            "ops:emergency-stop",
+            "admin:apikey",
+            "admin:permissions"
+          ],
+          "const": null
+        }
+      }
+    },
+    "ApiKey": {
+      "required": [
+        "account_id",
+        "description",
+        "environment_id",
+        "expires_at_utc",
+        "key_id",
+        "scopes"
+      ],
+      "properties": {
+        "account_id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "description": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "environment_id": {
+          "type": null,
+          "enum": [
+            "SIM",
+            "LIVE"
+          ],
+          "items_enum": null,
+          "const": null
+        },
+        "expires_at_utc": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "fingerprint": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "key_id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "last_used_at_utc": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "revoked_at_utc": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "scopes": {
+          "type": "array",
+          "enum": null,
+          "items_enum": [
+            "read:market",
+            "read:events",
+            "read:portfolio",
+            "read:risk",
+            "read:audit",
+            "analysis:request",
+            "analysis:submit-research",
+            "write:parameters",
+            "write:strategy-control",
+            "trade:simulate",
+            "trade:live",
+            "ops:start",
+            "ops:stop",
+            "ops:recover",
+            "ops:emergency-stop",
+            "admin:apikey",
+            "admin:permissions"
+          ],
+          "const": null
+        }
+      }
+    },
+    "ApiKeyIssueResult": {
+      "required": [
+        "key",
+        "secret_available"
+      ],
+      "properties": {
+        "key": {
+          "type": "object",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "secret": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "secret_available": {
+          "type": "boolean",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        }
+      }
+    },
+    "WriteProposal": {
+      "required": [
+        "expected_version",
+        "payload",
+        "reason",
+        "schema_version"
+      ],
+      "properties": {
+        "evidence_ids": {
+          "type": "array",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "expected_version": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "payload": {
+          "type": "object",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "reason": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "schema_version": {
+          "type": null,
+          "enum": null,
+          "items_enum": null,
+          "const": "1.1"
+        }
+      }
+    },
+    "Record": {
+      "required": [
+        "created_at_utc",
+        "id",
+        "schema_version"
+      ],
+      "properties": {
+        "account_id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "created_at_utc": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "detail_uri": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "environment_id": {
+          "type": null,
+          "enum": [
+            "SIM",
+            "LIVE"
+          ],
+          "items_enum": null,
+          "const": null
+        },
+        "id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "reason_codes": {
+          "type": "array",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "schema_version": {
+          "type": null,
+          "enum": null,
+          "items_enum": null,
+          "const": "1.1"
+        },
+        "source_ids": {
+          "type": "array",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "status": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        }
+      }
+    },
+    "ClaimSpan": {
+      "required": [
+        "end_offset",
+        "evidence_hash",
+        "evidence_id",
+        "span_hash",
+        "span_id",
+        "start_offset"
+      ],
+      "properties": {
+        "end_offset": {
+          "type": "integer",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "evidence_hash": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "evidence_id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "license_ref": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "span_hash": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "span_id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "start_offset": {
+          "type": "integer",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        }
+      }
+    },
+    "Claim": {
+      "required": [
+        "available_at_utc",
+        "claim_id",
+        "entities",
+        "evidence_hash",
+        "evidence_id",
+        "extraction_status",
+        "extractor_version",
+        "normalized_fact",
+        "numbers",
+        "schema_version",
+        "span_ids"
+      ],
+      "properties": {
+        "available_at_utc": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "claim_id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "entities": {
+          "type": "array",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "evidence_hash": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "evidence_id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "extraction_status": {
+          "type": null,
+          "enum": [
+            "EXTRACTED",
+            "PARTIAL",
+            "UNKNOWN",
+            "REJECTED"
+          ],
+          "items_enum": null,
+          "const": null
+        },
+        "extractor_version": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "fact_at_utc": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "normalized_fact": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "numbers": {
+          "type": "array",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "revision_of_claim_id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "schema_version": {
+          "type": null,
+          "enum": null,
+          "items_enum": null,
+          "const": "1.1"
+        },
+        "span_ids": {
+          "type": "array",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        }
+      }
+    },
+    "ExtractedEvidence": {
+      "required": [
+        "claims",
+        "completed_at_utc",
+        "evidence_hash",
+        "evidence_id",
+        "extraction_status",
+        "extractor_id",
+        "extractor_version",
+        "schema_version",
+        "spans"
+      ],
+      "properties": {
+        "claims": {
+          "type": "array",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "completed_at_utc": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "errors": {
+          "type": "array",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "evidence_hash": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "evidence_id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "extraction_status": {
+          "type": null,
+          "enum": [
+            "COMPLETE",
+            "PARTIAL",
+            "EXTRACTION_UNREADY",
+            "QUARANTINED"
+          ],
+          "items_enum": null,
+          "const": null
+        },
+        "extractor_id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "extractor_version": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "schema_version": {
+          "type": null,
+          "enum": null,
+          "items_enum": null,
+          "const": "1.1"
+        },
+        "spans": {
+          "type": "array",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        }
+      }
+    },
+    "ClaimResult": {
+      "required": [
+        "claim_id",
+        "model_probability",
+        "program_verification",
+        "question_id",
+        "span_ids",
+        "verification_reasons"
+      ],
+      "properties": {
+        "claim_id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "model_probability": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "program_verification": {
+          "type": null,
+          "enum": [
+            "SUPPORTED",
+            "UNSUPPORTED",
+            "UNKNOWN"
+          ],
+          "items_enum": null,
+          "const": null
+        },
+        "question_id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "span_ids": {
+          "type": "array",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "verification_reasons": {
+          "type": "array",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        }
+      }
+    },
+    "ProbabilityResult": {
+      "required": [
+        "kind",
+        "raw_value"
+      ],
+      "properties": {
+        "kind": {
+          "type": null,
+          "enum": [
+            "Choice",
+            "Score",
+            "Noul"
+          ],
+          "items_enum": null,
+          "const": null
+        },
+        "raw_confidence": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "raw_value": {
+          "type": null,
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        }
+      }
+    },
+    "ProviderProvenance": {
+      "required": [
+        "attestation_hash",
+        "evidence_manifest_hash",
+        "extractor_version",
+        "origin",
+        "provider_id",
+        "workload_identity"
+      ],
+      "properties": {
+        "attestation_hash": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "evidence_manifest_hash": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "extractor_version": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "origin": {
+          "type": null,
+          "enum": null,
+          "items_enum": null,
+          "const": "INTERNAL_PROVIDER"
+        },
+        "provider_id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "workload_identity": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        }
+      }
+    },
+    "AnalysisRequest": {
+      "required": [
+        "analysis_run_id",
+        "available_at_utc",
+        "claim_ids",
+        "evidence_hashes",
+        "evidence_ids",
+        "prompt_version",
+        "question_set_version",
+        "requested_model",
+        "schema_version",
+        "target_instrument"
+      ],
+      "properties": {
+        "analysis_run_id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "available_at_utc": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "claim_ids": {
+          "type": "array",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "evidence_hashes": {
+          "type": "array",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "evidence_ids": {
+          "type": "array",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "prompt_version": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "question_set_version": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "requested_model": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "schema_version": {
+          "type": null,
+          "enum": null,
+          "items_enum": null,
+          "const": "1.1"
+        },
+        "target_instrument": {
+          "type": null,
+          "enum": null,
+          "items_enum": null,
+          "const": "SOXLUSDT"
+        }
+      }
+    },
+    "AnalysisJobRequest": {
+      "required": [
+        "evidence_ids",
+        "reason",
+        "schema_version",
+        "target_instrument"
+      ],
+      "properties": {
+        "evidence_ids": {
+          "type": "array",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "reason": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "schema_version": {
+          "type": null,
+          "enum": null,
+          "items_enum": null,
+          "const": "1.1"
+        },
+        "target_instrument": {
+          "type": null,
+          "enum": null,
+          "items_enum": null,
+          "const": "SOXLUSDT"
+        }
+      }
+    },
+    "ResearchCandidateSubmission": {
+      "required": [
+        "asserted_claim_ids",
+        "evidence_ids",
+        "proposed_direction",
+        "proposed_event_type",
+        "reason",
+        "schema_version"
+      ],
+      "properties": {
+        "asserted_claim_ids": {
+          "type": "array",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "evidence_ids": {
+          "type": "array",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "notes": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "proposed_direction": {
+          "type": null,
+          "enum": [
+            "UP",
+            "DOWN",
+            "NEUTRAL",
+            "UNKNOWN"
+          ],
+          "items_enum": null,
+          "const": null
+        },
+        "proposed_event_type": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "reason": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "schema_version": {
+          "type": null,
+          "enum": null,
+          "items_enum": null,
+          "const": "1.1"
+        }
+      }
+    },
+    "SignalEligibility": {
+      "required": [
+        "account_id",
+        "analysis_run_id",
+        "candidate_id",
+        "eligibility",
+        "environment_id",
+        "evidence_hashes",
+        "expires_at_utc",
+        "gate_version",
+        "instrument_id",
+        "issued_at_utc",
+        "issuer_workload_identity",
+        "schema_version",
+        "strategy_id"
+      ],
+      "properties": {
+        "account_id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "analysis_run_id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "candidate_id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "eligibility": {
+          "type": null,
+          "enum": [
+            "VERIFIED",
+            "ELIGIBLE_FOR_SIM",
+            "ELIGIBLE_FOR_LIVE",
+            "REVOKED"
+          ],
+          "items_enum": null,
+          "const": null
+        },
+        "environment_id": {
+          "type": null,
+          "enum": [
+            "SIM",
+            "LIVE"
+          ],
+          "items_enum": null,
+          "const": null
+        },
+        "evidence_hashes": {
+          "type": "array",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "expires_at_utc": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "gate_version": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "instrument_id": {
+          "type": null,
+          "enum": null,
+          "items_enum": null,
+          "const": "SOXLUSDT"
+        },
+        "issued_at_utc": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "issuer_workload_identity": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "schema_version": {
+          "type": null,
+          "enum": null,
+          "items_enum": null,
+          "const": "1.1"
+        },
+        "strategy_id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        }
+      }
+    },
+    "PermissionUpdate": {
+      "required": [
+        "account_id",
+        "environment_id",
+        "expected_version",
+        "reason",
+        "schema_version",
+        "scopes"
+      ],
+      "properties": {
+        "account_id": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "environment_id": {
+          "type": null,
+          "enum": [
+            "SIM",
+            "LIVE"
+          ],
+          "items_enum": null,
+          "const": null
+        },
+        "expected_version": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "reason": {
+          "type": "string",
+          "enum": null,
+          "items_enum": null,
+          "const": null
+        },
+        "schema_version": {
+          "type": null,
+          "enum": null,
+          "items_enum": null,
+          "const": "1.1"
+        },
+        "scopes": {
+          "type": "array",
+          "enum": null,
+          "items_enum": [
+            "read:market",
+            "read:events",
+            "read:portfolio",
+            "read:risk",
+            "read:audit",
+            "analysis:request",
+            "analysis:submit-research",
+            "write:parameters",
+            "write:strategy-control",
+            "trade:simulate",
+            "trade:live",
+            "ops:start",
+            "ops:stop",
+            "ops:recover",
+            "ops:emergency-stop",
+            "admin:apikey",
+            "admin:permissions"
+          ],
+          "const": null
+        }
+      }
+    }
+  }
+}

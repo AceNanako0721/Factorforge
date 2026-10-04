@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ApiScope",
+  "description": "Only capabilities grantable to an external API principal or API key.",
+  "type": "string",
+  "enum": [
+    "read:market",
+    "read:events",
+    "read:portfolio",
+    "read:risk",
+    "read:audit",
+    "analysis:request",
+    "analysis:submit-research",
+    "write:parameters",
+    "write:strategy-control",
+    "trade:simulate",
+    "trade:live",
+    "ops:start",
+    "ops:stop",
+    "ops:recover",
+    "ops:emergency-stop",
+    "admin:apikey",
+    "admin:permissions"
+  ]
+}

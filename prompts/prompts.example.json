@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "asset_kind": "EXAMPLE_OR_MOCK",
+  "production_ready": false,
+  "prompt_version": "",
+  "instructions": "",
+  "state_template": "",
+  "questions": [
+    {"id": "direction", "type": "Choice", "instructions": "", "criteria": [], "choices": ["NEGATIVE", "NEUTRAL", "POSITIVE"]},
+    {"id": "impact", "type": "Score", "instructions": "", "criteria": [], "scale_ref": ""},
+    {"id": "facts", "type": "Noul", "instructions": "", "criteria": []}
+  ]
+}

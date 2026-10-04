@@ -1,0 +1,70 @@
+{
+  "title": "Event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "family_id",
+    "status",
+    "available_at_utc",
+    "evidence_ids"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.1"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "family_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "CANDIDATE",
+        "QUARANTINED",
+        "VALIDATED",
+        "INACTIVE"
+      ]
+    },
+    "available_at_utc": {
+      "type": "string",
+      "format": "date-time",
+      "description": "RFC3339 UTC, suffix Z"
+    },
+    "evidence_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "event_type": {
+      "type": "string",
+      "minLength": 1
+    },
+    "direction": {
+      "enum": [
+        "UP",
+        "DOWN",
+        "NEUTRAL",
+        "UNKNOWN"
+      ]
+    },
+    "revision_of": {
+      "type": "string",
+      "minLength": 1
+    },
+    "uncertainties": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

@@ -1,0 +1,12 @@
+{
+  "_schema": "research-candidate-submission.json",
+  "data": {
+    "schema_version": "1.1",
+    "evidence_ids": ["evidence-001"],
+    "asserted_claim_ids": ["c001"],
+    "proposed_event_type": "COMPANY_EARNINGS",
+    "proposed_direction": "UP",
+    "reason": "Fixture only",
+    "eligibility": "ELIGIBLE_FOR_LIVE"
+  }
+}

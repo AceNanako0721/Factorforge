@@ -1,0 +1,60 @@
+{
+  "title": "Portfolio",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "environment_id",
+    "account_id",
+    "as_of_utc",
+    "positions",
+    "pending_exposure"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.1"
+    },
+    "environment_id": {
+      "enum": [
+        "SIM",
+        "LIVE"
+      ]
+    },
+    "account_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "as_of_utc": {
+      "type": "string",
+      "format": "date-time",
+      "description": "RFC3339 UTC, suffix Z"
+    },
+    "positions": {
+      "type": "array",
+      "items": {
+        "$ref": "./position.json"
+      }
+    },
+    "pending_exposure": {
+      "type": "array",
+      "items": {
+        "$ref": "./order-intent.json"
+      }
+    },
+    "equity": {
+      "type": "string",
+      "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$"
+    },
+    "equity_unit": {
+      "const": "USDT"
+    },
+    "reconciliation_status": {
+      "enum": [
+        "MATCHED",
+        "DIFFERENCE",
+        "UNKNOWN"
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

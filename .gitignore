@@ -1,0 +1,37 @@
+# Publish only one format template in each private asset directory.
+/config/*
+!/config/config.example.toml
+/prompts/*
+!/prompts/prompts.example.json
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+private/
+.private/
+secrets/
+# Real analysis prompts and model traces stay private.
+model_traces/
+ai_cache/
+# Local data, trading records, logs and build artifacts
+data/raw/
+data/private/
+runtime/
+logs/
+backups/
+*.sqlite*
+*.db
+__pycache__/
+.venv/
+.pytest_cache/
+# Internal document generation can contain workstation paths and private evidence
+doc/.*-build/*
+# Publish all authoring and validation source; exclude inputs and intermediates.
+!doc/.*-build/*.py
+!doc/.*-build/*.ps1
+doc/private/
+doc/_archive/
+~$*
+**/~$*

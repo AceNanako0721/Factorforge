@@ -1,0 +1,16 @@
+{
+  "_schema": "claim.json",
+  "data": {
+    "schema_version": "1.1",
+    "claim_id": "c001",
+    "evidence_id": "evidence-001",
+    "evidence_hash": "sha256-fixture-001",
+    "span_ids": ["span-001"],
+    "normalized_fact": "Fixture fact",
+    "entities": [{"entity_id": "entity-001", "name": "Fixture Co"}],
+    "numbers": [{"value": "1.5", "unit": "USD"}],
+    "extractor_version": "mock-extractor-1",
+    "extraction_status": "EXTRACTED",
+    "available_at_utc": "2026-09-27T00:00:00Z"
+  }
+}

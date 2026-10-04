@@ -1,0 +1,4193 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Factorforge Core Platform API",
+    "version": "1.1.0",
+    "description": "Design-stage Core API. External analysis is research-only; internal SignalAdmission gates SIM/LIVE. Business constants remain REQUIRED_UNSET."
+  },
+  "servers": [
+    {
+      "url": "/api/v1"
+    }
+  ],
+  "security": [
+    {
+      "ApiKey": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "ApiKey": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "opaque API key"
+      }
+    },
+    "schemas": {
+      "Problem": {
+        "$ref": "../schemas/problem.json"
+      },
+      "Meta": {
+        "$ref": "../schemas/meta.json"
+      },
+      "Job": {
+        "$ref": "../schemas/job.json"
+      },
+      "Run": {
+        "$ref": "../schemas/run.json"
+      },
+      "MarketSnapshot": {
+        "$ref": "../schemas/market-snapshot.json"
+      },
+      "Event": {
+        "$ref": "../schemas/event.json"
+      },
+      "Portfolio": {
+        "$ref": "../schemas/portfolio.json"
+      },
+      "Position": {
+        "$ref": "../schemas/position.json"
+      },
+      "RiskState": {
+        "$ref": "../schemas/risk-state.json"
+      },
+      "Decision": {
+        "$ref": "../schemas/decision.json"
+      },
+      "OrderIntent": {
+        "$ref": "../schemas/order-intent.json"
+      },
+      "AnalysisCandidate": {
+        "$ref": "../schemas/analysis-candidate.json"
+      },
+      "TradeRequest": {
+        "$ref": "../schemas/trade-request.json"
+      },
+      "CommandRequest": {
+        "$ref": "../schemas/command-request.json"
+      },
+      "ApiKeyCreate": {
+        "$ref": "../schemas/api-key-create.json"
+      },
+      "ApiKey": {
+        "$ref": "../schemas/api-key.json"
+      },
+      "ApiKeyIssueResult": {
+        "$ref": "../schemas/api-key-issue-result.json"
+      },
+      "WriteProposal": {
+        "$ref": "../schemas/write-proposal.json"
+      },
+      "Record": {
+        "$ref": "../schemas/record.json"
+      },
+      "ClaimSpan": {
+        "$ref": "../schemas/claim-span.json"
+      },
+      "Claim": {
+        "$ref": "../schemas/claim.json"
+      },
+      "ExtractedEvidence": {
+        "$ref": "../schemas/extracted-evidence.json"
+      },
+      "ClaimResult": {
+        "$ref": "../schemas/claim-result.json"
+      },
+      "ProbabilityResult": {
+        "$ref": "../schemas/probability-result.json"
+      },
+      "ProviderProvenance": {
+        "$ref": "../schemas/provider-provenance.json"
+      },
+      "AnalysisRequest": {
+        "$ref": "../schemas/analysis-request.json"
+      },
+      "AnalysisJobRequest": {
+        "$ref": "../schemas/analysis-job-request.json"
+      },
+      "ResearchCandidateSubmission": {
+        "$ref": "../schemas/research-candidate-submission.json"
+      },
+      "SignalEligibility": {
+        "$ref": "../schemas/signal-eligibility.json"
+      },
+      "PermissionUpdate": {
+        "$ref": "../schemas/permission-update.json"
+      }
+    },
+    "parameters": {
+      "Environment": {
+        "name": "E",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "enum": [
+            "SIM",
+            "LIVE"
+          ]
+        }
+      },
+      "Account": {
+        "name": "A",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "Id": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "Cursor": {
+        "name": "cursor",
+        "in": "query",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "Limit": {
+        "name": "limit",
+        "in": "query",
+        "schema": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "CorrelationId": {
+        "name": "X-Correlation-Id",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  },
+  "paths": {
+    "/environments": {
+      "get": {
+        "operationId": "listEnvironments",
+        "tags": [
+          "runs"
+        ],
+        "x-required-scopes": [
+          "read:risk"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Run"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/environments/{E}/runs": {
+      "get": {
+        "operationId": "listRuns",
+        "tags": [
+          "runs"
+        ],
+        "x-required-scopes": [
+          "read:risk"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Environment"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Run"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/market/instruments": {
+      "get": {
+        "operationId": "listInstruments",
+        "tags": [
+          "market"
+        ],
+        "x-required-scopes": [
+          "read:market"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Record"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/market/snapshots": {
+      "get": {
+        "operationId": "listMarketSnapshots",
+        "tags": [
+          "market"
+        ],
+        "x-required-scopes": [
+          "read:market"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MarketSnapshot"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/market/calendar": {
+      "get": {
+        "operationId": "listCalendar",
+        "tags": [
+          "market"
+        ],
+        "x-required-scopes": [
+          "read:market"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Record"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evidence": {
+      "get": {
+        "operationId": "listEvidence",
+        "tags": [
+          "events"
+        ],
+        "x-required-scopes": [
+          "read:events"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Record"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evidence/{id}": {
+      "get": {
+        "operationId": "getEvidence",
+        "tags": [
+          "events"
+        ],
+        "x-required-scopes": [
+          "read:events"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Record"
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events": {
+      "get": {
+        "operationId": "listEvents",
+        "tags": [
+          "events"
+        ],
+        "x-required-scopes": [
+          "read:events"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Event"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events/{id}": {
+      "get": {
+        "operationId": "getEvent",
+        "tags": [
+          "events"
+        ],
+        "x-required-scopes": [
+          "read:events"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Event"
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/event-families/{id}": {
+      "get": {
+        "operationId": "getEventFamily",
+        "tags": [
+          "events"
+        ],
+        "x-required-scopes": [
+          "read:events"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Record"
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/environments/{E}/accounts/{A}/portfolio": {
+      "get": {
+        "operationId": "getPortfolio",
+        "tags": [
+          "portfolio"
+        ],
+        "x-required-scopes": [
+          "read:portfolio"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Environment"
+          },
+          {
+            "$ref": "#/components/parameters/Account"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Portfolio"
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/environments/{E}/accounts/{A}/positions": {
+      "get": {
+        "operationId": "listPositions",
+        "tags": [
+          "portfolio"
+        ],
+        "x-required-scopes": [
+          "read:portfolio"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Environment"
+          },
+          {
+            "$ref": "#/components/parameters/Account"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Position"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/environments/{E}/accounts/{A}/orders": {
+      "get": {
+        "operationId": "listOrders",
+        "tags": [
+          "portfolio"
+        ],
+        "x-required-scopes": [
+          "read:portfolio"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Environment"
+          },
+          {
+            "$ref": "#/components/parameters/Account"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Record"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/environments/{E}/accounts/{A}/intents": {
+      "get": {
+        "operationId": "listIntents",
+        "tags": [
+          "portfolio"
+        ],
+        "x-required-scopes": [
+          "read:portfolio"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Environment"
+          },
+          {
+            "$ref": "#/components/parameters/Account"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/OrderIntent"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/environments/{E}/accounts/{A}/protections": {
+      "get": {
+        "operationId": "listProtections",
+        "tags": [
+          "portfolio"
+        ],
+        "x-required-scopes": [
+          "read:portfolio"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Environment"
+          },
+          {
+            "$ref": "#/components/parameters/Account"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Record"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/environments/{E}/accounts/{A}/risk": {
+      "get": {
+        "operationId": "getRisk",
+        "tags": [
+          "risk"
+        ],
+        "x-required-scopes": [
+          "read:risk"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Environment"
+          },
+          {
+            "$ref": "#/components/parameters/Account"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/RiskState"
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/environments/{E}/accounts/{A}/risk-events": {
+      "get": {
+        "operationId": "listRiskEvents",
+        "tags": [
+          "risk"
+        ],
+        "x-required-scopes": [
+          "read:risk"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Environment"
+          },
+          {
+            "$ref": "#/components/parameters/Account"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Record"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/environments/{E}/accounts/{A}/time-windows": {
+      "get": {
+        "operationId": "listTimeWindows",
+        "tags": [
+          "risk"
+        ],
+        "x-required-scopes": [
+          "read:risk"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Environment"
+          },
+          {
+            "$ref": "#/components/parameters/Account"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Record"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/environments/{E}/accounts/{A}/decisions": {
+      "get": {
+        "operationId": "listDecisions",
+        "tags": [
+          "decisions"
+        ],
+        "x-required-scopes": [
+          "read:portfolio"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Environment"
+          },
+          {
+            "$ref": "#/components/parameters/Account"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Decision"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/environments/{E}/accounts/{A}/decisions/{id}": {
+      "get": {
+        "operationId": "getDecision",
+        "tags": [
+          "decisions"
+        ],
+        "x-required-scopes": [
+          "read:portfolio"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Environment"
+          },
+          {
+            "$ref": "#/components/parameters/Account"
+          },
+          {
+            "$ref": "#/components/parameters/Id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Decision"
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/environments/{E}/accounts/{A}/sentiment": {
+      "get": {
+        "operationId": "getSentiment",
+        "tags": [
+          "decisions"
+        ],
+        "x-required-scopes": [
+          "read:events"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Environment"
+          },
+          {
+            "$ref": "#/components/parameters/Account"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Record"
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/environments/{E}/accounts/{A}/cases": {
+      "get": {
+        "operationId": "listCases",
+        "tags": [
+          "learning"
+        ],
+        "x-required-scopes": [
+          "read:portfolio"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Environment"
+          },
+          {
+            "$ref": "#/components/parameters/Account"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Record"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/environments/{E}/accounts/{A}/labels": {
+      "get": {
+        "operationId": "listLabels",
+        "tags": [
+          "learning"
+        ],
+        "x-required-scopes": [
+          "read:events"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Environment"
+          },
+          {
+            "$ref": "#/components/parameters/Account"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Record"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/environments/{E}/accounts/{A}/attributions": {
+      "get": {
+        "operationId": "listAttributions",
+        "tags": [
+          "learning"
+        ],
+        "x-required-scopes": [
+          "read:events"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Environment"
+          },
+          {
+            "$ref": "#/components/parameters/Account"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Record"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/parameters": {
+      "get": {
+        "operationId": "listParameters",
+        "tags": [
+          "learning"
+        ],
+        "x-required-scopes": [
+          "read:risk"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Record"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/parameter-versions": {
+      "get": {
+        "operationId": "listParameterVersions",
+        "tags": [
+          "learning"
+        ],
+        "x-required-scopes": [
+          "read:risk"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Record"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/learning-candidates": {
+      "get": {
+        "operationId": "listLearningCandidates",
+        "tags": [
+          "learning"
+        ],
+        "x-required-scopes": [
+          "read:risk"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Record"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createLearningCandidate",
+        "tags": [
+          "learning"
+        ],
+        "x-required-scopes": [
+          "write:parameters"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-idempotency": "same principal, RunKey, method, path, key and body returns first result; different body 409",
+        "x-retry": "same key only; timeout may be UNKNOWN; query job/reconcile before new intent",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WriteProposal"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reports": {
+      "get": {
+        "operationId": "listReports",
+        "tags": [
+          "research"
+        ],
+        "x-required-scopes": [
+          "read:risk"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Record"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/replay-runs": {
+      "get": {
+        "operationId": "listReplayRuns",
+        "tags": [
+          "research"
+        ],
+        "x-required-scopes": [
+          "read:risk"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Record"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createReplayRun",
+        "tags": [
+          "research"
+        ],
+        "x-required-scopes": [
+          "trade:simulate"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-idempotency": "same principal, RunKey, method, path, key and body returns first result; different body 409",
+        "x-retry": "same key only; timeout may be UNKNOWN; query job/reconcile before new intent",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WriteProposal"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/audit": {
+      "get": {
+        "operationId": "listAudit",
+        "tags": [
+          "audit"
+        ],
+        "x-required-scopes": [
+          "read:audit"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Record"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/audit/{id}": {
+      "get": {
+        "operationId": "getAudit",
+        "tags": [
+          "audit"
+        ],
+        "x-required-scopes": [
+          "read:audit"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Record"
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reconciliations": {
+      "get": {
+        "operationId": "listReconciliations",
+        "tags": [
+          "audit"
+        ],
+        "x-required-scopes": [
+          "read:audit"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Record"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jobs/{id}": {
+      "get": {
+        "operationId": "getJob",
+        "tags": [
+          "jobs"
+        ],
+        "x-required-scopes": [
+          "read:audit"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Job"
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-authorization-rule": "original command principal may read own job; otherwise read:audit with matching environment/account binding"
+      }
+    },
+    "/jobs/{id}/events": {
+      "get": {
+        "operationId": "listJobEvents",
+        "tags": [
+          "jobs"
+        ],
+        "x-required-scopes": [
+          "read:audit"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Record"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-authorization-rule": "original command principal may read own job; otherwise read:audit with matching environment/account binding"
+      }
+    },
+    "/api-keys": {
+      "get": {
+        "operationId": "listApiKeys",
+        "tags": [
+          "admin"
+        ],
+        "x-required-scopes": [
+          "admin:apikey"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ApiKey"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createApiKey",
+        "tags": [
+          "admin"
+        ],
+        "x-required-scopes": [
+          "admin:apikey"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ApiKeyIssueResult"
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-idempotency": "repeat creates no new key and returns metadata with secret_available=false; lost secret requires rotation",
+        "x-retry": "same key only; timeout may be UNKNOWN; query job/reconcile before new intent",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiKeyCreate"
+              }
+            }
+          }
+        },
+        "x-secret-once": true
+      }
+    },
+    "/api-keys/{id}": {
+      "get": {
+        "operationId": "getApiKey",
+        "tags": [
+          "admin"
+        ],
+        "x-required-scopes": [
+          "admin:apikey"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ApiKey"
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/permissions/{id}": {
+      "get": {
+        "operationId": "getPermissions",
+        "tags": [
+          "admin"
+        ],
+        "x-required-scopes": [
+          "admin:permissions"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Record"
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updatePermissions",
+        "tags": [
+          "admin"
+        ],
+        "x-required-scopes": [
+          "admin:permissions"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-idempotency": "same principal, RunKey, method, path, key and body returns first result; different body 409",
+        "x-retry": "same key only; timeout may be UNKNOWN; query job/reconcile before new intent",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PermissionUpdate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/analysis/jobs": {
+      "post": {
+        "operationId": "createAnalysisJob",
+        "tags": [
+          "analysis"
+        ],
+        "x-required-scopes": [
+          "analysis:request"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-idempotency": "same principal, RunKey, method, path, key and body returns first result; different body 409",
+        "x-retry": "same key only; timeout may be UNKNOWN; query job/reconcile before new intent",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalysisJobRequest"
+              }
+            }
+          }
+        },
+        "x-signal-effect": "RESEARCH_ONLY; cannot create or upgrade SIM/LIVE eligibility",
+        "x-queue-class": "research-analysis; never dispatches a trading-analysis job"
+      }
+    },
+    "/analysis-candidates": {
+      "post": {
+        "operationId": "submitAnalysisCandidate",
+        "tags": [
+          "analysis"
+        ],
+        "x-required-scopes": [
+          "analysis:submit-research"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-idempotency": "same principal, RunKey, method, path, key and body returns first result; different body 409",
+        "x-retry": "same key only; timeout may be UNKNOWN; query job/reconcile before new intent",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResearchCandidateSubmission"
+              }
+            }
+          }
+        },
+        "x-signal-effect": "RESEARCH_ONLY; cannot create or upgrade SIM/LIVE eligibility"
+      }
+    },
+    "/evidence/import-jobs": {
+      "post": {
+        "operationId": "importEvidence",
+        "tags": [
+          "analysis"
+        ],
+        "x-required-scopes": [
+          "analysis:submit-research"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-idempotency": "same principal, RunKey, method, path, key and body returns first result; different body 409",
+        "x-retry": "same key only; timeout may be UNKNOWN; query job/reconcile before new intent",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WriteProposal"
+              }
+            }
+          }
+        },
+        "x-signal-effect": "RESEARCH_ONLY; cannot create or upgrade SIM/LIVE eligibility"
+      }
+    },
+    "/events/{id}/review": {
+      "post": {
+        "operationId": "reviewEvent",
+        "tags": [
+          "analysis"
+        ],
+        "x-required-scopes": [
+          "analysis:submit-research"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-idempotency": "same principal, RunKey, method, path, key and body returns first result; different body 409",
+        "x-retry": "same key only; timeout may be UNKNOWN; query job/reconcile before new intent",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WriteProposal"
+              }
+            }
+          }
+        },
+        "x-signal-effect": "RESEARCH_ONLY; cannot create or upgrade SIM/LIVE eligibility"
+      }
+    },
+    "/environments/{E}/accounts/{A}/simulations": {
+      "post": {
+        "operationId": "createSimulation",
+        "tags": [
+          "research"
+        ],
+        "x-required-scopes": [
+          "trade:simulate"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Environment"
+          },
+          {
+            "$ref": "#/components/parameters/Account"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-idempotency": "same principal, RunKey, method, path, key and body returns first result; different body 409",
+        "x-retry": "same key only; timeout may be UNKNOWN; query job/reconcile before new intent",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WriteProposal"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/environments/{E}/accounts/{A}/trade-requests": {
+      "post": {
+        "operationId": "createTradeRequest",
+        "tags": [
+          "trading"
+        ],
+        "x-required-scopes": [
+          "trade:simulate",
+          "trade:live"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Environment"
+          },
+          {
+            "$ref": "#/components/parameters/Account"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-idempotency": "same principal, RunKey, method, path, key and body returns first result; different body 409",
+        "x-retry": "same key only; timeout may be UNKNOWN; query job/reconcile before new intent",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TradeRequest"
+              }
+            }
+          }
+        },
+        "x-authorization-rule": "SIM requires trade:simulate; LIVE requires trade:live; both require exact environment/account binding and risk approval"
+      }
+    },
+    "/environments/{E}/accounts/{A}/positions/{id}/reduce-requests": {
+      "post": {
+        "operationId": "requestReduce",
+        "tags": [
+          "trading"
+        ],
+        "x-required-scopes": [
+          "trade:simulate",
+          "trade:live"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Environment"
+          },
+          {
+            "$ref": "#/components/parameters/Account"
+          },
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-idempotency": "same principal, RunKey, method, path, key and body returns first result; different body 409",
+        "x-retry": "same key only; timeout may be UNKNOWN; query job/reconcile before new intent",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TradeRequest"
+              }
+            }
+          }
+        },
+        "x-authorization-rule": "SIM requires trade:simulate; LIVE requires trade:live; both require exact environment/account binding and risk approval"
+      }
+    },
+    "/learning-candidates/{id}/validate": {
+      "post": {
+        "operationId": "validateLearningCandidate",
+        "tags": [
+          "learning"
+        ],
+        "x-required-scopes": [
+          "write:parameters"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-idempotency": "same principal, RunKey, method, path, key and body returns first result; different body 409",
+        "x-retry": "same key only; timeout may be UNKNOWN; query job/reconcile before new intent",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/environments/{E}/accounts/{A}/learning/freeze": {
+      "post": {
+        "operationId": "freezeLearning",
+        "tags": [
+          "learning"
+        ],
+        "x-required-scopes": [
+          "write:strategy-control"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Environment"
+          },
+          {
+            "$ref": "#/components/parameters/Account"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-idempotency": "same principal, RunKey, method, path, key and body returns first result; different body 409",
+        "x-retry": "same key only; timeout may be UNKNOWN; query job/reconcile before new intent",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/environments/{E}/accounts/{A}/learning/resume": {
+      "post": {
+        "operationId": "resumeLearning",
+        "tags": [
+          "learning"
+        ],
+        "x-required-scopes": [
+          "write:strategy-control"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Environment"
+          },
+          {
+            "$ref": "#/components/parameters/Account"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-idempotency": "same principal, RunKey, method, path, key and body returns first result; different body 409",
+        "x-retry": "same key only; timeout may be UNKNOWN; query job/reconcile before new intent",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/environments/{E}/accounts/{A}/start": {
+      "post": {
+        "operationId": "startRun",
+        "tags": [
+          "operations"
+        ],
+        "x-required-scopes": [
+          "ops:start",
+          "trade:live"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Environment"
+          },
+          {
+            "$ref": "#/components/parameters/Account"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-idempotency": "same principal, RunKey, method, path, key and body returns first result; different body 409",
+        "x-retry": "same key only; timeout may be UNKNOWN; query job/reconcile before new intent",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandRequest"
+              }
+            }
+          }
+        },
+        "x-authorization-rule": "ops:start always; trade:live additionally for LIVE; phase gates and reconciliation required"
+      }
+    },
+    "/environments/{E}/accounts/{A}/stop": {
+      "post": {
+        "operationId": "stopRun",
+        "tags": [
+          "operations"
+        ],
+        "x-required-scopes": [
+          "ops:stop"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Environment"
+          },
+          {
+            "$ref": "#/components/parameters/Account"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-idempotency": "same principal, RunKey, method, path, key and body returns first result; different body 409",
+        "x-retry": "same key only; timeout may be UNKNOWN; query job/reconcile before new intent",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/environments/{E}/accounts/{A}/emergency-stop": {
+      "post": {
+        "operationId": "emergencyStop",
+        "tags": [
+          "operations"
+        ],
+        "x-required-scopes": [
+          "ops:emergency-stop"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Environment"
+          },
+          {
+            "$ref": "#/components/parameters/Account"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-idempotency": "same principal, RunKey, method, path, key and body returns first result; different body 409",
+        "x-retry": "same key only; timeout may be UNKNOWN; query job/reconcile before new intent",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/environments/{E}/accounts/{A}/recover": {
+      "post": {
+        "operationId": "recoverRun",
+        "tags": [
+          "operations"
+        ],
+        "x-required-scopes": [
+          "ops:recover"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Environment"
+          },
+          {
+            "$ref": "#/components/parameters/Account"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-idempotency": "same principal, RunKey, method, path, key and body returns first result; different body 409",
+        "x-retry": "same key only; timeout may be UNKNOWN; query job/reconcile before new intent",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/environments/{E}/accounts/{A}/reconcile": {
+      "post": {
+        "operationId": "reconcileRun",
+        "tags": [
+          "operations"
+        ],
+        "x-required-scopes": [
+          "ops:recover"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Environment"
+          },
+          {
+            "$ref": "#/components/parameters/Account"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-idempotency": "same principal, RunKey, method, path, key and body returns first result; different body 409",
+        "x-retry": "same key only; timeout may be UNKNOWN; query job/reconcile before new intent",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api-keys/{id}/rotate": {
+      "post": {
+        "operationId": "rotateApiKey",
+        "tags": [
+          "admin"
+        ],
+        "x-required-scopes": [
+          "admin:apikey"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ApiKeyIssueResult"
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-idempotency": "repeat creates no new key and returns metadata with secret_available=false; lost secret requires rotation",
+        "x-retry": "same key only; timeout may be UNKNOWN; query job/reconcile before new intent",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandRequest"
+              }
+            }
+          }
+        },
+        "x-secret-once": true
+      }
+    },
+    "/api-keys/{id}/revoke": {
+      "post": {
+        "operationId": "revokeApiKey",
+        "tags": [
+          "admin"
+        ],
+        "x-required-scopes": [
+          "admin:apikey"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-idempotency": "same principal, RunKey, method, path, key and body returns first result; different body 409",
+        "x-retry": "same key only; timeout may be UNKNOWN; query job/reconcile before new intent",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/config-proposals": {
+      "post": {
+        "operationId": "createConfigProposal",
+        "tags": [
+          "admin"
+        ],
+        "x-required-scopes": [
+          "admin:permissions"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-idempotency": "same principal, RunKey, method, path, key and body returns first result; different body 409",
+        "x-retry": "same key only; timeout may be UNKNOWN; query job/reconcile before new intent",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WriteProposal"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/config-proposals/{id}/activate": {
+      "post": {
+        "operationId": "activateConfigProposal",
+        "tags": [
+          "admin"
+        ],
+        "x-required-scopes": [
+          "admin:permissions"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-idempotency": "same principal, RunKey, method, path, key and body returns first result; different body 409",
+        "x-retry": "same key only; timeout may be UNKNOWN; query job/reconcile before new intent",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/phase-gates/{id}/attest": {
+      "post": {
+        "operationId": "attestPhaseGate",
+        "tags": [
+          "admin"
+        ],
+        "x-required-scopes": [
+          "admin:permissions"
+        ],
+        "x-environment-account-binding": "required when path or body names an environment/account",
+        "x-audit": "all commands and authorization failures; queries according to access policy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-idempotency": "same principal, RunKey, method, path, key and body returns first result; different body 409",
+        "x-retry": "same key only; timeout may be UNKNOWN; query job/reconcile before new intent",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WriteProposal"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/live": {
+      "get": {
+        "operationId": "healthLive",
+        "tags": [
+          "health"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Record"
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "healthReady",
+        "tags": [
+          "health"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Versioned response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Envelope",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema_version",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "schema_version": {
+                      "const": "1.0"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Record"
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events/stream": {
+      "get": {
+        "operationId": "streamEvents",
+        "tags": [
+          "stream"
+        ],
+        "x-required-scopes": [
+          "read:market",
+          "read:events",
+          "read:portfolio",
+          "read:risk"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Cursor"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Read-only SSE; recover gaps through queries",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/analysis-candidates/{id}": {
+      "get": {
+        "operationId": "getAnalysisCandidate",
+        "tags": [
+          "analysis"
+        ],
+        "x-required-scopes": [
+          "read:events"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Research candidate or redacted internal candidate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Record"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

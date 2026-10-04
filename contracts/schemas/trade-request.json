@@ -1,0 +1,52 @@
+{
+  "title": "TradeRequest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "environment_id",
+    "account_id",
+    "intent_type",
+    "reason",
+    "expected_state_version"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.1"
+    },
+    "environment_id": {
+      "enum": [
+        "SIM",
+        "LIVE"
+      ]
+    },
+    "account_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "intent_type": {
+      "enum": [
+        "STRATEGY_REEVALUATE",
+        "REDUCE",
+        "FLATTEN"
+      ]
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "expected_state_version": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "instrument_id": {
+      "const": "SOXLUSDT"
+    },
+    "max_abs_quantity": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]+)?$"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

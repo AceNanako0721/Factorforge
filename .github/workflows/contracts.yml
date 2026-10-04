@@ -1,0 +1,56 @@
+name: Repository
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+
+jobs:
+  repository-checks:
+    name: repository-checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+      - name: Check actual public Git content and reachable history
+        run: python tools/check_public_tree.py --all-history
+      - name: Check baseline and PR version classification
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -n "$PR_BASE_SHA" ]; then
+            python tools/check_repository.py --base "$PR_BASE_SHA"
+          else
+            python tools/check_repository.py
+          fi
+      - name: Exercise private-file, history and version guards
+        run: python -m unittest discover -s tests -v
+      - name: Check historical design and current layer traceability
+        run: |
+          python doc/.requirements-build/audit_detail_v11.py
+          python doc/.v20-build/audit_v20.py
+
+  contract-checks:
+    name: contract-checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+      - name: Install locked contract validators
+        run: python -m pip install -r contracts/requirements.txt
+      - name: Lint OpenAPI, validate fixtures and frozen surface, generate stubs
+        run: python contracts/check_contract.py

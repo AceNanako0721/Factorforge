@@ -1,0 +1,68 @@
+{
+  "title": "RiskState",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "environment_id",
+    "account_id",
+    "state",
+    "as_of_utc",
+    "risk_version"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.1"
+    },
+    "environment_id": {
+      "enum": [
+        "SIM",
+        "LIVE"
+      ]
+    },
+    "account_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "state": {
+      "enum": [
+        "NORMAL",
+        "DEGRADED",
+        "RISK_LOCKED",
+        "EMERGENCY",
+        "RECOVERY_CHECK"
+      ]
+    },
+    "as_of_utc": {
+      "type": "string",
+      "format": "date-time",
+      "description": "RFC3339 UTC, suffix Z"
+    },
+    "risk_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "account_loss_mode": {
+      "enum": [
+        "OBSERVE",
+        "ENFORCE"
+      ]
+    },
+    "lock_reasons": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "gross_notional_usdt": {
+      "type": "string",
+      "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$"
+    },
+    "pending_worst_case_usdt": {
+      "type": "string",
+      "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

@@ -1,0 +1,133 @@
+{
+  "title": "Claim",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "claim_id",
+    "evidence_id",
+    "evidence_hash",
+    "span_ids",
+    "normalized_fact",
+    "entities",
+    "numbers",
+    "extractor_version",
+    "extraction_status",
+    "available_at_utc"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.1"
+    },
+    "claim_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_hash": {
+      "type": "string",
+      "minLength": 1
+    },
+    "span_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "normalized_fact": {
+      "type": "string",
+      "minLength": 1
+    },
+    "entities": {
+      "type": "array",
+      "items": {
+        "title": "ClaimEntity",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "entity_id",
+          "name"
+        ],
+        "properties": {
+          "entity_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "as_of_utc": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$"
+          }
+        }
+      }
+    },
+    "numbers": {
+      "type": "array",
+      "items": {
+        "title": "ClaimNumber",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "value",
+          "unit"
+        ],
+        "properties": {
+          "value": {
+            "type": "string",
+            "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$"
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "currency": {
+            "type": "string",
+            "minLength": 1
+          },
+          "at_utc": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$"
+          }
+        }
+      }
+    },
+    "extractor_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "extraction_status": {
+      "enum": [
+        "EXTRACTED",
+        "PARTIAL",
+        "UNKNOWN",
+        "REJECTED"
+      ]
+    },
+    "fact_at_utc": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "available_at_utc": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "revision_of_claim_id": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

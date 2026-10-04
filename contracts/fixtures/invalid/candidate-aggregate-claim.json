@@ -1,0 +1,71 @@
+{
+  "_schema": "analysis-candidate.json",
+  "data": {
+    "schema_version": "1.1",
+    "analysis_run_id": "run-001",
+    "question_set_version": "event-v1",
+    "prompt_version": "private-prompt-fixture",
+    "requested_model": "mock-model",
+    "resolved_model_version": "mock-1",
+    "evidence_ids": [
+      "evidence-001"
+    ],
+    "evidence_hashes": [
+      "sha256-fixture-001"
+    ],
+    "quoted_span_ids": [
+      "span-001"
+    ],
+    "claim_results": [
+      {
+        "claim_id": "c001",
+        "span_ids": [
+          "span-001"
+        ],
+        "question_id": "claim_supported",
+        "model_probability": 0.84,
+        "program_verification": "SUPPORTED",
+        "verification_reasons": []
+      }
+    ],
+    "raw_probabilities": {
+      "claim_supported:c001": {
+        "kind": "Noul",
+        "raw_value": 0.84
+      },
+      "direction": {
+        "kind": "Choice",
+        "raw_value": {
+          "UP": 0.7,
+          "DOWN": 0.1,
+          "NEUTRAL": 0.2
+        }
+      }
+    },
+    "unknown_fields": [],
+    "provider_trace_id": "mock-trace-001",
+    "latency_ms": 12,
+    "cost": {
+      "amount": "0",
+      "currency": "USD"
+    },
+    "extractor_version": "mock-extractor-1",
+    "provenance": {
+      "origin": "INTERNAL_PROVIDER",
+      "workload_identity": "internal-analysis-fixture",
+      "attestation_hash": "sha256-attestation-fixture",
+      "provider_id": "mock",
+      "extractor_version": "mock-extractor-1",
+      "evidence_manifest_hash": "sha256-manifest-fixture"
+    },
+    "event_type": "COMPANY_EARNINGS",
+    "direction": "UP",
+    "strength_band": 1,
+    "relevance": 0.5,
+    "novelty": 0.5,
+    "unexpectedness": 0.5,
+    "impact_horizon_band": "fixture-band",
+    "uncertainties": [],
+    "available_at_utc": "2026-09-27T00:00:00Z"
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "title": "Job",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "job_id",
+    "status",
+    "status_url"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.1"
+    },
+    "job_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "QUEUED",
+        "RUNNING",
+        "SUCCEEDED",
+        "FAILED",
+        "UNKNOWN",
+        "CANCELED"
+      ]
+    },
+    "status_url": {
+      "type": "string",
+      "minLength": 1
+    },
+    "result_url": {
+      "type": "string",
+      "minLength": 1
+    },
+    "error": {
+      "$ref": "./problem.json"
+    },
+    "created_at_utc": {
+      "type": "string",
+      "format": "date-time",
+      "description": "RFC3339 UTC, suffix Z"
+    },
+    "updated_at_utc": {
+      "type": "string",
+      "format": "date-time",
+      "description": "RFC3339 UTC, suffix Z"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

@@ -1,0 +1,44 @@
+{
+  "title": "PermissionUpdate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "expected_version",
+    "scopes",
+    "environment_id",
+    "account_id",
+    "reason"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.1"
+    },
+    "expected_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scopes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "./api-scope.json"
+      }
+    },
+    "environment_id": {
+      "enum": [
+        "SIM",
+        "LIVE"
+      ]
+    },
+    "account_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

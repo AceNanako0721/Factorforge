@@ -1,0 +1,22 @@
+{
+  "title": "ApiKeyIssueResult",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "key",
+    "secret_available"
+  ],
+  "properties": {
+    "key": {
+      "$ref": "./api-key.json"
+    },
+    "secret_available": {
+      "type": "boolean"
+    },
+    "secret": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

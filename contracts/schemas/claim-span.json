@@ -1,0 +1,44 @@
+{
+  "title": "ClaimSpan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "span_id",
+    "evidence_id",
+    "evidence_hash",
+    "start_offset",
+    "end_offset",
+    "span_hash"
+  ],
+  "properties": {
+    "span_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_hash": {
+      "type": "string",
+      "minLength": 1
+    },
+    "start_offset": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "end_offset": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "span_hash": {
+      "type": "string",
+      "minLength": 1
+    },
+    "license_ref": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

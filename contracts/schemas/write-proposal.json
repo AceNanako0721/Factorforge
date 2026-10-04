@@ -1,0 +1,36 @@
+{
+  "title": "WriteProposal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "reason",
+    "expected_version",
+    "payload"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.1"
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1
+    },
+    "expected_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "evidence_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

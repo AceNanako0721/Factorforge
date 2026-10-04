@@ -1,0 +1,70 @@
+{
+  "title": "Run",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "environment_id",
+    "account_id",
+    "phase",
+    "state",
+    "state_version"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.1"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "environment_id": {
+      "enum": [
+        "SIM",
+        "LIVE"
+      ]
+    },
+    "account_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "created_at_utc": {
+      "type": "string",
+      "format": "date-time",
+      "description": "RFC3339 UTC, suffix Z"
+    },
+    "phase": {
+      "enum": [
+        "R0",
+        "R1",
+        "R2",
+        "R3",
+        "R4"
+      ]
+    },
+    "state": {
+      "enum": [
+        "INITIALIZING",
+        "NORMAL",
+        "DEGRADED",
+        "RISK_LOCKED",
+        "EMERGENCY",
+        "RECOVERY_CHECK"
+      ]
+    },
+    "state_version": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "account_fingerprint": {
+      "type": "string",
+      "minLength": 1
+    },
+    "last_healthy_at_utc": {
+      "type": "string",
+      "format": "date-time",
+      "description": "RFC3339 UTC, suffix Z"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

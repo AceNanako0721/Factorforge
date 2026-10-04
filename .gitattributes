@@ -1,0 +1,18 @@
+* text=auto eol=lf
+*.py text eol=lf
+*.ps1 text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.toml text eol=lf
+.githooks/* text eol=lf
+*.docx binary
+*.png binary
+*.jpg binary
+*.pdf binary
+# Preserve the exact bytes of historical document baselines.
+doc/v0.1/** -text
+doc/v1.0/** -text
+doc/v1.1/** -text
+doc/v2.0/** -text

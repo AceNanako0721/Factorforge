@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+if command -v python >/dev/null 2>&1; then
+    python tools/check_public_tree.py --index
+else
+    python3 tools/check_public_tree.py --index
+fi

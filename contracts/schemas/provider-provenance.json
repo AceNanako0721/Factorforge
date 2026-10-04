@@ -1,0 +1,39 @@
+{
+  "title": "ProviderProvenance",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "origin",
+    "workload_identity",
+    "attestation_hash",
+    "provider_id",
+    "extractor_version",
+    "evidence_manifest_hash"
+  ],
+  "properties": {
+    "origin": {
+      "const": "INTERNAL_PROVIDER"
+    },
+    "workload_identity": {
+      "type": "string",
+      "minLength": 1
+    },
+    "attestation_hash": {
+      "type": "string",
+      "minLength": 1
+    },
+    "provider_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "extractor_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_manifest_hash": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

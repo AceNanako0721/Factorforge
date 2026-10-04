@@ -1,0 +1,76 @@
+{
+  "title": "Decision",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "environment_id",
+    "account_id",
+    "cycle_id",
+    "parameter_version",
+    "risk_decision_id",
+    "reason_codes",
+    "input_manifest_hash"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.1"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "environment_id": {
+      "enum": [
+        "SIM",
+        "LIVE"
+      ]
+    },
+    "account_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "created_at_utc": {
+      "type": "string",
+      "format": "date-time",
+      "description": "RFC3339 UTC, suffix Z"
+    },
+    "cycle_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "parameter_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "risk_decision_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reason_codes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "input_manifest_hash": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_quantity": {
+      "type": "string",
+      "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$"
+    },
+    "actual_quantity": {
+      "type": "string",
+      "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$"
+    },
+    "pending_quantity": {
+      "type": "string",
+      "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}
