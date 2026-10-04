@@ -51,7 +51,7 @@ def path_issue(path):
     return None
 
 
-def template_issue(path, content):
+def template_issue(path, content, *, historical_templates=False):
     try:
         if path == "config/config.example.toml":
             value = tomllib.loads(content.decode("utf-8"))
@@ -76,8 +76,16 @@ def template_issue(path, content):
             allowed = {"schema_version", "mode", "runtime", "services", "credentials", "application", "trading"}
             if set(value) != allowed:
                 return "unrecognized-template-section"
+            trading = {"adapter": "mock", "allow_live": False,
+                       "account_id": "", "principal_id": "", "permissions": []}
+            valid_trading = value["trading"] == trading
+            # Frozen releases predate the empty principal/account bindings.
+            # Accept only their exact safe shape when scanning older commits;
+            # the index and current HEAD still require the complete template.
+            if historical_templates:
+                valid_trading |= value["trading"] == {"adapter": "mock", "allow_live": False}
             if (value["runtime"] != {"environment": "SIM", "instance_id": "soxl-jev"}
-                    or value["trading"] != {"adapter": "mock", "allow_live": False, "account_id": "", "principal_id": "", "permissions": []}
+                    or not valid_trading
                     or value["application"] != {"prompt_file": "prompts/prompts.local.json"}):
                 return "unrecognized-template-field"
         elif path == "prompts/prompts.example.json":
@@ -109,10 +117,10 @@ def template_issue(path, content):
     return None
 
 
-def content_issues(path, content):
+def content_issues(path, content, *, historical_templates=False):
     issues = []
     if path in PUBLIC_TEMPLATES:
-        issue = template_issue(path, content)
+        issue = template_issue(path, content, historical_templates=historical_templates)
         if issue:
             issues.append(issue)
     payloads = [content]
@@ -139,7 +147,11 @@ def content_issues(path, content):
 
 
 def scan(root=ROOT, revision=None, history=False):
-    revisions = git(root, "rev-list", "--all").decode().splitlines() if history else [revision]
+    head = git(root, "rev-parse", "HEAD").decode().strip() if history else None
+    # HEAD goes first so blob deduplication never skips its strict validation
+    # when the same template also appears on an older branch.
+    revisions = ([head] + [commit for commit in git(root, "rev-list", "--all").decode().splitlines()
+                           if commit != head]) if history else [revision]
     errors, checked = set(), set()
     templates_seen = set()
     for commit in revisions:
@@ -157,7 +169,8 @@ def scan(root=ROOT, revision=None, history=False):
                 errors.add((path, "unsupported-link-or-file-mode"))
                 continue
             content = git(root, "cat-file", "blob", sha)
-            errors.update((path, issue) for issue in content_issues(path, content))
+            errors.update((path, issue) for issue in content_issues(
+                path, content, historical_templates=history and commit != head))
     # A pre-commit index must retain both templates. History can include early
     # commits predating template introduction, so require them across the scan.
     if PUBLIC_TEMPLATES - templates_seen:

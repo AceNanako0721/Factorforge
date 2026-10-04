@@ -82,6 +82,24 @@ class RepositoryGuards(unittest.TestCase):
         self.assertEqual(scan(self.root, revision="HEAD")[0], [])
         self.assertIn(("leak.txt", "github-token"), scan(self.root, history=True)[0])
 
+    def test_legacy_template_allowed_only_in_frozen_history(self):
+        path = self.root / "config/config.example.toml"
+        current = path.read_bytes()
+        legacy = current
+        for field in (b'account_id = ""', b'principal_id = ""', b'permissions = []'):
+            legacy = legacy.replace(field, b"")
+        path.write_bytes(legacy)
+        self.commit("legacy empty template")
+        self.assertIn(("config/config.example.toml", "unrecognized-template-field"),
+                      scan(self.root, history=True)[0])
+        path.write_bytes(current)
+        self.commit("add empty identity bindings")
+        self.assertEqual(scan(self.root, history=True)[0], [])
+        self.assertEqual(scan(self.root)[0], [])
+        unsafe = legacy + b'\npassword = "short"\n'
+        self.assertEqual(template_issue("config/config.example.toml", unsafe,
+                                        historical_templates=True), "unrecognized-template-field")
+
     def test_docx_hidden_xml_credential_detected(self):
         payload = BytesIO()
         with ZipFile(payload, "w") as archive:
