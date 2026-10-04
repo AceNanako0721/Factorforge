@@ -231,3 +231,35 @@ def test_signed_protection_worker_confirms_physical_cover_on_first_poll(harness)
         with pytest.raises(AmbiguousResult):
             broker.query_protection(store.read(key), item.protection_id)
         response[field] = original
+
+
+def test_v3_account_balances_use_separate_configuration_for_trade_capability(harness):
+    calls = []
+    def handler(request):
+        calls.append((request.method, request.url.path))
+        if request.url.path == "/fapi/v3/account":
+            return httpx.Response(200, json={"totalWalletBalance": "1000.01", "totalMarginBalance": "1010.02",
+                "availableBalance": "900.03"})  # documented V3 shape has no canTrade
+        return httpx.Response(200, json={"canTrade": True, "dualSidePosition": False, "multiAssetsMargin": False})
+    broker = BinanceBroker(transport(handler, lambda: harness.run().clock))
+    account = broker.get_account(harness.run())
+    assert account["cash"] == Decimal("1000.01") and account["equity"] == Decimal("1010.02")
+    assert account["available_margin"] == Decimal("900.03")
+    assert calls == [("GET", "/fapi/v3/account"), ("GET", "/fapi/v1/accountConfig")]
+
+
+@pytest.mark.parametrize("configuration,code", [
+    ({"canTrade": False, "dualSidePosition": False, "multiAssetsMargin": False}, "VENUE_ACCOUNT_CANNOT_TRADE"),
+    ({"dualSidePosition": False, "multiAssetsMargin": False}, "VENUE_ACCOUNT_CANNOT_TRADE"),
+    ({"canTrade": True, "dualSidePosition": True, "multiAssetsMargin": False}, "TARGET_ACCOUNT_MODE_UNVERIFIED"),
+    ({"canTrade": True, "dualSidePosition": False, "multiAssetsMargin": True}, "TARGET_ACCOUNT_MODE_UNVERIFIED"),
+])
+def test_account_configuration_failures_remain_blocked(harness, configuration, code):
+    def handler(request):
+        if request.url.path == "/fapi/v3/account":
+            return httpx.Response(200, json={"totalWalletBalance": "1000", "totalMarginBalance": "1000",
+                "availableBalance": "1000"})
+        return httpx.Response(200, json=configuration)
+    broker = BinanceBroker(transport(handler, lambda: harness.run().clock))
+    with pytest.raises(TradingError, match=code):
+        broker.get_account(harness.run())

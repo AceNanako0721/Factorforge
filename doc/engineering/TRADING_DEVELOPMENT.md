@@ -64,14 +64,16 @@ market-collector --config runtime/api/config.toml --run-id <运行ID> --instrume
 
 用户已选择 Binance 合约测试网。其 REST 当前为 `https://demo-fapi.binance.com`。[官方说明](https://developers.binance.com/en/docs/products/derivatives-trading-usds-futures/general-info) 本地SIM与交易所测试网是两条验收路径；测试网使用签名渠道，在隔离的LIVE协议schema运行，资金仍为交易所模拟资金，不能证明生产LIVE准入。
 
-先在唯一私有配置填写测试网地址/Key/Secret。无数据库、无写权限的账户只读探针为：
+当前只读账户验证仅需在唯一私有配置填写测试网地址/Key/Secret；不要求账户标签、数据库或准入记录。运行服务才需要后述配置，由部署过程准备；不把完整部署清单作为填写API凭据的前置条件。无数据库、无写权限的账户只读探针为：
 
 ```sh
 python tools/check_trading_readiness.py --config config/config.toml
 python tools/probe_binance_testnet.py --config config/config.toml --timeout <超时> --recv-window-ms <签名窗口> --request-budget <请求预算> --budget-window-seconds <预算窗口> --output runtime/testnet/account-probe.json
 ```
 
-只读探针强制官方测试网主机，拒绝生产/其他端点，在签名传输层不安装写入许可，仅查询账户、持仓模式、多资产模式、普通单和条件单。报告只含脱敏状态/计数，保留在runtime，不打印密钥或原始账户正文。公开行情探针不需要Key：`python tools/probe_public_market.py --help`。
+只读探针强制官方测试网主机，拒绝生产/其他端点，在签名传输层不安装写入许可，仅查询账户、账户配置、持仓模式、多资产模式、普通单和条件单，共6个GET。V3账户接口返回余额，`canTrade`及账户模式由独立的`/fapi/v1/accountConfig`核验，缺失/禁用或不兼容模式仍拒绝，不把缺失字段默认为可交易。[官方账户接口](https://developers.binance.com/en/docs/catalog/core-trading-derivatives-trading-usd-s-m-futures/api/rest-api/account) 报告只含脱敏状态/计数，保留在runtime，不打印密钥或原始账户正文。公开行情探针不需要Key：`python tools/probe_public_market.py --help`。
+
+探针的请求预算是临时实验参数，应结合`exchangeInfo.rateLimits`的对应窗口限制和服务器已用权重登记。服务器权重包含已有IP流量；随意给一个低于已用权重的本地预算会在有效凭据下停止后续查询。完整执行的请求权重登记须包含`GET /fapi/v1/accountConfig`，不得用此次实验预算填充生产政策。
 
 完整签名执行还需显式登记 transport 请求权重、总预算、保护/撤单/减险的额度保留、超时、轮询和接收窗口，以及 account_policy、cost_model、账差容忍度、存储路径、账户币种与 live_readiness。该记录绑定账户、端点、规则版本、政策、有效期和真实证据引用，含不同的操作/复核职责；填写引用不是现场验证。亏损保护须全部ENFORCE；当前LIVE成本模型仅接受1倍线性单资产路径，更高杠杆LIVE明确拒绝。
 
