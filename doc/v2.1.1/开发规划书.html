@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="ff:version" content="2.1.1"><meta name="ff:kind" content="plan"><title>开发规划书 · Factorforge v2.1.1</title><style>
+:root{--ink:#172d40;--muted:#587083;--accent:#006e82;--line:#cfdee5;--paper:#fff;--bg:#edf3f6}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.8 system-ui,'Microsoft YaHei',sans-serif}
+a{color:var(--accent);text-underline-offset:3px;overflow-wrap:anywhere}header{background:#15384a;color:white;padding:28px max(24px,calc((100vw - 1320px)/2));border-bottom:5px solid #2eb6ad}
+header p{margin:0}header strong{font-size:23px}header a{color:#a9eee9}.shell{display:grid;grid-template-columns:245px minmax(0,1fr);gap:26px;max-width:1320px;margin:28px auto;padding:0 24px}
+nav{position:sticky;top:16px;align-self:start;max-height:calc(100vh - 32px);overflow:auto;padding:18px;background:var(--paper);border:1px solid var(--line);border-radius:12px;font-size:14px}
+nav a{display:block;padding:6px 0;text-decoration:none}main{overflow-wrap:anywhere;min-width:0;background:var(--paper);padding:30px 38px;border:1px solid var(--line);border-radius:12px}
+h1{font-size:30px;line-height:1.35;margin:0 0 18px}h2{font-size:23px;border-bottom:2px solid var(--line);padding:10px 0;margin:34px 0 18px;scroll-margin-top:20px}h3{font-size:18px;margin:25px 0 10px;scroll-margin-top:20px}p{margin:12px 0}
+.meta,.note{background:#eef7f8;border-left:4px solid var(--accent);padding:12px 16px;margin:18px 0;color:#294c60}.warning{background:#fff7e9;border-color:#d09b39}.table-wrap{overflow:auto;margin:18px 0}
+table{width:100%;border-collapse:collapse;font-size:14px}th{background:#e8f1f4;text-align:left}th,td{padding:11px 13px;border:1px solid var(--line);vertical-align:top;overflow-wrap:anywhere}td code{white-space:normal;overflow-wrap:anywhere}
+pre{padding:16px;background:#102d3d;color:#d8f2ed;border-radius:8px;overflow:auto;font:13px/1.7 Consolas,monospace}code{overflow-wrap:anywhere;font-family:Consolas,monospace;font-size:.9em;background:#edf3f6;padding:1px 4px;border-radius:3px}pre code{background:none;color:inherit;padding:0}
+figure{margin:24px 0;border:1px solid var(--line);border-radius:10px;padding:16px;background:#f8fbfc;overflow:auto}figure svg{display:block;width:100%;height:auto;min-width:520px}figcaption{font-size:14px;color:var(--muted);margin-top:12px}details{margin:12px 0}footer{color:var(--muted);font-size:13px;margin-top:28px;border-top:1px solid var(--line);padding-top:15px}li{margin:5px 0}.badge{display:inline-block;background:#d6eee8;color:#15564b;border-radius:5px;padding:0 7px;font-size:13px}
+@media(max-width:900px){.shell{display:block;padding:0 12px;margin:16px auto}nav{position:static;max-height:220px;margin-bottom:16px}main{padding:22px 18px}h1{font-size:25px}}
+@media print{body{background:white;font-size:11pt}.shell{display:block;margin:0;padding:0;max-width:none}nav,header{display:none}main{padding:0;border:0}h2,h3{break-after:avoid}figure,tr{break-inside:avoid}figure svg{min-width:0}pre{white-space:pre-wrap;overflow-wrap:anywhere}a{color:inherit}table{font-size:9pt}}
+</style></head><body><header><strong>Factorforge / 文档基线</strong><p>v2.1.1 · 2026-10-05 · 三层架构 · HTML 正文</p></header><div class="shell"><nav aria-label="文档目录"><a href="index.html">版本索引</a><a href="#section-1">阶段顺序与完成条件</a><a href="#section-2">每次继续开发</a><a href="#section-3">Go 迁移阶段（先于新应用启用）</a></nav><main><div class="meta">开发规划书</div><article id="document-body"><div class="note">本版调整目标实现为 Go 后端与浏览器 JavaScript（React/TypeScript 编译），三层职责和全部业务式样不变。旧 Python P1/P2 是迁移对照，目前尚未切换生产入口；Go 域计算已开始，HTTP/存储/执行迁移另行验收。以迁移进度为准，旧版验收不能移作 Go 运行证据。</div><div data-source-sha256="a7d6bca9bc4373a0a4574462af2f60ea14faab5fe6f5d04d86127f81ae62e7c0" data-source-document="开发规划书.md"><h1>Factorforge v2.1.1 开发规划书</h1>
+<p>版本：2.1.1；日期：2026年10月5日。用于持续AI开发保持方向；功能看对应式样书，代码实现看对应设计书。</p>
+<h2 id="section-1">阶段顺序与完成条件</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>应完成的事情</th>
+<th>完成条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>P1 交易系统层</td>
+<td>建立独立交易包、接口与配置；完成行情、模拟执行、实盘适配方向、保护、账户风险、幂等及恢复</td>
+<td>上层未安装时T1适用验收通过；实盘未验证能力明确未就绪</td>
+</tr>
+<tr>
+<td>P2 策略化框架层</td>
+<td>创建对象/事件/评分；完成情绪、兑现、仓位、止损计算、案例、归因、反事实及固定步长学习</td>
+<td>不安装应用层，以手工/夹具完成T2闭环，底层拒绝不能被绕过</td>
+</tr>
+<tr>
+<td>P3 SOXLUSDT/JEV实例</td>
+<td>完成监控、搜索、证据抽取、路由、JEV映射、框架提交、实例只读查询及配置；并行补齐下层通用只读追溯、独立Web管理台及HTML契约/页面验收</td>
+<td>T3与T4适用离线/联调通过；真实供应商、来源许可和未决配置有独立验证记录</td>
+</tr>
+<tr>
+<td>P4 理论与实时验证</td>
+<td>标定最少参数，完成无泄漏研究、前瞻影子、模拟及故障恢复；取得日亏损与双次数默认值证据</td>
+<td>核心假设、样本外/前瞻证据及适用安全验收满足R0～R2准入；不足就停止升级</td>
+</tr>
+<tr>
+<td>P5 有限实盘与交付</td>
+<td>关闭目标账户、DEC-06、预算和人工预案等阻塞；在另行授权下进行400 USDT上限实盘，完成运维及脱敏成果</td>
+<td>R3适用证据齐全；代码/文档/验收可追踪；公开发布及扩额各有授权</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="section-2">每次继续开发</h2>
+<p>只记录当前阶段、已完成需求及其证据、未完成需求、阻塞项和下一件工作。先完成下层再启用上层；阶段内可做不依赖阻塞项的工作。完成代码不等于业务验证通过，不因盈利自动升级。</p>
+<p>当前 Python P1/P2 及 v2.1.0 基线作为对照；先按 G0～G4 完成 Go 迁移，再推进新增只读查询、P3 与管理台。此规划不拆成大量工作包，不重新定义需求或填写待标定常数。</p>
+</div><h2 id="section-3">Go 迁移阶段（先于新应用启用）</h2><div class="table-wrap"><table><thead><tr><th>阶段</th><th>应完成事情</th><th>完成条件</th></tr></thead><tbody><tr><td>G0 设计与固定对照</td><td>发布 Go 设计，固定契约、源提交与合成行为结果</td><td>四组式样语义不变，设计配对完整，对照来源可查</td></tr><tr><td>G1 P1</td><td>迁移交易域、账务、仿真、API、存储、执行及运行工具</td><td>独立 Go P1 的适用 T1、SIM/故障/恢复验收通过</td></tr><tr><td>G2 P2</td><td>迁移情绪、周期、执行反馈、案例、学习、研究与权限/存储</td><td>逐周期对照及独立 Go T2、数据库/进程/SIM 验收通过</td></tr><tr><td>G3 工具与切换</td><td>替换活跃 Python 检查/构建/hooks/CI，隔离旧执行后恢复切换</td><td>无 Python 环境可构建测试运行，回退与隔离验证齐全</td></tr><tr><td>G4 上层</td><td>用 Go 实现 P3/console 后端和 React 浏览器页</td><td>原 T3/T4 分阶段通过，供应商/LIVE 原未决项不自动解除</td></tr></tbody></table></div></article><footer>HTML 是本版唯一发布正文。图表为内嵌 SVG，无需联网或运行脚本。文档通过不代表程序实现、交易运行或实盘准入通过。</footer></main></div></body></html>

@@ -5,7 +5,7 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 ROOT_DIRS = {".github", ".githooks", "src", "tests", "contracts", "doc", "tools", "config", "prompts"}
-TRADING_DIRS = {"domain", "application", "ports", "adapters", "api", "workers"}
+TRADING_DIRS = {"domain", "application", "ports", "adapters", "api", "workers", "entrypoints"}
 
 
 def check(root=ROOT):
@@ -52,6 +52,16 @@ def check(root=ROOT):
                         failures.append(name + ": reversed application dependency")
                     if area in {"adapters", "ports"} and imported.startswith(tuple(package+"."+x for x in ("application","api","workers","bootstrap"))):
                         failures.append(name + ": adapter/port depends on application entry")
+    # Migration phase: keep the Python guard and also parse native Go imports.
+    # The Go guard is independently runnable and becomes the sole entry at cutover.
+    if (root / "go.mod").is_file():
+        native = subprocess.run(["go", "run", "./tools/check-layout", "--root", str(root)],
+                                cwd=root, capture_output=True, text=True, check=False)
+        if native.returncode:
+            failures.extend(line.removeprefix("BLOCKED ") for line in native.stdout.splitlines()
+                            if line.startswith("BLOCKED "))
+            if not native.stdout.startswith("BLOCKED "):
+                failures.append("native Go layout guard could not complete")
     return sorted(set(failures))
 
 

@@ -21,6 +21,20 @@
         "03_SOXLUSDT_JEV应用实例",
         "04_Web管理台"
       ]
+    },
+    {
+      "version": "2.1.1",
+      "directory": "doc/v2.1.1",
+      "change_kind": "design",
+      "date": "2026-10-05",
+      "reason": "业务式样不变；四本设计改为 Go 后端、浏览器 JavaScript，开始 P1/P2 数值域重构并登记迁移切换门槛。",
+      "format": "html",
+      "document_pairs": [
+        "01_交易系统层",
+        "02_策略化框架层",
+        "03_SOXLUSDT_JEV应用实例",
+        "04_Web管理台"
+      ]
     }
   ]
 }

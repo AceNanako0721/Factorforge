@@ -1,8 +1,10 @@
 # Factorforge
 
-Factorforge 是分为交易系统、策略化框架、应用实例三层的事件情绪量化交易项目。当前发布基线为 **v2.1.0**，代码与公开文档采用 [MIT](LICENSE) 许可证。
+Factorforge 是分为交易系统、策略化框架、应用实例三层的事件情绪量化交易项目。当前开发基线为 **v2.1.1**（Go 设计与 P1 重构），既有发布对照为 v2.1.0，代码与公开文档采用 [MIT](LICENSE) 许可证。
 
-当前仓库已有三层式样书、对应设计书、仓库管理工具，以及 P1 独立交易层。P1 提供 API/CLI、公共行情采集、可重放撮合、保护工作池、目标撤替/反向续接、账户与组合风险、多币种账务、外部事实恢复、PostgreSQL 持久化和受准入控制的签名执行。P1 实现、本地验收和 Binance 合约测试网完整闭环已完成：实际挂撤单、响应丢失后原ID查询、物理止损触发成交、费用与资金对账、停机应急减仓及恢复、进程/网络隔离和存储故障检查均通过。范围和证据见 [P1 进度](doc/progress/P1.md)，操作见 [交易层运行说明](doc/engineering/TRADING_DEVELOPMENT.md)。
+后端正在由 Python 迁移为 Go；前端目标为 React/TypeScript 编译的 JavaScript。**P1 已完整重构为 Go 并完成本地运行验收**：交易核心、完整 API/CLI、PostgreSQL、SIM/Binance、保护/反馈/采集、独立进程及测试网验收工具均已迁移，运行路径不调用 Python。原生 Go 测试网只读/隔离/存储子集 12 项实际通过，本次没有交易所写请求；完整 Go 测试网交易复验与生产实盘准入单独登记。P2 数值域已迁移，完整框架尚待迁移。见 [迁移进度](doc/progress/GO_MIGRATION.md) 和 [Go 运行说明](doc/engineering/TRADING_GO.md)。
+
+P1 提供 API/CLI、公共行情采集、可重放撮合、保护工作池、目标撤替/反向续接、账户与组合风险、多币种账务、外部事实恢复、PostgreSQL 持久化和受准入控制的签名执行。原 Python P1 的 Binance 合约测试网完整闭环已完成，历史证据保留在 [P1 记录](doc/progress/P1.md)；该记录不能代替 Go 的现场交易验收。
 
 P2 已实现通用对象、事件与评分资格、逐贡献情绪账本、持仓与止损计算、P1 执行反馈、案例观察、归因与独立反事实、固定步长学习、自动发布回滚，以及 PostgreSQL 恢复和公共/工作负载权限隔离。独立安装 P1/P2 即可运行，P3 尚未实现。实现和本地 SIM 验收见 [P2 进度](doc/progress/P2.md)，操作见 [框架运行说明](doc/engineering/STRATEGY_DEVELOPMENT.md)。生产实盘须另行准入；本地机制验收不代表收益、学习收敛或核心研究假设获得验证。
 
@@ -10,7 +12,7 @@ P2 已实现通用对象、事件与评分资格、逐贡献情绪账本、持�
 
 ## 文档与依赖
 
-从 [当前 HTML 文档索引](doc/v2.1.0/index.html) 阅读，再读目标层式样书及对应设计书。应用实例依赖框架与交易层，框架依赖交易层，交易层可独立运行。SOXLUSDT/JEV 分析实例与 Web 管理台在第三层平级；具体标的与模型不进入下层通用实现。
+从 [当前 HTML 文档索引](doc/v2.1.1/index.html) 阅读，再读目标层式样书及对应设计书。应用实例依赖框架与交易层，框架依赖交易层，交易层可独立运行。SOXLUSDT/JEV 分析实例与 Web 管理台在第三层平级；具体标的与模型不进入下层通用实现。
 
 v2.1.0 新增 [Web 管理台仕様书](doc/v2.1.0/04_Web管理台式样书.html) 与 [设计书](doc/v2.1.0/04_Web管理台设计书.html)，分别记录功能/业务逻辑图与模块/实际接口/开源参考文件。P2/P3 通用只读追溯接口及管理台尚未实现。自本版起版本基线统一使用离线 HTML 和内嵌 SVG，旧版 Markdown/Word 冻结，不产生新版配套副本。
 
@@ -18,7 +20,9 @@ v2.1.0 新增 [Web 管理台仕様书](doc/v2.1.0/04_Web管理台式样书.html)
 | --- | --- |
 | `doc/v0.1`、`doc/v1.0`、`doc/v1.1` | 历史版本，冻结保留 |
 | `doc/v2.0` | 冻结的 v2.0.0 三层文档基线；保留原目录名 |
-| `doc/v2.1.0` | 当前 HTML 基线；四组配对，管理台与分析实例平级 |
+| `doc/v2.1.0` | 冻结的 HTML 基线与迁移行为对照 |
+| `doc/v2.1.1` | Go 设计与 P1 完整重构；四组式样业务正文保持 |
+| `go.mod`、`go.sum` | 唯一 Go 模块与固定依赖；旧 Python 包定义暂留 |
 | `doc/releases.json`、`VERSION` | 文档发布记录及当前基线 |
 | `contracts` | 历史 v1.1 接口契约及检查代码 |
 | `src/factorforge/trading` | P1 独立交易层源码；领域、应用、端口、适配器、API、执行进程 |
@@ -48,13 +52,21 @@ v2.1.0 新增 [Web 管理台仕様书](doc/v2.1.0/04_Web管理台式样书.html)
 
 ## 私有配置和提示词
 
-运行 `python tools/init_private_config.py`，创建本地 `config/config.toml` 和 `prompts/prompts.local.json`；已有文件不会被覆盖。Token、API 地址与密钥、数据库连接等集中在 `config/config.toml`。真实提示词只存于配置所指的本地提示词文件，应用层的 PromptProvider 读取它；源码、文档、提交、PR、日志与模型追踪不能复制真实提示词。
+运行 `go run ./tools/init-private-config`，创建本地 `config/config.toml` 和 `prompts/prompts.local.json`；已有文件不会被覆盖。Token、API 地址与密钥、数据库连接等集中在 `config/config.toml`。真实提示词只存于配置所指的本地提示词文件，应用层的 PromptProvider 读取它；源码、文档、提交、PR、日志与模型追踪不能复制真实提示词。
 
 两个目录在 GitHub 各只允许一个模板。模板中的凭据、地址和提示词内容为空，默认 mock/SIM，禁止实盘。当前初始化工具只准备私有文件，不启动服务或访问供应商。没有真实提示词或配置时，未来实现必须明确保持 mock/不可用状态，不能自动进入实盘。
 
 ## 本地检查
 
-需要 Python 3.11+ 和 Git。在项目根目录运行：
+迁移期需要 Go（go.mod 自动选择 Go 1.27.1）、Python 3.11+ 和 Git。先运行独立 Go 检查，再运行原回归：
+
+```sh
+go run ./tools/check-layout
+go test ./...
+go vet ./...
+```
+
+旧实现与迁移期仓库检查：
 
 ```sh
 python tools/install_hooks.py

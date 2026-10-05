@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="ff:version" content="2.1.1"><meta name="ff:kind" content="design"><meta name="ff:pair" content="03_SOXLUSDT_JEV应用实例式样书.html"><title>03_SOXLUSDT_JEV应用实例设计书 · Factorforge v2.1.1</title><style>
+:root{--ink:#172d40;--muted:#587083;--accent:#006e82;--line:#cfdee5;--paper:#fff;--bg:#edf3f6}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.8 system-ui,'Microsoft YaHei',sans-serif}
+a{color:var(--accent);text-underline-offset:3px;overflow-wrap:anywhere}header{background:#15384a;color:white;padding:28px max(24px,calc((100vw - 1320px)/2));border-bottom:5px solid #2eb6ad}
+header p{margin:0}header strong{font-size:23px}header a{color:#a9eee9}.shell{display:grid;grid-template-columns:245px minmax(0,1fr);gap:26px;max-width:1320px;margin:28px auto;padding:0 24px}
+nav{position:sticky;top:16px;align-self:start;max-height:calc(100vh - 32px);overflow:auto;padding:18px;background:var(--paper);border:1px solid var(--line);border-radius:12px;font-size:14px}
+nav a{display:block;padding:6px 0;text-decoration:none}main{overflow-wrap:anywhere;min-width:0;background:var(--paper);padding:30px 38px;border:1px solid var(--line);border-radius:12px}
+h1{font-size:30px;line-height:1.35;margin:0 0 18px}h2{font-size:23px;border-bottom:2px solid var(--line);padding:10px 0;margin:34px 0 18px;scroll-margin-top:20px}h3{font-size:18px;margin:25px 0 10px;scroll-margin-top:20px}p{margin:12px 0}
+.meta,.note{background:#eef7f8;border-left:4px solid var(--accent);padding:12px 16px;margin:18px 0;color:#294c60}.warning{background:#fff7e9;border-color:#d09b39}.table-wrap{overflow:auto;margin:18px 0}
+table{width:100%;border-collapse:collapse;font-size:14px}th{background:#e8f1f4;text-align:left}th,td{padding:11px 13px;border:1px solid var(--line);vertical-align:top;overflow-wrap:anywhere}td code{white-space:normal;overflow-wrap:anywhere}
+pre{padding:16px;background:#102d3d;color:#d8f2ed;border-radius:8px;overflow:auto;font:13px/1.7 Consolas,monospace}code{overflow-wrap:anywhere;font-family:Consolas,monospace;font-size:.9em;background:#edf3f6;padding:1px 4px;border-radius:3px}pre code{background:none;color:inherit;padding:0}
+figure{margin:24px 0;border:1px solid var(--line);border-radius:10px;padding:16px;background:#f8fbfc;overflow:auto}figure svg{display:block;width:100%;height:auto;min-width:520px}figcaption{font-size:14px;color:var(--muted);margin-top:12px}details{margin:12px 0}footer{color:var(--muted);font-size:13px;margin-top:28px;border-top:1px solid var(--line);padding-top:15px}li{margin:5px 0}.badge{display:inline-block;background:#d6eee8;color:#15564b;border-radius:5px;padding:0 7px;font-size:13px}
+@media(max-width:900px){.shell{display:block;padding:0 12px;margin:16px auto}nav{position:static;max-height:220px;margin-bottom:16px}main{padding:22px 18px}h1{font-size:25px}}
+@media print{body{background:white;font-size:11pt}.shell{display:block;margin:0;padding:0;max-width:none}nav,header{display:none}main{padding:0;border:0}h2,h3{break-after:avoid}figure,tr{break-inside:avoid}figure svg{min-width:0}pre{white-space:pre-wrap;overflow-wrap:anywhere}a{color:inherit}table{font-size:9pt}}
+</style></head><body><header><strong>Factorforge / 文档基线</strong><p>v2.1.1 · 2026-10-05 · 三层架构 · HTML 正文</p></header><div class="shell"><nav aria-label="文档目录"><a href="index.html">版本索引</a><a href="#section-1">1 包结构、配置与职责</a><a href="#section-2">2 从线索到可核验事实</a><a href="#section-3">3 确定性路由与资格</a><a href="#section-4">4 JEV适配与评分映射</a><a href="#section-5">5 框架调用时序与数据一致性</a><a href="#section-6">6 SOXLUSDT具体策略配置</a><a href="#section-7">6.1 产品和价格</a><a href="#section-8">6.2 日历和时段双次数</a><a href="#section-9">6.3 额度、账户保护与默认值</a><a href="#section-10">6.4 自动参数和报告</a><a href="#section-11">7 供应商、研究、运维准入</a><a href="#section-12">8 式样与验收映射</a><a href="#section-13">9 v2.1.0 追加：S3-018 只读投影</a><a href="#section-14">10 Go 实例模块、下层接口与进程边界</a><a href="#section-15">Go 迁移共同约束与切换门槛</a></nav><main><div class="meta">03_SOXLUSDT_JEV应用实例设计书 · <a href="03_SOXLUSDT_JEV应用实例式样书.html">对应仕様书</a></div><article id="document-body"><div class="note">本版采用 Go 后端与浏览器 JavaScript（React/TypeScript 编译），三层职责和业务式样不变。P1 已完成完整 Go 实现、本地运行验收及测试网只读/隔离/存储子集；完整 Go 现场交易复验单独登记。P2 数值域已迁移，完整框架及全局工具迁移继续进行；旧 Python 验收不能移作 Go 证据，生产实盘未准入。</div><div data-source-sha256="2fd8d0bb79dd1eb964b0603ce2aaad788690a01d06db9a74066cc04f53f2c807" data-source-document="03_SOXLUSDT_JEV应用实例设计书.md"><h1>SOXLUSDT / JEV 应用实例设计书</h1>
+<p>版本：2.1.1；日期：2026年10月5日。唯一对应式样书：<a href="03_SOXLUSDT_JEV%E5%BA%94%E7%94%A8%E5%AE%9E%E4%BE%8B%E5%BC%8F%E6%A0%B7%E4%B9%A6.html">SOXLUSDT / JEV 应用实例式样书</a>。本层生成 S3 的实例代码，调用下两层公开契约，不重写其量化算法。</p>
+<h2 id="section-1">1 包结构、配置与职责</h2>
+<p>实现 src/factorforge/applications/soxl_jev，子包 config、monitoring、evidence、routing、analysis、submission、reports、operations；独立入口 soxl-jev-api、ingest-worker、trading-analysis-worker、research-analysis-worker。只依赖 strategy DTO/client 与 trading 只读查询client，不导入其数据库和执行组件。所有实例产生的仓位目标由框架计算/提交；应用没有trading下单凭据或签名密钥。</p>
+<p>本层端口：MonitorSource、SearchProvider、RawEvidenceStore、EvidenceExtractor、JevDecisionProvider、PromptProvider、FrameworkClient、TradingReadClient、CalendarProvider、SecretProvider、Notifier。监控/搜索/抽取/模型各自可Mock；应用不需要新生产模型才能完成离线接口联调。替换JEV只替换本应用Provider及评测，不改变S2评分接口；v2.0仅实现一个生产模型适配方向。</p>
+<p>InstanceConfig字段：instance_id、environment、trading_run_key、instrument_key、object_id?、provider_binding、source_registry_version、entity_mapping_version、routing_policy_version、rubric_version、calibration_version、prompt_version_ref、parameter_snapshot_ref、price_proxy_binding、calendar_version、time_policy_version、risk_policy_ref、notional_cap、stage、analysis_budget、retention_policy、private_asset_refs。environment由部署身份固定不能在线任意改。InstrumentKey准确绑定币安目标永续产品，字符串SOXLUSDT不能替代product枚举和规则版本；InstrumentSpec来源是交易层能力查询。</p>
+<p>R0研究回放、R1影子、R2模拟、R3有限实盘、R4受控扩展。R0～R2实例名义绝对上限4000 USDT，R3测试400 USDT，R4仅按另行批准额度；值连同依据写不可学习的AccountPolicy。SIM本金/风险日必须登记，名义上限不是本金。R0/R1不发真实订单；R2用SimBroker；R3启用LIVE执行需下两层准入满足。</p>
+<h2 id="section-2">2 从线索到可核验事实</h2>
+<p>IngestScheduler按版本化频率运行监控源及搜索任务，源记录source_id、URL/domain、licence、可信类别、允许用途、更新频率、最大年龄、归档策略和激活范围。主题配置只包含已启用的半导体/相关公司/宏观政策/监管/行业/突发类别，范围映射有当时有效版本，不把当前成分信息回填历史。</p>
+<p>RawEvidence={evidence_id,source_id,url,content_hash,first_public_at,provider_published_at,received_at,revision_of?,licence_ref,storage_ref,fetch_status}；正文私有存储，证据引用保存摘要和哈希。正文视为数据，忽略其中要求发单/改Prompt/取消风险的指令。URL由搜索/源allowlist、协议及网络出口规则验证，拒绝本地/私有服务地址和跳转绕过；抓取超时、体积和重试有界。</p>
+<p>SearchJob={job_id,seed_evidence_id,query_plan_version,topics,cutoff_time,status,attempt,deadline}。搜索围绕原始公告、同事件已有报道、事前预期、事实修订及反向资料补全；搜索片段只作线索，须读取许可允许原文，无法读取则MISSING_ORIGINAL，不声称完成事实核验。抓取时刻不是历史首次可用时刻；无法证明当时可用的事后材料只能研究。</p>
+<p>EvidenceExtractor输出ExtractedEvidence={evidence_id,content_hash,extractor_id/version,claims,spans,extraction_status,completed_at,errors}。Claim与框架第2章类型一致，Span={span_id,start_offset,end_offset,text_hash,licence_ref}，claim_id从证据hash、规范事实版本和跨度确定。数字、单位、币种、主体、时间与原文核验，反向事实及限定条件也必须抽出。只抽出几个正确事实不能证明完整，production extractor须盲标漏抽/错抽、成本与许可验证；具体选型保留OD-01。</p>
+<p>EntityResolver依据历史版本将主体与SOXL/半导体主题及合约关联，输出object映射及证据。FamilyProposal给出主体、事项、期间、关键事实及可能前事件；框架EventService最终校验事件族。创建事件后即使尚未模型评分也保留event_id，便于补充证据及以后评分。</p>
+<h2 id="section-3">3 确定性路由与资格</h2>
+<p>EvidenceRoutingPolicy先检来源登记及目标环境allowlist，再检许可、当时实体/对象映射、抽取完整性、事件类型启用、新鲜度、重复/修订关系、provider/calibration状态与政策版本。route为TRADING_CANDIDATE/RESEARCH/QUARANTINE；任一安全信息未知不能进交易任务，不能让JEV自己选择LIVE资格。</p>
+<p>RoutingReceipt={routing_id,evidence_ids/hashes,claim_ids,input_manifest_hash,source_registry_version,entity_mapping_version,event_family_version,policy_version,object_id,environment,route,reason_codes,available_at,evaluated_at,issuer_identity,integrity_ref}。内部dispatcher持久化并产生交易任务；公共principal只能产生research job，不能传一个route=trading字段升级。框架最终Admission复核receipt与内部身份、环境、证据许可及已登记配置，不只信应用标签。</p>
+<p>公共ApiScope与内部WorkloadCapability的物理分离由框架授权服务实现。本应用read/operations API不写workload grants。生产trading评分worker通过受限WorkloadIdentity提交signal:sim或signal:live；research worker只有RESEARCH提交权限，数据库角色也不能领取/写交易队列表或读取信号身份凭据。实盘角色绑定特定instance/object，不可改成另一对象。</p>
+<p>研究和交易表分别为app_research_analysis_job、app_trading_analysis_job，不同数据库角色、领取SQL和worker池。LIVE与SIM交易任务另有硬保留并发/积压/预算；原文抓取与抽取也有交易保留预算，不只模型最后一步隔离。研究请求按principal速率、积压及每日预算限流429。共享供应商上游限流不能被本地两个表自动隔离，OD-02需实际并发/限流测试证明LIVE延迟，不能证明则保持实盘未就绪。</p>
+<p>job字段为job_id、instance_id、object_id、environment、routing_receipt_id或research_principal、evidence_manifest、question_set_version、deadline、status、attempt、budget_bucket、claimed_by、lease_until、provider_request_id、completed_at。状态QUEUED/CLAIMED/RUNNING/COMPLETED/ABSTAINED/EXPIRED/FAILED；claim超时恢复但保留provider请求ID及结果幂等。过期任务不转新实盘任务，不在恢复后补发过去周期交易。</p>
+<h2 id="section-4">4 JEV适配与评分映射</h2>
+<p>本设计沿用TypeSafe AI Jev这一产品身份，供应商文档于2026年10月4日复核。JEV接收状态与类型化问题，Choice用于分类，Score用于有序量表，Noul用于陈述真值；Noul没有单独confidence。它不是联网搜索器或自由文本事实抽取器。供应商页面说明同请求问题独立且共享状态，相关但无前置依赖的问题批量发送，真正依赖上轮答案的题再单独请求。<a href="https://docs.typesafe.ai/introduction">JEV介绍</a>、<a href="https://docs.typesafe.ai/primitives">问题原语</a></p>
+<p>JevDecisionProvider内部输入AnalysisRequest={request_id,evidence_manifest,claim_ids,object_context,available_cutoff,question_set_version,prompt_version_ref,rubric_version,requested_model,timeout,budget_bucket}。输出AnalysisCandidate={answers,claim_results,raw_distributions,resolved_model_version,provider_trace_id,latency,cost?,completed_at,unknown_fields,raw_output_ref}。本表是项目语义接口，不假设JEV原生返回这一JSON；HTTP/SDK协议、确切模型版本及依赖在P3按<a href="https://docs.typesafe.ai/introduction/quickstart">官方快速入门</a>作契约探针冻结。没有实际响应不能标“供应商已联调”。成本未知明确unknown，不复制旧价格。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>项目问题</th>
+<th>原语/输出</th>
+<th>程序处理</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>事件类型</td>
+<td>Choice：已启用类型加UNKNOWN/OTHER</td>
+<td>未启用记录研究，不交易</td>
+</tr>
+<tr>
+<td>方向</td>
+<td>Choice：POSITIVE/NEGATIVE/NEUTRAL/UNKNOWN</td>
+<td>映射+1/-1/0；UNKNOWN弃权，不强转0</td>
+</tr>
+<tr>
+<td>基础影响</td>
+<td>Score：已标定影响量表</td>
+<td>量表版本映射b，保留分布及原始score；不默认0～100</td>
+</tr>
+<tr>
+<td>对观测对象相关性</td>
+<td>Score：已标定相关量表</td>
+<td>映射r∈[0,1]，由盲标校准核验</td>
+</tr>
+<tr>
+<td>事前预期覆盖</td>
+<td>Score，必要预期资料</td>
+<td>候选e，缺共识不默认意外程度1</td>
+</tr>
+<tr>
+<td>影响期限</td>
+<td>Choice/Score：登记期限分档</td>
+<td>映射h候选；未知或框架不授权则仅研究</td>
+</tr>
+<tr>
+<td>claim_supported:{id}</td>
+<td>每关键claim各一题Noul</td>
+<td>回答与claim/span成对核验，不能一个聚合值覆盖全部事实</td>
+</tr>
+</tbody>
+</table></div>
+<p>SourceVerifier与CalibrationMapper共同形成c、Q和质量元数据；事件事实增量n由claim/族比较提出并由框架复核，价格提前反应p由框架计算，u/A/情绪/目标/止损/风险由确定性下层计算。JEV的概率及confidence保存为原始元数据，未在领域盲标集校准不作为系统可信度或归因门。数学、数字比较、日期排序和风险结论由代码处理。</p>
+<p>每次state只含当前问题必要、许可可发送的已可用证据、主体背景和量表，不附账户凭据、仓位控制权限或无关全文。真实instructions、criteria与拼接片段由私有PromptProvider注入；本设计的上表是问题语义，不能作为公开生产Prompt。MockProvider及虚构量表可联调，标EXAMPLE_OR_MOCK，缺真实Prompt不静默调用生产模型。</p>
+<p>ResponseValidator检查题ID集合完全、每claim唯一对应、数量一致、分布/枚举/范围合法、出处与span_hash一致、事实与推断分离、跨题矛盾、时间/许可及版本。缺关键claim、漏限定事实、方向/解释矛盾、未校准或无法抽取时QUARANTINED/ABSTAINED。有限重试仅用于技术失败，保留全部尝试；不能挑选最利于交易的一次输出。已使用响应固化，重放不再次调用模型。</p>
+<h2 id="section-5">5 框架调用时序与数据一致性</h2>
+<p>Bootstrap先只读核验交易层InstrumentSpec、账户环境及政策，再向框架POST objects创建/绑定目标对象，保存返回object_id及版本。恢复时按instance_id查询已有对象，不盲目重建；同InstrumentKey owner冲突由框架/交易层拒绝。</p>
+<p>采集 → 抽取/核验 → 路由 → 框架创建或修订Event → JEV判断 → 校准/校验 → 框架提交ScoreSubmission → 查询AdmissionReceipt → 下一有效框架周期 → 框架目标 → 交易层执行。这条路径不从JEV直接跳到订单。</p>
+<p>新事件：EventCreate成功保存event_id，评分未完成则保持无贡献；完成后POST events/{id}/scores。已创建但未评分事件使用同入口。已有有效评分遇确认/修订，先提交事实版本关系，再POST scores/{score}/revisions，带previous_score_id及revision_kind。真正新增claim作为NEW_FACT子贡献申请，撤销引用旧claim而非新增等量反向。框架CAS/去重失败返回409，应用重新查询现状，不修改事实版本迎合结果。</p>
+<p>SubmissionOutbox保存event_id、fact_version、object_id、candidate_hash、idempotency_key、previous_score_id、created_at、expires_at、receipt及delivery_state。幂等键基于(instance,object,event,fact_version,analysis_version,revision_kind)；相同响应重投不新增贡献。网络超时先查询回执再重投同键，不能重新随机评分ID。available_at以评分完成及框架准入的真实时间确定，绝不使用新闻发布日期回填。</p>
+<p>应用表为instance_config_version、source_registry、entity_mapping_version、raw_evidence_manifest、span、extracted_claim、search_job、routing_receipt、app_trading_analysis_job、app_research_analysis_job、analysis_candidate、provider_probe、calibration_report、submission_outbox、instance_report、health_event、audit。私有原文和模型缓存由权限隔离对象存储持有，数据库存引用。本层无权限直接写策略contribution/target、交易order/fill/risk_lock。</p>
+<p>对JEV或搜索整体故障，health=DEGRADED，隔离新输入、限制有界积压并告警；不关闭下层既有时间衰减、可靠保护和减险。恢复先重新评估期限及路由政策，过期job为EXPIRED；新政策不回写旧RoutingReceipt。下层处于RECOVERY_CHECK时可继续采集研究，不产生增险可用目标。</p>
+<h2 id="section-6">6 SOXLUSDT具体策略配置</h2>
+<h3 id="section-7">6.1 产品和价格</h3>
+<p>价格绑定分为执行BID/ASK、保证金MARK、参考INDEX、SOXL ETF/FX与框架兑现代理。ETF休市/过期或合约派生指数缺独立性时标不可用于独立兑现，框架可继续时间衰减。应用将已验证代理选择及缺数政策版本传给对象，不自行修改S2公式。产品金额使用交易层合约单位，SOXL每日三倍目标是参考ETF产品语义，不再次乘合同损益。</p>
+<p>资金费、分红特殊结算、佣金和其他income按交易层TypedIncome分项展示；特殊结算不以普通资金费上限截断。分红、拆并股、只减仓、档位变化、退市、强平及ADL触发交易层事实/恢复，然后框架暂停旧目标，应用展示原因。历史ETF可研究代理，但不能生成不存在的合约成交回放。</p>
+<h3 id="section-8">6.2 日历和时段双次数</h3>
+<p>CalendarProvider用版本化有效市场日历及有夏令时的时区定义常规时段，包含提前收市/节假日，映射到UTC持久窗口。初始候选窗口为相邻常规时段之间的连续非传统段，周末不按自然日重置；最终window_policy/max_new_risk/max_loss_cases经试验冻结。向框架TimePolicy注入窗口和阈值，两计数各自持久化。全天服务不强制收盘平仓，也不忽略交易所停盘。</p>
+<h3 id="section-9">6.3 额度、账户保护与默认值</h3>
+<p>SIM主试验AccountPolicy.daily_loss/drawdown/consecutive_loss.mode=OBSERVE；LIVE全部适用账户保护为ENFORCE。框架投影也不得引用OBSERVE阈值将目标归零。4000/400绝对名义限制同时写交易AccountPolicy及框架对象上限，最终以交易层保守敞口核验，价格跳变被动超限禁增险并按已登记减险政策处理。阈值/资金/风险日缺失不填默认资金或默认风险数。</p>
+<p>DefaultLossLimitResearch从含未实现损益、全部费用/资金费的日内路径，训练及验证候选金额/比例与政策，报告尾损、误停、恢复后损失、收益截断及跨时段稳定性；最终封存/前瞻复核。400额度重跑最小订单、固定成本和滑点，不能机械÷10。证据不足默认值状态REQUIRED_UNSET；临时人工联调阈值标EXPERIMENT_ONLY，不能替代实盘准入证据。DEC-06触限后存量与恢复政策未确认，LIVE启动阻塞。</p>
+<h3 id="section-10">6.4 自动参数和报告</h3>
+<p>应用只读框架ParameterActivation、LearningDecision及AttributionView形成周期报告，字段包括发布/拒绝/冻结/回滚、触发证据、前后版本、未改参数理由、未知比例、与冻结对照差异。不得把“报告待用户查看”设成候选批准门。代码、模型、Prompt及量表更换走独立配置变更/校准，不伪装成w/h固定步长更新。</p>
+<h2 id="section-11">7 供应商、研究、运维准入</h2>
+<p>ProviderProbe冻结SDK/协议和resolved_model版本、超时/错误/限流行为、输出映射、成本和数据条款。盲标集覆盖中文/英文财经事实、反向限定、转载修订、未来知识污染和恶意内容，报告捕获漏报、抽取漏/错、评分方向/强度/期限误差、校准与弃权、P95/P99和费用。无目标产品历史时，不虚构数据；无法排除供应商已知未来事件，则必须补模型冻结后的前瞻影子证据。</p>
+<p>阶段门：R0数据/许可/试验manifest完整；R1框架H01～H08及无泄漏验证有适用证据；R2实时重放、模拟与故障验收通过，主试验账户亏损只观察；R3再要求实际账户能力、默认日亏损证据、DEC-06、独立分析预算及人工恢复预案关闭，名义上限400；R4不能自动扩额。这里不把开发P阶段完成当收益或实盘准入。</p>
+<p>本地部署盘点操作系统/磁盘/资源/时间/网络/电力，主机地址等只私有配置。交易密钥归交易execution-live，JEV密钥归本应用分析worker；实例API只有受限读/配置身份。监控最老积压、抓取/抽取/评分新鲜度、LIVE预算、框架心跳、交易保护与残仓，告警失效作为未通过门。</p>
+<p>数据库/API或主机故障有残仓时按交易层人工runbook，通过官方目标账户查询和减险，保留外部证据；用户与AI的现有安排没有第二名人工复核者，OD-03明确保留复核能力待落实，不在文档中虚构团队。恢复后先导入事实、核验owner_epoch和下层锁；应用不能发“恢复旧仓位”请求。</p>
+<p>JEV为托管服务，生产调用前确认所发送Prompt/状态的来源许可、隐私/保留和数据处理条款。公开资产与私有Prompt/密钥/原文/账户/缓存从首次构建分离；生成脱敏白名单快照并扫描暂存、历史、分支/标签、产物、镜像、附件、图片/文档元数据及Prompt片段。公开版本缺私有资产时Mock模式可运行，不能静默进LIVE；许可证和公开仓库归属仍待用户决定，本次不发布。</p>
+<h2 id="section-12">8 式样与验收映射</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>式样</th>
+<th>章节与组件</th>
+<th>验收</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>S3-001</td>
+<td>1、5、6.1；Bootstrap/InstanceConfig</td>
+<td>T3-01</td>
+</tr>
+<tr>
+<td>S3-002</td>
+<td>2、6.2；IngestScheduler/Calendar</td>
+<td>T3-02、T3-08</td>
+</tr>
+<tr>
+<td>S3-003</td>
+<td>2；SearchProvider/RawEvidenceStore</td>
+<td>T3-02</td>
+</tr>
+<tr>
+<td>S3-004</td>
+<td>2、5；Extractor/FamilyProposal</td>
+<td>T3-03</td>
+</tr>
+<tr>
+<td>S3-005</td>
+<td>4；JevDecisionProvider/CalibrationMapper</td>
+<td>T3-04</td>
+</tr>
+<tr>
+<td>S3-006</td>
+<td>2、4；Extractor及确定性校验</td>
+<td>T3-02、T3-04</td>
+</tr>
+<tr>
+<td>S3-007</td>
+<td>5；SubmissionOutbox/FrameworkClient</td>
+<td>T3-03</td>
+</tr>
+<tr>
+<td>S3-008</td>
+<td>3；Routing/Dispatcher/分队列</td>
+<td>T3-05</td>
+</tr>
+<tr>
+<td>S3-009</td>
+<td>5；Health/Deadline/BoundedRetry</td>
+<td>T3-06</td>
+</tr>
+<tr>
+<td>S3-010</td>
+<td>6.1；价格及TypedIncome绑定</td>
+<td>T3-07</td>
+</tr>
+<tr>
+<td>S3-011</td>
+<td>6.2；Calendar/TimePolicy</td>
+<td>T3-08</td>
+</tr>
+<tr>
+<td>S3-012</td>
+<td>1、6.3；AccountPolicy实例设置</td>
+<td>T3-09</td>
+</tr>
+<tr>
+<td>S3-013</td>
+<td>6.3；DefaultLossLimitResearch</td>
+<td>T3-10</td>
+</tr>
+<tr>
+<td>S3-014</td>
+<td>6.4；ReadModel/Reports</td>
+<td>T3-11</td>
+</tr>
+<tr>
+<td>S3-015</td>
+<td>7；ProviderProbe/盲标/前瞻及阶段门</td>
+<td>T3-12</td>
+</tr>
+<tr>
+<td>S3-016</td>
+<td>1、4、7；PrivateAssets/配置/数据条款</td>
+<td>T3-13</td>
+</tr>
+<tr>
+<td>S3-017</td>
+<td>7；Health/人工预案/发布边界</td>
+<td>T3-14、T3-13</td>
+</tr>
+</tbody>
+</table></div>
+<p>联调用MockSource/MockExtractor/MockJev验证创建→首次评分→重评→修订→撤销的实际API请求和回执；独立故障测试覆盖公网失效、provider格式错、研究洪泛、配额共享、过期job、跨环境身份和残仓恢复。真实Provider探针、目标账户能力及前瞻研究尚未执行，文档不得填写为已通过。</p>
+</div><h2 id="section-13">9 v2.1.0 追加：S3-018 只读投影</h2><p>新增soxl_jev/api/read_dto.py、reports/read_service.py和operations/query_service.py；由本应用数据端口读取已保存状态，不导入下层数据库。全部GET，固定前缀/api/v2/instances/{instance_id}：/health、/sources、/analysis-jobs、/analysis-jobs/{job_id}、/evidence/{evidence_id}、/budgets、/reports、/audit。列表cursor/limit有上限，任务支持queue_kind/state，报告/审计支持from/to；principal与部署环境固定，不允许客户端route=trading提升能力。</p><p>显式DTO为InstanceHealth、SourceView、JobView、EvidenceView、BudgetView、ReportView与InstanceAuditView，字段/参数详见本版Web管理台设计书第6节。元数据包含schema_version、environment、instance_id、source_version、observed_at（缺则null）。JobView仅给出任务ID、状态、队列分区、真实时间、公开模型版本和回执引用；不返回provider完整输入、Prompt或worker授权。证据raw_text需许可allow_original与用户范围同时允许，否则返回raw_text=null/redaction_reason。报告读取已有框架投影，缺记录标UNKNOWN，不自动启动分析或再计算。</p><p>用单独只读数据库角色或允许的本应用存储端口访问，不能领取交易job、消耗供应商预算或提交评分。T3-15检查许可、跨实例/环境、raw/自由字典的白名单投影、查询副作用及未实现能力；原S3-001～017和信号生产路径保持。</p><h2 id="section-14">10 Go 实例模块、下层接口与进程边界</h2>
+<p>本应用目标实现全部 Go；entrypoints/{soxl-jev-api,ingest-worker,trading-analysis-worker,research-analysis-worker}/main.go 独立启动。config、monitoring、evidence、routing、analysis、submission、reports、operations 的职责和全部 S3/T3 保持；Provider/Source/Extractor 是带 context.Context 的 Go interface，Mock 也用 Go 实现，不启动 Python sidecar。标准库 HTTP 客户端只接供应商正式登记协议，不猜 SDK；JEV 供应商版本/来源许可/抽取器等原未决项继续保留。</p>
+<p>submission/framework_client.go 用框架公共创建对象/事件接口和独立内部评分 listener，按既有 schema_version 提交版本化评分、修订与证据；保存 AdmissionReceipt，不把回执升级成成交。operations/trading_read_client.go 只调用 P1 产品/行情/运行/健康查询；本应用不导入 P1 执行组件，不读取签名密钥，不直接写 P1/P2 数据库。实例 spec/score/request 时间仍为真实可用时点。</p>
+<p>analysis/provider.go 把状态和有限问题映射到 JEV 请求，用 encoding/json 明确 DTO 校验格式/方向/质量/弃权；提示词由 analysis/prompt_provider.go 从 config/config.toml 指定的私有文件载入。只允许模板进公开仓库，HTTP 错误、追踪、报告和模型记录均不给出真实 Prompt 或供应商密钥。数据库队列表/角色/SIM-LIVE保留预算、抓取/抽取的保留容量及上游共享限流验证按原第3章实施，不能把多个 goroutine 当成权限边界。</p>
+<p>reports/read_service.go、operations/query_service.go、api/read_dto.go 实现 S3-018 的 /api/v2/instances/{instance_id} GET 投影，全部具体下层调用和受限原文规则按原第9章及管理台设计清单。HTTP/存储/供应商适配完成后用 Go Mock 验证创建→评分→修订→撤销与许可/身份/资源故障。P3 当前尚无正式实现，本版不为了展示 Go 迁移制造假生产 Provider 或实例。</p><figure id="go-p3"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 500" role="img" aria-labelledby="go-p3-title go-p3-desc"><title id="go-p3-title">图 D3-Go：来源与模型输出经过确定性边界</title><desc id="go-p3-desc">Go ingest → Source / Search / EvidenceExtractor，许可 / 来源 / 时间 / facts + spans；routing policy → 独立研究或交易持久任务，身份 / 对象 / 环境固定；未知隔离；Go AnalysisProvider + 私有 PromptProvider，JEV 有限 DTO 校验 / 弃权 / 版本；framework_client → 创建事件 / 首次评分 / 修订，公共研究和内部信号分别调用；读取准入回执；实例 read API → 受限报告 / 证据 / 运维，console 只读；不越过下层发单</desc><defs><marker id="go-p3-arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L9,3 L0,6" fill="#39768a"/></marker></defs><path d="M450.0,85 L450.0,100.0 L450.0,100.0 L450.0,115" fill="none" stroke="#39768a" stroke-width="2" marker-end="url(#go-p3-arrow)"/><path d="M450.0,185 L450.0,200.0 L450.0,200.0 L450.0,215" fill="none" stroke="#39768a" stroke-width="2" marker-end="url(#go-p3-arrow)"/><path d="M450.0,285 L450.0,300.0 L450.0,300.0 L450.0,315" fill="none" stroke="#39768a" stroke-width="2" marker-end="url(#go-p3-arrow)"/><path d="M450.0,385 L450.0,400.0 L450.0,400.0 L450.0,415" fill="none" stroke="#39768a" stroke-width="2" marker-end="url(#go-p3-arrow)"/><rect x="100" y="15" width="700" height="70" rx="9" fill="#e5f2f3" stroke="#72a4b2"/><text x="450.0" y="44.5" text-anchor="middle" font-size="15" fill="#17384a">Go ingest → Source / Search / EvidenceExtractor</text><text x="450.0" y="65.5" text-anchor="middle" font-size="15" fill="#17384a">许可 / 来源 / 时间 / facts + spans</text><rect x="100" y="115" width="700" height="70" rx="9" fill="#e5f2f3" stroke="#72a4b2"/><text x="450.0" y="144.5" text-anchor="middle" font-size="15" fill="#17384a">routing policy → 独立研究或交易持久任务</text><text x="450.0" y="165.5" text-anchor="middle" font-size="15" fill="#17384a">身份 / 对象 / 环境固定；未知隔离</text><rect x="100" y="215" width="700" height="70" rx="9" fill="#e5f2f3" stroke="#72a4b2"/><text x="450.0" y="244.5" text-anchor="middle" font-size="15" fill="#17384a">Go AnalysisProvider + 私有 PromptProvider</text><text x="450.0" y="265.5" text-anchor="middle" font-size="15" fill="#17384a">JEV 有限 DTO 校验 / 弃权 / 版本</text><rect x="100" y="315" width="700" height="70" rx="9" fill="#e5f2f3" stroke="#72a4b2"/><text x="450.0" y="344.5" text-anchor="middle" font-size="15" fill="#17384a">framework_client → 创建事件 / 首次评分 / 修订</text><text x="450.0" y="365.5" text-anchor="middle" font-size="15" fill="#17384a">公共研究和内部信号分别调用；读取准入回执</text><rect x="100" y="415" width="700" height="70" rx="9" fill="#e5f2f3" stroke="#72a4b2"/><text x="450.0" y="444.5" text-anchor="middle" font-size="15" fill="#17384a">实例 read API → 受限报告 / 证据 / 运维</text><text x="450.0" y="465.5" text-anchor="middle" font-size="15" fill="#17384a">console 只读；不越过下层发单</text></svg><figcaption>图 D3-Go：来源与模型输出经过确定性边界</figcaption></figure><h2 id="section-15">Go 迁移共同约束与切换门槛</h2>
+<p>根 go.mod 是 Go 模块唯一真源，go.sum 固定依赖校验；本版工具链 Go 1.27.1。Go 生产代码仍只放 src/factorforge 对应层，domain、application、ports、adapters、api、workers 六类职责保留；独立 main 放本层 entrypoints/入口名。P1 不导入上层，P2 仅引用 P1 api/dto 的公开值类型和 HTTP 客户端；不创建承载跨层业务的 common。Go 测试放 tests 对应层，数据库迁移仍归属本层 PostgreSQL 适配器。</p>
+<p>迁移以 v2.1.0 标签 e97c9e9a380d105a7e96933bdd325e1d9af06d93 的源码、冻结业务式样和 contracts/v2 契约为对照。HTTP 方法/路径、schema_version、十进制字符串、UTC/空值/未知语义、错误码、状态机和授权范围保持；OpenAPI 3.1.0 及历史 JSON Schema Draft 2020-12 不降级。接口不是因 Go 类型名变化自动升版。</p>
+<p>新实现不调用 Python 子进程、不嵌 Python 解释器，也不以 Python HTTP 服务作为最终 Go 后端。迁移期间旧源码与入口保留，用合成夹具捕获对照；不得双启动同一账户的执行者、双写同一运行，或因 Go 模块编译通过就替换运行服务。切换前记录当前版本、运行状态和库快照，停止旧执行者并取得隔离证据，由新进程恢复对账；回退也须停止并隔离新执行者，不能同时使用同一签名身份。</p>
+<p>替换全部活跃初始化、布局/版本/HTML/公开内容/历史契约检查、构建、hooks、CI 与运行工具；最终用没有 Python 的受控环境完成 Go 构建、单元/故障/真实 PostgreSQL/独立进程/SIM 验收。历史冻结文档中的 Python 文字或文件保留为历史，不要求运行其作者脚本；旧活跃作者工具在 Go 替代检查通过后退役。迁移夹具 JSON 自带源提交和 fixture_only，Go 测试读取固定结果，不依赖即时 Python oracle。真实配置及 Prompt 不迁移进夹具。</p>
+<p>发布记录应逐模块区分已迁移、仅设计和已运行验收；P1/P2 原 Python 运行证据继续保留但不标成 Go 已通过，P3 与管理台仍为未实现。实盘准入、业务校准及 DEC-06 等原未决项保持。本次不授权实际交易。</p></article><footer>HTML 是本版唯一发布正文。图表为内嵌 SVG，无需联网或运行脚本。文档通过不代表程序实现、交易运行或实盘准入通过。</footer></main></div></body></html>
