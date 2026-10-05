@@ -7,6 +7,20 @@
       "change_kind": "framework",
       "date": "2026-10-04",
       "reason": "三层框架文档基线；原 v2.0 按三段版本规则登记为 v2.0.0，正文保持不变。"
+    },
+    {
+      "version": "2.1.0",
+      "directory": "doc/v2.1.0",
+      "change_kind": "specification",
+      "date": "2026-10-05",
+      "reason": "追加第三层Web管理台仕様/设计与下层只读追溯，发布文档自本版起统一HTML。",
+      "format": "html",
+      "document_pairs": [
+        "01_交易系统层",
+        "02_策略化框架层",
+        "03_SOXLUSDT_JEV应用实例",
+        "04_Web管理台"
+      ]
     }
   ]
 }
