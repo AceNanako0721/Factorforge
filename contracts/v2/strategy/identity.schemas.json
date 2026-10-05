@@ -1,0 +1,116 @@
+{
+  "public": {
+    "$defs": {
+      "ApiScope": {
+        "enum": [
+          "query",
+          "score:research",
+          "object:write"
+        ],
+        "title": "ApiScope",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false,
+    "properties": {
+      "principal_id": {
+        "maxLength": 160,
+        "minLength": 1,
+        "title": "Principal Id",
+        "type": "string"
+      },
+      "instance_id": {
+        "maxLength": 160,
+        "minLength": 1,
+        "title": "Instance Id",
+        "type": "string"
+      },
+      "environment": {
+        "enum": [
+          "SIM",
+          "LIVE"
+        ],
+        "title": "Environment",
+        "type": "string"
+      },
+      "scopes": {
+        "items": {
+          "$ref": "#/$defs/ApiScope"
+        },
+        "title": "Scopes",
+        "type": "array",
+        "uniqueItems": true
+      }
+    },
+    "required": [
+      "principal_id",
+      "instance_id",
+      "environment",
+      "scopes"
+    ],
+    "title": "PublicPrincipal",
+    "type": "object"
+  },
+  "workload": {
+    "$defs": {
+      "WorkloadCapability": {
+        "enum": [
+          "signal:sim",
+          "signal:live"
+        ],
+        "title": "WorkloadCapability",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false,
+    "properties": {
+      "workload_id": {
+        "maxLength": 160,
+        "minLength": 1,
+        "title": "Workload Id",
+        "type": "string"
+      },
+      "instance_id": {
+        "maxLength": 160,
+        "minLength": 1,
+        "title": "Instance Id",
+        "type": "string"
+      },
+      "environment": {
+        "enum": [
+          "SIM",
+          "LIVE"
+        ],
+        "title": "Environment",
+        "type": "string"
+      },
+      "object_ids": {
+        "items": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "title": "Object Ids",
+        "type": "array",
+        "uniqueItems": true
+      },
+      "capabilities": {
+        "items": {
+          "$ref": "#/$defs/WorkloadCapability"
+        },
+        "title": "Capabilities",
+        "type": "array",
+        "uniqueItems": true
+      }
+    },
+    "required": [
+      "workload_id",
+      "instance_id",
+      "environment",
+      "object_ids",
+      "capabilities"
+    ],
+    "title": "WorkloadIdentity",
+    "type": "object"
+  }
+}

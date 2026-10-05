@@ -32,6 +32,7 @@ class OrderView(Model):
     state: str
     reduce_only: bool
     spec_version: ID
+    target_version: int | None = None
 
 
 class RunView(Model):
@@ -62,6 +63,12 @@ class PositionView(Model):
     protection_state: str
     reconciliation_state: str
     observed_at: UTC
+
+
+class OwnerBindingView(Model):
+    instrument_key: InstrumentKey
+    owner_id: ID | None
+    owner_epoch: int
 
 
 class ProtectionView(Model):
@@ -155,4 +162,5 @@ def order_view(order):
                      instrument_key=order.request.instrument_key, side=order.request.side,
                      requested_quantity=order.request.quantity, filled_quantity=order.filled_quantity,
                      remaining_quantity=order.remaining, average_fill_price=order.average_fill_price,
-                     state=order.state, reduce_only=order.request.reduce_only, spec_version=order.request.spec_version)
+                     state=order.state, reduce_only=order.request.reduce_only, spec_version=order.request.spec_version,
+                     target_version=order.target_version)

@@ -18,6 +18,7 @@ from factorforge.trading.api.dto import (CreateRun, SubmitOrder, RegisterSpec, S
 from factorforge.trading.api.views import (Receipt, RunView, OrderView, AccountView, PositionView, ProtectionView,
                                           TargetView, Page, Problem, AcceptedOrder, RunReceipt, order_view)
 from factorforge.trading.api.views import AlertView, AuditView, OperationalView
+from factorforge.trading.api.views import OwnerBindingView
 from factorforge.trading.domain.models import InstrumentSpec, MarketPoint, MarketTrade, Candle, Fill, Income, ExternalFact, Target
 
 PREFIX = "/api/v2/trading"
@@ -118,6 +119,17 @@ def create_app(service: TradingService, tokens: dict):
                               average_entry=p.average_entry, protection_state=p.protection_state,
                               reconciliation_state=run.state, observed_at=run.clock) for p in run.positions.values()]
         return envelope(views, run)
+
+    @app.get(PREFIX + "/owners", response_model=Page[OwnerBindingView])
+    def owners(environment: str, account_id: str, run_id: str, principal=Identity):
+        run = service.read(principal, key(environment, account_id, run_id))
+        return envelope([OwnerBindingView(instrument_key=spec.key, owner_id=run.owners.get(code),
+            owner_epoch=run.owner_epochs.get(code, 0)) for code,spec in run.specs.items()],run)
+
+    @app.get(PREFIX + "/protections", response_model=Page[ProtectionView])
+    def protections(environment: str, account_id: str, run_id: str, principal=Identity):
+        run = service.read(principal, key(environment, account_id, run_id))
+        return envelope(list(run.protections.values()),run)
 
     @app.get(PREFIX + "/account", response_model=AccountView)
     def account(environment: str, account_id: str, run_id: str, principal=Identity):

@@ -32,3 +32,14 @@ include = ["factorforge", "factorforge.trading*"]
 testpaths = ["tests"]
 addopts = "-ra"
 markers = ["postgres: uses an isolated PostgreSQL test database"]
+
+[tool.factorforge.strategy]
+name = "factorforge-strategy"
+description = "Generic event strategy framework using the public trading API"
+dependencies = ["factorforge-trading==2.0.0"]
+
+[tool.factorforge.strategy.scripts]
+strategy-api = "factorforge.strategy.bootstrap:api_main"
+strategy-scheduler = "factorforge.strategy.bootstrap:scheduler_main"
+strategy-feedback = "factorforge.strategy.bootstrap:feedback_main"
+factorforge-strategy = "factorforge.strategy.cli:main"
