@@ -50,3 +50,19 @@ Factorforge's `trading/domain/decimal/value.go` calls the library and adds finit
 string validation, immutable values, operation-local rounding and checked Exp
 work precision. It does not copy apd source. Retain this dependency's license
 when distributing binaries or vendored source. Factorforge source remains MIT.
+
+## Native P1 infrastructure dependencies
+
+These modules are called through their public APIs; their applications or source
+are not copied into Factorforge. Exact versions and transitive dependencies are
+pinned in go.mod/go.sum. Preserve their licenses when distributing binaries.
+
+| Module | Version and used files | License and copyright |
+| --- | --- | --- |
+| jackc/pgx/v5 | [v5.11.0](https://github.com/jackc/pgx/tree/v5.11.0), pgxpool/pool.go, tx.go, pgconn | MIT; Copyright (c) 2013-2021 Jack Christensen |
+| pelletier/go-toml/v2 | [v2.4.3](https://github.com/pelletier/go-toml/tree/v2.4.3), unmarshaler.go, marshaler.go | MIT; Copyright (c) 2021-2023 Thomas Pelletier |
+| landlock-lsm/go-landlock | [v0.10.1](https://github.com/landlock-lsm/go-landlock/tree/v0.10.1), landlock path rules and strict thread restrictions | MIT; Copyright (c) 2021 Günther Noack |
+
+The MIT terms reproduced above also apply to these dependencies. Indirect
+modules retain their own licenses, including pgpassfile, pgservicefile, puddle,
+Go x/sync, x/sys, x/text, and libcap/psx; consult their LICENSE files when bundling.

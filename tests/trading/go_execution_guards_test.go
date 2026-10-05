@@ -105,7 +105,7 @@ func TestFillFailureRollsBackEarlierCreditsAndPrecisionFailure(t *testing.T) {
 	if !bytes.Equal(before, after) {
 		t.Fatal("failed fee conversion committed realized cash/position changes")
 	}
-	run.Specs.Value(code).ContractMultiplier = executionNumber(t, "1e100000")
+	run.Specs.Value(code).ContractMultiplier = executionNumber(t, "1e999999")
 	before, _ = json.Marshal(run)
 	err = d.Mutate(run, func(e *d.Engine) { e.AssessLossGates() })
 	if !errors.Is(err, decimal.ErrArithmetic) {

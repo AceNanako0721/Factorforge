@@ -122,6 +122,8 @@ func sameJSON(a, b any) bool {
 	return sameValue(reflect.ValueOf(a), reflect.ValueOf(b))
 }
 
+func EqualModel(a, b any) bool { return sameJSON(a, b) }
+
 // Immutable fact equality follows typed values, not JSON spelling: decimal
 // scales, UTC offset spelling, sets and object key order are not new facts.
 func sameValue(a, b reflect.Value) bool {

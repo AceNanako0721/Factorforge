@@ -3,6 +3,7 @@ package domain
 import (
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/domain/decimal"
 	"time"
+	_ "time/tzdata"
 )
 
 func (e *Engine) Quote(key InstrumentKey, kind string) decimal.Value {

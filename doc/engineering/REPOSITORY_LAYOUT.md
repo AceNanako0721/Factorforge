@@ -1,6 +1,6 @@
 # 仓库文件树规范
 
-确立日期：2026-10-04；更新：2026-10-05。适用于 v2.1.1 Go 设计与迁移，三层职责不变。生产源码只放 src/factorforge 对应层，业务式样和实现方法以当前 HTML 基线为准。
+确立日期：2026-10-04；更新：2026-10-06。适用于 v2.1.1 Go 设计与 P1 完整重构，三层职责不变。生产源码只放 src/factorforge 对应层，业务式样和实现方法以当前 HTML 基线为准。
 
 沿用 NautilusTrader 的核心/适配器划分与 Freqtrade 的源码/测试/运行数据分离；Go 使用单根模块与各层独立入口，不引入完整交易框架。
 
@@ -16,7 +16,7 @@ Factorforge/
 │   │   │   └── postgres/migrations/ # 本层 SQL
 │   │   ├── api/                 # HTTP、认证；dto/ 为公开值接口
 │   │   ├── workers/             # 执行、保护、反馈、行情
-│   │   └── entrypoints/         # 实现时创建，入口名/main.go
+│   │   └── entrypoints/         # 六个独立入口及 runtime 装配
 │   ├── strategy/                # P2，依赖 P1 公开 DTO 与 HTTP
 │   │   ├── domain/              # 情绪、仓位、止损、案例、学习、研究
 │   │   ├── application/         # 对象、事件、评分、周期、反馈
@@ -34,7 +34,7 @@ Factorforge/
 │   └── strategy/fixtures/       # 固定合成 JSON，不含秘密
 ├── contracts/                   # 历史 v1.1 与 v2/trading、v2/strategy
 ├── doc/                         # v*/ 冻结 HTML；engineering/、progress/
-├── tools/                       # check-layout/ 入口、layoutguard/ Go AST
+├── tools/                       # Go 布局/构建/契约/配置工具，冻结夹具作者工具
 ├── config/ / prompts/           # 各仅提交一个空内容模板
 ├── runtime/                     # 忽略：构建、数据库、日志、截图
 ├── .github/ / .githooks/         # CI、合并与公开内容检查
@@ -45,7 +45,7 @@ Factorforge/
 
 Go 模块只用根 go.mod/go.sum，各层不另建长期模块。各入口在本层 entrypoints/入口名/main.go，分别构建二进制；不合并交易执行与管理台进程。P1 不需 P2/P3；P2 经 P1 公开接口运行。源码目录仅在有实际代码时创建。Go 测试在 tests 对应层，外部 test package 调用 src，src 不放 _test.go；夹具用虚构账户/行情。SQL 归属本层适配器，历史基线/标签冻结不搬动。
 
-迁移期旧 .py 与对应 .go 暂时共存；Go 不执行 Python。替换验收前保留旧入口，禁止同时写入同一运行或启动两个签名执行者。旧源码/活跃工具在 Go 独立回归、存储与进程/SIM验收通过后退役，历史文档保持原貌。构建产物、缓存与二进制放被忽略的 runtime，所有非敏感源码与测试公开。
+P1 的正常运行入口已改为六个 Go 二进制，见 [Go 运行说明](TRADING_GO.md)。旧 .py 暂留作冻结对照及 P2 迁移依赖，Go 不执行 Python。禁止同时写入同一运行或启动两个签名执行者。旧源码和全局 Python 工具在 P2/G3 切换后退役，历史文档保持原貌。构建、缓存、二进制、实验报告和派生运行配置只放忽略的 runtime，所有非敏感源码与测试公开。
 
 独立 Go 检查：go run ./tools/check-layout、go test ./...、go vet ./...。迁移期仍运行 python tools/check_layout.py 检查旧源码并调用 Go AST guard；现有 CI 通过迁移回归测试检查 Go。最终替换 Python 工具与 CI 后退役桥接，进度见 [Go 迁移记录](../progress/GO_MIGRATION.md)。
 

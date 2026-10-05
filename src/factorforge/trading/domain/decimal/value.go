@@ -14,16 +14,15 @@ var ErrValue = errors.New("DECIMAL_STRING_REQUIRED")
 var ErrArithmetic = errors.New("DECIMAL_ARITHMETIC_FAILED")
 
 // Value's zero value is decimal zero. Its coefficient cannot be mutated by users.
-type Value struct{ value *apd.Decimal }
+type Value struct {
+	value            *apd.Decimal
+	extendedExponent *int64
+}
 
 func Parse(text string) (Value, error) {
 	// Python Decimal accepts surrounding whitespace and digit separators.
 	text = strings.ReplaceAll(strings.TrimSpace(text), "_", "")
-	d, _, err := apd.NewFromString(text)
-	if err != nil || d.Form != apd.Finite {
-		return Value{}, ErrValue
-	}
-	return Value{d}, nil
+	return parseFinite(text)
 }
 
 func (v Value) raw() *apd.Decimal {
@@ -32,11 +31,15 @@ func (v Value) raw() *apd.Decimal {
 	}
 	return v.value
 }
-func (v Value) String() string               { return v.raw().String() }
-func (v Value) Sign() int                    { return v.raw().Sign() }
-func (v Value) Cmp(other Value) int          { return v.raw().Cmp(other.raw()) }
-func (v Value) Abs() Value                   { return Value{new(apd.Decimal).Abs(v.raw())} }
-func (v Value) Neg() Value                   { return Value{new(apd.Decimal).Neg(v.raw())} }
+func (v Value) String() string      { return valueString(v) }
+func (v Value) Sign() int           { return v.raw().Sign() }
+func (v Value) Cmp(other Value) int { return compare(v, other) }
+func (v Value) Abs() Value {
+	return Value{value: new(apd.Decimal).Abs(v.raw()), extendedExponent: v.extendedExponent}
+}
+func (v Value) Neg() Value {
+	return Value{value: new(apd.Decimal).Neg(v.raw()), extendedExponent: v.extendedExponent}
+}
 func (v Value) MarshalJSON() ([]byte, error) { return json.Marshal(v.String()) }
 func (v *Value) UnmarshalJSON(data []byte) error {
 	// json.Unmarshal(null, &string) succeeds; explicitly exclude null and numbers.
@@ -90,6 +93,7 @@ type Math struct {
 func NewMath(precision uint32) *Math {
 	context := apd.BaseContext.WithPrecision(precision)
 	context.Rounding = apd.RoundHalfEven
+	context.Traps = apd.DivisionByZero | apd.DivisionUndefined | apd.InvalidOperation | apd.Overflow
 	context.MaxExponent = 999999
 	context.MinExponent = -999999
 	return &Math{context: *context}
@@ -100,7 +104,7 @@ func (m *Math) result(d *apd.Decimal, err error) Value {
 		m.err = ErrArithmetic
 		return Value{}
 	}
-	return Value{d}
+	return Value{value: d}
 }
 func (m *Math) binary(a, b Value, op func(*apd.Decimal, *apd.Decimal, *apd.Decimal) (apd.Condition, error)) Value {
 	if m.err != nil {
@@ -110,10 +114,49 @@ func (m *Math) binary(a, b Value, op func(*apd.Decimal, *apd.Decimal, *apd.Decim
 	_, err := op(d, a.raw(), b.raw())
 	return m.result(d, err)
 }
-func (m *Math) Add(a, b Value) Value { return m.binary(a, b, m.context.Add) }
-func (m *Math) Sub(a, b Value) Value { return m.binary(a, b, m.context.Sub) }
-func (m *Math) Mul(a, b Value) Value { return m.binary(a, b, m.context.Mul) }
-func (m *Math) Div(a, b Value) Value { return m.binary(a, b, m.context.Quo) }
+func (m *Math) Add(a, b Value) Value {
+	if a.wide() || b.wide() {
+		return m.wideBinary(a, b, "add")
+	}
+	return m.binary(a, b, m.context.Add)
+}
+func (m *Math) Sub(a, b Value) Value {
+	if a.wide() || b.wide() {
+		return m.wideBinary(a, b, "sub")
+	}
+	return m.binary(a, b, m.context.Sub)
+}
+func (m *Math) Mul(a, b Value) Value {
+	if a.wide() || b.wide() {
+		return m.wideBinary(a, b, "mul")
+	}
+	return m.binary(a, b, m.context.Mul)
+}
+func (m *Math) Div(a, b Value) Value {
+	if m.err != nil {
+		return Value{}
+	}
+	if a.wide() || b.wide() {
+		return m.wideBinary(a, b, "div")
+	}
+	d := new(apd.Decimal)
+	conditions, err := m.context.Quo(d, a.raw(), b.raw())
+	if err == nil && !conditions.Inexact() {
+		preferred := a.raw().Exponent - b.raw().Exponent
+		ten := apd.NewBigInt(10)
+		remainder := new(apd.BigInt)
+		for d.Exponent < preferred && d.Coeff.Sign() != 0 {
+			coefficient := new(apd.BigInt)
+			coefficient.QuoRem(&d.Coeff, ten, remainder)
+			if remainder.Sign() != 0 {
+				break
+			}
+			d.Coeff.Set(coefficient)
+			d.Exponent++
+		}
+	}
+	return m.result(d, err)
+}
 func (m *Math) Sum(values ...Value) Value {
 	result := Value{}
 	for _, v := range values {
@@ -122,6 +165,9 @@ func (m *Math) Sum(values ...Value) Value {
 	return result
 }
 func (m *Math) Ln(v Value) Value {
+	if v.wide() {
+		return m.wideLn(v)
+	}
 	if m.err != nil {
 		return Value{}
 	}
@@ -130,6 +176,9 @@ func (m *Math) Ln(v Value) Value {
 	return m.result(d, err)
 }
 func (m *Math) Abs(v Value) Value {
+	if v.wide() {
+		return m.finish(v.coefficient(), v.exponent(), false)
+	}
 	if m.err != nil {
 		return Value{}
 	}
@@ -138,6 +187,9 @@ func (m *Math) Abs(v Value) Value {
 	return m.result(d, err)
 }
 func (m *Math) Neg(v Value) Value {
+	if v.wide() {
+		return m.finish(v.coefficient(), v.exponent(), !v.raw().Negative)
+	}
 	if m.err != nil {
 		return Value{}
 	}
@@ -146,6 +198,9 @@ func (m *Math) Neg(v Value) Value {
 	return m.result(d, err)
 }
 func (m *Math) Sqrt(v Value) Value {
+	if v.wide() {
+		return m.wideSqrt(v)
+	}
 	if m.err != nil {
 		return Value{}
 	}
@@ -157,6 +212,10 @@ func (m *Math) Sqrt(v Value) Value {
 // Exp rounds an extended-precision result back to the original Python context.
 // Two work precisions must agree after rounding; uncertainty fails the calculation.
 func (m *Math) Exp(v Value) Value {
+	limit, _ := Parse("500")
+	if v.wide() || v.Abs().Cmp(limit) > 0 {
+		return m.rangeExp(v)
+	}
 	if m.err != nil {
 		return Value{}
 	}
@@ -178,7 +237,7 @@ func (m *Math) Exp(v Value) Value {
 		m.err = ErrArithmetic
 		return Value{}
 	}
-	return Value{rounded[0]}
+	return Value{value: rounded[0]}
 }
 
 type Rounding string
@@ -190,8 +249,14 @@ const (
 )
 
 func (m *Math) Integral(v Value, mode Rounding) Value {
+	if v.wide() {
+		return m.wideIntegral(v, mode)
+	}
 	if m.err != nil {
 		return Value{}
+	}
+	if v.raw().Exponent >= 0 {
+		return Value{value: new(apd.Decimal).Set(v.raw()), extendedExponent: v.extendedExponent}
 	}
 	context := m.context
 	switch mode {
