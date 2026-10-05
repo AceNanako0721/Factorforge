@@ -1,11 +1,11 @@
 # 文档作者工具
 
-已有 `doc/.*-build/*.py` 与 `*.ps1` 全部作为源码公开。首次开源时将工作站绝对路径改为项目根目录下 `runtime/doc-build/` 的对应构建目录；根目录运行这些工具。生成文件、下载证据、渲染页与中间验证报告不入库。
+从 v2.1.0 起，版本基线统一使用 HTML；HTML 是唯一发布正文，仕様和设计各自独立、保持一对一。仕様写功能、效果与业务流程，设计写代码、下层实际接口和固定开源来源。不要为新版生成 Markdown/Word 配套副本，不重写冻结的旧版。
 
-`doc/.requirements-build`、`.development-plan-build`、`.v11-build` 内的生成器及修改脚本是历史来源，包含当时的单次迁移和文档重写行为。现有基线已经归档，它们不能被当作当前开发入口重跑。历史只读检查 `audit_detail_v11.py` 和当前 `audit_v20.py` 可以运行；`archive_versions.py` 已执行，再运行应拒绝。
+tools/html_documents.py 提供离线 HTML 样式、目录、表格及带 title/desc 的内嵌 SVG 作者辅助函数。最终 HTML 可直接编辑，目录与锚点、版本、配对引用应同步维护；不引入联网字体、CDN、脚本或图表 iframe。设计中的参考代码链接采用固定提交和具体文件，明确复用方式及许可证。
 
-`doc/.v20-build/build_word.py`、`export_word.ps1`、`verify_word.py` 展示当前七份 Word 的生成、原生 Word 导出和正文一致性验证。后续新版本作者必须先指定新基线输入/输出目录和页脚版本，避免覆盖冻结的 `doc/v2.0`。Windows 原生 Word 导出需要本机 Microsoft Word，PDF 渲染需要 Poppler；不触碰用户已打开的 Word 实例。
+tools/check_html_documents.py 校验当前基线 UTF-8 封装、唯一正文、配对、版本、相对链接/锚点、非执行内容、SVG 可读描述、前端 S/T 映射及已有 API 引用。tools/check_repository.py 在 v2.1.0 及以后使用 HTML 检查，继续校验版本分类、目录登记、旧基线冻结和设计版本不得修改仕様；legacy 路径仍支持旧 Word/Markdown 正文比较。
 
-可选文档 Python 依赖：`python-docx`、`lxml`、`Pillow`、`pdf2image`。仓库自己的 `tools/render_docx.py` 只将原生导出的 PDF 渲染成 PNG；既有作者脚本读取此模块，不依赖某台机器的 Codex 安装。最终检查正文和所有页面，不把生成成功视为排版通过。
+tools/migrate_documents_html.py 仅用于首次迁移到尚不存在、尚未登记的新目录，使用 markdown-it-py==4.0.0，可在被忽略的 runtime/doc-build 中创建作者环境。它不会覆盖目标，也不能作为重建已发布 HTML 的入口。迁移保留原始 SHA-256 和正文，后续新增条款直接写 HTML。运行后核对继承文本、实际图表与逐份桌面/窄屏布局；检查成功不等于视觉验收或交易运行成功。
 
-`tools/check_repository.py` 对当前基线的七份 Word/Markdown 做独立正文比较；CI 不启动 Word、不调用模型、不读取私有配置，也不宣称完成交易运行验收。
+已有 doc/.*-build 生成器与 Word 导出脚本作为历史源码公开，不能重跑覆盖冻结版本。audit_detail_v11.py 与 audit_v20.py 只读检查仍可运行；新版本无需启动 Word。runtime/doc-build 中的作者环境、临时驱动、截图和验证报告不入库，HTML 最终正文及可复用作者/校验工具进入公开仓库。

@@ -1,4 +1,4 @@
-"""Validate document versions, immutable baselines and Word/Markdown parity."""
+"""Validate immutable release baselines, HTML and legacy Word/Markdown parity."""
 import argparse
 import ast
 import json
@@ -11,8 +11,10 @@ from zipfile import ZipFile
 
 try:
     from .repo_support import ROOT, git
+    from .check_html_documents import validate as check_html, spec_semantics
 except ImportError:
     from repo_support import ROOT, git
+    from check_html_documents import validate as check_html, spec_semantics
 
 KINDS = {"code-only", "design", "specification", "framework"}
 NAMES = ["01_交易系统层", "02_策略化框架层", "03_SOXLUSDT_JEV应用实例"]
@@ -127,10 +129,23 @@ def check_transition(root, base, kind, current, manifest):
     if kind == "design":
         old_dir, new_dir = old_records[-1]["directory"], records[-1]["directory"]
         old_specs = git(root, "ls-tree", "-r", "--name-only", "-z", base, old_dir).decode().split("\0")
-        for old_path in (path for path in old_specs if path.endswith("式样书.md")):
+        specification_paths = [path for path in old_specs if path.endswith(("式样书.md","式样书.html"))]
+        old_names = {Path(path).stem for path in specification_paths}
+        new_names = {path.stem for path in (root/new_dir).iterdir() if path.name.endswith(("式样书.md","式样书.html"))}
+        if old_names != new_names:
+            raise ValueError("Design-only release adds/removes a specification; classify as specification/framework")
+        for old_path in specification_paths:
             new_spec = root / new_dir / Path(old_path).name
+            if not new_spec.is_file():
+                new_spec = new_spec.with_suffix(".html")
             old_text = git(root, "show", f"{base}:{old_path}").decode("utf-8")
-            if not new_spec.is_file() or spec_body(old_text) != spec_body(new_spec.read_text(encoding="utf-8")):
+            if not new_spec.is_file():
+                raise ValueError("Design-only release removes a specification")
+            if new_spec.suffix == ".html":
+                changed_spec = spec_semantics(old_text,Path(old_path).suffix) != spec_semantics(new_spec.read_text(encoding="utf-8"),".html")
+            else:
+                changed_spec = spec_body(old_text) != spec_body(new_spec.read_text(encoding="utf-8"))
+            if changed_spec:
                 raise ValueError("Design-only release changes specification; classify as specification/framework")
 
 
@@ -155,12 +170,21 @@ def check(root=ROOT, base=None, kind=None):
             raise ValueError("Release directory, reason and date are required")
     check_registered_directories(root, records)
     directory = root / records[-1]["directory"]
-    if not (directory / "README.md").is_file():
-        raise ValueError("Current document index is missing")
-    for prefix in NAMES:
-        for suffix in ("式样书", "设计书"):
-            check_word(directory / (prefix + suffix + ".md"))
-    check_word(directory / "开发规划书.md")
+    if version(current) >= (2,1,0):
+        if records[-1].get("format") != "html" or not records[-1].get("document_pairs"):
+            raise ValueError("From v2.1.0 onward releases must declare HTML document pairs")
+        if not set(NAMES).issubset(set(records[-1]["document_pairs"])):
+            raise ValueError("Original layer document pairs must be preserved")
+        check_html(directory,current,records[-1]["document_pairs"],root)
+        if not (directory/"开发规划书.html").is_file():
+            raise ValueError("Current short HTML phase plan is missing")
+    else:
+        if not (directory / "README.md").is_file():
+            raise ValueError("Current document index is missing")
+        for prefix in NAMES:
+            for suffix in ("式样书", "设计书"):
+                check_word(directory / (prefix + suffix + ".md"))
+        check_word(directory / "开发规划书.md")
     for path in root.rglob("*.py"):
         if set(path.relative_to(root).parts) & {".git", ".venv", "runtime", "__pycache__"}:
             continue
@@ -185,7 +209,7 @@ def main():
     except (ValueError, RuntimeError, OSError, SyntaxError) as error:
         print(f"BLOCKED: {error}", file=sys.stderr)
         return 1
-    print(f"OK: v{current}; paired document bodies; version records; Python syntax")
+    print(f"OK: v{current}; paired documents; immutable version records; Python syntax")
     return 0
 
 
