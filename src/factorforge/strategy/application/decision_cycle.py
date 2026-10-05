@@ -12,7 +12,7 @@ from factorforge.strategy.domain.factors import valid_manifest
 from factorforge.strategy.domain.models import utc
 from factorforge.strategy.domain.learning import activate,monitor
 from factorforge.strategy.domain.models import Contribution, DecisionView, TargetOutbox, WorkloadIdentity, ZERO, ONE, ApiScope, StrategyError
-from factorforge.strategy.domain.position import level_for, exposure, quantity, shared_projection
+from factorforge.strategy.domain.position import level_for, exposure, quantity, shared_projection,existing_risk_scale,reduce_quantity
 from factorforge.strategy.domain.regime import update_regime
 from factorforge.strategy.domain.sentiment import advance_contributions, append_entry, decay, pool, verify_ledger
 from factorforge.strategy.domain.stop import normal_noise, size_and_stop
@@ -177,6 +177,13 @@ class DecisionCycle:
                     corrected = correct_actual_risk(state,obj,snap,at)
                     if corrected:
                         outputs.append(corrected)
+                        # The urgent reduction is only a target until P1 fills
+                        # it. Reserve this object's observed exposure while
+                        # projecting other objects in the same account.
+                        if sample:
+                            spec=snap.specs[obj.object_id]
+                            value=(actual+pending)*sample.price*Decimal(spec["contract_multiplier"])
+                            base.append((value,abs(value)*policy.max_stop_fraction,spec.get("risk_group") or "DEFAULT"))
                         continue
                     if obj.last_cycle and at < obj.last_cycle:
                         raise StrategyError("CLOCK_REWIND")
@@ -267,9 +274,45 @@ class DecisionCycle:
                     if sample:
                         mult = Decimal(snap.specs[obj.object_id]["contract_multiplier"])
                         rows.append(((actual+pending)*sample.price*mult,target*sample.price*mult,stress,(snap.specs[obj.object_id].get("risk_group") or "DEFAULT")))
-                alpha = min((shared_projection(rows,base,p) for _,p,*_ in due),default=ONE)
+                scales = [existing_risk_scale(rows,base,p) for _,p,*_ in due]
+                unresolved = any(scale is None for scale in scales)
+                risk_scale = min((scale for scale in scales if scale is not None),default=ONE)
+                if risk_scale<ONE and not unresolved:
+                    corrected_due,corrected_rows = [],[]
+                    for obj,policy,sample,target,stop,stress,view,level,raw,reasons,decision_id in due:
+                        if sample and sample.quality=="VALID":
+                            spec=snap.specs[obj.object_id]
+                            current=obj.actual_quantity+obj.pending_quantity
+                            target=reduce_quantity(current,target,risk_scale,Decimal(spec["quantity_step"]))
+                            if abs(target)<=abs(obj.actual_quantity):
+                                stop=None
+                            elif stop:
+                                stop.covered_quantity=abs(target)
+                            reasons.append("ACCOUNT_EXISTING_RISK_REDUCED")
+                        corrected_due.append((obj,policy,sample,target,stop,stress,view,level,raw,reasons,decision_id))
+                        if sample:
+                            spec=snap.specs[obj.object_id]
+                            multiplier=Decimal(spec["contract_multiplier"])
+                            corrected_rows.append(((obj.actual_quantity+obj.pending_quantity)*sample.price*multiplier,target*sample.price*multiplier,stress,spec.get("risk_group") or "DEFAULT"))
+                    due,rows=corrected_due,corrected_rows
+                    # Quantity steps can make a continuously feasible hedge
+                    # infeasible. Keep known exposure/protection in that case;
+                    # do not send a net-risk-increasing "reduction" or claim success.
+                    if any(existing_risk_scale(rows,base,p)!=ONE for _,p,*_ in due):
+                        unresolved=True
+                        restored=[]
+                        for obj,policy,sample,target,stop,stress,view,level,raw,reasons,decision_id in due:
+                            target,stop=obj.actual_quantity+obj.pending_quantity,None
+                            if "ACCOUNT_EXISTING_RISK_REDUCED" in reasons:
+                                reasons.remove("ACCOUNT_EXISTING_RISK_REDUCED")
+                            reasons.append("ACCOUNT_QUANTITY_STEP_RECONCILIATION_REQUIRED")
+                            restored.append((obj,policy,sample,target,stop,stress,view,level,raw,reasons,decision_id))
+                        due=restored
+                alpha = ZERO if unresolved else min((shared_projection(rows,base,p) for _,p,*_ in due),default=ONE)
                 for obj,policy,sample,target,stop,stress,view,level,raw,reasons,decision_id in due:
                     actual,pending = obj.actual_quantity,obj.pending_quantity
+                    if unresolved:
+                        reasons.append("ACCOUNT_RISK_RECONCILIATION_REQUIRED")
                     if alpha < 1 and abs(target) > abs(actual+pending):
                         spec = snap.specs[obj.object_id]
                         step = Decimal(spec["quantity_step"])
