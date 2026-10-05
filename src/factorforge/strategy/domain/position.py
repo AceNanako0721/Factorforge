@@ -60,3 +60,37 @@ def shared_projection(candidates, base, constraints):
         else:
             high = mid
     return low
+
+
+def existing_risk_scale(candidates,base,constraints):
+    """Largest feasible uniform scale of already planned non-increasing risk.
+
+    Gross/stress/group constraints are linear in this scale. Net exposure has
+    both a lower and upper bound: unmanaged risk can require keeping part of an
+    existing hedge. An empty interval requires reconciliation, not a claim that
+    scaling to zero solved the account risk.
+    """
+    planned = [(desired if abs(desired)<abs(current) else current,stress,group) for current,desired,stress,group in candidates]
+    lower,upper = ZERO,ONE
+    bounds = [(constraints.portfolio_gross_limit,sum((abs(v) for v,_,_ in base),ZERO),sum((abs(v) for v,_,_ in planned),ZERO)),
+              (constraints.portfolio_stress_limit,sum((s for _,s,_ in base),ZERO),sum((abs(v)*s for v,s,_ in planned),ZERO))]
+    for group in {g for _,_,g in base+planned}:
+        bounds.append((constraints.group_limits.get(group,ZERO),sum((abs(v) for v,_,g in base if g==group),ZERO),sum((abs(v) for v,_,g in planned if g==group),ZERO)))
+    for limit,fixed,slope in bounds:
+        if fixed>limit:
+            return None
+        if slope>0:
+            upper=min(upper,(limit-fixed)/slope)
+    fixed_net=sum((v for v,_,_ in base),ZERO)
+    slope_net=sum((v for v,_,_ in planned),ZERO)
+    if slope_net:
+        edges=sorted(((-constraints.portfolio_net_limit-fixed_net)/slope_net,(constraints.portfolio_net_limit-fixed_net)/slope_net))
+        lower,upper=max(lower,edges[0]),min(upper,edges[1])
+    elif abs(fixed_net)>constraints.portfolio_net_limit:
+        return None
+    return upper if ZERO<=lower<=upper else None
+
+
+def reduce_quantity(current,desired,scale,step):
+    planned=desired if abs(desired)<abs(current) else current
+    return (planned*scale/step).to_integral_value(rounding=ROUND_DOWN)*step

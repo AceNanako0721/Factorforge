@@ -9,7 +9,7 @@ from factorforge.strategy.application.score_admission import ScoreAdmission
 from factorforge.strategy.domain.models import *
 from factorforge.strategy.domain.sentiment import pool,verify_ledger,advance_contributions
 from factorforge.strategy.domain.stop import normal_noise,size_and_stop
-from factorforge.strategy.domain.position import shared_projection
+from factorforge.strategy.domain.position import shared_projection,existing_risk_scale
 from factorforge.strategy.domain.time_policy import reserve,window_id
 from factorforge.strategy.domain.regime import update_regime
 from factorforge.strategy.domain.attribution import verified_attribution,group_samples
@@ -88,6 +88,76 @@ def test_same_account_alpha_order_independent_and_observe_loss_excluded():
     alpha = shared_projection(rows,[],p)
     assert abs(alpha-Decimal("0.5")) < p.numerical_tolerance
     assert shared_projection(list(reversed(rows)),[],p) == alpha
+
+
+def test_existing_position_over_portfolio_budget_is_reduced_after_price_move(harness):
+    h = harness
+    with h.store.transaction(h.identity.instance_id) as state:
+        state.policies["fixture-policy"] = policy(portfolio_gross_limit="50")
+    h.event()
+    h.cycle.tick(h.identity)
+    h.cycle.dispatch(h.identity)
+    h.dispatch_trading()
+    h.frame("140")
+    decision = h.cycle.tick(h.identity)[0]
+    assert decision.actual_quantity*140 > 50
+    assert decision.target_quantity < decision.actual_quantity
+    assert decision.target_quantity*140 <= 50
+    assert "ACCOUNT_EXISTING_RISK_REDUCED" in decision.reason_codes
+    h.cycle.dispatch(h.identity)
+    h.dispatch_trading()
+    h.frame("140",1)
+    snapshot=h.trading.snapshot(list(h.state().objects.values()))
+    assert snapshot.actual["object-0"]==decision.target_quantity
+    assert snapshot.actual["object-0"]*140<=50
+
+
+def test_existing_risk_scale_preserves_required_hedge_and_reports_infeasible_base():
+    p=policy(portfolio_gross_limit="190",portfolio_net_limit="20",portfolio_stress_limit="100")
+    rows=[(Decimal(-100),Decimal(-100),Decimal("0.1"),"DEFAULT")]
+    assert existing_risk_scale(rows,[(Decimal(100),Decimal(10),"DEFAULT")],p)==Decimal("0.9")
+    assert existing_risk_scale(rows,[(Decimal(250),Decimal(25),"DEFAULT")],p) is None
+
+
+def test_quantity_step_cannot_turn_required_hedge_reduction_into_net_risk_increase():
+    h=Harness(objects=2)
+    h.event("short-owned",object_id="object-0",direction=-1)
+    h.event("long-other",object_id="object-1")
+    h.cycle.tick(h.identity)
+    h.cycle.dispatch(h.identity)
+    h.dispatch_trading()
+    h.frame("100",60,0)
+    h.frame("100",1,1)
+    snapshot=h.trading.snapshot(list(h.state().objects.values()))
+    assert snapshot.actual["object-0"]==Decimal("-0.9") and snapshot.actual["object-1"]==Decimal("0.9")
+    with h.store.transaction(h.identity.instance_id) as state:
+        state.policies["fixture-policy"]=policy(portfolio_gross_limit="171",portfolio_net_limit="9")
+    h.identity=h.identity.model_copy(update={"object_ids":{"object-0"}})
+    decision=h.cycle.tick(h.identity)[0]
+    # Continuous -0.81 is feasible, but the available step only allows -0.8
+    # (net 10, above limit 9) or -0.9 (gross 180, above limit 171).
+    assert decision.target_quantity==decision.actual_quantity
+    assert "ACCOUNT_QUANTITY_STEP_RECONCILIATION_REQUIRED" in decision.reason_codes
+    assert "ACCOUNT_EXISTING_RISK_REDUCED" not in decision.reason_codes
+
+
+def test_urgent_unfilled_risk_reduction_still_reserves_exposure_for_other_object():
+    h=Harness(objects=2)
+    h.event("first-risk",object_id="object-0")
+    h.cycle.tick(h.identity)
+    h.cycle.dispatch(h.identity)
+    h.dispatch_trading()
+    h.frame("160",1,0)
+    h.event("second-risk",object_id="object-1")
+    h.frame("100",60,1)
+    with h.store.transaction(h.identity.instance_id) as state:
+        state.policies["fixture-policy"]=policy(portfolio_gross_limit="200")
+    decisions=h.cycle.tick(h.identity)
+    first=next(d for d in decisions if d.object_id=="object-0")
+    second=next(d for d in decisions if d.object_id=="object-1")
+    assert "ACTUAL_FILL_STOP_BUDGET_REDUCTION" in first.reason_codes
+    assert first.actual_quantity*160+second.target_quantity*100<=200
+    assert "ACCOUNT_ALPHA_PROJECTED" in second.reason_codes
 
 
 def test_time_reservation_two_independent_counts_unknown_and_reduction(harness):
