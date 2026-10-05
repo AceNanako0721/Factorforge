@@ -2,7 +2,7 @@
 
 Factorforge 是分为交易系统、策略化框架、应用实例三层的事件情绪量化交易项目。当前开发基线为 **v2.1.1**（Go 设计与迁移启动），既有发布对照为 v2.1.0，代码与公开文档采用 [MIT](LICENSE) 许可证。
 
-后端正在由 Python 迁移为 Go；前端目标为 React/TypeScript 编译的 JavaScript。已落地 Go 数值域、执行租约、身份隔离和 386 组固定对照；完整 API/存储/工作进程尚未迁移。以下 P1/P2 运行验收描述属于旧 Python 实现，不能视为 Go 已通过；服务切换按 [Go 迁移进度](doc/progress/GO_MIGRATION.md) 逐项验收。
+后端正在由 Python 迁移为 Go；前端目标为 React/TypeScript 编译的 JavaScript。已落地 Go 数值域、执行租约、身份隔离，以及 P1 账务/风险/保护/外部事实和模拟撮合；386 组数值对照与 114 条交易轨迹（954 步）通过。完整 API/存储/工作进程尚未迁移。以下 P1/P2 运行验收描述属于旧 Python 实现，不能视为 Go 已通过；服务切换按 [Go 迁移进度](doc/progress/GO_MIGRATION.md) 逐项验收。
 
 当前仓库已有三层式样书、对应设计书、仓库管理工具，以及 P1 独立交易层。P1 提供 API/CLI、公共行情采集、可重放撮合、保护工作池、目标撤替/反向续接、账户与组合风险、多币种账务、外部事实恢复、PostgreSQL 持久化和受准入控制的签名执行。P1 实现、本地验收和 Binance 合约测试网完整闭环已完成：实际挂撤单、响应丢失后原ID查询、物理止损触发成交、费用与资金对账、停机应急减仓及恢复、进程/网络隔离和存储故障检查均通过。范围和证据见 [P1 进度](doc/progress/P1.md)，操作见 [交易层运行说明](doc/engineering/TRADING_DEVELOPMENT.md)。
 
