@@ -11,7 +11,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class GoMigrationChecks(unittest.TestCase):
     def test_native_migration_and_boundaries(self):
-        for command in (["go", "test", "./..."], ["go", "vet", "./..."],
+        for command in (["go", "test", "-v", "./..."], ["go", "vet", "./..."],
                         ["go", "run", "./tools/check-layout"]):
             result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=240)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            for line in result.stdout.splitlines():
+                if "--- SKIP:" in line or "host denies network namespaces" in line:
+                    print(line)

@@ -13,7 +13,7 @@ import (
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/adapters/postgres"
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/trading/domain"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/domain/decimal"
-	r "github.com/AceNanako0721/Factorforge/src/factorforge/trading/entrypoints/runtime"
+	r "github.com/AceNanako0721/Factorforge/src/factorforge/trading/entrypoints/assembly"
 	"io"
 	"os"
 	"path/filepath"

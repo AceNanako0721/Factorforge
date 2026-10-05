@@ -8,7 +8,7 @@ import (
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/adapters/httptrading"
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/trading/domain"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/domain/decimal"
-	r "github.com/AceNanako0721/Factorforge/src/factorforge/trading/entrypoints/runtime"
+	r "github.com/AceNanako0721/Factorforge/src/factorforge/trading/entrypoints/assembly"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/workers"
 	"time"
 )

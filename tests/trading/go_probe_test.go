@@ -46,6 +46,7 @@ func TestNativeIsolatedTestnetSignerAndAuthority(t *testing.T) {
 	if err == nil || string(data) != "TESTNET_ORDER_AUTHORIZATION_REQUIRED\n" {
 		t.Fatalf("testnet authority gate failed: %s", data)
 	}
+	requireNetworkNamespace(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	database, err := postgres.StartTemporary(ctx, t.TempDir(), nativePostgresBin(t))

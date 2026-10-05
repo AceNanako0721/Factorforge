@@ -7,7 +7,7 @@ import (
 	c "github.com/AceNanako0721/Factorforge/src/factorforge/trading/adapters/configuration"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/adapters/httptrading"
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/trading/domain"
-	r "github.com/AceNanako0721/Factorforge/src/factorforge/trading/entrypoints/runtime"
+	r "github.com/AceNanako0721/Factorforge/src/factorforge/trading/entrypoints/assembly"
 	"net/url"
 	"os"
 	"strings"

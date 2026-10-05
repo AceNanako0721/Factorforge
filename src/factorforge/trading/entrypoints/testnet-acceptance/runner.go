@@ -17,7 +17,7 @@ import (
 	a "github.com/AceNanako0721/Factorforge/src/factorforge/trading/application"
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/trading/domain"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/domain/decimal"
-	r "github.com/AceNanako0721/Factorforge/src/factorforge/trading/entrypoints/runtime"
+	r "github.com/AceNanako0721/Factorforge/src/factorforge/trading/entrypoints/assembly"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/workers"
 	"github.com/jackc/pgx/v5"
 	"io"

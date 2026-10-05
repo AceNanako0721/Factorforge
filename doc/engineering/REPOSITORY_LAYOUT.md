@@ -16,7 +16,7 @@ Factorforge/
 │   │   │   └── postgres/migrations/ # 本层 SQL
 │   │   ├── api/                 # HTTP、认证；dto/ 为公开值接口
 │   │   ├── workers/             # 执行、保护、反馈、行情
-│   │   └── entrypoints/         # 六个独立入口及 runtime 装配
+│   │   └── entrypoints/         # 六个独立入口及 assembly 装配
 │   ├── strategy/                # P2，依赖 P1 公开 DTO 与 HTTP
 │   │   ├── domain/              # 情绪、仓位、止损、案例、学习、研究
 │   │   ├── application/         # 对象、事件、评分、周期、反馈

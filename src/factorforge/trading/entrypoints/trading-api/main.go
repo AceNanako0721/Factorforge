@@ -8,7 +8,7 @@ import (
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/adapters/postgres"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/api"
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/trading/domain"
-	r "github.com/AceNanako0721/Factorforge/src/factorforge/trading/entrypoints/runtime"
+	r "github.com/AceNanako0721/Factorforge/src/factorforge/trading/entrypoints/assembly"
 	"net"
 	"strconv"
 )
