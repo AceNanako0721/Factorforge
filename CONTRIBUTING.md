@@ -15,7 +15,7 @@
 
 ## 分支和 PR
 
-源码和辅助文件的位置按 [文件树规范](doc/engineering/REPOSITORY_LAYOUT.md) 执行。新增顶层目录先登记用途；生产代码、测试、数据库迁移和运行产物不可混放。运行包采用 src 布局，测试已安装包；`python tools/check_layout.py` 验证目录和依赖边界。
+源码和辅助文件的位置按 [文件树规范](doc/engineering/REPOSITORY_LAYOUT.md) 执行。新增顶层目录先登记用途；生产代码、测试、数据库迁移和运行产物不可混放。Go 模块采用 src 三层布局，各层入口独立构建；迁移期保留已安装的 Python 包回归；`python tools/check_layout.py` 验证目录和依赖边界。
 
 从最新 `main` 建立 `feat/...`、`fix/...`、`docs/...` 或 `chore/...` 分支。PR 填写一个 `Change-Type`，写明变更内容、原因、涉及的 S/T 编号、验证结果和限制。仅代码变更不修改 VERSION、不新增发布标签；GitHub 合并时以 PR 标题/正文记载此次实现变更。
 
@@ -41,3 +41,5 @@ v2.1.0 首次执行 HTML 规则，迁移全部三层文档并追加 Web 管理�
 `config/` 只提交 `config.example.toml`；真实值集中到本地 `config/config.toml`。`prompts/` 只提交 `prompts.example.json`；真实 instructions、criteria、拼接片段及生产 Prompt 放入本地 `prompts/prompts.local.json` 或其他被忽略的私有提示词文件。禁止通过硬编码、DOCX 隐藏内容、附件或 PR 复制敏感资产。
 
 安装本地 hooks 后，强制暂存私有路径、往模板填真实内容、提交识别得到的密钥会被拒绝。CI 使用相同规则，并检查可达历史。模式检测不能保证识别所有任意形态的秘密，提交者仍需审查内容；不得在错误日志中打印原值。
+
+v2.1.1 是 Go 设计与迁移启动版本：业务式样保持，四本设计同步 Go 模块/进程/接口和切换门槛。旧 Python 入口在 Go 验收后退役，迁移未完成前不将 Go 域测试标为完整交易运行通过。只符合已发布 Go 设计的后续迁移代码仍按 code-only 记录；需要改设计则发布修订版本。

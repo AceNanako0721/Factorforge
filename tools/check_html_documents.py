@@ -113,7 +113,7 @@ def validate(directory, expected_version=None, expected_pairs=None, root=None):
     actual_specs = {name.removesuffix('式样书.html') for name,doc in documents.items() if doc.meta['ff:kind']=='specification'}
     if prefixes and actual_specs != prefixes:
         raise ValueError('HTML specification pairs do not match release manifest')
-    if expected_version == '2.1.0':
+    if expected_version and tuple(map(int, expected_version.split('.'))) >= (2,1,0):
         specification = (directory/'04_Web管理台式样书.html').read_text(encoding='utf-8')
         design = (directory/'04_Web管理台设计书.html').read_text(encoding='utf-8')
         for prefix,count,body in [('S4-',16,specification),('T4-',14,specification)]:

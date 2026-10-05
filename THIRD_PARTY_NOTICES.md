@@ -6,7 +6,7 @@ Factorforge retains its MIT license. The following small algorithms are adapted 
 
 Source: [FusionHub._gate_direction](https://github.com/alexeymozolevsky-max/financier/blob/3708a31d77cb57c0f972828488449efc341dfbf1/engine/app/core/fusion_hub.py).
 Pinned commit: `3708a31d77cb57c0f972828488449efc341dfbf1`.
-Adaptation: `strategy/domain/position.py:level_for` extends the Decimal entry/retention equality rules to multiple registered levels. No AI, Redis, broker or uncalibrated sizing defaults are included.
+Adaptation: `strategy/domain/position.py:level_for` and its Go translation `strategy/domain/position.go:LevelFor` extend the Decimal entry/retention equality rules to multiple registered levels. No AI, Redis, broker or uncalibrated sizing defaults are included.
 
 Copyright (c) 2026 Alexey Mozolevsky
 
@@ -37,3 +37,16 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## cockroachdb/apd Go dependency
+
+Dependency: `github.com/cockroachdb/apd/v3 v3.2.3`, pinned by go.mod/go.sum.
+Source commit: `6d9c587326e78bcfbea630bf52893ff45f6f9ed5`.
+Source: [apd v3.2.3](https://github.com/cockroachdb/apd/tree/6d9c587326e78bcfbea630bf52893ff45f6f9ed5).
+License: [Apache 2.0](https://github.com/cockroachdb/apd/blob/6d9c587326e78bcfbea630bf52893ff45f6f9ed5/LICENSE).
+Copyright 2016 The Cockroach Authors.
+
+Factorforge's `trading/domain/decimal/value.go` calls the library and adds finite
+string validation, immutable values, operation-local rounding and checked Exp
+work precision. It does not copy apd source. Retain this dependency's license
+when distributing binaries or vendored source. Factorforge source remains MIT.

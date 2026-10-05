@@ -1,68 +1,52 @@
 # 仓库文件树规范
 
-确立日期：2026-10-04；更新：2026-10-05。适用于 v2.1.0 三层设计的实现和仓库维护，不修改层职责或已发布设计书。新增功能以当前 HTML 版本基线为准。
+确立日期：2026-10-04；更新：2026-10-05。适用于 v2.1.1 Go 设计与迁移，三层职责不变。生产源码只放 src/factorforge 对应层，业务式样和实现方法以当前 HTML 基线为准。
 
-参考 [NautilusTrader](https://github.com/nautechsystems/nautilus_trader) 的核心与适配器划分、[Freqtrade](https://github.com/freqtrade/freqtrade) 的源码/测试/用户数据分离，以及 [PyPA src layout](https://packaging.python.org/en/latest/discussions/src-layout-vs-flat-layout/) 的安装包边界。只参考组织方式，不引入其策略或技术栈。
+沿用 NautilusTrader 的核心/适配器划分与 Freqtrade 的源码/测试/运行数据分离；Go 使用单根模块与各层独立入口，不引入完整交易框架。
 
 ```text
 Factorforge/
+├── go.mod / go.sum              # 唯一 Go 模块与依赖校验
 ├── src/factorforge/
-│   ├── trading/                 # P1，独立安装和运行
-│   │   ├── domain/              # 类型、账务、风险纯逻辑
-│   │   ├── application/         # 命令、查询、对账用例
-│   │   ├── ports/               # 本层基础设施接口
-│   │   ├── adapters/
-│   │   │   ├── sim/             # 确定性模拟
-│   │   │   ├── binance/         # 渠道协议与公开行情
-│   │   │   └── postgres/
-│   │   │       └── migrations/  # 本适配器独占的数据库迁移
-│   │   ├── api/                 # HTTP DTO、认证、路由
-│   │   ├── workers/             # 出站执行、保护工作池、成交查询与行情采集
-│   │   ├── bootstrap.py         # 本层配置、依赖装配、入口
-│   │   └── cli.py               # HTTP 客户端
-│   ├── strategy/                # P2，独立安装；仅依赖 P1 公共接口
-│   │   ├── domain/              # 情绪、仓位、止损、案例、学习与验证纯逻辑
-│   │   ├── application/         # 对象/事件/评分、决策周期、反馈和研究用例
-│   │   ├── ports/               # 存储、时钟、交易和归因输入协议
-│   │   ├── adapters/
-│   │   │   ├── trading_v2.py    # P1 HTTP 契约；不访问交易层内部存储或 SDK
-│   │   │   └── postgres/
-│   │   │       └── migrations/  # 框架 SIM/LIVE 独立模式、权限及追加账本
-│   │   ├── api/                 # 公共/内部路由与各自的身份类型
-│   │   ├── workers/             # 周期调度、及时成交/保护反馈
-│   │   ├── bootstrap.py         # 私有配置及本层装配
-│   │   └── cli.py               # 手工 SIM/研究 HTTP 客户端
-│   └── applications/            # 实现时创建；第三层平级应用
-│       ├── soxl_jev/            # P3 采集、分析与实例只读查询
-│       └── console/             # 独立 Web 管理台的 API/BFF 和 web/ 前端源码
-├── tests/
-│   ├── trading/                 # 对应 P1 包的领域/API/故障测试
-│   ├── strategy/                # 对应 P2 包的机制/闭环/数据库/进程测试
-│   ├── applications/console/    # 将来的管理台授权、DTO/聚合测试
-│   ├── web/                     # 将来的前端组件与浏览器测试
-│   └── test_repository_guards.py # 仓库管理测试
-├── contracts/v2/
-│   ├── trading/                # 当前 P1 API 的生成契约；v1 保留历史
-│   ├── strategy/               # 公共/工作负载 API 与身份类型的生成契约
-│   └── console/                # 实现后由管理台 API 生成，只读接口
-├── doc/
-│   ├── v*/                     # 已发布基线冻结；v2.1.0起HTML/内嵌SVG
-│   ├── engineering/            # 非版本业务文档：文件树、开发操作说明
-│   └── progress/               # 当前阶段实现证据、未完成事项
-├── tools/                      # 仓库检查、契约生成、开发辅助工具
-├── config/                     # 只提交一个格式模板
-├── prompts/                    # 只提交一个空提示词模板
-├── runtime/                    # 忽略：数据库、日志、构建/验收产物
-├── .github/                    # CI、PR 模板等 GitHub 管理文件
-└── pyproject.toml              # 唯一运行包定义；含 P1/P2 独立构建档案和入口
+│   ├── trading/                 # P1，独立构建和运行
+│   │   ├── domain/              # 类型、账务、风险；decimal/ 纯十进制
+│   │   ├── application/         # 命令、查询、对账
+│   │   ├── ports/               # 本层设施接口
+│   │   ├── adapters/            # sim/、binance/、postgres/
+│   │   │   └── postgres/migrations/ # 本层 SQL
+│   │   ├── api/                 # HTTP、认证；dto/ 为公开值接口
+│   │   ├── workers/             # 执行、保护、反馈、行情
+│   │   └── entrypoints/         # 实现时创建，入口名/main.go
+│   ├── strategy/                # P2，依赖 P1 公开 DTO 与 HTTP
+│   │   ├── domain/              # 情绪、仓位、止损、案例、学习、研究
+│   │   ├── application/         # 对象、事件、评分、周期、反馈
+│   │   ├── ports/               # 本层存储、时钟、交易、归因
+│   │   ├── adapters/            # trading_v2.go 与 postgres/
+│   │   │   └── postgres/migrations/
+│   │   ├── api/                 # 公共/工作负载独立 listener
+│   │   ├── workers/
+│   │   └── entrypoints/         # API、调度、反馈、CLI
+│   └── applications/            # 尚未实现，不预建空应用
+│       ├── soxl_jev/            # Go 采集、分析、提交、只读查询
+│       └── console/             # Go 同源 BFF
+│           └── web/             # React/TypeScript → JS，独有 npm 定义
+├── tests/                       # trading/、strategy/、engineering/
+│   └── strategy/fixtures/       # 固定合成 JSON，不含秘密
+├── contracts/                   # 历史 v1.1 与 v2/trading、v2/strategy
+├── doc/                         # v*/ 冻结 HTML；engineering/、progress/
+├── tools/                       # check-layout/ 入口、layoutguard/ Go AST
+├── config/ / prompts/           # 各仅提交一个空内容模板
+├── runtime/                     # 忽略：构建、数据库、日志、截图
+├── .github/ / .githooks/         # CI、合并与公开内容检查
+└── pyproject.toml               # 迁移期旧 Python 包定义，切换后退役
 ```
 
-尚未实现的应用目录仅作位置约定，不提前创建空应用包。业务源码不得放在根目录、tools、doc 或 runtime。生产包不得通过路径修改导入根目录工具；测试必须测试已安装的 src 包。禁止为了复用把策略/实例代码搬入一个跨层 common 包。
+禁止业务代码进入 tools/doc/runtime 或跨层 common。十进制归 P1 domain/decimal，稳定公开值接口在 api/dto；P2 只能导入 trading/api/dto、trading/api/views 或使用 HTTP，不导入 P1 domain/application/adapters/workers。domain 不依赖本层外圈；application 依赖 domain/ports；adapters 实现 ports；api/workers 调用 application；entrypoints 装配。P1 禁止向上导入。
 
-领域逻辑不导入网络、数据库、API、适配器或上层；应用依赖领域与端口；适配器实现端口；API 和 workers 调用应用；只有 bootstrap 装配依赖。交易层禁止导入 strategy/applications。文件按一个明确职责拆分，禁止泛用 utils.py 堆积。
+Go 模块只用根 go.mod/go.sum，各层不另建长期模块。各入口在本层 entrypoints/入口名/main.go，分别构建二进制；不合并交易执行与管理台进程。P1 不需 P2/P3；P2 经 P1 公开接口运行。源码目录仅在有实际代码时创建。Go 测试在 tests 对应层，外部 test package 调用 src，src 不放 _test.go；夹具用虚构账户/行情。SQL 归属本层适配器，历史基线/标签冻结不搬动。
 
-迁移与渠道契约属于其适配器。测试夹具存放于对应的 tests/trading 或 tests/strategy，使用虚构账户和行情；生产秘密不进入夹具。P2 的 P1 客户端只可导入 trading.api.dto/views，不得导入 P1 application/domain/store/broker。依赖锁在 tools/requirements-trading.lock，当前 P2 复用同一已锁定基础设施依赖。构建工具从根 pyproject.toml 派生临时配置，不新增第二份长期包定义。P1 wheel 仅含 trading，P2 wheel 仅含 strategy 并声明依赖 P1；测试中不安装应用层。构建目录/egg-info/缓存忽略。历史作者源码的位置保留，冻结版本不搬动。
+迁移期旧 .py 与对应 .go 暂时共存；Go 不执行 Python。替换验收前保留旧入口，禁止同时写入同一运行或启动两个签名执行者。旧源码/活跃工具在 Go 独立回归、存储与进程/SIM验收通过后退役，历史文档保持原貌。构建产物、缓存与二进制放被忽略的 runtime，所有非敏感源码与测试公开。
 
-修改前运行目录/导入边界检查；CI 同步检查。新增顶层目录需先更新本文并说明用途；接口增加仍须符合对应式样及设计，不能以文件树说明替代版本变更。
+独立 Go 检查：go run ./tools/check-layout、go test ./...、go vet ./...。迁移期仍运行 python tools/check_layout.py 检查旧源码并调用 Go AST guard；现有 CI 通过迁移回归测试检查 Go。最终替换 Python 工具与 CI 后退役桥接，进度见 [Go 迁移记录](../progress/GO_MIGRATION.md)。
 
-管理台前端源码及其唯一 package.json/pnpm-lock.yaml 放在 src/factorforge/applications/console/web；它们只定义浏览器构建，不另建 Python 运行包或根级 frontend 项目。Python/BFF 继续由根 pyproject.toml 定义；HTTP 客户端只调用公开契约。浏览器测试放 tests/web，构建与截图放被忽略的 runtime/web-build；node_modules 不进入公开树。当前任务只发布文档，不预创建应用空包。
+管理台唯一 package.json/pnpm-lock.yaml 放 console/web。Node/pnpm 只用于构建和浏览器测试；产物放 runtime/web-build，再由受控步骤交给 Go BFF 同源提供。node_modules、源码图和截图不进公开树，真实 config/prompts 不在静态目录。运行服务不依赖 Python 或 Node。未来测试放 tests/applications/console 与 tests/web；当前不预建空包。
