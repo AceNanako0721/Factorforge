@@ -21,9 +21,11 @@ def check(root=ROOT):
             failures.append(name + ": source is outside factorforge package")
         if name.startswith("src/factorforge/") and len(path.parts) > 3 and path.parts[2] not in {"trading", "strategy", "applications"}:
             failures.append(name + ": unregistered layer")
-        if name.startswith("src/factorforge/trading/"):
+        if name.startswith(("src/factorforge/trading/","src/factorforge/strategy/")):
+            layer = path.parts[2]
+            package = "factorforge."+layer
             if len(path.parts) > 4 and path.parts[3] not in TRADING_DIRS:
-                failures.append(name + ": unregistered trading package")
+                failures.append(name + ": unregistered layer package")
             if path.suffix != ".py":
                 continue
             tree = ast.parse((root / path).read_text(encoding="utf-8"))
@@ -38,15 +40,17 @@ def check(root=ROOT):
                 else:
                     continue
                 for imported in imports:
-                    if imported.startswith(("factorforge.strategy", "factorforge.applications")):
+                    if imported.startswith("factorforge.applications") or layer == "trading" and imported.startswith("factorforge.strategy"):
                         failures.append(name + ": upward layer import")
+                    if layer == "strategy" and imported.startswith("factorforge.trading") and not imported.startswith(("factorforge.trading.api.dto","factorforge.trading.api.views")):
+                        failures.append(name + ": strategy must use trading public DTOs/client")
                     if area in {"domain", "ports"} and imported.startswith(("fastapi", "httpx", "psycopg", "uvicorn", "requests", "socket", "subprocess")):
                         failures.append(name + ": infrastructure in domain/port")
-                    if area == "domain" and imported.startswith("factorforge.trading.") and not imported.startswith("factorforge.trading.domain"):
+                    if area == "domain" and imported.startswith(package+".") and not imported.startswith(package+".domain"):
                         failures.append(name + ": domain depends on an outer package")
-                    if area == "application" and imported.startswith(("factorforge.trading.api", "factorforge.trading.workers", "factorforge.trading.bootstrap", "factorforge.trading.adapters")):
+                    if area == "application" and imported.startswith(tuple(package+"."+x for x in ("api","workers","bootstrap","adapters"))):
                         failures.append(name + ": reversed application dependency")
-                    if area in {"adapters", "ports"} and imported.startswith(("factorforge.trading.application", "factorforge.trading.api", "factorforge.trading.workers", "factorforge.trading.bootstrap")):
+                    if area in {"adapters", "ports"} and imported.startswith(tuple(package+"."+x for x in ("application","api","workers","bootstrap"))):
                         failures.append(name + ": adapter/port depends on application entry")
     return sorted(set(failures))
 
@@ -57,4 +61,4 @@ if __name__ == "__main__":
         print("BLOCKED " + error)
     if errors:
         raise SystemExit(1)
-    print("OK: registered file tree and trading layer import boundaries")
+    print("OK: registered file tree and trading/strategy layer import boundaries")

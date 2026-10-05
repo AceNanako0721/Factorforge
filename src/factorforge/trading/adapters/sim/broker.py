@@ -103,6 +103,7 @@ def _exit_order(run, protection, quantity):
     order = Order(order_id=identifier, client_order_id=identifier, external_order_id=identifier,
                   request=request, state="ACKNOWLEDGED", created_at=run.clock)
     run.orders[identifier] = order
+    protection.exit_order_id = identifier
     return order
 
 

@@ -70,3 +70,29 @@ reviewer_id = ""
 approved_instrument_versions = {}
 overlapping_protections = false
 atomic_protection_modify = false
+
+# P2 scoped API access only. Exchange/model credentials are not used by P2.
+[strategy]
+environment = ""
+instance_id = ""
+public_database_url = ""
+worker_database_url = ""
+migration_database_url = ""
+initial_registry = {}
+trading_api_url = ""
+trading_api_token = ""
+public_token = ""
+workload_token = ""
+public_identity = {}
+workload_identity = {}
+public_host = ""
+public_port = 0
+internal_host = ""
+internal_port = 0
+public_api_url = ""
+internal_api_url = ""
+timeout_seconds = 0
+candle_interval = ""
+history_seconds = 0
+worker_poll_seconds = 0
+replay_clock = ""

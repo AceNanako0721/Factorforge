@@ -2,9 +2,11 @@
 
 Factorforge 是分为交易系统、策略化框架、应用实例三层的事件情绪量化交易项目。当前发布基线为 **v2.0.0**，代码与公开文档采用 [MIT](LICENSE) 许可证。
 
-当前仓库已有三层式样书、对应设计书、仓库管理工具，以及 P1 独立交易层。P1 提供 API/CLI、公共行情采集、可重放撮合、保护工作池、目标撤替/反向续接、账户与组合风险、多币种账务、外部事实恢复、PostgreSQL 持久化和受准入控制的签名执行。P1 实现、本地验收和 Binance 合约测试网完整闭环已完成：实际挂撤单、响应丢失后原ID查询、物理止损触发成交、费用与资金对账、停机应急减仓及恢复、进程/网络隔离和存储故障检查均通过。P2/P3 尚未实现；生产实盘仍须单独准入。范围和证据见 [P1 进度](doc/progress/P1.md)，操作见 [交易层运行说明](doc/engineering/TRADING_DEVELOPMENT.md)。
+当前仓库已有三层式样书、对应设计书、仓库管理工具，以及 P1 独立交易层。P1 提供 API/CLI、公共行情采集、可重放撮合、保护工作池、目标撤替/反向续接、账户与组合风险、多币种账务、外部事实恢复、PostgreSQL 持久化和受准入控制的签名执行。P1 实现、本地验收和 Binance 合约测试网完整闭环已完成：实际挂撤单、响应丢失后原ID查询、物理止损触发成交、费用与资金对账、停机应急减仓及恢复、进程/网络隔离和存储故障检查均通过。范围和证据见 [P1 进度](doc/progress/P1.md)，操作见 [交易层运行说明](doc/engineering/TRADING_DEVELOPMENT.md)。
 
-P2已完成首轮开源实现选材，结果见[复用调研](doc/engineering/P2_UPSTREAM_REVIEW.md)与[P2进度](doc/progress/P2.md)；预研结果不代表框架运行实现或T2验收已经完成。
+P2 已实现通用对象、事件与评分资格、逐贡献情绪账本、持仓与止损计算、P1 执行反馈、案例观察、归因与独立反事实、固定步长学习、自动发布回滚，以及 PostgreSQL 恢复和公共/工作负载权限隔离。独立安装 P1/P2 即可运行，P3 尚未实现。实现和本地 SIM 验收见 [P2 进度](doc/progress/P2.md)，操作见 [框架运行说明](doc/engineering/STRATEGY_DEVELOPMENT.md)。生产实盘须另行准入；本地机制验收不代表收益、学习收敛或核心研究假设获得验证。
+
+实现先做了 [GitHub 选材调研](doc/engineering/P2_UPSTREAM_REVIEW.md)，再适配 Financier 的滞回算法和 timeseriescv 的时间清除算法；固定来源、修改范围及许可证见 [第三方声明](THIRD_PARTY_NOTICES.md)。执行、撮合和真实账务直接复用 P1 公共接口。
 
 ## 文档与依赖
 
@@ -18,7 +20,10 @@ P2已完成首轮开源实现选材，结果见[复用调研](doc/engineering/P2
 | `contracts` | 历史 v1.1 接口契约及检查代码 |
 | `src/factorforge/trading` | P1 独立交易层源码；领域、应用、端口、适配器、API、执行进程 |
 | `tests/trading` | 交易行为、故障注入、真实 PostgreSQL 和独立进程测试 |
+| `src/factorforge/strategy` | P2 通用策略框架；与交易层相同的六类职责目录 |
+| `tests/strategy` | 框架机制、P1 SIM 闭环、数据库/权限/安装包与独立进程验收 |
 | `contracts/v2/trading` | 当前交易 API 的生成契约 |
+| `contracts/v2/strategy` | 公共 API、工作负载 API 与分离的身份类型契约 |
 | `doc/engineering`、`doc/progress` | [文件树规范](doc/engineering/REPOSITORY_LAYOUT.md)、运行说明与实现证据 |
 | `tools`、`.githooks`、`.github` | 版本、公开内容、测试及合并管理 |
 | `doc/.*-build` | 公开的文档生成/校验源码；中间产物不入库 |

@@ -79,3 +79,27 @@ jobs:
           git diff --exit-code -- contracts/v2/trading/openapi.json
       - name: Build the independent trading distribution
         run: python tools/build_trading.py
+
+  strategy-checks:
+    name: strategy-checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+      - name: Install locked dependencies and independent P1/P2 wheels
+        run: |
+          python -m pip install -r tools/requirements-trading.lock
+          python tools/build_trading.py
+          python tools/build_strategy.py
+          python -m pip install --no-deps runtime/build/*.whl
+      - name: Verify framework, P1 SIM, PostgreSQL faults, roles and installed processes
+        run: python -m pytest tests/strategy -q
+      - name: Verify public and workload contracts
+        run: |
+          python tools/export_strategy_contract.py
+          python tools/export_trading_contract.py
+          git diff --exit-code -- contracts/v2

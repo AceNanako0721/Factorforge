@@ -71,6 +71,20 @@ class RepositoryGuards(unittest.TestCase):
         value = (self.root / "config/config.example.toml").read_bytes() + b'\npassword = "short"\n'
         self.assertEqual(template_issue("config/config.example.toml", value), "unrecognized-template-field")
 
+    def test_strategy_template_rejects_short_tokens_and_registered_runtime_values(self):
+        original = (self.root / "config/config.example.toml").read_bytes()
+        for replacement in (b'workload_token = "short"',b'workload_identity = { capabilities = ["signal:live"] }',b'initial_registry = { values = [1] }'):
+            name = replacement.split(b" = ")[0]
+            empty = b"{}" if name in {b"workload_identity",b"initial_registry"} else b'""'
+            value = original.replace(name+b" = "+empty,replacement)
+            self.assertEqual(template_issue("config/config.example.toml",value),"unrecognized-template-field")
+
+    def test_empty_p1_template_is_allowed_only_in_older_history(self):
+        original = (self.root / "config/config.example.toml").read_bytes()
+        older = original.split(b"# P2 scoped API access only.")[0]
+        self.assertEqual(template_issue("config/config.example.toml",older),"unrecognized-template-section")
+        self.assertIsNone(template_issue("config/config.example.toml",older,historical_templates=True))
+
     def test_deleted_credential_remains_blocked_in_history(self):
         self.commit("clean templates")
         # Synthetic value assembled at runtime; no token literal enters sources.

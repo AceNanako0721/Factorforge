@@ -20,12 +20,26 @@ Factorforge/
 │   │   ├── workers/             # 出站执行、保护工作池、成交查询与行情采集
 │   │   ├── bootstrap.py         # 本层配置、依赖装配、入口
 │   │   └── cli.py               # HTTP 客户端
-│   ├── strategy/                # P2 实现时才创建
+│   ├── strategy/                # P2，独立安装；仅依赖 P1 公共接口
+│   │   ├── domain/              # 情绪、仓位、止损、案例、学习与验证纯逻辑
+│   │   ├── application/         # 对象/事件/评分、决策周期、反馈和研究用例
+│   │   ├── ports/               # 存储、时钟、交易和归因输入协议
+│   │   ├── adapters/
+│   │   │   ├── trading_v2.py    # P1 HTTP 契约；不访问交易层内部存储或 SDK
+│   │   │   └── postgres/
+│   │   │       └── migrations/  # 框架 SIM/LIVE 独立模式、权限及追加账本
+│   │   ├── api/                 # 公共/内部路由与各自的身份类型
+│   │   ├── workers/             # 周期调度、及时成交/保护反馈
+│   │   ├── bootstrap.py         # 私有配置及本层装配
+│   │   └── cli.py               # 手工 SIM/研究 HTTP 客户端
 │   └── applications/            # P3 实现时才创建
 ├── tests/
 │   ├── trading/                 # 对应 P1 包的领域/API/故障测试
+│   ├── strategy/                # 对应 P2 包的机制/闭环/数据库/进程测试
 │   └── test_repository_guards.py # 已有仓库管理测试
-├── contracts/v2/trading/        # 当前 API 的生成契约；v1 保留历史
+├── contracts/v2/
+│   ├── trading/                # 当前 P1 API 的生成契约；v1 保留历史
+│   └── strategy/               # 公共/工作负载 API 与身份类型的生成契约
 ├── doc/
 │   ├── v*/                     # 已发布的版本式样/设计/短规划，冻结
 │   ├── engineering/            # 非版本业务文档：文件树、开发操作说明
@@ -35,13 +49,13 @@ Factorforge/
 ├── prompts/                    # 只提交一个空提示词模板
 ├── runtime/                    # 忽略：数据库、日志、构建/验收产物
 ├── .github/                    # CI、PR 模板等 GitHub 管理文件
-└── pyproject.toml              # 唯一运行包定义与入口
+└── pyproject.toml              # 唯一运行包定义；含 P1/P2 独立构建档案和入口
 ```
 
-未来目录仅作位置约定，不提前创建空框架或应用包。业务源码不得放在根目录、tools、doc 或 runtime。生产包不得通过路径修改导入根目录工具；测试必须测试已安装的 src 包。禁止为了复用把策略/实例代码搬入一个跨层 common 包。
+尚未实现的应用目录仅作位置约定，不提前创建空应用包。业务源码不得放在根目录、tools、doc 或 runtime。生产包不得通过路径修改导入根目录工具；测试必须测试已安装的 src 包。禁止为了复用把策略/实例代码搬入一个跨层 common 包。
 
 领域逻辑不导入网络、数据库、API、适配器或上层；应用依赖领域与端口；适配器实现端口；API 和 workers 调用应用；只有 bootstrap 装配依赖。交易层禁止导入 strategy/applications。文件按一个明确职责拆分，禁止泛用 utils.py 堆积。
 
-迁移与渠道契约属于其适配器。测试夹具存放于 tests/trading，使用虚构账户和行情；生产秘密不进入夹具。依赖锁在 tools/requirements-trading.lock，构建目录/egg-info/缓存忽略。历史作者源码的位置保留，冻结版本不搬动。
+迁移与渠道契约属于其适配器。测试夹具存放于对应的 tests/trading 或 tests/strategy，使用虚构账户和行情；生产秘密不进入夹具。P2 的 P1 客户端只可导入 trading.api.dto/views，不得导入 P1 application/domain/store/broker。依赖锁在 tools/requirements-trading.lock，当前 P2 复用同一已锁定基础设施依赖。构建工具从根 pyproject.toml 派生临时配置，不新增第二份长期包定义。P1 wheel 仅含 trading，P2 wheel 仅含 strategy 并声明依赖 P1；测试中不安装应用层。构建目录/egg-info/缓存忽略。历史作者源码的位置保留，冻结版本不搬动。
 
 修改前运行目录/导入边界检查；CI 同步检查。新增顶层目录需先更新本文并说明用途；接口增加仍须符合对应式样及设计，不能以文件树说明替代版本变更。

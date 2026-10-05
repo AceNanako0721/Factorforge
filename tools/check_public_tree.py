@@ -76,9 +76,19 @@ def template_issue(path, content, *, historical_templates=False):
                 return "nonempty-template-service-settings"
             if value.get("application", {}).get("prompt_file") != "prompts/prompts.local.json":
                 return "unsafe-prompt-path"
-            allowed = {"schema_version", "mode", "runtime", "services", "credentials", "application", "trading"}
-            if set(value) != allowed:
+            allowed = {"schema_version", "mode", "runtime", "services", "credentials", "application", "trading", "strategy"}
+            valid_sections = set(value) == allowed
+            if historical_templates:
+                valid_sections |= set(value) == allowed - {"strategy"}
+            if not valid_sections:
                 return "unrecognized-template-section"
+            strategy = {**{k:"" for k in ("environment","instance_id","public_database_url","worker_database_url",
+                "migration_database_url","trading_api_url","trading_api_token","public_token","workload_token",
+                "public_host","internal_host","public_api_url","internal_api_url","candle_interval","replay_clock")},
+                "initial_registry":{},"public_identity":{},"workload_identity":{},"public_port":0,"internal_port":0,
+                "timeout_seconds":0,"history_seconds":0,"worker_poll_seconds":0}
+            if "strategy" in value and value["strategy"] != strategy:
+                return "unrecognized-template-field"
             trading = {"adapter": "mock", "allow_live": False,
                        "account_id": "", "principal_id": "", "permissions": [],
                        "storage_path": "", "account_currency": "", "reconciliation_tolerance": "",
