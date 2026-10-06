@@ -521,6 +521,15 @@ func (s *acceptance) run(readonly bool) error {
 	if runErr != nil {
 		s.report["error"] = stableCode(runErr)
 		fmt.Println("FAILED " + stableCode(runErr))
+		// Preserve the failing state before bounded cleanup changes it. Receipts
+		// remain in this run's ignored, private directory.
+		if s.store != nil {
+			if snapshot, err := s.store.Read(s.ctx, s.key); err == nil {
+				if err = privateJSON(filepath.Join(s.directory, "failure-snapshot.json"), snapshot); err != nil {
+					s.report["failure_snapshot_error"] = stableCode(err)
+				}
+			}
+		}
 		if s.broker != nil {
 			if stats, err := s.stats(); err == nil {
 				s.report["transport"] = stats
