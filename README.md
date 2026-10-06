@@ -2,7 +2,7 @@
 
 Factorforge 是分为交易系统、策略化框架、应用实例三层的事件情绪量化交易项目。当前开发基线为 **v2.1.1**（Go 设计与 P1 重构），既有发布对照为 v2.1.0，代码与公开文档采用 [MIT](LICENSE) 许可证。
 
-后端正在由 Python 迁移为 Go；前端目标为 React/TypeScript 编译的 JavaScript。**P1 已完整重构为 Go 并完成本地运行验收**：交易核心、完整 API/CLI、PostgreSQL、SIM/Binance、保护/反馈/采集、独立进程及测试网验收工具均已迁移，运行路径不调用 Python。原生 Go 测试网只读/隔离/存储子集 12 项实际通过，本次没有交易所写请求；完整 Go 测试网交易复验与生产实盘准入单独登记。P2 数值域已迁移，完整框架尚待迁移。见 [迁移进度](doc/progress/GO_MIGRATION.md) 和 [Go 运行说明](doc/engineering/TRADING_GO.md)。
+后端正在由 Python 迁移为 Go；前端目标为 React/TypeScript 编译的 JavaScript。**P1 已完整重构为 Go，完成本地运行及 Binance 合约测试网完整交易验收**：交易核心、完整 API/CLI、PostgreSQL、SIM/Binance、保护/反馈/采集、独立进程及测试网验收工具均已迁移，运行路径不调用 Python。Go 测试网只读子集 12 项及完整虚拟资金交易套件 25 项实际通过，包括交易所止损触发、应急减仓、账务恢复、隔离与数据库故障阻断；最终账户平仓且无挂单，生产实盘尚未准入。P2 数值域已迁移，完整框架尚待迁移。见 [迁移进度](doc/progress/GO_MIGRATION.md) 和 [Go 运行说明](doc/engineering/TRADING_GO.md)。
 
 P1 提供 API/CLI、公共行情采集、可重放撮合、保护工作池、目标撤替/反向续接、账户与组合风险、多币种账务、外部事实恢复、PostgreSQL 持久化和受准入控制的签名执行。原 Python P1 的 Binance 合约测试网完整闭环已完成，历史证据保留在 [P1 记录](doc/progress/P1.md)；该记录不能代替 Go 的现场交易验收。
 

@@ -45,10 +45,10 @@ execution-live 的 `--probe-only` 只读取账户能力；`--initialize-run` 仅
 runtime/go-bin/testnet-acceptance --config config/config.toml --postgres-bin <原生PG目录> --isolation-only
 ```
 
-入口创建本轮私有数据库、API 和签名进程，要求整个测试账户平仓且没有其他程序或挂单。用户填写测试网地址及 Key/Secret，运行资料由实验入口生成。官方入口必须为 https://demo-fapi.binance.com；实验固定数据不写回生产配置。本次 Go 只读子集 12 项现场检查通过，见 [迁移记录](../progress/GO_MIGRATION.md)。
+入口创建本轮私有数据库、API 和签名进程，要求整个测试账户平仓且没有其他程序或挂单。用户填写测试网地址及 Key/Secret，运行资料由实验入口生成。官方入口必须为 https://demo-fapi.binance.com；实验固定数据不写回生产配置。Go 只读子集 12 项及后续完整交易套件 25 项现场检查通过，见 [迁移记录](../progress/GO_MIGRATION.md)。
 
-完整虚拟资金套件必须显式添加 `--authorize-testnet-orders`，可指定诊断 `--symbol` 和 `--max-notional`（最多 100 USDT）。它实际验证挂撤单、真实回执丢失后的原 ID 查询、物理保护/重叠替换/自然止损触发、账务、停机独立 REST 应急减仓、外部事实恢复及故障/隔离。缺少写权限时，在读取配置之前拒绝。完整 Go 现场交易套件本次未执行，旧 Python 报告不能代替它。
+完整虚拟资金套件必须显式添加 `--authorize-testnet-orders`，可指定诊断 `--symbol` 和 `--max-notional`（最多 100 USDT）。它实际验证挂撤单、真实回执丢失后的原 ID 查询、物理保护/重叠替换/自然止损触发、账务、停机独立 REST 应急减仓、外部事实恢复及故障/隔离。缺少写权限时，在读取配置之前拒绝。日本时间 2026-10-06 09:32:57–09:33:22，完整 Go 现场交易套件 25 项通过，证据与边界见 [P1 记录](../progress/P1.md)；旧 Python 报告保持独立历史。
 
-报告/回执仅位于本轮 runtime/p1-go-*。未证明的外部仓位差异使清理保留物理止损并报失败，不修改账本来通过。`--cleanup-run <本轮目录> --authorize-testnet-orders` 只允许账户已平仓时取消 owned-snapshot.json 中本轮已知保护 ID，每次写前再证明平仓，不撤账户全部挂单。
+报告/回执仅位于本轮 runtime/p1-go-*。失败时先保存 failure-snapshot.json，再执行受限清理；查询诊断只记录获准的方法、路径和稳定错误码，不记录参数、签名或供应商正文。未证明的外部仓位差异使清理保留物理止损并报失败，不修改账本来通过。`--cleanup-run <本轮目录> --authorize-testnet-orders` 只允许账户已平仓时取消 owned-snapshot.json 中本轮已知保护 ID，每次写前再证明平仓，不撤账户全部挂单。
 
 生产切换按 [恢复预案](TRADING_RECOVERY_RUNBOOK.md) 保存快照、确认旧执行隔离、Go 恢复核账及显式 resume；回退亦先隔离 Go。现场准入和参数标定独立于本地测试/CI。本次未自动启动生产交易。

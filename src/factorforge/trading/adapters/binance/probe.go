@@ -2,6 +2,7 @@ package binance
 
 import (
 	"context"
+	"errors"
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/trading/domain"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/domain/decimal"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/ports"
@@ -35,6 +36,15 @@ type ProbeTransport struct {
 	epoch         int64
 	dropNext      bool
 	writeAttempts int
+	lastFailure   *probeFailure
+}
+
+// Only admitted method/path and stable codes are recorded, never parameters,
+// signatures, provider bodies, or account/order identities.
+type probeFailure struct {
+	Method string `json:"method"`
+	Path   string `json:"path"`
+	Code   string `json:"code"`
 }
 
 var probeReads = map[string]bool{"/fapi/v3/account": true, "/fapi/v1/accountConfig": true, "/fapi/v3/positionRisk": true, "/fapi/v1/openOrders": true, "/fapi/v1/openAlgoOrders": true, Ordinary: true, Conditional: true, "/fapi/v1/userTrades": true, "/fapi/v1/income": true}
@@ -45,7 +55,11 @@ func (p *ProbeTransport) DropResponse()    { p.mu.Lock(); p.dropNext = true; p.m
 func (p *ProbeTransport) Stats() map[string]any {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	return map[string]any{"write_attempts": p.writeAttempts, "last_rejection_code": p.Signed.LastRejectionCode()}
+	result := map[string]any{"write_attempts": p.writeAttempts, "last_rejection_code": p.Signed.LastRejectionCode()}
+	if p.lastFailure != nil {
+		result["last_failure"] = *p.lastFailure
+	}
+	return result
 }
 func (p *ProbeTransport) Require(ctx context.Context) error {
 	m := p.Manifest
@@ -212,6 +226,17 @@ func (p *ProbeTransport) Request(ctx context.Context, method, path string, param
 	}
 	raw, err := p.Signed.Request(ctx, method, path, params, write)
 	if err != nil {
+		code := "VENUE_QUERY_UNAVAILABLE"
+		var problem *d.Error
+		var ambiguous *ports.Ambiguous
+		if errors.As(err, &problem) {
+			code = problem.Code
+		} else if errors.As(err, &ambiguous) {
+			code = "AMBIGUOUS_RESULT"
+		}
+		p.mu.Lock()
+		p.lastFailure = &probeFailure{Method: method, Path: path, Code: code}
+		p.mu.Unlock()
 		return nil, err
 	}
 	if write && method == "POST" && path == Ordinary {

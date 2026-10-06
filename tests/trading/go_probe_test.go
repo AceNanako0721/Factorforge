@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -100,6 +101,11 @@ func TestNativeIsolatedTestnetSignerAndAuthority(t *testing.T) {
 			t.Error("native signer absent")
 		}
 		signed.Add(1)
+		if r.URL.Path == binance.Conditional {
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(map[string]any{"code": -2013, "msg": "synthetic-private-provider-receipt"})
+			return
+		}
 		json.NewEncoder(w).Encode(map[string]any{"canTrade": true, "dualSidePosition": false, "multiAssetsMargin": false})
 	}))
 	venue.TLS = &tls.Config{Certificates: []tls.Certificate{{Certificate: [][]byte{der}, PrivateKey: key}}}
@@ -143,9 +149,30 @@ func TestNativeIsolatedTestnetSignerAndAuthority(t *testing.T) {
 	if !errors.As(err, &problem) || problem.Code != "TESTNET_READ_SCOPE" || signed.Load() != 1 {
 		t.Fatal("read allowlist escaped", err)
 	}
+	_, err = remote.Call(ctx, "raw", binance.Conditional, binance.Params{"clientAlgoId": "synthetic-private-order-id"})
+	if !errors.As(err, &problem) || problem.Code != "ORDER_NOT_FOUND" || signed.Load() != 2 {
+		t.Fatal("provider lookup failure misclassified", err)
+	}
+	result, err = remote.Call(ctx, "stats")
+	var stats struct {
+		WriteAttempts int `json:"write_attempts"`
+		LastFailure   struct {
+			Method string `json:"method"`
+			Path   string `json:"path"`
+			Code   string `json:"code"`
+		} `json:"last_failure"`
+	}
+	if err != nil || json.Unmarshal(result, &stats) != nil || stats.WriteAttempts != 0 || stats.LastFailure.Method != "GET" || stats.LastFailure.Path != binance.Conditional || stats.LastFailure.Code != "ORDER_NOT_FOUND" {
+		t.Fatal("stable native query diagnostic missing", err)
+	}
+	for _, private := range []string{"synthetic-private-order-id", "synthetic-private-provider-receipt", "synthetic-native-key", "synthetic-native-secret", "signature", "timestamp"} {
+		if strings.Contains(string(result), private) {
+			t.Fatal("native query diagnostic leaked private data")
+		}
+	}
 	gateway.Revoke(token)
 	_, err = remote.Call(ctx, "raw", "/fapi/v1/accountConfig", binance.Params{})
-	if err == nil || signed.Load() != 1 {
+	if err == nil || signed.Load() != 2 {
 		t.Fatal("revoked signer reconnected")
 	}
 	remote.Close()
