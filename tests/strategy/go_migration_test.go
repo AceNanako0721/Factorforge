@@ -122,6 +122,32 @@ func TestPythonGolden(t *testing.T) {
 			// Preserve the fixture's Python-style argument names at this test boundary.
 			var fields map[string]json.RawMessage
 			json.Unmarshal(c.Input, &fields)
+			// Numeric-only fixtures predate the public snake_case record tags.
+			// Normalize that test boundary without changing frozen oracle data.
+			for _, key := range []string{"bars", "sample"} {
+				var raw any
+				if json.Unmarshal(fields[key], &raw) != nil {
+					continue
+				}
+				var normalize func(any)
+				normalize = func(v any) {
+					switch x := v.(type) {
+					case []any:
+						for _, item := range x {
+							normalize(item)
+						}
+					case map[string]any:
+						for old, renamed := range map[string]string{"CloseAt": "close_at", "AvailableAt": "available_at"} {
+							if value, ok := x[old]; ok {
+								x[renamed] = value
+								delete(x, old)
+							}
+						}
+					}
+				}
+				normalize(raw)
+				fields[key], _ = json.Marshal(raw)
+			}
 			for old, newName := range map[string]string{"half_life": "HalfLife", "k_stop": "KStop"} {
 				if value, ok := fields[old]; ok {
 					fields[newName] = value

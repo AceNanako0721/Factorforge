@@ -15,7 +15,11 @@ func (e *Error) Error() string { return e.Code }
 
 // These are typed inputs to the migrated numerical functions, not a replacement
 // for the complete persisted StrategyState or public API request validation.
-type Level struct{ Exposure, Enter, Exit Decimal }
+type Level struct {
+	Exposure Decimal `json:"exposure"`
+	Enter    Decimal `json:"enter"`
+	Exit     Decimal `json:"exit"`
+}
 type NumericalPolicy struct {
 	Levels                                                                         []Level
 	CleanupThreshold, NumericalTolerance, Epsilon, SigmaRef, LiquidityBudget       Decimal
@@ -69,22 +73,30 @@ type SentimentState struct {
 	Ledger        []LedgerEntry
 }
 type PoolView struct {
-	ObjectID                  string
-	Plus, Minus, Net, Quality Decimal
-	Contributions             []Contribution
-	LedgerVersion             int
+	ObjectID      string         `json:"object_id"`
+	Plus          Decimal        `json:"plus"`
+	Minus         Decimal        `json:"minus"`
+	Net           Decimal        `json:"net"`
+	Quality       Decimal        `json:"quality"`
+	Contributions []Contribution `json:"contributions"`
+	LedgerVersion int            `json:"ledger_version"`
 }
 type MarketSample struct {
-	AvailableAt                 time.Time
-	Price                       Decimal
-	Benchmark, Sigma, Liquidity *Decimal
-	Quality                     string
+	AvailableAt time.Time `json:"available_at"`
+	Price       Decimal   `json:"price"`
+	Benchmark   *Decimal  `json:"benchmark"`
+	Sigma       *Decimal  `json:"sigma"`
+	Liquidity   *Decimal  `json:"liquidity"`
+	Quality     string    `json:"quality"`
 }
 type Bar struct {
-	CloseAt, AvailableAt time.Time
-	High, Low, Close     Decimal
-	Final                bool
-	Quality              string
+	CloseAt     time.Time `json:"close_at"`
+	AvailableAt time.Time `json:"available_at"`
+	High        Decimal   `json:"high"`
+	Low         Decimal   `json:"low"`
+	Close       Decimal   `json:"close"`
+	Final       bool      `json:"final"`
+	Quality     string    `json:"quality"`
 }
 type ProductRules struct {
 	Multiplier, QuantityStep, PriceTick, MinNotional Decimal
@@ -92,9 +104,12 @@ type ProductRules struct {
 	Version                                          string
 }
 type StopPlan struct {
-	TriggerKind                                   string
-	TriggerPrice, CoveredQuantity, MaxSlippageBPS Decimal
-	ExitOrderType, SpecVersion                    string
+	TriggerKind     string  `json:"trigger_kind"`
+	TriggerPrice    Decimal `json:"trigger_price"`
+	CoveredQuantity Decimal `json:"covered_quantity"`
+	MaxSlippageBPS  Decimal `json:"max_slippage_bps"`
+	ExitOrderType   string  `json:"exit_order_type"`
+	SpecVersion     string  `json:"spec_version"`
 }
 type StopResult struct {
 	Quantity Decimal
