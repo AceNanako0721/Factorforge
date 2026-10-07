@@ -15,3 +15,8 @@ type RegisterFX = d.RegisterFX
 type ResolveExternal = d.ResolveExternal
 type FenceExecutor = d.FenceExecutor
 type MarketSnapshot = d.MarketSnapshot
+
+// Read-only value bindings for higher HTTP clients; no execution or store API.
+type RunKey = d.RunKey
+type InstrumentKey = d.InstrumentKey
+type InstrumentSpec = d.InstrumentSpec
