@@ -48,6 +48,49 @@ query_max_original_bytes = 0
 query_cursor_age_seconds = 0
 query_cursor_key = ""
 
+[application.pipeline.settings]
+environment = ""
+instance_id = ""
+object_id = ""
+stage = ""
+assets_file = ""
+fixture_input_file = ""
+poll_seconds = 0
+timeout_seconds = 0
+lease_seconds = 0
+task_ttl_seconds = 0
+max_input_bytes = 0
+max_outboxes = 0
+max_framework_pages = 0
+research_bucket = ""
+trading_bucket = ""
+question_set_version = ""
+prompt_version = ""
+rubric_version = ""
+calibration_version = ""
+model_version = ""
+
+[application.pipeline.publication]
+database_url = ""
+source_version = ""
+max_records = 0
+max_bytes = 0
+
+[application.pipeline.ingest]
+database_url = ""
+framework_url = ""
+framework_token = ""
+
+[application.pipeline.research]
+database_url = ""
+framework_url = ""
+framework_token = ""
+
+[application.pipeline.trading]
+database_url = ""
+framework_url = ""
+framework_token = ""
+
 
 [trading]
 adapter = "mock"

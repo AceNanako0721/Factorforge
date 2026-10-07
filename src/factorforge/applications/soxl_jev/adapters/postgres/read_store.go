@@ -117,8 +117,9 @@ func (s *Store) VerifyRole(ctx context.Context) error {
         AND NOT EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
           WHERE n.nspname NOT IN ('pg_catalog','information_schema') AND n.nspname NOT LIKE 'pg_toast%'
           AND c.relkind IN ('r','p','v','m','f')
-          AND (has_table_privilege(session_user,c.oid,'INSERT,UPDATE,DELETE,TRUNCATE,TRIGGER')
-               OR (n.nspname<>$3 AND has_table_privilege(session_user,c.oid,'SELECT'))))
+          AND (has_any_column_privilege(session_user,c.oid,'INSERT,UPDATE')
+               OR has_table_privilege(session_user,c.oid,'DELETE,TRUNCATE,TRIGGER')
+               OR (n.nspname<>$3 AND has_any_column_privilege(session_user,c.oid,'SELECT'))))
         FROM pg_roles r WHERE r.rolname=session_user`, role, other, s.schema).Scan(&allowed)
 	if err != nil {
 		return safe(err)

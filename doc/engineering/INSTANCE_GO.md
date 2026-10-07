@@ -1,6 +1,6 @@
 # P3 实例只读 API 运行说明
 
-更新：2026-10-07。实现冻结 v2.1.1 的 S3-018/T3-15；属于 code-only，版本仍为 2.1.1。P3 目前完成管理台所需的只读基础，采集、联网搜索、JEV 分析、路由、评分提交及其工作进程仍待实现。该 API 不持有交易执行、工作负载评分或供应商能力。
+更新：2026-10-08。实现冻结 v2.1.1 的 S3-018/T3-15；属于 code-only，版本仍为 2.1.1。P3 首批采集、联网搜索、JEV 适配、路由、评分提交及独立进程已实现，见 [链路说明](INSTANCE_PIPELINE.md)。该只读 API 不持有交易执行、工作负载评分或供应商能力；G4 与生产准入状态分别登记。
 
 生产代码位于 src/factorforge/applications/soxl_jev，按 domain/ports、operations/reports、adapters/postgres、config/api/entrypoints 摆放；测试位于 tests/applications/soxl_jev。复用本仓库已经验证的 pgx、环境角色、原生进程和离线 OpenAPI 检查方式；本轮没有新增第三方依赖，不引入 Python、Node 或新交易框架。
 

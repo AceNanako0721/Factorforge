@@ -1,6 +1,6 @@
 # 仓库文件树规范
 
-确立日期：2026-10-04；更新：2026-10-07。适用于 v2.1.1 Go 设计、P1/P2 重构与 P3 只读基础，三层职责不变。生产源码只放 src/factorforge 对应层，业务式样和实现方法以当前 HTML 基线为准。
+确立日期：2026-10-04；更新：2026-10-08。适用于 v2.1.1 Go 设计、P1/P2 重构与 G4 实例链路，三层职责不变。生产源码只放 src/factorforge 对应层，业务式样和实现方法以当前 HTML 基线为准。
 
 沿用 NautilusTrader 的核心/适配器划分与 Freqtrade 的源码/测试/运行数据分离；Go 使用单根模块与各层独立入口，不引入完整交易框架。
 
@@ -27,11 +27,13 @@ Factorforge/
 │   │   ├── workers/
 │   │   └── entrypoints/         # API、调度、反馈、CLI
 │   └── applications/
-│       └── soxl_jev/            # 已有 P3 只读基础，采集/分析/提交待实现
-│           ├── domain/ / ports/ # 显式已存事实与只读端口
-│           ├── operations/ / reports/ # 无副作用投影
+│       └── soxl_jev/            # P3 只读基础及首批采集/分析/提交链路
+│           ├── domain/ / ports/ # 显式事实、绑定与队列/来源/评分端口
+│           ├── monitoring/ / evidence/ / routing/ # 受限原文、核验与确定性路由
+│           ├── analysis/ / submission/ / workers/ # 私有 Provider、下层 HTTP、工作进程
+│           ├── operations/ / reports/ # bootstrap、日历及无副作用投影
 │           ├── adapters/postgres/migrations/ # 本应用 SQL
-│           └── config/ / api/ / entrypoints/soxl-jev-api/
+│           └── config/ / api/ / entrypoints/ # API、三 worker、操作者 CLI
 │   # console/ 与其 web/ 尚未实施，仅在有实际代码时创建
 ├── tests/                       # trading/、strategy/、engineering/、applications/soxl_jev/
 │   └── strategy/fixtures/       # 固定合成 JSON，不含秘密
@@ -54,4 +56,4 @@ P1 的正常运行入口已改为六个 Go 二进制，见 [Go 运行说明](TRA
 
 管理台唯一 package.json/pnpm-lock.yaml 放 console/web。Node/pnpm 只用于构建和浏览器测试；产物放 runtime/web-build，再由受控步骤交给 Go BFF 同源提供。node_modules、源码图和截图不进公开树，真实 config/prompts 不在静态目录。运行服务不依赖 Python 或 Node。未来测试放 tests/applications/console 与 tests/web；当前不预建空包。
 
-P3 当前只读 API 见 [实例说明](INSTANCE_GO.md)。applications 下只登记 soxl_jev/console，应用领域和端口同样受纯领域检查；向下只通过公开 DTO/client 或 HTTP，同层应用也不导入对方数据库/业务实现。operations/reports/routing/submission 禁止反向依赖 API、适配器或入口；不为尚未实现的组件创建占位源码。
+P3 当前只读 API 见 [实例说明](INSTANCE_GO.md)，私有队列/工作进程与配置身份派生见 [实例链路说明](INSTANCE_PIPELINE.md)。applications 下只登记 soxl_jev/console，应用领域和端口同样受纯领域检查；向下只通过公开 DTO/client 或 HTTP，同层应用也不导入对方数据库/业务实现。operations/reports/routing/submission 禁止反向依赖 API、适配器或入口；不为尚未实现的组件创建占位源码。

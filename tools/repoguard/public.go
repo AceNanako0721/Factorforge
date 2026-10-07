@@ -97,6 +97,12 @@ func TemplateIssue(name string, data []byte, historical bool) string {
 		if historical {
 			old := cloneMap(expected)
 			application := cloneMap(asMap(old["application"]))
+			delete(application, "pipeline")
+			old["application"] = application
+			old["services"] = actual["services"]
+			if equalJSON(actual, old) {
+				return ""
+			}
 			delete(application, "read_api")
 			old["application"] = application
 			old["services"] = actual["services"]

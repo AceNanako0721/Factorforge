@@ -28,7 +28,12 @@ GitHub 的权限规则见 [OAuth scopes](https://docs.github.com/en/apps/oauth-a
 
 ## 解决结果
 
-2026-10-08，提交 `026b0e1f74526bdf07f3d05dc74473fe3e6313f3` 已通过既有 SSH 认证实际推送，远端接受工作流变更。[Go CI 首轮记录](https://github.com/AceNanako0721/Factorforge/actions/runs/37644618514) 已启动四项必需检查；上传权限问题已解决，CI 和 main 合并结果另行核验。
+2026-10-08，提交 `026b0e1f74526bdf07f3d05dc74473fe3e6313f3` 已通过既有 SSH 认证实际推送，远端接受工作流变更。[Go CI 首轮记录](https://github.com/AceNanako0721/Factorforge/actions/runs/37644618514) 的四项必需检查全部通过；上传权限问题已解决。
+
+- [PR #13](https://github.com/AceNanako0721/Factorforge/pull/13)：四项检查通过后 squash 合并，main 提交 `46182a8e57b813cb7f00f774adb0c1da0e7d43c9`；[合并后 main CI](https://github.com/AceNanako0721/Factorforge/actions/runs/37645172048) 四项通过。
+- [PR #14](https://github.com/AceNanako0721/Factorforge/pull/14)：先纳入上述 main，再核验 [PR CI](https://github.com/AceNanako0721/Factorforge/actions/runs/37645316635) 四项通过，squash 合并提交 `f3832a8254f5c90c0e39662c73d0c4e126b98752`；[合并后 main CI](https://github.com/AceNanako0721/Factorforge/actions/runs/37645623981) 四项通过。
+
+两次合并都指定已验收的 PR head，不跳过检查或改 main 保护。GitHub 已删除合并分支；再次删除返回 Reference does not exist 不代表合并失败。该轮 GitHub CI 与合并收尾完成；G4 上层实现另记进度，不把本次通过记成 JEV 联调或生产实盘准入。
 
 推送前历史扫描发现旧 G3 校验器不认识 P3 分支的空 `application.read_api` 模板。采用 P3 已有的完整空模板及严格校验，保留冻结旧模板仅在历史中的兼容，实际暂存 314 个文件版本、所有可达历史 703 个文件版本扫描通过。没有放宽真实值或私有文件限制。
 
