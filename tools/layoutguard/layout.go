@@ -73,6 +73,15 @@ func Check(root string) ([]string, error) {
 		if layer != "applications" && !has([]string{"domain", "application", "ports", "adapters", "api", "workers", "entrypoints"}, area) {
 			fail("unregistered layer area")
 		}
+		own := module + layer + "/"
+		if layer == "applications" {
+			if len(parts) < 6 || !has([]string{"soxl_jev", "console"}, parts[3]) {
+				fail("unregistered application or source area")
+				return nil
+			}
+			own += parts[3] + "/"
+			area = parts[4]
+		}
 		file, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
 		if err != nil {
 			return err
@@ -91,11 +100,25 @@ func Check(root string) ([]string, error) {
 			if layer == "strategy" && strings.HasPrefix(imported, module+"trading/") && !prefix(imported, module+"trading/api/", []string{"dto", "views"}) {
 				fail("strategy requires public trading DTO/client")
 			}
-			own := module + layer + "/"
+			if layer == "applications" {
+				if strings.HasPrefix(imported, module+"trading/") && !prefix(imported, module+"trading/api/", []string{"dto", "views"}) {
+					fail("application requires public trading DTO/client")
+				}
+				if strings.HasPrefix(imported, module+"strategy/") && !prefix(imported, module+"strategy/api/", []string{"dto", "client"}) {
+					fail("application requires public strategy DTO/client")
+				}
+				if strings.HasPrefix(imported, module+"applications/") && !strings.HasPrefix(imported, own) {
+					other := strings.TrimPrefix(imported, module+"applications/")
+					app, _, found := strings.Cut(other, "/")
+					if !found || !prefix(imported, module+"applications/"+app+"/api/", []string{"dto", "client"}) {
+						fail("peer applications require HTTP or public DTO/client")
+					}
+				}
+			}
 			if area == "domain" && strings.HasPrefix(imported, own) && !strings.HasPrefix(imported, own+"domain") {
 				fail("domain depends on outer package")
 			}
-			if area == "application" && prefix(imported, own, []string{"api", "workers", "adapters", "entrypoints"}) {
+			if has([]string{"application", "operations", "reports", "routing", "submission"}, area) && prefix(imported, own, []string{"api", "workers", "adapters", "entrypoints"}) {
 				fail("reversed application dependency")
 			}
 			if (area == "ports" || area == "adapters") && prefix(imported, own, []string{"application", "api", "workers", "entrypoints"}) {

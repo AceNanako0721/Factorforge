@@ -433,7 +433,7 @@ func Check(root string) (int, int, error) {
 	if count < 4 {
 		return 0, 0, fmt.Errorf("contract fixtures missing")
 	}
-	for _, name := range []string{"v2/trading/openapi.json", "v2/strategy/openapi.json", "v2/strategy/workload.openapi.json"} {
+	for _, name := range []string{"v2/trading/openapi.json", "v2/strategy/openapi.json", "v2/strategy/workload.openapi.json", "v2/instances/openapi.json"} {
 		value, err := read(filepath.Join(abs, name))
 		if err != nil {
 			return 0, 0, err

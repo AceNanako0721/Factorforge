@@ -28,4 +28,8 @@ GitHub 的权限规则见 [OAuth scopes](https://docs.github.com/en/apps/oauth-a
 
 ## 解决结果
 
-当前等待通过 SSH 推送并核验新工作流的实际 GitHub 结果。完成后在本节、Go 迁移进度和对应 PR 正文登记提交与 CI 证据，不能提前写成已解决。
+2026-10-08，提交 `026b0e1f74526bdf07f3d05dc74473fe3e6313f3` 已通过既有 SSH 认证实际推送，远端接受工作流变更。[Go CI 首轮记录](https://github.com/AceNanako0721/Factorforge/actions/runs/37644618514) 已启动四项必需检查；上传权限问题已解决，CI 和 main 合并结果另行核验。
+
+推送前历史扫描发现旧 G3 校验器不认识 P3 分支的空 `application.read_api` 模板。采用 P3 已有的完整空模板及严格校验，保留冻结旧模板仅在历史中的兼容，实际暂存 314 个文件版本、所有可达历史 703 个文件版本扫描通过。没有放宽真实值或私有文件限制。
+
+开发机旧版 `gh pr edit` 另返回已退役 Projects classic 的 GraphQL 错误；这不是 workflow 权限问题。PR 正文通过 `gh api` 的 REST PATCH 与结构化 JSON 文件更新，ready 状态通过专门 GraphQL mutation 更新，不调用已退役字段。
