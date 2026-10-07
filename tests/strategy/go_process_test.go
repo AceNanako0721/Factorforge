@@ -88,6 +88,7 @@ func TestNativeP2APIAndCLIProcessesPersistWithoutPython(t *testing.T) {
 	port := freePort(t)
 	workloadPort := freePort(t)
 	c := configuration.Config{Environment: "SIM", InstanceID: base.InstanceID, MigrationDatabaseURL: server.AdminDSN, PublicDatabaseURL: dsns["public"], WorkerDatabaseURL: dsns["worker"], InitialRegistry: map[string]any{"parameters": []any{sd.Map(create.Parameters)}, "policies": []any{sd.Map(create.Policy)}, "factor_manifests": map[string]any{}}, PublicIdentity: sd.Map(public), WorkloadIdentity: sd.Map(identity), PublicToken: "process-fixture-public-token", WorkloadToken: "process-fixture-workload-token", TradingAPIURL: "http://127.0.0.1:1", TradingAPIToken: "process-fixture-p1-token", PublicAPIURL: fmt.Sprintf("http://127.0.0.1:%d", port), InternalAPIURL: fmt.Sprintf("http://127.0.0.1:%d", workloadPort), PublicHost: "127.0.0.1", InternalHost: "127.0.0.1", PublicPort: port, InternalPort: workloadPort, TimeoutSeconds: 2, CandleInterval: "1m", HistorySeconds: 86400, WorkerPollSeconds: 1, ReplayClock: sd.ISO(create.Parameters.ValidFrom.Add(time.Second))}
+	c.QueryDefaultLimit, c.QueryMaxLimit, c.QueryMaxRecords, c.QueryCursorAgeSeconds, c.QueryCursorKey = 1, 10, 100, 60, "process-fixture-cursor-key"
 	if err = assembly.Initialize(ctx, c); err != nil {
 		t.Fatal(err)
 	}
@@ -185,6 +186,23 @@ func TestNativeP2APIAndCLIProcessesPersistWithoutPython(t *testing.T) {
 		t.Fatal("native object creation failed")
 	}
 	before := invoke("show-pool", nil, false)
+	readDirectory := func() []byte {
+		t.Helper()
+		request, _ := http.NewRequest(http.MethodGet, c.PublicAPIURL+api.Prefix+"/objects", nil)
+		request.Header.Set("Authorization", "Bearer "+c.PublicToken)
+		response, err := (&http.Client{Timeout: time.Second}).Do(request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer response.Body.Close()
+		var page map[string]any
+		if response.StatusCode != 200 || json.NewDecoder(response.Body).Decode(&page) != nil || len(sd.Rows(page["items"])) != 1 {
+			t.Fatal("native persisted trace unavailable")
+		}
+		encoded, _ := json.Marshal(page)
+		return encoded
+	}
+	traceBefore := readDirectory()
 	stop()
 	stopInternal()
 	stop, logsAfter := start(false)
@@ -192,6 +210,9 @@ func TestNativeP2APIAndCLIProcessesPersistWithoutPython(t *testing.T) {
 	after := invoke("show-pool", nil, false)
 	if !bytes.Equal(before, after) {
 		t.Fatal("native restart lost persisted framework state")
+	}
+	if !bytes.Equal(traceBefore, readDirectory()) {
+		t.Fatal("native persisted trace changed across restart")
 	}
 	for _, log := range []*privateProcessLog{logs, internalLogs, logsAfter} {
 		for _, secret := range []string{server.AdminDSN, dsns["public"], dsns["worker"], c.PublicToken, c.WorkloadToken, c.TradingAPIToken} {

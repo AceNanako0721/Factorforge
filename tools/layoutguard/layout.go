@@ -6,6 +6,7 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -16,6 +17,32 @@ const module = "github.com/AceNanako0721/Factorforge/src/factorforge/"
 
 func Check(root string) ([]string, error) {
 	failures := []string{}
+	// Read only registered/unignored paths; ignored configuration and runtime
+	// files are never inspected. Tiny non-Git import fixtures remain supported.
+	if _, err := os.Stat(filepath.Join(root, ".git")); err == nil {
+		absolute, err := filepath.Abs(root)
+		if err != nil {
+			return nil, err
+		}
+		command := exec.Command("git", "-c", "safe.directory="+filepath.ToSlash(absolute), "-C", absolute, "ls-files", "--cached", "--others", "--exclude-standard", "-z")
+		data, err := command.Output()
+		if err != nil {
+			return nil, err
+		}
+		registered := []string{".github", ".githooks", "src", "tests", "contracts", "doc", "tools", "config", "prompts"}
+		for _, name := range strings.Split(string(data), "\x00") {
+			parts := strings.Split(name, "/")
+			if len(parts) > 1 && !has(registered, parts[0]) {
+				failures = append(failures, name+": unregistered top-level directory")
+			}
+			if strings.HasPrefix(name, "src/") && (len(parts) < 3 || parts[1] != "factorforge") {
+				failures = append(failures, name+": source outside factorforge")
+			}
+			if strings.HasSuffix(name, ".py") && name != "contracts/check_contract.py" {
+				failures = append(failures, name+": retired Python source in active tree")
+			}
+		}
+	}
 	err := filepath.WalkDir(filepath.Join(root, "src"), func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return err

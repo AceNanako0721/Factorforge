@@ -1,1 +1,0 @@
-"""Environment-scoped PostgreSQL persistence."""

@@ -17,6 +17,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -27,7 +28,7 @@ func nativePG(t *testing.T) string {
 	if path := os.Getenv("FACTORFORGE_TEST_PG_BIN"); path != "" {
 		return path
 	}
-	for _, pattern := range []string{"../../.venv/lib/python*/site-packages/pgserver/pginstall/bin", "../../runtime/go-migration-regression/lib/python*/site-packages/pgserver/pginstall/bin", "/usr/lib/postgresql/*/bin"} {
+	for _, pattern := range []string{"../../runtime/native-pg/pgserver/pginstall/bin", "/usr/lib/postgresql/*/bin"} {
 		paths, _ := filepath.Glob(pattern)
 		if len(paths) > 0 {
 			path, err := filepath.Abs(paths[0])
@@ -157,6 +158,29 @@ func TestNativeP2PostgresAtomicityRolesAndRestart(t *testing.T) {
 	if after.Version != state.Version+1 || after.Objects.Len() != 1 || len(after.Audit) != 1 {
 		t.Fatal("duplicate aggregate mutation")
 	}
+	if err = worker.Transaction(ctx, state.InstanceID, func(s *sd.StrategyState) error {
+		addQueryFacts(s, request.Object.ObjectID, "", clock.Now())
+		s.Cases.Set("trace-case", &sd.CaseRecord{CaseID: "trace-case", ObjectID: request.Object.ObjectID, Direction: 1, EntryAt: clock.Now(), EntryWindow: "fixture", Status: "OPEN", LabelStatus: "IMMATURE"})
+		s.Candidates.Set("unknown-transition", map[string]any{"object_id": request.Object.ObjectID, "state": "MONITORING"})
+		for _, record := range []any{s.Events.Value("fact"), s.Scores.Value("score"), s.Receipts.Value("score"), s.Contributions.Value("contribution"), s.Cases.Value("trace-case")} {
+			raw, e := sd.Marshal(record)
+			if e != nil {
+				t.Fatal(e)
+			}
+			copy := reflect.New(reflect.TypeOf(record).Elem()).Interface()
+			if e = sd.DecodeJSON(raw, copy); e != nil {
+				t.Fatalf("invalid synthetic read fixture %T: %v", record, e)
+			}
+		}
+		s.Version++
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	after, err = worker.Read(ctx, state.InstanceID)
+	if err != nil {
+		t.Fatal(err)
+	}
 	before := sd.Clone(after)
 	assertStrategyCode(t, public.Transaction(ctx, state.InstanceID, func(s *sd.StrategyState) error { s.ConsumedEvidence = append(s.ConsumedEvidence, "forged"); return nil }), "PUBLIC_INTERNAL_STATE_FORBIDDEN")
 	assertStrategyCode(t, worker.Transaction(ctx, state.InstanceID, func(s *sd.StrategyState) error { s.Audit[0]["action"] = "tampered"; return nil }), "APPEND_ONLY_MUTATION_FORBIDDEN")
@@ -175,6 +199,46 @@ func TestNativeP2PostgresAtomicityRolesAndRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	if e := firstDifference(sd.JSONValue(before), sd.JSONValue(restored), "restart"); e != nil {
+		t.Fatal(e)
+	}
+	readPolicy := app.ReadPolicy{DefaultLimit: 1, MaxLimit: 10, MaxRecords: 100, CursorAge: time.Minute, CursorKey: []byte("query-fixture-only")}
+	principal := sd.PublicPrincipal{PrincipalID: "trace-public", InstanceID: state.InstanceID, Environment: "SIM", Scopes: []sd.ApiScope{sd.Query}}
+	query := app.QueryService{Store: public, Clock: clock, Policy: readPolicy}
+	page, err := query.Trace(ctx, principal, "event", "fact", app.ReadFilter{})
+	if err != nil || page.Cursor == nil {
+		t.Fatal("persisted event page", err)
+	}
+	public.Close()
+	public, err = pg.Open(ctx, dsns["public"], "SIM", "public")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer public.Close()
+	query.Store = public
+	next, err := query.Trace(ctx, principal, "event", "fact", app.ReadFilter{Cursor: *page.Cursor})
+	if err != nil || len(next.Items) != 1 || next.Items[0]["fact_version"] != 2 {
+		t.Fatal("restart stable cursor", err, next.Items)
+	}
+	for _, read := range []struct{ resource, id string }{{"objects", ""}, {"events", ""}, {"scores", "fact"}, {"ledger", request.Object.ObjectID}, {"attributions", "trace-case"}, {"counterfactuals", "trace-case"}, {"parameter-activations", ""}, {"audit", ""}} {
+		if _, err = query.Trace(ctx, principal, read.resource, read.id, app.ReadFilter{}); err != nil {
+			t.Fatal(read.resource, err)
+		}
+	}
+	query.Store = worker
+	page, err = query.Trace(ctx, identity, "event", "fact", app.ReadFilter{})
+	if err != nil || page.Cursor == nil {
+		t.Fatal("scoped worker page", err)
+	}
+	if _, err = adminConn.Exec(ctx, "DELETE FROM strategy_sim.workload_capability_grant WHERE workload_id=$1", identity.WorkloadID); err != nil {
+		t.Fatal(err)
+	}
+	_, err = query.Trace(ctx, identity, "event", "fact", app.ReadFilter{Cursor: *page.Cursor})
+	assertStrategyCode(t, err, "WORKLOAD_GRANT_MISSING")
+	readAfter, err := worker.Read(ctx, state.InstanceID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e := firstDifference(sd.JSONValue(before), sd.JSONValue(readAfter), "query purity"); e != nil {
 		t.Fatal(e)
 	}
 	publicConn, err := pgx.Connect(ctx, dsns["public"])

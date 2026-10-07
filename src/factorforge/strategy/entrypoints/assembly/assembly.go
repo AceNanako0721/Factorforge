@@ -142,7 +142,7 @@ func Serve(ctx context.Context, c config.Config, internal bool) error {
 	if host == "" || port < 1 || port > 65535 {
 		return &d.Error{Code: "STRATEGY_LISTENER_REQUIRED", Status: 503}
 	}
-	handler, err := api.New(api.Options{Store: runtime.Store, Clock: runtime.Clock, Tokens: map[string]d.Identity{token: runtime.Identity}, Internal: internal, Cycle: &runtime.Cycle})
+	handler, err := api.New(api.Options{Store: runtime.Store, Clock: runtime.Clock, Tokens: map[string]d.Identity{token: runtime.Identity}, Internal: internal, Cycle: &runtime.Cycle, ReadPolicy: app.ReadPolicy{DefaultLimit: c.QueryDefaultLimit, MaxLimit: c.QueryMaxLimit, MaxRecords: c.QueryMaxRecords, CursorAge: time.Duration(c.QueryCursorAgeSeconds) * time.Second, CursorKey: []byte(c.QueryCursorKey)}})
 	if err != nil {
 		return err
 	}

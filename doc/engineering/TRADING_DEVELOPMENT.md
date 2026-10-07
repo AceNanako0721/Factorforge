@@ -1,28 +1,23 @@
 # 独立交易层开发与运行
 
-2026-10-06：当前 P1 使用独立 Go 二进制，启动/配置/构建见 [Go 运行说明](TRADING_GO.md)。本文保留原操作和恢复职责；历史 Python 命令仅供冻结回归，不能与 Go 同时写同一账户。
+2026-10-06：当前 P1 使用独立 Go 二进制，启动/配置/构建见 [Go 运行说明](TRADING_GO.md)。本文保留原操作和恢复职责；旧 Python 源码与工具已退役到 Git 历史，固定 JSON 对照继续保留。
 
 本文件记录 v2.0.0 既有设计的实现操作。源码遵守[文件树规范](REPOSITORY_LAYOUT.md)，适用验收和证据见[P1进度](../progress/P1.md)。交易层不依赖 P2/P3。
 
 ## 安装与检查
 
-使用 Python 3.11+，在仓库根目录执行：
+使用根 go.mod 的 Go 工具链、Git 和原生 PostgreSQL。数据库测试在临时目录运行，不接触现有配置或交易账户。FACTORFORGE_TEST_PG_BIN 指定 initdb/pg_ctl 目录；常驻部署使用自行管理的 PostgreSQL。
 
 ```sh
-python -m venv .venv
-.venv/bin/python -m pip install -r tools/requirements-trading.lock
-.venv/bin/python -m pip install -e . --no-deps
-.venv/bin/python tools/check_layout.py
-.venv/bin/python -m pytest tests -q
-.venv/bin/python tools/export_trading_contract.py
-.venv/bin/python tools/build_trading.py
+go run ./tools/build-trading
+go run ./tools/check-layout
+go test ./tests/trading -count=1
+go run ./tools/export-trading-contract --check
 ```
-
-Windows 对应 `.venv/Scripts/python.exe`。真实 PostgreSQL/独立进程验收在 Ubuntu 完成；pgserver 只在测试临时目录启动数据库，不接触已有配置或交易账户。常驻部署使用自行管理的 PostgreSQL。
 
 ## 配置和权限
 
-`python tools/init_private_config.py` 只创建缺失的私有文件，不覆盖旧文件。配置唯一真源为 `config/config.toml`；新字段格式见 `config/config.example.toml`，旧私有文件需由操作者补入。公开模板中的零、空字串和空对象为占位，不能作为运行参数。提示词不参与 P1。
+`go run ./tools/init-private-config` 只创建缺失的私有文件，不覆盖旧文件。配置唯一真源为 `config/config.toml`；新字段格式见 `config/config.example.toml`，旧私有文件需由操作者补入。公开模板中的零、空字串和空对象为占位，不能作为运行参数。提示词不参与 P1。
 
 SIM 使用 mock 适配器、固定本金和明确冻结的费用/滑点/参与率/延迟/保证金/队列参数。杠杆大于1时必须登记清算费。规则登记包括单位、币种、时段/停盘、能力和可选保证金阶梯；非线性产品拒绝。外币费用、资金和敞口需先登记有来源/时间的FX；保留原币余额，不假装实际兑换。
 
@@ -31,12 +26,12 @@ SIM 使用 mock 适配器、固定本金和明确冻结的费用/滑点/参与�
 交易凭据只供执行服务账号读取。含签名密钥的唯一私有源不交给 API/CLI/采集账号。部署时派生最小运行配置：
 
 ```sh
-python tools/prepare_trading_profile.py --source config/config.toml --output runtime/api/config.toml
+go run ./tools/prepare-trading-profiles --config config/config.toml --out runtime/trading-profiles
 ```
 
 派生文件没有交易所Key/Secret或执行数据库连接，Unix创建权限为0600；已有文件不覆盖。API/CLI/采集/模拟执行拒绝任何包含签名密钥的配置。操作者将派生文件授予对应服务账号，保留源文件仅执行账号可读；不同环境使用不同账号、数据库和runtime子目录，验证进程无法越界读源文件。派生文件是部署产物，修改仍回到唯一配置真源。
 
-迁移管理账号与运行账号分开。管理连接调用 `factorforge.trading.adapters.postgres.store.initialize(dsn, "SIM")` 或 `"LIVE"`；也可用无交易密钥的管理员配置运行 `trading-api --initialize-db`，只迁移后退出。迁移可重复执行，补充新增事实、历史规则、租约、健康及市场逐笔表。
+迁移管理账号与运行账号分开。管理连接调用 Go postgres.Initialize(ctx, dsn, environment)；也可用无交易密钥的管理员配置运行 `trading-api --initialize-db`，只迁移后退出。迁移可重复执行，补充新增事实、历史规则、租约、健康及市场逐笔表。
 
 运行连接须具备本环境 `factorforge_sim`/`factorforge_live` NOLOGIN角色，拒绝超级用户及可访问另一环境schema的账号。API连接写入 `services.database_url`，签名执行另用 `services.execution_database_url`。上层不获得数据库直写权。不要让测试网与生产账户共享数据库或执行账号。
 
@@ -45,9 +40,9 @@ python tools/prepare_trading_profile.py --source config/config.toml --output run
 ## 本地SIM与行情
 
 ```sh
-trading-api --config runtime/api/config.toml --host 127.0.0.1 --port 8000
-execution-sim --config runtime/api/config.toml --run-id <运行ID> --executor-id <执行ID>
-factorforge-trading --config runtime/api/config.toml account-show --run-id <运行ID>
+trading-api --config runtime/trading-profiles/api.toml --host 127.0.0.1 --port 8000
+execution-sim --config runtime/trading-profiles/api.toml --run-id <运行ID> --executor-id <执行ID>
+trading-cli --config runtime/trading-profiles/api.toml account-show --run-id <运行ID>
 ```
 
 CLI 只调用HTTP。写入JSON含请求ID、幂等键、环境/账户/运行、期望版本、有效期和原因，格式见[生成契约](../../contracts/v2/trading/openapi.json)。命令包括模拟创建、挂撤单/保护、查询、外部导入/归属解释、FX、隔离、停止/对账/恢复。
@@ -57,7 +52,7 @@ CLI 只调用HTTP。写入JSON含请求ID、幂等键、环境/账户/运行、�
 公共行情采集只使用 MarketPort 和HTTP API：
 
 ```sh
-market-collector --config runtime/api/config.toml --run-id <运行ID> --instrument <对象> --interval <周期> --lookback-seconds <范围> --poll-seconds <间隔> --multiplier <已核验单位> --publication-delay-ms <已登记延迟> --trade-limit <逐笔条数>
+market-collector --config runtime/trading-profiles/api.toml --run-id <运行ID> --instrument <对象> --interval <周期> --lookback-seconds <范围> --poll-seconds <间隔> --multiplier <已核验单位> --publication-delay-ms <已登记延迟> --trade-limit <逐笔条数>
 ```
 
 采集器保存完成K线、逐笔及 BID/ASK/LAST/MARK/INDEX，不把报价当作真实可成交量，不自动撮合。交易/保护能力由授权操作者预先登记；公共行情只提供其可核验的能力，采集器沿用相同经济规则下已登记能力，不能自行补账户授权。规则变化保留档案并要求新版本核验。缺口、过期、交叉报价和未确认规则阻止相应增险。成交后持续维护的是实际仓位，旧目标撤单确认前不替换；反向先平到零再查风险。
@@ -69,11 +64,11 @@ market-collector --config runtime/api/config.toml --run-id <运行ID> --instrume
 当前只读账户验证仅需在唯一私有配置填写测试网地址/Key/Secret；不要求账户标签、数据库或准入记录。运行服务才需要后述配置，由部署过程准备；不把完整部署清单作为填写API凭据的前置条件。无数据库、无写权限的账户只读探针为：
 
 ```sh
-python tools/check_trading_readiness.py --config config/config.toml
-python tools/probe_binance_testnet.py --config config/config.toml --timeout <超时> --recv-window-ms <签名窗口> --request-budget <请求预算> --budget-window-seconds <预算窗口> --output runtime/testnet/account-probe.json
+go run ./tools/check-trading-readiness --config config/config.toml
+go run ./tools/probe-binance-testnet --config config/config.toml --timeout <时长如10s> --recv-window-ms <签名窗口> --request-budget <请求预算> --budget-window <时长如1m> --output runtime/testnet/account-probe.json
 ```
 
-只读探针强制官方测试网主机，拒绝生产/其他端点，在签名传输层不安装写入许可，仅查询账户、账户配置、持仓模式、多资产模式、普通单和条件单，共6个GET。V3账户接口返回余额，`canTrade`及账户模式由独立的`/fapi/v1/accountConfig`核验，缺失/禁用或不兼容模式仍拒绝，不把缺失字段默认为可交易。[官方账户接口](https://developers.binance.com/en/docs/catalog/core-trading-derivatives-trading-usd-s-m-futures/api/rest-api/account) 报告只含脱敏状态/计数，保留在runtime，不打印密钥或原始账户正文。公开行情探针不需要Key：`python tools/probe_public_market.py --help`。
+只读探针强制官方测试网主机，拒绝生产/其他端点，在签名传输层不安装写入许可，仅查询账户、账户配置、持仓模式、多资产模式、普通单和条件单，共6个GET。V3账户接口返回余额，`canTrade`及账户模式由独立的`/fapi/v1/accountConfig`核验，缺失/禁用或不兼容模式仍拒绝，不把缺失字段默认为可交易。[官方账户接口](https://developers.binance.com/en/docs/catalog/core-trading-derivatives-trading-usd-s-m-futures/api/rest-api/account) 报告只含脱敏状态/计数，保留在runtime，不打印密钥或原始账户正文。公共行情由 market-collector 采集，不需要交易所 Key；它只向 P1 HTTP 写入行情事实。
 
 探针的请求预算是临时实验参数，应结合`exchangeInfo.rateLimits`的对应窗口限制和服务器已用权重登记。服务器权重包含已有IP流量；随意给一个低于已用权重的本地预算会在有效凭据下停止后续查询。完整执行的请求权重登记须包含`GET /fapi/v1/accountConfig`，不得用此次实验预算填充生产政策。
 
@@ -97,9 +92,9 @@ OBSERVE日损失/回撤/连亏不暂停或间接缩仓；硬名义/保证金/压
 
 ```sh
 # 仅只读访问交易所，实测进程/文件/出口/数据库/审计隔离。
-python tools/accept_binance_testnet.py --isolation-only
+runtime/go-bin/testnet-acceptance --postgres-bin <原生PG目录> --isolation-only
 # 已明确授权且账户没有其他程序操作后，以交易所虚拟资金验收。
-python tools/accept_binance_testnet.py --authorize-testnet-orders --symbol ETHUSDT --max-notional 100
+runtime/go-bin/testnet-acceptance --postgres-bin <原生PG目录> --authorize-testnet-orders --symbol ETHUSDT --max-notional 100
 ```
 
 入口是能力探针，不填写或伪造 `live_readiness`，正常 `execution-live` 准入门保持有效。默认标的是可更换的 P1 诊断对象，不是 P3 实例绑定；100 USDT 是实验名义上限，生产政策没有默认值。初始要求全账户平仓、无普通或条件挂单，单向/单资产模式。验收中发现未归属成交立即停止；多个程序共享同一测试账户会使闭环失效，必须先停止其他程序。
