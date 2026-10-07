@@ -15,7 +15,7 @@
 
 ## 分支和 PR
 
-源码和辅助文件的位置按 [文件树规范](doc/engineering/REPOSITORY_LAYOUT.md) 执行。新增顶层目录先登记用途；生产代码、测试、数据库迁移和运行产物不可混放。Go 模块采用 src 三层布局，各层入口独立构建；迁移期保留已安装的 Python 包回归；`python tools/check_layout.py` 验证目录和依赖边界。
+源码和辅助文件的位置按 [文件树规范](doc/engineering/REPOSITORY_LAYOUT.md) 执行。新增顶层目录先登记用途；生产代码、测试、数据库迁移和运行产物不可混放。Go 模块采用 src 三层布局，各层入口独立构建；使用 `go run ./tools/check-layout` 验证目录和依赖边界。旧 Python 源码和桥接工具已在 G3 退役，固定合成 JSON 对照仍由 Go 验证。
 
 从最新 `main` 建立 `feat/...`、`fix/...`、`docs/...` 或 `chore/...` 分支。PR 填写一个 `Change-Type`，写明变更内容、原因、涉及的 S/T 编号、验证结果和限制。仅代码变更不修改 VERSION、不新增发布标签；GitHub 合并时以 PR 标题/正文记载此次实现变更。
 
@@ -35,6 +35,8 @@
 v2.1.0 首次执行 HTML 规则，迁移全部三层文档并追加 Web 管理台配对、S2-024/T2-16 与 S3-018/T3-15；不改变三层架构，不修改历史记录。前端项目依赖与参考位置属于设计，具体业务效果及流程属于仕様，不将实现细节塞入仕様。
 
 ## 上传边界
+
+GitHub 工作流修改的认证差异、历史故障及 SSH 处理方式见 [工作流维护记录](doc/engineering/GITHUB_WORKFLOW.md)。遇到 OAuth workflow scope 或连接器 403 时先核对既有 SSH 通道，不自动要求重新授权或改全局认证。
 
 所有非敏感源码、测试、生成器、校验器及公开文档上传 GitHub。文档构建目录只提交源码；下载的证据、临时文档、渲染图与工作站报告不提交。私有数据不是私有代码，不应把代码藏在 private/runtime 目录。
 

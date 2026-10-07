@@ -1,1 +1,0 @@
-"""Framework I/O adapters."""

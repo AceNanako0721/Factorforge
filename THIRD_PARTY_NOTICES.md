@@ -6,7 +6,7 @@ Factorforge retains its MIT license. The following small algorithms are adapted 
 
 Source: [FusionHub._gate_direction](https://github.com/alexeymozolevsky-max/financier/blob/3708a31d77cb57c0f972828488449efc341dfbf1/engine/app/core/fusion_hub.py).
 Pinned commit: `3708a31d77cb57c0f972828488449efc341dfbf1`.
-Adaptation: `strategy/domain/position.py:level_for` and its Go translation `strategy/domain/position.go:LevelFor` extend the Decimal entry/retention equality rules to multiple registered levels. No AI, Redis, broker or uncalibrated sizing defaults are included.
+Adaptation: `strategy/domain/position.go:LevelFor` extends the Decimal entry/retention equality rules to multiple registered levels. The earlier Python adaptation remains in Git history. No AI, Redis, broker or uncalibrated sizing defaults are included.
 
 Copyright (c) 2026 Alexey Mozolevsky
 
@@ -14,7 +14,7 @@ Copyright (c) 2026 Alexey Mozolevsky
 
 Source: [cross_validation.purge](https://github.com/sam31415/timeseriescv/blob/cb04fb6ea7a0b2c15920ca253f882336fe336ba8/timeseriescv/cross_validation.py).
 Pinned commit: `cb04fb6ea7a0b2c15920ca253f882336fe336ba8`.
-Adaptation: `strategy/domain/validation.py:purge` uses UTC records instead of pandas/NumPy, adds availability, embargo and group exclusion, and omits the future-training branch to enforce strict forward validation.
+Adaptation: `strategy/domain/validation.go:Purge` uses UTC records instead of pandas/NumPy, adds availability, embargo and group exclusion, and omits the future-training branch to enforce strict forward validation. The earlier Python adaptation remains in Git history.
 
 Copyright (c) 2018 Samuel Monnier
 
@@ -66,3 +66,19 @@ pinned in go.mod/go.sum. Preserve their licenses when distributing binaries.
 The MIT terms reproduced above also apply to these dependencies. Indirect
 modules retain their own licenses, including pgpassfile, pgservicefile, puddle,
 Go x/sync, x/sys, x/text, and libcap/psx; consult their LICENSE files when bundling.
+
+## Native repository validation dependencies
+
+These libraries are called through their public APIs and pinned by go.mod/go.sum.
+No application or copied implementation from them is included.
+
+| Module | Version and use | License |
+| --- | --- | --- |
+| golang.org/x/net | [v0.59.0](https://pkg.go.dev/golang.org/x/net@v0.59.0/html), html/parse.go HTML5 document validation | BSD 3-Clause; The Go Authors |
+| santhosh-tekuri/jsonschema/v6 | [v6.0.2](https://github.com/santhosh-tekuri/jsonschema/tree/v6.0.2), compiler.go and validator.go for offline Draft 2020-12 | [Apache 2.0](https://github.com/santhosh-tekuri/jsonschema/blob/v6.0.2/LICENSE) |
+| dlclark/regexp2 | [v1.11.5](https://github.com/dlclark/regexp2/tree/v1.11.5), regexp.go ECMAScript lookahead compatibility for existing decimal schemas | [MIT](https://github.com/dlclark/regexp2/blob/v1.11.5/LICENSE); Doug Clark |
+
+The OpenAPI Initiative's official dated OpenAPI 3.1 meta-schema is bundled
+unchanged in contracts/meta for offline validation. Its source URL, SHA-256,
+scope and Apache 2.0 license are included there. Distributions must retain the
+licenses of these dependencies and the bundled schema. Factorforge remains MIT.

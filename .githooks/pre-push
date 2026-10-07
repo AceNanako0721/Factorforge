@@ -1,7 +1,3 @@
 #!/bin/sh
 set -eu
-if command -v python >/dev/null 2>&1; then
-    python tools/check_public_tree.py --all-history
-else
-    python3 tools/check_public_tree.py --all-history
-fi
+exec go run ./tools/check-public-tree --all-history

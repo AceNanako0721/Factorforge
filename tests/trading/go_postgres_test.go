@@ -19,7 +19,7 @@ func nativePostgresBin(t *testing.T) string {
 	if path := os.Getenv("FACTORFORGE_TEST_PG_BIN"); path != "" {
 		return path
 	}
-	for _, pattern := range []string{"../../.venv/lib/python*/site-packages/pgserver/pginstall/bin", "../../runtime/go-migration-regression/lib/python*/site-packages/pgserver/pginstall/bin", "/usr/lib/postgresql/*/bin"} {
+	for _, pattern := range []string{"../../runtime/native-pg/pgserver/pginstall/bin", "/usr/lib/postgresql/*/bin"} {
 		paths, _ := filepath.Glob(pattern)
 		for _, path := range paths {
 			if _, err := os.Stat(filepath.Join(path, "initdb")); err == nil {

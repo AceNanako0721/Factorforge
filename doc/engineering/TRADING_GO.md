@@ -1,10 +1,10 @@
 # P1 Go 运行与重构验收
 
-设计基线 v2.1.1；P1 的当前运行入口为 Go。上两层、Python 和 Node 均不是交易运行依赖。旧 Python 源码和 wheel 工具暂留给冻结回归/P2 迁移。签名隔离在 Linux 使用严格 Landlock 和空网络命名空间；内核不支持时拒绝隔离启动。
+设计基线 v2.1.1；P1 的当前运行入口为 Go。上两层、Python 和 Node 均不是交易运行依赖。旧活跃 Python 源码和 wheel 工具已退役，行为对照保留为固定 JSON。签名隔离在 Linux 使用严格 Landlock 和空网络命名空间；内核不支持时拒绝隔离启动。
 
 ## 构建与检查
 
-从仓库根目录执行，需要 go.mod 指定的 Go 工具链与原生 PostgreSQL。测试可设置 `FACTORFORGE_TEST_PG_BIN`，指定 `initdb`/`pg_ctl` 所在目录；现有 pgserver 携带的原生二进制也可用，Go 不执行 Python。
+从仓库根目录执行，需要 go.mod 指定的 Go 工具链与原生 PostgreSQL。测试可设置 `FACTORFORGE_TEST_PG_BIN`，指定 `initdb`/`pg_ctl` 所在目录；测试只执行原生 PG 程序；从旧打包环境提取二进制时必须保留原生共享库的相对目录，不带入或执行 Python。
 
 ```sh
 go run ./tools/build-trading

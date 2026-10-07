@@ -1,24 +1,21 @@
 # 策略化框架运行说明
 
-适用实现：P2；当前设计基线：v2.1.1。正常运行使用 [P2 Go 入口](STRATEGY_GO.md)，与 [P1 Go 交易层](TRADING_GO.md) 联动。业务规则来自当前 HTML 式样/设计，本文保留字段解释和旧 Python 回归操作，不定义新的参数或准入条件。
+适用实现：P2；当前设计基线：v2.1.1。正常运行使用 [P2 Go 入口](STRATEGY_GO.md)，与 [P1 Go 交易层](TRADING_GO.md) 联动。业务规则来自当前 HTML 式样/设计，本文记录字段解释和当前 Go 操作，不定义新的参数或准入条件。
 
-## 历史 Python 回归安装与检查
+## 构建与检查
 
-以下 Python 3.11+ wheel 仅用于冻结行为回归；正常服务按 Go 说明启动。P2 复用 P1 的行情、撮合、成交、费用、保护及账户风险；P2 不读取交易所密钥，不安装模型或搜索服务。
+当前使用独立 Go 入口，P2 复用 P1 的行情、撮合、成交、费用、保护及账户风险；不读取交易所密钥，也不安装模型或搜索服务。
 
 ```sh
-python -m pip install -r tools/requirements-trading.lock
-python tools/build_trading.py
-python tools/build_strategy.py
-python -m pip install --no-deps runtime/build/*.whl
-python tools/check_layout.py
-python -m pytest tests/trading -q
-python -m pytest tests/strategy -q
-python tools/export_trading_contract.py
-python tools/export_strategy_contract.py
+go run ./tools/build-trading
+go run ./tools/build-strategy
+go test ./tests/strategy -count=1
+go run ./tools/check-layout
+go run ./tools/export-trading-contract
+go run ./tools/export-strategy-contract
 ```
 
-两个 wheel 互不打包对方的生产源码；P2 声明依赖同版本 P1。不要将源码目录加入 PYTHONPATH 代替安装包验收。所有测试的账户、行情、参数和授权均为显式实验夹具；测试不读取私有配置，不调用交易所写接口。
+旧 Python 操作已退役。以下历史验收源码名可在删除前提交 fed7614dd34b281d5ecea11beeea51c7af317266 查看；当前测试读取固定合成夹具，不加载私有配置或交易所写接口。
 
 ## 私有配置与数据库
 
@@ -34,7 +31,7 @@ python tools/export_strategy_contract.py
 | `replay_clock` | SIM 可指定 UTC 重放时钟；留空使用系统时钟。LIVE 没有手工推进时钟接口 |
 | 其余连接/采样字段 | 各 API 地址、监听主机和端口、超时、K 线周期、历史范围、工作进程轮询间隔；按运行环境填写 |
 
-类型完整定义见 `strategy/domain/models.py` 和 [身份类型契约](../../contracts/v2/strategy/identity.schemas.json)。Decimal 数值在 JSON 中写字符串；时间必须明确为 UTC。公共 key 不因请求填写 `signal:live` 或评分“置信度”而获得执行资格。
+类型完整定义见 `strategy/domain/records.go` 和 [身份类型契约](../../contracts/v2/strategy/identity.schemas.json)。Decimal 数值在 JSON 中写字符串；时间必须明确为 UTC。公共 key 不因请求填写 `signal:live` 或评分“置信度”而获得执行资格。
 
 ```sh
 factorforge-strategy --config config/config.toml initialize
@@ -69,7 +66,7 @@ factorforge-strategy show-target --object-id OBJECT
 factorforge-strategy show-case --object-id OBJECT
 ```
 
-手工内部 CLI 仅允许 SIM。推进框架时钟前，先给 P1 SIM 投递相同真实可用时间的行情帧，并运行 P1 执行进程。未安装应用层的完整示例载荷和驱动过程见 `tests/strategy/conftest.py`、`test_release_replay.py`；这些夹具数值不得抄为生产配置。
+手工内部 CLI 仅允许 SIM。推进框架时钟前，先给 P1 SIM 投递相同真实可用时间的行情帧，并运行 P1 执行进程。未安装应用层的完整示例载荷和驱动过程见 `tests/strategy/go_trading_binding_test.go`、`go_replay_test.go`；这些夹具数值不得抄为生产配置。
 
 目标的 SENT/ACK 只表示发送/受理；实际仓位、成本和案例来自 P1 成交、保护及资金事实。请求结果 UNKNOWN 时保留原命令和次数预占，查历史受理记录或用同一命令重试。暂停或撤销后未发出的增险目标废弃，减险继续。重启先读取 P1 一致快照；漏掉的周期只登记，不补发过期订单。回撤到旧高位不会再次消费价格预算。
 
@@ -85,4 +82,4 @@ factorforge-strategy show-case --object-id OBJECT
 
 生产参数缺少来源/标定或质量为 REQUIRED_UNSET 时只允许研究，不发执行目标。辅助因子与价格代理未通过登记验证也不能启用增险。未来仍需合法历史数据、独立标签与样本外实验检验 H01～H08；本地 SIM/数据库/CI 验收不证明盈利、收敛或生产实盘资格。P3 的标的选择、联网采集、JEV 与真实提示词加载尚未实现。
 
-提前计价使用 `factor_manifests` 中 `prepricing:<input_manifest_hash>` 的独立登记记录：绑定评分输入清单/标定版本/核验来源，记录训练截止、事前/可用时间、P_pre/P_available、基准收益、beta/rho、预期覆盖和各自证据引用及许可。框架重新计算比例并冻结用于该评分的登记记录；公共 API 不能写这些内部登记。UNCOVERED_PRICE 的价格证据必须与预期证据分开；已经完全被预期覆盖的证据使用 EXPECTATION_COVERED，避免扣两次。未知、未来或不合法记录保留隔离回执，不以评分者填入的 p=0 代替。具体结构与缺数拒绝示例见 `tests/strategy/test_prepricing.py`。
+提前计价使用 `factor_manifests` 中 `prepricing:<input_manifest_hash>` 的独立登记记录：绑定评分输入清单/标定版本/核验来源，记录训练截止、事前/可用时间、P_pre/P_available、基准收益、beta/rho、预期覆盖和各自证据引用及许可。框架重新计算比例并冻结用于该评分的登记记录；公共 API 不能写这些内部登记。UNCOVERED_PRICE 的价格证据必须与预期证据分开；已经完全被预期覆盖的证据使用 EXPECTATION_COVERED，避免扣两次。未知、未来或不合法记录保留隔离回执，不以评分者填入的 p=0 代替。具体结构与缺数拒绝示例见 `tests/strategy/fixtures/go_replay.json` 中的预定价用例。

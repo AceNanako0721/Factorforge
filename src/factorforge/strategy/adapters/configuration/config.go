@@ -5,34 +5,40 @@ import (
 	"encoding/json"
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/strategy/domain"
 	"github.com/pelletier/go-toml/v2"
+	"math"
 	"os"
 	"time"
 )
 
 type Config struct {
-	Environment          string         `toml:"environment"`
-	InstanceID           string         `toml:"instance_id"`
-	MigrationDatabaseURL string         `toml:"migration_database_url"`
-	PublicDatabaseURL    string         `toml:"public_database_url"`
-	WorkerDatabaseURL    string         `toml:"worker_database_url"`
-	InitialRegistry      map[string]any `toml:"initial_registry"`
-	PublicIdentity       map[string]any `toml:"public_identity"`
-	WorkloadIdentity     map[string]any `toml:"workload_identity"`
-	PublicToken          string         `toml:"public_token"`
-	WorkloadToken        string         `toml:"workload_token"`
-	TradingAPIURL        string         `toml:"trading_api_url"`
-	TradingAPIToken      string         `toml:"trading_api_token"`
-	PublicAPIURL         string         `toml:"public_api_url"`
-	InternalAPIURL       string         `toml:"internal_api_url"`
-	PublicHost           string         `toml:"public_host"`
-	InternalHost         string         `toml:"internal_host"`
-	PublicPort           int            `toml:"public_port"`
-	InternalPort         int            `toml:"internal_port"`
-	TimeoutSeconds       float64        `toml:"timeout_seconds"`
-	CandleInterval       string         `toml:"candle_interval"`
-	HistorySeconds       int            `toml:"history_seconds"`
-	WorkerPollSeconds    float64        `toml:"worker_poll_seconds"`
-	ReplayClock          string         `toml:"replay_clock"`
+	Environment           string         `toml:"environment"`
+	InstanceID            string         `toml:"instance_id"`
+	MigrationDatabaseURL  string         `toml:"migration_database_url"`
+	PublicDatabaseURL     string         `toml:"public_database_url"`
+	WorkerDatabaseURL     string         `toml:"worker_database_url"`
+	InitialRegistry       map[string]any `toml:"initial_registry"`
+	PublicIdentity        map[string]any `toml:"public_identity"`
+	WorkloadIdentity      map[string]any `toml:"workload_identity"`
+	PublicToken           string         `toml:"public_token"`
+	WorkloadToken         string         `toml:"workload_token"`
+	TradingAPIURL         string         `toml:"trading_api_url"`
+	TradingAPIToken       string         `toml:"trading_api_token"`
+	PublicAPIURL          string         `toml:"public_api_url"`
+	InternalAPIURL        string         `toml:"internal_api_url"`
+	PublicHost            string         `toml:"public_host"`
+	InternalHost          string         `toml:"internal_host"`
+	PublicPort            int            `toml:"public_port"`
+	InternalPort          int            `toml:"internal_port"`
+	TimeoutSeconds        float64        `toml:"timeout_seconds"`
+	CandleInterval        string         `toml:"candle_interval"`
+	HistorySeconds        int            `toml:"history_seconds"`
+	WorkerPollSeconds     float64        `toml:"worker_poll_seconds"`
+	ReplayClock           string         `toml:"replay_clock"`
+	QueryDefaultLimit     int            `toml:"query_default_limit"`
+	QueryMaxLimit         int            `toml:"query_max_limit"`
+	QueryMaxRecords       int            `toml:"query_max_records"`
+	QueryCursorAgeSeconds int            `toml:"query_cursor_age_seconds"`
+	QueryCursorKey        string         `toml:"query_cursor_key"`
 }
 
 func Load(path string) (Config, error) {
@@ -46,6 +52,9 @@ func Load(path string) (Config, error) {
 	c := root.Strategy
 	if !d.Has([]string{"SIM", "LIVE"}, c.Environment) || c.InstanceID == "" {
 		return Config{}, &d.Error{Code: "STRATEGY_CONFIGURATION_INCOMPLETE", Status: 503}
+	}
+	if c.QueryCursorAgeSeconds < 0 || int64(c.QueryCursorAgeSeconds) > math.MaxInt64/int64(time.Second) {
+		return Config{}, &d.Error{Code: "QUERY_POLICY_INVALID", Status: 503}
 	}
 	return c, nil
 }

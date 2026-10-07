@@ -15,11 +15,12 @@ import (
 const Prefix = "/api/v2/strategy"
 
 type Options struct {
-	Store    ports.Store
-	Clock    ports.Clock
-	Tokens   map[string]d.Identity
-	Internal bool
-	Cycle    *app.DecisionCycle
+	Store      ports.Store
+	Clock      ports.Clock
+	Tokens     map[string]d.Identity
+	Internal   bool
+	Cycle      *app.DecisionCycle
+	ReadPolicy app.ReadPolicy
 }
 type endpoint func(http.ResponseWriter, *http.Request, d.Identity) (any, int, error)
 
@@ -67,7 +68,7 @@ func New(options Options) (http.Handler, error) {
 		}
 		respond(w, status, d.Problem{Code: code, Message: code, CorrelationID: correlation})
 	}
-	register := func(method, path string, fn endpoint) {
+	registerWithAudit := func(method, path string, fn endpoint, audit bool) {
 		mux.HandleFunc(method+" "+Prefix+path, func(w http.ResponseWriter, r *http.Request) {
 			var identity d.Identity
 			header := r.Header.Get("Authorization")
@@ -88,11 +89,31 @@ func New(options Options) (http.Handler, error) {
 			var status int
 			err := d.Guard(func() error { v, s, e := fn(w, r, identity); value, status = v, s; return e })
 			if err != nil {
+				if !audit {
+					identity = nil
+				}
 				reject(w, r, identity, err)
 				return
 			}
 			respond(w, status, value)
 		})
+	}
+	register := func(method, path string, fn endpoint) { registerWithAudit(method, path, fn, true) }
+	trace := app.QueryService{Store: options.Store, Clock: options.Clock, Policy: options.ReadPolicy}
+	for _, route := range []struct{ path, resource, id string }{
+		{"/objects", "objects", ""}, {"/events", "events", ""}, {"/events/{event_id}", "event", "event_id"},
+		{"/events/{event_id}/scores", "scores", "event_id"}, {"/objects/{object_id}/ledger", "ledger", "object_id"},
+		{"/cases/{case_id}/attributions", "attributions", "case_id"}, {"/cases/{case_id}/counterfactuals", "counterfactuals", "case_id"},
+		{"/parameter-activations", "parameter-activations", ""}, {"/audit", "audit", ""},
+	} {
+		registerWithAudit("GET", route.path, func(_ http.ResponseWriter, r *http.Request, p d.Identity) (any, int, error) {
+			filter, err := readFilter(r)
+			if err != nil {
+				return nil, 0, err
+			}
+			page, err := trace.Trace(r.Context(), p, route.resource, r.PathValue(route.id), filter)
+			return page, 200, err
+		}, false)
 	}
 	query := func(r *http.Request, identity d.Identity, id string) (*d.StrategyState, error) {
 		s, err := options.Store.Read(r.Context(), identity.Instance())
@@ -116,11 +137,7 @@ func New(options Options) (http.Handler, error) {
 	})
 	mux.HandleFunc("GET /openapi.json", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		if options.Internal {
-			_, _ = w.Write([]byte(workloadOpenAPI))
-		} else {
-			_, _ = w.Write([]byte(publicOpenAPI))
-		}
+		_, _ = w.Write(OpenAPI(options.Internal))
 	})
 	register("POST", "/objects", func(_ http.ResponseWriter, r *http.Request, p d.Identity) (any, int, error) {
 		var body d.CreateObject

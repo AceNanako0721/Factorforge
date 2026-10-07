@@ -27,6 +27,26 @@ notification_token = ""
 [application]
 prompt_file = "prompts/prompts.local.json"
 
+[application.read_api]
+environment = ""
+instance_id = ""
+database_url = ""
+token = ""
+principal_id = ""
+authorization_version = ""
+original_sources = []
+host = ""
+port = 0
+timeout_seconds = 0
+query_default_limit = 0
+query_max_limit = 0
+query_max_records = 0
+query_max_snapshot_bytes = 0
+query_max_original_bytes = 0
+query_cursor_age_seconds = 0
+query_cursor_key = ""
+
+
 [trading]
 adapter = "mock"
 allow_live = false
@@ -96,3 +116,8 @@ candle_interval = ""
 history_seconds = 0
 worker_poll_seconds = 0
 replay_clock = ""
+query_default_limit = 0
+query_max_limit = 0
+query_max_records = 0
+query_cursor_age_seconds = 0
+query_cursor_key = ""
