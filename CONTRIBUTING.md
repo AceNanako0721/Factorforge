@@ -36,6 +36,8 @@ v2.1.0 首次执行 HTML 规则，迁移全部三层文档并追加 Web 管理�
 
 ## 上传边界
 
+GitHub 工作流修改的认证差异、历史故障及 SSH 处理方式见 [工作流维护记录](doc/engineering/GITHUB_WORKFLOW.md)。遇到 OAuth workflow scope 或连接器 403 时先核对既有 SSH 通道，不自动要求重新授权或改全局认证。
+
 所有非敏感源码、测试、生成器、校验器及公开文档上传 GitHub。文档构建目录只提交源码；下载的证据、临时文档、渲染图与工作站报告不提交。私有数据不是私有代码，不应把代码藏在 private/runtime 目录。
 
 `config/` 只提交 `config.example.toml`；真实值集中到本地 `config/config.toml`。`prompts/` 只提交 `prompts.example.json`；真实 instructions、criteria、拼接片段及生产 Prompt 放入本地 `prompts/prompts.local.json` 或其他被忽略的私有提示词文件。禁止通过硬编码、DOCX 隐藏内容、附件或 PR 复制敏感资产。
