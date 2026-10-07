@@ -19,6 +19,14 @@ func TestGoImportBoundary(t *testing.T) {
 		{"trading/domain", "net/http", false},
 		{"trading/application", "github.com/AceNanako0721/Factorforge/src/factorforge/trading/adapters/memory", false},
 		{"trading/domain", "github.com/AceNanako0721/Factorforge/tools/layoutguard", false},
+		{"applications/soxl_jev/operations", "github.com/AceNanako0721/Factorforge/src/factorforge/strategy/adapters/postgres", false},
+		{"applications/soxl_jev/operations", "github.com/AceNanako0721/Factorforge/src/factorforge/trading/application", false},
+		{"applications/soxl_jev/operations", "github.com/AceNanako0721/Factorforge/src/factorforge/strategy/api/dto", true},
+		{"applications/soxl_jev/operations", "github.com/AceNanako0721/Factorforge/src/factorforge/trading/api/dto", true},
+		{"applications/soxl_jev/domain", "net/http", false},
+		{"applications/soxl_jev/domain", "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/adapters/postgres", false},
+		{"applications/console/api", "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/adapters/postgres", false},
+		{"applications/common/domain", "fmt", false},
 	} {
 		t.Run(row.path+"/"+row.imported, func(t *testing.T) {
 			root := t.TempDir()

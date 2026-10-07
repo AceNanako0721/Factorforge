@@ -1,6 +1,6 @@
 # 仓库文件树规范
 
-确立日期：2026-10-04；更新：2026-10-07。适用于 v2.1.1 Go 设计与 P1/P2 完整重构，三层职责不变。生产源码只放 src/factorforge 对应层，业务式样和实现方法以当前 HTML 基线为准。
+确立日期：2026-10-04；更新：2026-10-07。适用于 v2.1.1 Go 设计、P1/P2 重构与 P3 只读基础，三层职责不变。生产源码只放 src/factorforge 对应层，业务式样和实现方法以当前 HTML 基线为准。
 
 沿用 NautilusTrader 的核心/适配器划分与 Freqtrade 的源码/测试/运行数据分离；Go 使用单根模块与各层独立入口，不引入完整交易框架。
 
@@ -26,13 +26,16 @@ Factorforge/
 │   │   ├── api/                 # 公共/工作负载独立 listener
 │   │   ├── workers/
 │   │   └── entrypoints/         # API、调度、反馈、CLI
-│   └── applications/            # 尚未实现，不预建空应用
-│       ├── soxl_jev/            # Go 采集、分析、提交、只读查询
-│       └── console/             # Go 同源 BFF
-│           └── web/             # React/TypeScript → JS，独有 npm 定义
-├── tests/                       # trading/、strategy/、engineering/
+│   └── applications/
+│       └── soxl_jev/            # 已有 P3 只读基础，采集/分析/提交待实现
+│           ├── domain/ / ports/ # 显式已存事实与只读端口
+│           ├── operations/ / reports/ # 无副作用投影
+│           ├── adapters/postgres/migrations/ # 本应用 SQL
+│           └── config/ / api/ / entrypoints/soxl-jev-api/
+│   # console/ 与其 web/ 尚未实施，仅在有实际代码时创建
+├── tests/                       # trading/、strategy/、engineering/、applications/soxl_jev/
 │   └── strategy/fixtures/       # 固定合成 JSON，不含秘密
-├── contracts/                   # 历史 v1.1 与 v2/trading、v2/strategy
+├── contracts/                   # 历史 v1.1 与 v2/trading、v2/strategy、v2/instances
 ├── doc/                         # v*/ 冻结 HTML；engineering/、progress/
 ├── tools/                       # Go 布局/构建/契约/配置/历史文档检查
 ├── config/ / prompts/           # 各仅提交一个空内容模板
@@ -50,3 +53,5 @@ P1 的正常运行入口已改为六个 Go 二进制，见 [Go 运行说明](TRA
 独立 Go 检查：go run ./tools/check-layout、go test ./...、go vet ./...。Go 布局检查同时验证登记的顶层树、源码层和导入边界。当前 CI 与 hooks 只调用 Go；唯一保留的 contracts/check_contract.py 是冻结 v1.1 链接的历史目标，不执行。进度见 [Go 迁移记录](../progress/GO_MIGRATION.md)。
 
 管理台唯一 package.json/pnpm-lock.yaml 放 console/web。Node/pnpm 只用于构建和浏览器测试；产物放 runtime/web-build，再由受控步骤交给 Go BFF 同源提供。node_modules、源码图和截图不进公开树，真实 config/prompts 不在静态目录。运行服务不依赖 Python 或 Node。未来测试放 tests/applications/console 与 tests/web；当前不预建空包。
+
+P3 当前只读 API 见 [实例说明](INSTANCE_GO.md)。applications 下只登记 soxl_jev/console，应用领域和端口同样受纯领域检查；向下只通过公开 DTO/client 或 HTTP，同层应用也不导入对方数据库/业务实现。operations/reports/routing/submission 禁止反向依赖 API、适配器或入口；不为尚未实现的组件创建占位源码。

@@ -1,0 +1,2127 @@
+{
+  "components": {
+    "schemas": {
+      "BudgetView": {
+        "additionalProperties": false,
+        "properties": {
+          "consumed": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "observed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "pattern": "Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "policy_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "queue_kind": {
+            "type": "string"
+          },
+          "record_status": {
+            "type": "string"
+          },
+          "reserved_capacity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "upstream_limit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "window_end": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "pattern": "Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "window_start": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "pattern": "Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "queue_kind",
+          "policy_version",
+          "limit",
+          "consumed",
+          "reserved_capacity",
+          "upstream_limit",
+          "unit",
+          "window_start",
+          "window_end",
+          "observed_at",
+          "record_status"
+        ],
+        "type": "object"
+      },
+      "EvidenceView": {
+        "additionalProperties": false,
+        "properties": {
+          "content_hash": {
+            "type": "string"
+          },
+          "evidence_id": {
+            "type": "string"
+          },
+          "extracted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "pattern": "Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "extraction_state": {
+            "type": "string"
+          },
+          "facts": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "claim_id": {
+                  "type": "string"
+                },
+                "economic_item": {
+                  "type": "string"
+                },
+                "fact_time": {
+                  "anyOf": [
+                    {
+                      "format": "date-time",
+                      "pattern": "Z$",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "span_ids": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "subject_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "claim_id",
+                "subject_id",
+                "economic_item",
+                "fact_time",
+                "span_ids"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "first_public_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "pattern": "Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "licence_ref": {
+            "type": "string"
+          },
+          "licence_state": {
+            "type": "string"
+          },
+          "provider_published_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "pattern": "Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "raw_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "received_at": {
+            "format": "date-time",
+            "pattern": "Z$",
+            "type": "string"
+          },
+          "redaction_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "revision_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source_id": {
+            "type": "string"
+          },
+          "spans": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "end_offset": {
+                  "type": "integer"
+                },
+                "licence_ref": {
+                  "type": "string"
+                },
+                "span_id": {
+                  "type": "string"
+                },
+                "start_offset": {
+                  "type": "integer"
+                },
+                "text_hash": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "span_id",
+                "start_offset",
+                "end_offset",
+                "text_hash",
+                "licence_ref"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "evidence_id",
+          "source_id",
+          "content_hash",
+          "licence_ref",
+          "first_public_at",
+          "provider_published_at",
+          "received_at",
+          "extracted_at",
+          "revision_of",
+          "extraction_state",
+          "facts",
+          "spans",
+          "licence_state",
+          "raw_text",
+          "redaction_reason"
+        ],
+        "type": "object"
+      },
+      "InstanceAuditView": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "audit_id": {
+            "type": "string"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "evidence_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "receipt_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "recorded_at": {
+            "format": "date-time",
+            "pattern": "Z$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "audit_id",
+          "recorded_at",
+          "action",
+          "code",
+          "job_id",
+          "evidence_id",
+          "receipt_ref"
+        ],
+        "type": "object"
+      },
+      "InstanceHealth": {
+        "additionalProperties": false,
+        "properties": {
+          "capability_states": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "checked_at": {
+                  "anyOf": [
+                    {
+                      "format": "date-time",
+                      "pattern": "Z$",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "evidence_ref": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "state",
+                "checked_at",
+                "evidence_ref"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "checked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "pattern": "Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "degradation": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "live_ready": {
+            "type": "boolean"
+          },
+          "readiness_reason_codes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "recovery_state": {
+            "type": "string"
+          },
+          "stage": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "stage",
+          "degradation",
+          "recovery_state",
+          "checked_at",
+          "capability_states",
+          "live_ready",
+          "readiness_reason_codes"
+        ],
+        "type": "object"
+      },
+      "JobView": {
+        "additionalProperties": false,
+        "properties": {
+          "claimed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "pattern": "Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "pattern": "Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "format": "date-time",
+            "pattern": "Z$",
+            "type": "string"
+          },
+          "deadline": {
+            "format": "date-time",
+            "pattern": "Z$",
+            "type": "string"
+          },
+          "job_id": {
+            "type": "string"
+          },
+          "object_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "queue_kind": {
+            "type": "string"
+          },
+          "reason_codes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "receipt_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "resolved_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "pattern": "Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "object_id",
+          "queue_kind",
+          "state",
+          "created_at",
+          "claimed_at",
+          "started_at",
+          "completed_at",
+          "deadline",
+          "resolved_model",
+          "receipt_ref",
+          "reason_codes"
+        ],
+        "type": "object"
+      },
+      "Problem": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "retryable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "retryable"
+        ],
+        "type": "object"
+      },
+      "ReportView": {
+        "additionalProperties": false,
+        "properties": {
+          "activation_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "attribution_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "framework_snapshot_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "parameter_versions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "period_end": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "pattern": "Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "period_start": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "pattern": "Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason_codes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "recorded_at": {
+            "format": "date-time",
+            "pattern": "Z$",
+            "type": "string"
+          },
+          "report_id": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "report_id",
+          "recorded_at",
+          "period_start",
+          "period_end",
+          "state",
+          "framework_snapshot_version",
+          "parameter_versions",
+          "activation_refs",
+          "attribution_refs",
+          "reason_codes"
+        ],
+        "type": "object"
+      },
+      "SourceView": {
+        "additionalProperties": false,
+        "properties": {
+          "allow_original": {
+            "type": "boolean"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "last_failure_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "pattern": "Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "last_failure_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "last_success_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "pattern": "Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "licence_ref": {
+            "type": "string"
+          },
+          "licence_state": {
+            "type": "string"
+          },
+          "licence_valid_until": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "pattern": "Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "oldest_pending_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "pattern": "Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "registry_version": {
+            "type": "string"
+          },
+          "source_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_id",
+          "registry_version",
+          "licence_ref",
+          "licence_state",
+          "allow_original",
+          "licence_valid_until",
+          "enabled",
+          "last_success_at",
+          "last_failure_at",
+          "last_failure_code",
+          "oldest_pending_at"
+        ],
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "title": "Factorforge instance read API",
+    "version": "instance-2.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v2/instances/{instance_id}/analysis-jobs": {
+      "get": {
+        "operationId": "read_instance_analysis_jobs",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "instance_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[A-Za-z0-9_.-]{1,128}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "queue_kind",
+            "schema": {
+              "enum": [
+                "RESEARCH",
+                "SIM",
+                "LIVE"
+              ],
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "schema": {
+              "enum": [
+                "QUEUED",
+                "CLAIMED",
+                "RUNNING",
+                "COMPLETED",
+                "ABSTAINED",
+                "EXPIRED",
+                "FAILED"
+              ],
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "cursor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "environment": {
+                      "enum": [
+                        "SIM",
+                        "LIVE"
+                      ],
+                      "type": "string"
+                    },
+                    "instance_id": {
+                      "type": "string"
+                    },
+                    "items": {
+                      "items": {
+                        "$ref": "#/components/schemas/JobView"
+                      },
+                      "type": "array"
+                    },
+                    "observed_at": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "pattern": "Z$",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "schema_version": {
+                      "const": "instance-2.0",
+                      "type": "string"
+                    },
+                    "snapshot_version": {
+                      "type": "string"
+                    },
+                    "source_version": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "schema_version",
+                    "environment",
+                    "instance_id",
+                    "source_version",
+                    "observed_at",
+                    "snapshot_version",
+                    "items",
+                    "cursor"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Recorded instance facts; unknown timestamps and measurements remain null"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v2/instances/{instance_id}/analysis-jobs/{job_id}": {
+      "get": {
+        "operationId": "read_instance_analysis_jobs_job_id",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "instance_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[A-Za-z0-9_.-]{1,128}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[A-Za-z0-9_.-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/JobView"
+                    },
+                    "environment": {
+                      "enum": [
+                        "SIM",
+                        "LIVE"
+                      ],
+                      "type": "string"
+                    },
+                    "instance_id": {
+                      "type": "string"
+                    },
+                    "observed_at": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "pattern": "Z$",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "schema_version": {
+                      "const": "instance-2.0",
+                      "type": "string"
+                    },
+                    "snapshot_version": {
+                      "type": "string"
+                    },
+                    "source_version": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "schema_version",
+                    "environment",
+                    "instance_id",
+                    "source_version",
+                    "observed_at",
+                    "snapshot_version",
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Recorded instance facts; unknown timestamps and measurements remain null"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v2/instances/{instance_id}/audit": {
+      "get": {
+        "operationId": "read_instance_audit",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "instance_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[A-Za-z0-9_.-]{1,128}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "schema": {
+              "format": "date-time",
+              "minLength": 1,
+              "pattern": "Z$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "schema": {
+              "format": "date-time",
+              "minLength": 1,
+              "pattern": "Z$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "cursor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "environment": {
+                      "enum": [
+                        "SIM",
+                        "LIVE"
+                      ],
+                      "type": "string"
+                    },
+                    "instance_id": {
+                      "type": "string"
+                    },
+                    "items": {
+                      "items": {
+                        "$ref": "#/components/schemas/InstanceAuditView"
+                      },
+                      "type": "array"
+                    },
+                    "observed_at": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "pattern": "Z$",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "schema_version": {
+                      "const": "instance-2.0",
+                      "type": "string"
+                    },
+                    "snapshot_version": {
+                      "type": "string"
+                    },
+                    "source_version": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "schema_version",
+                    "environment",
+                    "instance_id",
+                    "source_version",
+                    "observed_at",
+                    "snapshot_version",
+                    "items",
+                    "cursor"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Recorded instance facts; unknown timestamps and measurements remain null"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v2/instances/{instance_id}/budgets": {
+      "get": {
+        "operationId": "read_instance_budgets",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "instance_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[A-Za-z0-9_.-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "items": {
+                        "$ref": "#/components/schemas/BudgetView"
+                      },
+                      "type": "array"
+                    },
+                    "environment": {
+                      "enum": [
+                        "SIM",
+                        "LIVE"
+                      ],
+                      "type": "string"
+                    },
+                    "instance_id": {
+                      "type": "string"
+                    },
+                    "observed_at": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "pattern": "Z$",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "schema_version": {
+                      "const": "instance-2.0",
+                      "type": "string"
+                    },
+                    "snapshot_version": {
+                      "type": "string"
+                    },
+                    "source_version": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "schema_version",
+                    "environment",
+                    "instance_id",
+                    "source_version",
+                    "observed_at",
+                    "snapshot_version",
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Recorded instance facts; unknown timestamps and measurements remain null"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v2/instances/{instance_id}/evidence/{evidence_id}": {
+      "get": {
+        "operationId": "read_instance_evidence_evidence_id",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "instance_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[A-Za-z0-9_.-]{1,128}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "evidence_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[A-Za-z0-9_.-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/EvidenceView"
+                    },
+                    "environment": {
+                      "enum": [
+                        "SIM",
+                        "LIVE"
+                      ],
+                      "type": "string"
+                    },
+                    "instance_id": {
+                      "type": "string"
+                    },
+                    "observed_at": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "pattern": "Z$",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "schema_version": {
+                      "const": "instance-2.0",
+                      "type": "string"
+                    },
+                    "snapshot_version": {
+                      "type": "string"
+                    },
+                    "source_version": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "schema_version",
+                    "environment",
+                    "instance_id",
+                    "source_version",
+                    "observed_at",
+                    "snapshot_version",
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Recorded instance facts; unknown timestamps and measurements remain null"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v2/instances/{instance_id}/health": {
+      "get": {
+        "operationId": "read_instance_health",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "instance_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[A-Za-z0-9_.-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/InstanceHealth"
+                    },
+                    "environment": {
+                      "enum": [
+                        "SIM",
+                        "LIVE"
+                      ],
+                      "type": "string"
+                    },
+                    "instance_id": {
+                      "type": "string"
+                    },
+                    "observed_at": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "pattern": "Z$",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "schema_version": {
+                      "const": "instance-2.0",
+                      "type": "string"
+                    },
+                    "snapshot_version": {
+                      "type": "string"
+                    },
+                    "source_version": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "schema_version",
+                    "environment",
+                    "instance_id",
+                    "source_version",
+                    "observed_at",
+                    "snapshot_version",
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Recorded instance facts; unknown timestamps and measurements remain null"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v2/instances/{instance_id}/reports": {
+      "get": {
+        "operationId": "read_instance_reports",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "instance_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[A-Za-z0-9_.-]{1,128}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "schema": {
+              "format": "date-time",
+              "minLength": 1,
+              "pattern": "Z$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "schema": {
+              "format": "date-time",
+              "minLength": 1,
+              "pattern": "Z$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "cursor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "environment": {
+                      "enum": [
+                        "SIM",
+                        "LIVE"
+                      ],
+                      "type": "string"
+                    },
+                    "instance_id": {
+                      "type": "string"
+                    },
+                    "items": {
+                      "items": {
+                        "$ref": "#/components/schemas/ReportView"
+                      },
+                      "type": "array"
+                    },
+                    "observed_at": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "pattern": "Z$",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "schema_version": {
+                      "const": "instance-2.0",
+                      "type": "string"
+                    },
+                    "snapshot_version": {
+                      "type": "string"
+                    },
+                    "source_version": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "schema_version",
+                    "environment",
+                    "instance_id",
+                    "source_version",
+                    "observed_at",
+                    "snapshot_version",
+                    "items",
+                    "cursor"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Recorded instance facts; unknown timestamps and measurements remain null"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v2/instances/{instance_id}/sources": {
+      "get": {
+        "operationId": "read_instance_sources",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "instance_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[A-Za-z0-9_.-]{1,128}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "cursor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "environment": {
+                      "enum": [
+                        "SIM",
+                        "LIVE"
+                      ],
+                      "type": "string"
+                    },
+                    "instance_id": {
+                      "type": "string"
+                    },
+                    "items": {
+                      "items": {
+                        "$ref": "#/components/schemas/SourceView"
+                      },
+                      "type": "array"
+                    },
+                    "observed_at": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "pattern": "Z$",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "schema_version": {
+                      "const": "instance-2.0",
+                      "type": "string"
+                    },
+                    "snapshot_version": {
+                      "type": "string"
+                    },
+                    "source_version": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "schema_version",
+                    "environment",
+                    "instance_id",
+                    "source_version",
+                    "observed_at",
+                    "snapshot_version",
+                    "items",
+                    "cursor"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Recorded instance facts; unknown timestamps and measurements remain null"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Stable error code; no private values"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    }
+  }
+}

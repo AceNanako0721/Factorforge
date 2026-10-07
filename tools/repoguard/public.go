@@ -96,7 +96,13 @@ func TemplateIssue(name string, data []byte, historical bool) string {
 		}
 		if historical {
 			old := cloneMap(expected)
+			application := cloneMap(asMap(old["application"]))
+			delete(application, "read_api")
+			old["application"] = application
 			old["services"] = actual["services"]
+			if equalJSON(actual, old) {
+				return ""
+			}
 			strategy := asMap(old["strategy"])
 			for _, key := range []string{"query_default_limit", "query_max_limit", "query_max_records", "query_cursor_age_seconds", "query_cursor_key"} {
 				delete(strategy, key)

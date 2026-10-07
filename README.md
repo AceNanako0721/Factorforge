@@ -6,7 +6,7 @@ Factorforge 是分为交易系统、策略化框架、应用实例三层的事�
 
 P1 提供 API/CLI、公共行情采集、可重放撮合、保护工作池、目标撤替/反向续接、账户与组合风险、多币种账务、外部事实恢复、PostgreSQL 持久化和受准入控制的签名执行。原 Python P1 的 Binance 合约测试网完整闭环已完成，历史证据保留在 [P1 记录](doc/progress/P1.md)；该记录不能代替 Go 的现场交易验收。
 
-P2 已实现通用对象、事件与评分资格、逐贡献情绪账本、持仓与止损计算、P1 执行反馈、案例观察、归因与独立反事实、固定步长学习、自动发布回滚，以及 PostgreSQL 恢复和公共/工作负载权限隔离。分别构建 P1/P2 Go 入口即可运行，P3 尚未实现。实现和本地 SIM 验收见 [P2 进度](doc/progress/P2.md)，操作见 [框架运行说明](doc/engineering/STRATEGY_DEVELOPMENT.md)。生产实盘须另行准入；本地机制验收不代表收益、学习收敛或核心研究假设获得验证。
+P2 已实现通用对象、事件与评分资格、逐贡献情绪账本、持仓与止损计算、P1 执行反馈、案例观察、归因与独立反事实、固定步长学习、自动发布回滚，以及 PostgreSQL 恢复和公共/工作负载权限隔离。分别构建 P1/P2 Go 入口即可运行，P3 的 S3-018 实例只读基础已实现，其采集/分析/评分链路仍待实施。实现和本地 SIM 验收见 [P2 进度](doc/progress/P2.md)，操作见 [框架运行说明](doc/engineering/STRATEGY_DEVELOPMENT.md)。生产实盘须另行准入；本地机制验收不代表收益、学习收敛或核心研究假设获得验证。
 
 实现先做了 [GitHub 选材调研](doc/engineering/P2_UPSTREAM_REVIEW.md)，再适配 Financier 的滞回算法和 timeseriescv 的时间清除算法；固定来源、修改范围及许可证见 [第三方声明](THIRD_PARTY_NOTICES.md)。执行、撮合和真实账务直接复用 P1 公共接口。
 
@@ -14,7 +14,7 @@ P2 已实现通用对象、事件与评分资格、逐贡献情绪账本、持�
 
 从 [当前 HTML 文档索引](doc/v2.1.1/index.html) 阅读，再读目标层式样书及对应设计书。应用实例依赖框架与交易层，框架依赖交易层，交易层可独立运行。SOXLUSDT/JEV 分析实例与 Web 管理台在第三层平级；具体标的与模型不进入下层通用实现。
 
-v2.1.0 新增 [Web 管理台仕様书](doc/v2.1.0/04_Web管理台式样书.html) 与 [设计书](doc/v2.1.0/04_Web管理台设计书.html)，分别记录功能/业务逻辑图与模块/实际接口/开源参考文件。P2 通用只读追溯已实现；P3 及管理台尚待实施。自本版起版本基线统一使用离线 HTML 和内嵌 SVG，旧版 Markdown/Word 冻结，不产生新版配套副本。
+v2.1.0 新增 [Web 管理台仕様书](doc/v2.1.0/04_Web管理台式样书.html) 与 [设计书](doc/v2.1.0/04_Web管理台设计书.html)，分别记录功能/业务逻辑图与模块/实际接口/开源参考文件。P2 通用只读追溯已实现；P3 八类实例只读 GET 已实现；其信号生产链路和管理台仍待实施。自本版起版本基线统一使用离线 HTML 和内嵌 SVG，旧版 Markdown/Word 冻结，不产生新版配套副本。
 
 | 目录或文件 | 内容 |
 | --- | --- |
@@ -31,6 +31,8 @@ v2.1.0 新增 [Web 管理台仕様书](doc/v2.1.0/04_Web管理台式样书.html)
 | `tests/strategy` | 框架机制、P1 SIM 闭环、数据库/权限/安装包与独立进程验收 |
 | `contracts/v2/trading` | 当前交易 API 的生成契约 |
 | `contracts/v2/strategy` | 公共 API、工作负载 API 与分离的身份类型契约 |
+| `src/factorforge/applications/soxl_jev`、`tests/applications/soxl_jev` | P3 实例只读 API/存储及验收；[当前范围](doc/progress/P3.md) |
+| `contracts/v2/instances` | [原生实例只读 API](doc/engineering/INSTANCE_GO.md) 的生成契约 |
 | `doc/engineering`、`doc/progress` | [文件树规范](doc/engineering/REPOSITORY_LAYOUT.md)、运行说明与实现证据 |
 | `tools`、`.githooks`、`.github` | 版本、公开内容、测试及合并管理 |
 | 历史 Git 提交 | 旧 Python 源码、作者工具和迁移对照；当前开发不执行它们 |

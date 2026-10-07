@@ -133,6 +133,11 @@ func TestPublicGuardTemplateShapesAndDocumentContainers(t *testing.T) {
 		}
 	}
 	legacy := strings.Split(string(config), "# P2 scoped API access only.")[0]
+	// The historical fixture predates both the P2 section and P3 read API.
+	start, end := strings.Index(legacy, "[application.read_api]"), strings.Index(legacy, "[trading]")
+	if start >= 0 && end > start {
+		legacy = legacy[:start] + legacy[end:]
+	}
 	if guard.TemplateIssue("config/config.example.toml", []byte(legacy), false) == "" || guard.TemplateIssue("config/config.example.toml", []byte(legacy), true) != "" {
 		t.Fatal("legacy template history policy")
 	}
