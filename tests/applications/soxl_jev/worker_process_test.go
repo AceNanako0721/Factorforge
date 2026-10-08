@@ -8,6 +8,7 @@ import (
 	a "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/analysis"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/config"
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/domain"
+	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/reports"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/submission"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/strategy/adapters"
 	sapi "github.com/AceNanako0721/Factorforge/src/factorforge/strategy/api"
@@ -72,6 +73,13 @@ func TestNativeInstanceWorkerProfilesAndProcessWithoutPythonNode(t *testing.T) {
 	if _, err = client.CreateObject(ctx, create); err != nil {
 		t.Fatal(err)
 	}
+	publicIdentity := sd.PublicPrincipal{PrincipalID: "fixture-report", InstanceID: state.InstanceID, Environment: state.Environment, Scopes: []sd.ApiScope{sd.Query}}
+	readHandler, err := sapi.New(sapi.Options{Store: p2store, Clock: clock, Tokens: map[string]sd.Identity{"fixture-report-read": publicIdentity}, ReadPolicy: app.ReadPolicy{DefaultLimit: 10, MaxLimit: 50, MaxRecords: 1000, CursorAge: time.Hour, CursorKey: []byte("fixture-only-cursor-secret")}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	publicFramework := httptest.NewServer(readHandler)
+	defer publicFramework.Close()
 	var providerCalls atomic.Int64
 	model := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		providerCalls.Add(1)
@@ -126,6 +134,7 @@ func TestNativeInstanceWorkerProfilesAndProcessWithoutPythonNode(t *testing.T) {
 	}
 	settings := config.PipelineSettings{Environment: "SIM", InstanceID: r.Binding.InstanceID, ObjectID: r.ObjectID, Stage: "R2", AssetsFile: filepath.Join(private, "assets.json"), FixtureInputFile: filepath.Join(private, "inputs.json"), PollSeconds: 1, TimeoutSeconds: 10, LeaseSeconds: 60, TaskTTLSeconds: 3600, MaxInputBytes: 100000, MaxOutboxes: 10, MaxFrameworkPages: 10, ResearchBucket: "fixture-budget", TradingBucket: "fixture-budget", QuestionSetVersion: r.QuestionSetVersion, PromptVersion: r.PromptVersion, RubricVersion: r.RubricVersion, CalibrationVersion: r.CalibrationVersion, ModelVersion: r.ModelVersion}
 	asset := config.PipelineAssets{Version: "fixture-assets", FixtureOnly: true, RoutingPolicy: d.RoutingPolicy{Version: "fixture-policy", Binding: r.Binding, ObjectID: r.ObjectID, CalibrationVersion: r.CalibrationVersion}, Calibration: a.CalibrationMapping{Version: r.CalibrationVersion, RubricVersion: r.RubricVersion, ProducerVersion: "fixture-producer", Impact: []dec.Decimal{number("0"), number("5")}, Relevance: []dec.Decimal{number("0"), number("1")}, Expectation: []dec.Decimal{number("0"), number("1")}, HalfLife: []dec.Decimal{number("60"), number("300")}, Credibility: number("1"), Quality: number("1"), Novelty: number("1"), Prepricing: number("0"), ClaimSupportMinimum: number("0.9"), Verified: true}}
+	asset.ReportSchedule = &reports.Schedule{Anchor: now.Add(-time.Hour), PeriodSeconds: 3600, MaxRecords: 100}
 	data, _ := json.Marshal(asset)
 	if err = os.WriteFile(settings.AssetsFile, data, 0600); err != nil {
 		t.Fatal(err)
@@ -143,7 +152,7 @@ func TestNativeInstanceWorkerProfilesAndProcessWithoutPythonNode(t *testing.T) {
 		t.Fatal(err)
 	}
 	canonical := filepath.Join(private, "canonical.toml")
-	sections := map[string]any{"mode": "mock", "services": map[string]any{"jev_api_url": model.URL + "/v1/systemone"}, "credentials": map[string]any{"jev_api_key": "fixture-token"}, "application": map[string]any{"prompt_file": prompt, "pipeline": map[string]any{"settings": settings, "ingest": config.WorkerAccess{DatabaseURL: dsns["INGEST"], FrameworkURL: framework.URL, FrameworkToken: "fixture-only-worker"}, "trading": config.WorkerAccess{DatabaseURL: dsns["TRADING"], FrameworkURL: framework.URL, FrameworkToken: "fixture-only-worker"}, "research": config.WorkerAccess{DatabaseURL: dsns["RESEARCH"], FrameworkURL: framework.URL, FrameworkToken: "fixture-only-research"}}}}
+	sections := map[string]any{"mode": "mock", "services": map[string]any{"jev_api_url": model.URL + "/v1/systemone", "framework_api_url": publicFramework.URL}, "credentials": map[string]any{"jev_api_key": "fixture-token", "framework_api_token": "fixture-report-read"}, "application": map[string]any{"prompt_file": prompt, "pipeline": map[string]any{"settings": settings, "ingest": config.WorkerAccess{DatabaseURL: dsns["INGEST"], FrameworkURL: framework.URL, FrameworkToken: "fixture-only-worker"}, "trading": config.WorkerAccess{DatabaseURL: dsns["TRADING"], FrameworkURL: framework.URL, FrameworkToken: "fixture-only-worker"}, "research": config.WorkerAccess{DatabaseURL: dsns["RESEARCH"], FrameworkURL: framework.URL, FrameworkToken: "fixture-only-research"}}}}
 	data, err = toml.Marshal(sections)
 	if err != nil {
 		t.Fatal(err)
@@ -167,9 +176,28 @@ func TestNativeInstanceWorkerProfilesAndProcessWithoutPythonNode(t *testing.T) {
 		if profile.Role == "INGEST" && profile.ProviderToken != "" {
 			t.Fatal("model token copied to ingest")
 		}
+		if profile.Role != "INGEST" && (profile.ReportReadURL != "" || profile.ReportReadToken != "") {
+			t.Fatal("report token copied to analysis")
+		}
 	}
 	if _, err = config.LoadWorker(paths[1], "TRADING"); err == nil {
 		t.Fatal("role profile rebound")
+	}
+	ingestBinary := filepath.Join(private, "ingest-worker")
+	buildIngest := exec.Command("go", "build", "-o", ingestBinary, "../../../src/factorforge/applications/soxl_jev/entrypoints/ingest-worker")
+	if output, e := buildIngest.CombinedOutput(); e != nil {
+		t.Fatal(e, string(output))
+	}
+	for i := 0; i < 2; i++ {
+		command := exec.Command(ingestBinary, "--config", paths[0], "--once")
+		command.Env = []string{"PATH=/nonexistent", "TZ=UTC"}
+		if output, e := command.CombinedOutput(); e != nil {
+			t.Fatal("native report iteration", e, string(output))
+		}
+	}
+	var reportCount int
+	if err = admin.QueryRow(ctx, "SELECT count(*) FROM instance_pipeline_sim.framework_report").Scan(&reportCount); err != nil || reportCount != 1 {
+		t.Fatal("native periodic report once", reportCount, err)
 	}
 	binary := filepath.Join(private, "analysis-worker")
 	build := exec.Command("go", "build", "-o", binary, "../../../src/factorforge/applications/soxl_jev/entrypoints/trading-analysis-worker")

@@ -13,6 +13,7 @@ import (
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/monitoring"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/operations"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/ports"
+	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/reports"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/submission"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/workers"
 	tdto "github.com/AceNanako0721/Factorforge/src/factorforge/trading/api/dto"
@@ -55,7 +56,8 @@ func RunWorker(role string) error {
 	}
 	var ingest *workers.IngestWorker
 	var analysisWorker *workers.AnalysisWorker
-	var sources []ports.MonitorSource
+	sources := map[string]ports.MonitorSource{}
+	var reporter *reports.Scheduled
 	var search ports.SearchProvider
 	if role == "INGEST" {
 		if assets.Bootstrap != nil {
@@ -85,7 +87,10 @@ func RunWorker(role string) error {
 			if err != nil {
 				return err
 			}
-			sources = append(sources, monitoring.RSSSource{Fetcher: fetcher, FeedURL: registration.FeedURL, SourceID: registration.SourceID, LicenceRef: registration.LicenceRef, MaxItems: registration.MaxItems, PublicationTimeVerified: registration.PublicationTimeVerified, Clock: clock{}.Now})
+			if sources[registration.SourceID] != nil {
+				return d.Fail("SOURCE_REGISTRATION_DUPLICATE", 422)
+			}
+			sources[registration.SourceID] = monitoring.RSSSource{Fetcher: fetcher, FeedURL: registration.FeedURL, SourceID: registration.SourceID, LicenceRef: registration.LicenceRef, MaxItems: registration.MaxItems, PublicationTimeVerified: registration.PublicationTimeVerified, Clock: clock{}.Now}
 		}
 		if len(assets.SearchPlans) > 0 {
 			hosts := []string{}
@@ -108,6 +113,15 @@ func RunWorker(role string) error {
 				return err
 			}
 		}
+		if assets.ReportSchedule != nil {
+			read, err := submission.NewReportRead(submission.ReportReadOptions{URL: p.ReportReadURL, Token: p.ReportReadToken, Binding: p.Binding(), ObjectID: p.Settings.ObjectID, MaxBytes: p.Settings.MaxInputBytes, MaxRecords: assets.ReportSchedule.MaxRecords, MaxPages: p.Settings.MaxFrameworkPages, Timeout: timeout, FixtureOnly: p.Mode == "mock"})
+			if err != nil {
+				return err
+			}
+			reporter = &reports.Scheduled{Store: store, Source: read, Clock: clock{}, Binding: p.Binding(), ObjectID: p.Settings.ObjectID, Policy: *assets.ReportSchedule}
+		} else if p.Mode != "mock" {
+			return d.Fail("REPORT_SCHEDULE_REQUIRED", 503)
+		}
 	} else {
 		if role == "TRADING" && p.Settings.Stage != "R2" {
 			return d.Fail("INSTANCE_SIGNAL_STAGE_REQUIRED", 423)
@@ -120,7 +134,7 @@ func RunWorker(role string) error {
 		if err != nil {
 			return err
 		}
-		analysisWorker = &workers.AnalysisWorker{Store: store, Framework: framework, Provider: provider, Clock: clock{}, WorkerID: "instance-" + role, Lease: time.Duration(p.Settings.LeaseSeconds) * time.Second, AllowMock: p.Mode == "mock", MaxOutboxes: p.Settings.MaxOutboxes}
+		analysisWorker = &workers.AnalysisWorker{Store: store, Framework: framework, Provider: provider, Clock: clock{}, WorkerID: "instance-" + role, Lease: time.Duration(p.Settings.LeaseSeconds) * time.Second, AllowMock: p.Mode == "mock", MaxOutboxes: p.Settings.MaxOutboxes, Operations: store}
 		if err = analysisWorker.Validate(); err != nil {
 			return err
 		}
@@ -137,30 +151,17 @@ func RunWorker(role string) error {
 					return e
 				}
 			}
-			for _, source := range sources {
-				items, e := source.Poll(work, time.Now().UTC())
-				if e != nil {
-					return e
+			result := (workers.IngestCycle{Worker: *ingest, Store: store, Sources: sources, Search: search}).Run(work, inputs)
+			if reporter != nil {
+				e := reporter.Tick(work)
+				if recordErr := operations.RecordFact(work, store, p.Binding(), "INGEST", "REPORT", nil, nil, time.Now().UTC(), e); recordErr != nil {
+					return recordErr
 				}
-				inputs = append(inputs, items...)
-			}
-			for _, item := range inputs {
-				if search != nil {
-					found, e := search.Search(work, item, time.Now().UTC())
-					if e != nil {
-						return e
-					}
-					for _, evidence := range found {
-						if _, e = ingest.Process(work, evidence); e != nil {
-							return e
-						}
-					}
-				}
-				if _, e := ingest.Process(work, item); e != nil {
-					return e
+				if e != nil && result == nil {
+					result = e
 				}
 			}
-			return nil
+			return result
 		}
 		if _, e := analysisWorker.ProcessOne(work); e != nil {
 			return e

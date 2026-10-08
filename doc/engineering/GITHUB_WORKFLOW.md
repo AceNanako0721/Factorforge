@@ -42,3 +42,5 @@ GitHub 的权限规则见 [OAuth scopes](https://docs.github.com/en/apps/oauth-a
 G4 首批实例链路的 [PR #15](https://github.com/AceNanako0721/Factorforge/pull/15) 在 [PR CI](https://github.com/AceNanako0721/Factorforge/actions/runs/37703890677) 四项成功后以 head `01d23c136ba2693174ddb69163051c7ba742c2f5` squash 合并；main 提交 `fc5aa89ffc71bf0c704eb9ea96fcbc2a6f3e73e9` 的 [CI](https://github.com/AceNanako0721/Factorforge/actions/runs/37704205540) 四项成功。GitHub 交付覆盖已实现范围，不关闭尚缺生产标定或时段装配。
 
 管理台追加 console-checks，第五项固定 Go/Node/pnpm 版本、无依赖生命周期脚本构建、TypeScript/单元/实际 Chromium 测试及静态资产检查。Node 只在构建测试 job 使用；四项既有检查名称保持。涉及 YAML 的推送继续沿用上述仓库限定 SSH；本任务等待全部五项成功再合并，不把四项旧保护检查通过当第五项已通过。
+
+[PR #16](https://github.com/AceNanako0721/Factorforge/pull/16) 的 [五项 CI](https://github.com/AceNanako0721/Factorforge/actions/runs/37708667804) 全部成功，以精确 head `764e3996cd6029a84a4edcd38819a8df0db17cc2` squash 合并。main 提交 `ee1cb938f39f27986d176960d376e526e2e5730c` 的 [五项 CI](https://github.com/AceNanako0721/Factorforge/actions/runs/37708881703) 全部成功；主分支保护没有放宽。推送前索引 420 个、可达历史 816 个 Git 文件版本扫描通过。

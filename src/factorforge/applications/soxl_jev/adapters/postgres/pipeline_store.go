@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-//go:embed migrations/002_pipeline.sql
+//go:embed migrations/002_pipeline.sql migrations/003_operations.sql
 var pipelineFiles embed.FS
 
 type QueueBudget struct {
@@ -58,12 +58,14 @@ func InitializePipeline(ctx context.Context, dsn string, b d.Binding) error {
 		return safe(err)
 	}
 	defer tx.Rollback(ctx)
-	raw, err := pipelineFiles.ReadFile("migrations/002_pipeline.sql")
-	if err != nil {
-		return d.Fail("MIGRATION_UNAVAILABLE", 503)
-	}
-	if _, err = tx.Exec(ctx, strings.ReplaceAll(strings.ReplaceAll(string(raw), "__SCHEMA__", schema), "__ENV__", b.Environment)); err != nil {
-		return safe(err)
+	for _, file := range []string{"migrations/002_pipeline.sql", "migrations/003_operations.sql"} {
+		raw, e := pipelineFiles.ReadFile(file)
+		if e != nil {
+			return d.Fail("MIGRATION_UNAVAILABLE", 503)
+		}
+		if _, e = tx.Exec(ctx, strings.ReplaceAll(strings.ReplaceAll(string(raw), "__SCHEMA__", schema), "__ENV__", b.Environment)); e != nil {
+			return safe(e)
+		}
 	}
 	for _, kind := range []string{"INGEST", "RESEARCH", "TRADING"} {
 		role := pipelineRole(b, kind)
@@ -80,6 +82,7 @@ func InitializePipeline(ctx context.Context, dsn string, b d.Binding) error {
 			"REVOKE ALL ON ALL TABLES IN SCHEMA " + schema + " FROM " + role,
 			"GRANT USAGE ON SCHEMA " + schema + " TO " + role,
 			"GRANT SELECT ON " + schema + ".worker_grant," + schema + ".budget," + schema + ".raw_evidence_manifest," + schema + ".routing_receipt TO " + role,
+			"GRANT SELECT,INSERT ON " + schema + ".operation_fact TO " + role,
 		} {
 			if _, err = tx.Exec(ctx, sql); err != nil {
 				return safe(err)
@@ -90,6 +93,7 @@ func InitializePipeline(ctx context.Context, dsn string, b d.Binding) error {
 				"GRANT SELECT,INSERT ON " + schema + ".app_research_analysis_job," + schema + ".app_trading_analysis_job TO " + role,
 				"GRANT INSERT ON " + schema + ".raw_evidence_manifest," + schema + ".routing_receipt TO " + role,
 				"GRANT UPDATE(used_jobs) ON " + schema + ".budget TO " + role,
+				"GRANT SELECT,INSERT ON " + schema + ".framework_report TO " + role,
 			} {
 				if _, err = tx.Exec(ctx, sql); err != nil {
 					return safe(err)
@@ -219,7 +223,7 @@ func (s *PipelineStore) VerifyRole(ctx context.Context) error {
 		return d.Fail("PIPELINE_DATABASE_SCOPE_FORBIDDEN", 403)
 	}
 	// Extra privileges on peer queues or grant tables must not survive a grant.
-	tables := []string{"worker_grant", "budget", "raw_evidence_manifest", "routing_receipt", "app_research_analysis_job", "app_trading_analysis_job", "research_submission_outbox", "trading_submission_outbox"}
+	tables := []string{"worker_grant", "budget", "raw_evidence_manifest", "routing_receipt", "app_research_analysis_job", "app_trading_analysis_job", "research_submission_outbox", "trading_submission_outbox", "operation_fact", "framework_report"}
 	for _, table := range tables {
 		var read, write, insert, remove bool
 		err = s.pool.QueryRow(ctx, "SELECT has_any_column_privilege(session_user,$1,'SELECT'),has_any_column_privilege(session_user,$1,'UPDATE'),has_any_column_privilege(session_user,$1,'INSERT'),has_table_privilege(session_user,$1,'DELETE,TRUNCATE,TRIGGER')", s.schema+"."+table).Scan(&read, &write, &insert, &remove)
@@ -227,9 +231,9 @@ func (s *PipelineStore) VerifyRole(ctx context.Context) error {
 			return safe(err)
 		}
 		shared := d.Has([]string{"worker_grant", "budget", "raw_evidence_manifest", "routing_receipt"}, table)
-		readAllowed := shared || table == s.table || table == s.outbox || s.kind == "INGEST" && strings.HasPrefix(table, "app_")
+		readAllowed := shared || table == "operation_fact" || s.kind == "INGEST" && table == "framework_report" || table == s.table || table == s.outbox || s.kind == "INGEST" && strings.HasPrefix(table, "app_")
 		writeAllowed := table == s.table || table == s.outbox || s.kind == "INGEST" && table == "budget"
-		insertAllowed := table == s.outbox || s.kind == "INGEST" && d.Has([]string{"raw_evidence_manifest", "routing_receipt", "app_research_analysis_job", "app_trading_analysis_job"}, table)
+		insertAllowed := table == "operation_fact" || table == s.outbox || s.kind == "INGEST" && d.Has([]string{"raw_evidence_manifest", "routing_receipt", "app_research_analysis_job", "app_trading_analysis_job", "framework_report"}, table)
 		if remove || read && !readAllowed || write && !writeAllowed || insert && !insertAllowed {
 			return d.Fail("PIPELINE_DATABASE_ROLE_NOT_ISOLATED", 403)
 		}

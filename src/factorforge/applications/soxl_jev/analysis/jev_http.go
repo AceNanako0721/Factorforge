@@ -140,7 +140,13 @@ func (p *JevHTTP) Analyze(ctx context.Context, request d.AnalysisRequest) (d.Ana
 	if err != nil || len(raw) > o.MaxRequestBytes {
 		return empty, d.Fail("JEV_REQUEST_BUDGET_EXCEEDED", 422)
 	}
-	ctx, cancel := context.WithDeadline(ctx, request.Deadline)
+	// Qualification and transport use the same clock. Native replay/fixtures do
+	// not reinterpret a logical deadline as an unrelated wall-clock timestamp.
+	remaining := request.Deadline.Sub(o.Clock())
+	if remaining <= 0 {
+		return empty, d.Fail("JEV_TASK_EXPIRED", 422)
+	}
+	ctx, cancel := context.WithTimeout(ctx, remaining)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, o.Endpoint, bytes.NewReader(raw))
 	if err != nil {
