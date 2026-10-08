@@ -38,3 +38,7 @@ GitHub 的权限规则见 [OAuth scopes](https://docs.github.com/en/apps/oauth-a
 推送前历史扫描发现旧 G3 校验器不认识 P3 分支的空 `application.read_api` 模板。采用 P3 已有的完整空模板及严格校验，保留冻结旧模板仅在历史中的兼容，实际暂存 314 个文件版本、所有可达历史 703 个文件版本扫描通过。没有放宽真实值或私有文件限制。
 
 开发机旧版 `gh pr edit` 另返回已退役 Projects classic 的 GraphQL 错误；这不是 workflow 权限问题。PR 正文通过 `gh api` 的 REST PATCH 与结构化 JSON 文件更新，ready 状态通过专门 GraphQL mutation 更新，不调用已退役字段。
+
+G4 首批实例链路的 [PR #15](https://github.com/AceNanako0721/Factorforge/pull/15) 在 [PR CI](https://github.com/AceNanako0721/Factorforge/actions/runs/37703890677) 四项成功后以 head `01d23c136ba2693174ddb69163051c7ba742c2f5` squash 合并；main 提交 `fc5aa89ffc71bf0c704eb9ea96fcbc2a6f3e73e9` 的 [CI](https://github.com/AceNanako0721/Factorforge/actions/runs/37704205540) 四项成功。GitHub 交付覆盖已实现范围，不关闭尚缺生产标定或时段装配。
+
+管理台追加 console-checks，第五项固定 Go/Node/pnpm 版本、无依赖生命周期脚本构建、TypeScript/单元/实际 Chromium 测试及静态资产检查。Node 只在构建测试 job 使用；四项既有检查名称保持。涉及 YAML 的推送继续沿用上述仓库限定 SSH；本任务等待全部五项成功再合并，不把四项旧保护检查通过当第五项已通过。

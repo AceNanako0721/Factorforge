@@ -27,17 +27,20 @@ Factorforge/
 │   │   ├── workers/
 │   │   └── entrypoints/         # API、调度、反馈、CLI
 │   └── applications/
-│       └── soxl_jev/            # P3 只读基础及首批采集/分析/提交链路
+│       ├── soxl_jev/            # P3 只读基础及首批采集/分析/提交链路
 │           ├── domain/ / ports/ # 显式事实、绑定与队列/来源/评分端口
 │           ├── monitoring/ / evidence/ / routing/ # 受限原文、核验与确定性路由
 │           ├── analysis/ / submission/ / workers/ # 私有 Provider、下层 HTTP、工作进程
 │           ├── operations/ / reports/ # bootstrap、日历及无副作用投影
 │           ├── adapters/postgres/migrations/ # 本应用 SQL
 │           └── config/ / api/ / entrypoints/ # API、三 worker、操作者 CLI
-│   # console/ 与其 web/ 尚未实施，仅在有实际代码时创建
+│       └── console/             # 平级只读管理台，独立 Go 入口
+│           ├── domain/ / ports/ / application/ / adapters/ / api/
+│           ├── config/ / entrypoints/console-api/
+│           └── web/             # 唯一 pnpm React/TypeScript 包
 ├── tests/                       # trading/、strategy/、engineering/、applications/soxl_jev/
 │   └── strategy/fixtures/       # 固定合成 JSON，不含秘密
-├── contracts/                   # 历史 v1.1 与 v2/trading、v2/strategy、v2/instances
+├── contracts/                   # 历史 v1.1 与 v2/trading、v2/strategy、v2/instances、v2/console
 ├── doc/                         # v*/ 冻结 HTML；engineering/、progress/
 ├── tools/                       # Go 布局/构建/契约/配置/历史文档检查
 ├── config/ / prompts/           # 各仅提交一个空内容模板
@@ -54,6 +57,6 @@ P1 的正常运行入口已改为六个 Go 二进制，见 [Go 运行说明](TRA
 
 独立 Go 检查：go run ./tools/check-layout、go test ./...、go vet ./...。Go 布局检查同时验证登记的顶层树、源码层和导入边界。当前 CI 与 hooks 只调用 Go；唯一保留的 contracts/check_contract.py 是冻结 v1.1 链接的历史目标，不执行。进度见 [Go 迁移记录](../progress/GO_MIGRATION.md)。
 
-管理台唯一 package.json/pnpm-lock.yaml 放 console/web。Node/pnpm 只用于构建和浏览器测试；产物放 runtime/web-build，再由受控步骤交给 Go BFF 同源提供。node_modules、源码图和截图不进公开树，真实 config/prompts 不在静态目录。运行服务不依赖 Python 或 Node。未来测试放 tests/applications/console 与 tests/web；当前不预建空包。
+管理台唯一 package.json/pnpm-lock.yaml 放 console/web。Node/pnpm 只用于构建和浏览器测试；产物放 runtime/web-build，再由受控步骤交给 Go BFF 同源提供。node_modules、源码图和截图不进公开树，真实 config/prompts 不在静态目录。运行服务不依赖 Python 或 Node。测试放 tests/applications/console 与 tests/web；构建和操作见 [管理台说明](CONSOLE_GO.md)。
 
 P3 当前只读 API 见 [实例说明](INSTANCE_GO.md)，私有队列/工作进程与配置身份派生见 [实例链路说明](INSTANCE_PIPELINE.md)。applications 下只登记 soxl_jev/console，应用领域和端口同样受纯领域检查；向下只通过公开 DTO/client 或 HTTP，同层应用也不导入对方数据库/业务实现。operations/reports/routing/submission 禁止反向依赖 API、适配器或入口；不为尚未实现的组件创建占位源码。

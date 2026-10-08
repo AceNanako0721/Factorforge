@@ -1,0 +1,34 @@
+{
+  "name": "factorforge-console",
+  "version": "2.1.1",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.33.0",
+  "scripts": {
+    "build": "tsc --noEmit && vite build --outDir ../../../../../runtime/web-build --emptyOutDir",
+    "test": "vitest run --config ../../../../../tests/web/vitest.config.ts",
+    "test:browser": "playwright test --config ../../../../../tests/web/playwright.config.ts"
+  },
+  "dependencies": {
+    "react": "19.2.5",
+    "react-dom": "19.2.5",
+    "@tanstack/react-query": "5.99.0",
+    "@tanstack/react-router": "1.168.22",
+    "@tanstack/react-table": "8.21.3",
+    "@radix-ui/react-slot": "1.2.4",
+    "class-variance-authority": "0.7.1",
+    "clsx": "2.1.1",
+    "tailwind-merge": "3.5.0",
+    "lightweight-charts": "5.2.1"
+  },
+  "devDependencies": {
+    "typescript": "6.0.3",
+    "vite": "8.0.8",
+    "@vitejs/plugin-react": "6.0.1",
+    "vitest": "4.1.4",
+    "@playwright/test": "1.64.0",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@types/node": "22.19.15"
+  }
+}

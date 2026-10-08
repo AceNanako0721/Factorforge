@@ -33,6 +33,9 @@ func PathIssue(name string) string {
 	}
 	private := map[string]bool{"private": true, ".private": true, "secrets": true, "model_traces": true, "ai_cache": true, "runtime": true, "logs": true, "backups": true, ".venv": true, "__pycache__": true}
 	for _, part := range parts {
+		if part == "node_modules" || part == ".vite" || part == ".pnpm-store" {
+			return "generated-dependency-path"
+		}
 		if private[part] {
 			return "private-runtime-path"
 		}
@@ -75,7 +78,7 @@ func asMap(value any) map[string]any {
 func TemplateIssue(name string, data []byte, historical bool) string {
 	var actual, expected map[string]any
 	if name == "config/config.example.toml" {
-		if toml.Unmarshal(data, &actual) != nil || toml.Unmarshal([]byte(expectedConfig), &expected) != nil {
+		if toml.Unmarshal(data, &actual) != nil || toml.Unmarshal([]byte(expectedConfig+expectedConsole), &expected) != nil {
 			return "invalid-template-format"
 		}
 		// Enforce a complete, exact empty shape, including short arbitrary secrets.
@@ -96,6 +99,10 @@ func TemplateIssue(name string, data []byte, historical bool) string {
 		}
 		if historical {
 			old := cloneMap(expected)
+			delete(old, "console")
+			if equalJSON(actual, old) {
+				return ""
+			}
 			application := cloneMap(asMap(old["application"]))
 			delete(application, "pipeline")
 			old["application"] = application

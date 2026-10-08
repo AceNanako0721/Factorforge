@@ -1,0 +1,197 @@
+import type { Json } from "../api/client";
+export const labels: Record<string, string> = {
+  account: "账户事实",
+  positions: "实际持仓",
+  protections: "保护与核验",
+  run: "交易运行",
+  object: "观测对象",
+  pool: "情绪池",
+  decisions: "周期决策",
+  candles: "最终 K 线",
+  points: "各用途价格",
+  instruments: "交易产品",
+  events: "事件版本",
+  event: "事件事实",
+  scores: "评分与准入",
+  ledger: "贡献账本",
+  cases: "案例",
+  attributions: "归因记录",
+  counterfactuals: "研究反事实",
+  parameters: "冻结参数",
+  learning: "学习决策",
+  activations: "生效历史",
+  validation: "验证记录",
+  sources: "采集来源",
+  jobs: "分析任务",
+  budgets: "分区预算",
+  reports: "周期报告",
+  "trading.operations": "执行与保护状态",
+  "instance.health": "应用健康",
+  "strategy.targets": "框架目标送达",
+  "trading.targets": "交易层目标受理",
+  "trading.audit": "交易审计",
+  "strategy.audit": "框架审计",
+  "instance.audit": "应用审计",
+  orders: "订单",
+  fills: "实际成交",
+  income: "费用与收入",
+  owners: "持仓归属",
+  "external-facts": "外部事实",
+  alerts: "风险告警",
+  equity: "实际权益",
+  available_margin: "可用保证金",
+  quantity: "数量",
+  observed_at: "事实时间",
+  available_at: "可用时间",
+  fetched_at: "读取时间",
+  completed_at: "评分完成时间",
+  first_public_at: "首次公开时间",
+  received_at: "接收时间",
+  parameter_version: "冻结参数版本",
+  owner_epoch: "归属期",
+  target_quantity: "目标数量",
+  actual_quantity: "实际数量",
+  pending_quantity: "未成交数量",
+  pool_net: "净值",
+  plus: "正向池",
+  minus: "负向池",
+  net: "净值",
+  state: "状态",
+  status: "状态",
+  reason_codes: "确定性原因",
+  live_ready: "实盘准入",
+  recovery_state: "恢复状态",
+  execution_mode: "执行模式",
+  risk_locks: "风险锁",
+  would_trigger: "观察触限",
+  fees: "手续费",
+  funding: "资金费",
+  realized_pnl: "已实现损益",
+  unrealized_pnl: "未实现损益",
+  currency: "单位",
+  recorded_at: "记录时间",
+  source_version: "来源版本",
+  snapshot_version: "快照版本",
+  fact_version: "事实版本",
+  score_version: "评分版本",
+  relation: "事件关系",
+  label_status: "标签状态",
+  receipt_ref: "回执引用",
+  queue_kind: "任务分区",
+  deadline: "期限",
+  licence_state: "许可",
+  raw_text: "已获许可原文",
+  redaction_reason: "原文限制原因",
+  source_id: "来源",
+  job_id: "任务标识",
+  report_id: "报告标识",
+  event_id: "事件标识",
+  case_id: "案例标识",
+  evidence_id: "证据标识",
+  content_hash: "原文哈希",
+  direction: "方向",
+  impact: "影响",
+  half_life: "生命周期",
+  confidence: "质量",
+  cost: "费用",
+  UNKNOWN: "未知",
+  AVAILABLE: "可用",
+  EMPTY: "真实空结果",
+  UNAVAILABLE: "不可用",
+  NOT_CONFIGURED: "缺少配置",
+  NOT_APPLICABLE: "不适用",
+  FORBIDDEN: "权限撤销",
+  MISSING: "缺少记录",
+  QUARANTINED: "隔离",
+  DELIVERY_UNKNOWN: "送达未知",
+  ACK: "受理回执",
+  COMPLETED: "已完成",
+  SIM: "模拟",
+  LIVE: "实盘",
+  RESEARCH: "研究",
+  EXPERIMENT_ONLY: "实验用途",
+  REQUIRED_UNSET: "必需值未标定",
+  VERIFIED: "已核验",
+  RESEARCH_ONLY: "仅研究",
+  DRAFT: "草稿",
+};
+export function label(key: string): string {
+  return labels[key] ?? key;
+}
+Object.assign(labels, {
+  STALE: "陈旧结果",
+  AVAILABLE: "可读取",
+  cash: "现金",
+  cash_balances: "分币种现金",
+  day_pnl: "日内损益",
+  external_flows: "外部资金流",
+  fx_revaluation: "汇率重估",
+  policy_version: "政策版本",
+  risk_day: "风险日",
+  risk_state: "风险状态",
+  average_entry: "平均入场价",
+  instrument_key: "产品绑定",
+  owner_id: "归属标识",
+  protection_state: "保护状态",
+  reconciliation_state: "对账状态",
+  aggregate_version: "记录版本",
+  active_owners: "实际归属",
+  executor_epoch: "执行者期",
+  resource_id: "资源标识",
+  run_key: "运行绑定",
+  parameter_version: "参数版本",
+  price_proxy_binding: "价格代理",
+  time_policy_version: "时段政策",
+  regime_binding: "市场状态绑定",
+  contributions: "事件贡献",
+  ledger_version: "账本版本",
+  quality: "质量",
+  RECOVERY_CHECK: "恢复核查",
+  NORMAL: "正常",
+  ACTIVE_VERIFIED: "保护已核验",
+  ACTIVE: "启用",
+  REPLAY: "回放模拟",
+  FILLED: "已成交",
+  ABSTAINED: "弃权",
+  IMMATURE: "未成熟",
+  MATURE: "已成熟",
+  CENSORED: "删失",
+  OPEN: "开放观察",
+  OBSERVING: "观察中",
+  NEUTRAL: "中性",
+  CORRECT: "正确",
+  WRONG: "错误",
+});
+export function scalar(value: Json): string {
+  if (value === null) return "未记录 / null";
+  if (typeof value === "boolean") return value ? "是" : "否";
+  if (typeof value === "string")
+    return labels[value] ? `${value} · ${labels[value]}` : value;
+  if (typeof value === "number") return String(value);
+  return JSON.stringify(value);
+}
+// Exact ordering for ordinary decimal strings. Only chart coordinates use a
+// floating point approximation; tables never round a monetary amount.
+export function compare(a: Json, b: Json): number {
+  if (
+    typeof a === "string" &&
+    typeof b === "string" &&
+    /^[+-]?\d+(\.\d+)?$/.test(a) &&
+    /^[+-]?\d+(\.\d+)?$/.test(b)
+  ) {
+    const digits = Math.max(
+      a.split(".")[1]?.length ?? 0,
+      b.split(".")[1]?.length ?? 0,
+    );
+    const integer = (x: string) => {
+      const negative = x.startsWith("-");
+      const [whole, frac = ""] = x.replace(/^[+-]/, "").split(".");
+      const n = BigInt(whole + frac.padEnd(digits, "0"));
+      return negative ? -n : n;
+    };
+    const x = integer(a),
+      y = integer(b);
+    return x < y ? -1 : x > y ? 1 : 0;
+  }
+  return scalar(a).localeCompare(scalar(b), "zh-CN");
+}

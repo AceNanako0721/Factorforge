@@ -32,6 +32,12 @@ __pycache__/
 /dist/
 /htmlcov/
 .coverage
+# Frontend dependencies and generated assets never enter public source.
+node_modules/
+.vite/
+.pnpm-store/
+*.tsbuildinfo
+*.map
 # Internal document generation can contain workstation paths and private evidence
 doc/.*-build/*
 # Publish all authoring and validation source; exclude inputs and intermediates.
