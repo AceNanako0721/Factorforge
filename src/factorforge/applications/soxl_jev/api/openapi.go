@@ -49,7 +49,9 @@ func shape(t reflect.Type) map[string]any {
 				tag = f.Name
 			}
 			props[tag] = shape(f.Type)
-			required = append(required, tag)
+			if !strings.Contains(f.Tag.Get("json"), ",omitempty") {
+				required = append(required, tag)
+			}
 		}
 		return map[string]any{"type": "object", "additionalProperties": false, "properties": props, "required": required}
 	default:

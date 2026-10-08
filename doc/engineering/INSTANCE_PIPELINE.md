@@ -67,10 +67,16 @@ G4 后续追加 `003_operations.sql`：来源、搜索、输入、模型和提�
 
 私有 PipelineAssets 的可选 report_schedule 登记 UTC anchor、period_seconds 和 max_records；生产 jev 模式必须登记，mock 未登记时保持报告无记录。INGEST 派生文件另读取既有 services.framework_api_url / credentials.framework_api_token 的公共只读身份，分析进程不获得它。报告请求仅固定公共 GET：health、对象目录/已存在对象详情、parameter-activations、learning-decisions、当前对象 cases 和 attribution。先后快照版本相同才保存；分页/字节/记录预算、对象/环境/实例和 UTC 全部核验。不会运行归因、学习或模型，也不增加候选审批门。
 
-最近闭合周期只记录一次，不补问历史模型、不重写旧报告。私有不可改 framework_report 保留学习原因、发布/拒绝/冻结/回滚及前后版本、证据引用、案例总数和未知/未成熟数；未知比例没有分母时保留未知，冻结对照差异没有记录时保留 null。原生 ReportView 当前只发布有限版本/引用/状态/原因，详细数值后续按契约扩展才能展示，不用 reason_codes 伪造金额或比例。报告和采集降级随现有操作者 CAS 发布进入只读投影与管理台，没有新增对外通知服务。
+最近闭合周期只记录一次，不补问历史模型、不重写旧报告。私有不可改 framework_report 保留学习原因、发布/拒绝/冻结/回滚及前后版本、证据引用、案例总数和未知/未成熟数；未知比例没有分母时保留未知，冻结对照差异没有记录时保留 null。v2.1.2 ReportView.report_details 追加有限学习/变化/案例数/未知比例与冻结对照差异字段；零分母和未记录差异保持 null，不能用 reason_codes 伪造金额或比例。报告和采集降级随现有操作者 CAS 发布进入只读投影与管理台，没有新增对外通知服务。
 
 实际 Go 公共 P2 → 报告读取前后完整框架状态相同；真实 PostgreSQL 的活动/报告幂等、不可改、角色/RLS、降级投影和重开保持通过。原生 ingest-worker 在 PATH=/nonexistent 下读取实际公共 P2 并在两次独立启动后仍只有一份周期报告；分析进程继续保留只调用一次模型的回执验证。全部使用虚构配置与本地服务。
 
 本地夹具验证证据哈希/跨度/单位、许可拒绝、JEV 官方 wire 映射/格式/版本/限流、原文网络边界、真实 PostgreSQL 的幂等预算/权限/租约/候选/outbox/重启、UTC/CAS 发布。实际 Go P3 HTTP→Go P2 完成对象、事件、首次评分、评分/事实修订和撤销；新夹具缺注册标定时保持 QUARANTINED。原生分析进程在 PATH=/nonexistent 下完成 SQL→供应商夹具→实际 Go P2→回执→重启，模型调用一次。
 
 真实来源许可、生产 JEV/搜索探针、OD-01 抽取选型/盲标、OD-02 共享供应商隔离、风险标定/DEC-06、人工复核与 LIVE 准入未关闭。来源状态和有限周期报告已装配，同层管理台已合并；时段政策注入及报告详细只读契约继续 G4，不得将本页局部验证写成整个 P3/G4 已完成。
+
+## v2.1.2 日历运行接口
+
+INGEST 从私有资产 calendar 读取版本化有效会话和 IANA 时区，在 bootstrap 后调用 P2 的 GET/POST objects/{object_id}/time-windows。仅已有绑定 workload 能注册计划；公共身份无写入路由。P2 只接收连续 UTC 窗口和是否应用两次数限制，阈值来自既有 Policy。首次需无既有风险/案例，后续只能从已登记末端追加未来窗口；同版本会话改写拒绝。无覆盖禁止增险，保护/减险继续，周末不按自然日重置。生产模式缺日历直接阻塞启动；mock 可明确省略日历，不冒称已通过生产日历验证。
+
+实际 HTTP / PostgreSQL / 独立进程与浏览器证据见 P3/P4 进度。下层接口与字段、错误控制流、离线逻辑图在 doc/v2.1.2 的一对一设计书中；生产默认阈值、来源许可与准入仍须私有登记。

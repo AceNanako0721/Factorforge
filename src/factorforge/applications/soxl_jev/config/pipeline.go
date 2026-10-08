@@ -6,6 +6,7 @@ import (
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/domain"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/evidence"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/monitoring"
+	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/operations"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/reports"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/workers"
 	dto "github.com/AceNanako0721/Factorforge/src/factorforge/strategy/api/dto"
@@ -185,6 +186,7 @@ type RSSRegistration struct {
 	PublicationTimeVerified bool     `json:"publication_time_verified"`
 }
 type PipelineAssets struct {
+	Calendar          *operations.Calendar            `json:"calendar"`
 	ReportSchedule    *reports.Schedule               `json:"report_schedule"`
 	Bootstrap         *BootstrapAsset                 `json:"bootstrap"`
 	Version           string                          `json:"version"`

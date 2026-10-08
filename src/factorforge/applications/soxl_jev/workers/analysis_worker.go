@@ -84,7 +84,14 @@ func (w AnalysisWorker) ProcessOne(ctx context.Context) (bool, error) {
 		if job.LeaseUntil != nil && job.LeaseUntil.Before(until) {
 			until = *job.LeaseUntil
 		}
-		callCtx, cancel := context.WithDeadline(ctx, until)
+		// Persisted deadlines use the injected task clock. Translate the remaining
+		// task/lease budget to a transport timeout so replay clocks stay meaningful;
+		// the parent context can still impose an earlier real cancellation.
+		remaining := until.Sub(w.Clock.Now().UTC())
+		if remaining <= 0 {
+			return true, reject("EXPIRED", "TASK_EXPIRED")
+		}
+		callCtx, cancel := context.WithTimeout(ctx, remaining)
 		candidate, e := w.Provider.Analyze(callCtx, r)
 		cancel()
 		if w.Operations != nil {

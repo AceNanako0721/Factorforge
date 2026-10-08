@@ -141,4 +141,42 @@ func TestReportActualPublicGoP2SnapshotAndScheduledOnce(t *testing.T) {
 	if _, e = client.ReadReport(ctx, create.Object.ObjectID, from, now.Add(time.Hour), now); e == nil {
 		t.Fatal("future report")
 	}
+	// Read meaningful stored learning/activation/case facts from the actual P2
+	// API, then check that the finite public detail retains reasons and unknowns.
+	if e = store.Transaction(ctx, state.InstanceID, func(s *sd.StrategyState) error {
+		at := now.Add(-time.Minute)
+		s.LearningDecisions = append(s.LearningDecisions, map[string]any{"object_id": create.Object.ObjectID, "parameter": "w", "at": sd.ISO(at), "reason": "INSUFFICIENT_EVIDENCE", "error": "0.1", "neff": "1", "groups": 1})
+		s.Candidates.Set("fixture-report-change", map[string]any{"object_id": create.Object.ObjectID, "parent_version": create.Parameters.Version, "activated_version": "fixture-parameter-next", "proposal_evidence": []string{"fixture-learning-evidence"}})
+		s.Audit = append(s.Audit, map[string]any{"candidate_id": "fixture-report-change", "action": "PARAMETER_ACTIVATED", "at": sd.ISO(at)})
+		for _, id := range []string{"fixture-report-known", "fixture-report-unknown"} {
+			label := "CORRECT"
+			if id == "fixture-report-unknown" {
+				label = "IMMATURE"
+			}
+			s.Cases.Set(id, &sd.CaseRecord{CaseID: id, ObjectID: create.Object.ObjectID, EntryAt: at, LabelStatus: label, Status: "OPEN", RiskLots: []map[string]any{}, EventGroups: []string{}, EntrySnapshot: map[string]any{}, PNLComponents: map[string]sd.Decimal{}, Labels: map[string]*sd.Decimal{}, AttributionIDs: []string{}, ParameterDecisionIDs: []string{}, FillIDs: []string{}, IncomeIDs: []string{}})
+		}
+		s.Version++
+		return nil
+	}); e != nil {
+		t.Fatal(e)
+	}
+	before, _ = store.Read(ctx, state.InstanceID)
+	baseline, _ = json.Marshal(before)
+	report, e = client.ReadReport(ctx, create.Object.ObjectID, from, to, now)
+	if e != nil {
+		t.Fatal(e)
+	}
+	view := report.PublicView()
+	if view.Detail == nil || view.Detail.UnknownRatio == nil || *view.Detail.UnknownRatio != "0.5" || len(view.Detail.Learning) != 1 || len(view.Detail.Changes) != 1 || !view.Detail.Valid(view) {
+		t.Fatal("report detail", view, e)
+	}
+	publicRaw, _ := json.Marshal(view)
+	if bytes.Contains(publicRaw, []byte("source_record_ref")) {
+		t.Fatal("private record projected")
+	}
+	after, _ = store.Read(ctx, state.InstanceID)
+	result, _ = json.Marshal(after)
+	if !bytes.Equal(baseline, result) {
+		t.Fatal("detailed report mutated framework")
+	}
 }

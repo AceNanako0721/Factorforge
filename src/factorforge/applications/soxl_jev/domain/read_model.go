@@ -158,16 +158,17 @@ type Budget struct {
 	ObservedAt       *time.Time `json:"observed_at"`
 }
 type Report struct {
-	ReportID                 string     `json:"report_id"`
-	RecordedAt               time.Time  `json:"recorded_at"`
-	PeriodStart              *time.Time `json:"period_start"`
-	PeriodEnd                *time.Time `json:"period_end"`
-	State                    string     `json:"state"`
-	FrameworkSnapshotVersion *string    `json:"framework_snapshot_version"`
-	ParameterVersions        []string   `json:"parameter_versions"`
-	ActivationRefs           []string   `json:"activation_refs"`
-	AttributionRefs          []string   `json:"attribution_refs"`
-	ReasonCodes              []string   `json:"reason_codes"`
+	Detail                   *ReportDetail `json:"report_details,omitempty"`
+	ReportID                 string        `json:"report_id"`
+	RecordedAt               time.Time     `json:"recorded_at"`
+	PeriodStart              *time.Time    `json:"period_start"`
+	PeriodEnd                *time.Time    `json:"period_end"`
+	State                    string        `json:"state"`
+	FrameworkSnapshotVersion *string       `json:"framework_snapshot_version"`
+	ParameterVersions        []string      `json:"parameter_versions"`
+	ActivationRefs           []string      `json:"activation_refs"`
+	AttributionRefs          []string      `json:"attribution_refs"`
+	ReasonCodes              []string      `json:"reason_codes"`
 }
 type Audit struct {
 	AuditID    string    `json:"audit_id"`
@@ -306,6 +307,9 @@ func (s Snapshot) Validate() error {
 		}
 	}
 	for _, v := range s.Reports {
+		if v.Detail != nil && !v.Detail.Valid(v) {
+			return Fail("REPORT_DETAIL_INVALID", 503)
+		}
 		if !unique("report", v.ReportID) || !Has([]string{"RECORDED", "UNKNOWN", "INCOMPLETE"}, v.State) || !Codes(v.ReasonCodes) {
 			return bad()
 		}

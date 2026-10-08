@@ -18,6 +18,7 @@ var shapes = func() map[string]shape {
 	if json.Unmarshal([]byte(recordSchema), &s) != nil {
 		panic("invalid frozen request schema")
 	}
+	extendWindowShapes(s)
 	return s
 }()
 

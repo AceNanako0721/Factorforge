@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/strategy/adapters"
 	pg "github.com/AceNanako0721/Factorforge/src/factorforge/strategy/adapters/postgres"
 	api "github.com/AceNanako0721/Factorforge/src/factorforge/strategy/api"
@@ -158,6 +159,38 @@ func TestNativeP2PostgresAtomicityRolesAndRestart(t *testing.T) {
 	if after.Version != state.Version+1 || after.Objects.Len() != 1 || len(after.Audit) != 1 {
 		t.Fatal("duplicate aggregate mutation")
 	}
+	plan := sd.TimeWindowPlan{PlanID: "fixture-utc-plan", ObjectID: request.Object.ObjectID, PolicyVersion: request.Policy.Version, SourceVersion: "fixture-utc-source", Windows: []sd.PolicyWindow{{WindowID: "fixture-continuous-window", Start: clock.Now(), End: clock.Now().Add(72 * time.Hour), EnforceLimits: true}}}
+	if _, err = service.InstallWindows(ctx, identity, sd.WindowCommand{Command: sd.Command{SchemaVersion: "strategy-2.0", RequestID: "fixture-install", IdempotencyKey: "fixture-install", ExpectedVersion: after.Version, Reason: "FIXTURE_ONLY"}, Plan: plan}, request.Object.ObjectID); err != nil {
+		t.Fatal(err)
+	}
+	if err = worker.Transaction(ctx, state.InstanceID, func(s *sd.StrategyState) error {
+		obj, p := s.Objects.Value(request.Object.ObjectID), s.Policies.Value(request.Policy.Version)
+		window, _, e := sd.RiskWindow(s, obj, clock.Now(), p)
+		if e != nil {
+			return e
+		}
+		losses := []string{}
+		for i := 0; i < p.MaxLossCases; i++ {
+			losses = append(losses, fmt.Sprintf("fixture-window-loss-%d", i))
+		}
+		s.LossCases.Set(window, losses)
+		s.Version++
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	reopened, err := pg.Open(ctx, dsns["worker"], "SIM", "worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	restored, err := reopened.Read(ctx, state.InstanceID)
+	reopened.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = sd.Reserve(restored, restored.Objects.Value(request.Object.ObjectID), clock.Now().Add(24*time.Hour), restored.Policies.Value(request.Policy.Version), "fixture-window-blocked")
+	assertStrategyCode(t, err, "LOSS_CASE_WINDOW_LIMIT")
+	assertStrategyCode(t, worker.Transaction(ctx, state.InstanceID, func(s *sd.StrategyState) error { s.TimeWindows = nil; return nil }), "TIME_WINDOW_PLAN_IMMUTABLE")
 	if err = worker.Transaction(ctx, state.InstanceID, func(s *sd.StrategyState) error {
 		addQueryFacts(s, request.Object.ObjectID, "", clock.Now())
 		s.Cases.Set("trace-case", &sd.CaseRecord{CaseID: "trace-case", ObjectID: request.Object.ObjectID, Direction: 1, EntryAt: clock.Now(), EntryWindow: "fixture", Status: "OPEN", LabelStatus: "IMMATURE"})
@@ -194,7 +227,7 @@ func TestNativeP2PostgresAtomicityRolesAndRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer worker.Close()
-	restored, err := worker.Read(ctx, state.InstanceID)
+	restored, err = worker.Read(ctx, state.InstanceID)
 	if err != nil {
 		t.Fatal(err)
 	}

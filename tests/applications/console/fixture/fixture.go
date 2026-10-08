@@ -167,6 +167,13 @@ func New(root string) (*World, error) {
 	if e = store.snapshot.Validate(); e != nil {
 		return nil, e
 	}
+	start := at.Add(-time.Hour)
+	reportReason := "INSUFFICIENT_EVIDENCE"
+	archive := id.FrameworkReport{Binding: binding, ObjectID: create.Object.ObjectID, View: id.Report{ReportID: "fixture-periodic-report", RecordedAt: at, PeriodStart: &start, PeriodEnd: &at, State: "RECORDED", ParameterVersions: []string{create.Parameters.Version}, ActivationRefs: []string{}, AttributionRefs: []string{}, ReasonCodes: []string{"FROZEN_CONTROL_DIFFERENCE_NOT_RECORDED"}}, Learning: []id.LearningFact{{ObjectID: create.Object.ObjectID, Parameter: "w", At: start.Add(time.Minute), Reason: &reportReason, Error: "0.1", Neff: "1", Groups: 1}}, Changes: []id.ActivationFact{}, TotalCases: 2, UnknownCases: 1}
+	store.snapshot.Reports = []id.Report{archive.PublicView()}
+	if e = store.snapshot.Validate(); e != nil {
+		return nil, e
+	}
 	ih, e := ia.New(ia.Options{Query: iope.QueryService{Store: store, Clock: clock, Policy: iope.ReadPolicy{DefaultLimit: 2, MaxLimit: 20, MaxRecords: 1000, MaxSnapshotBytes: 1 << 20, MaxOriginalBytes: 4096, CursorAge: time.Minute, CursorKey: []byte("synthetic-console-instance-query-key")}}, Tokens: map[string]id.ReadPrincipal{"fixture-p3-read": {PrincipalID: "fixture-console", Binding: binding, Read: true, OriginalSources: []string{"fixture-source"}, AuthorizationVersion: "fixture-auth"}}})
 	if e != nil {
 		return nil, e

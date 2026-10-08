@@ -120,16 +120,46 @@ func (f *fixtureFramework) Receipt(context.Context, string, string, string) (*dt
 }
 
 type fixtureJev struct {
-	candidate d.AnalysisCandidate
-	calls     int
+	candidate           d.AnalysisCandidate
+	calls               int
+	waitForCancellation bool
 }
 
-func (p *fixtureJev) Analyze(_ context.Context, r d.AnalysisRequest) (d.AnalysisCandidate, error) {
+func (p *fixtureJev) Analyze(ctx context.Context, r d.AnalysisRequest) (d.AnalysisCandidate, error) {
 	p.calls++
+	if err := ctx.Err(); err != nil {
+		return d.AnalysisCandidate{}, err
+	}
+	if p.waitForCancellation {
+		<-ctx.Done()
+		return d.AnalysisCandidate{}, ctx.Err()
+	}
 	c := p.candidate
 	c.RequestID = r.RequestID
 	c.ManifestHash = r.Routing.ManifestHash
 	return c, nil
+}
+
+func TestAnalysisWorkerLeaseTimeoutStopsProviderWithoutReasking(t *testing.T) {
+	_, request, candidate, now := pipelineFixture()
+	// The fixture date can be in the past relative to the host. The provider
+	// nevertheless receives a live context bounded by the logical lease budget.
+	store := &pipelineMemory{binding: request.Binding, kind: "SIM", job: &d.PipelineJob{
+		JobID: request.RequestID, QueueKind: "SIM", State: "QUEUED", Request: request, Deadline: request.Deadline,
+	}}
+	framework := &fixtureFramework{binding: request.Binding}
+	provider := &fixtureJev{candidate: candidate, waitForCancellation: true}
+	worker := workers.AnalysisWorker{Store: store, Framework: framework, Provider: provider,
+		Clock: &pipelineClock{now}, WorkerID: "fixture-worker", Lease: 15 * time.Millisecond, AllowMock: true, MaxOutboxes: 10}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	processed, err := worker.ProcessOne(ctx)
+	if err != nil || !processed || ctx.Err() != nil || store.job.State != "FAILED" || provider.calls != 1 || store.outbox != nil {
+		t.Fatal("lease did not cancel the provider", err, ctx.Err(), store.job.State, provider.calls)
+	}
+	if processed, err := worker.ProcessOne(ctx); err != nil || processed || provider.calls != 1 || framework.submits != 0 {
+		t.Fatal("timed-out model was reasked or submitted", err, processed, provider.calls, framework.submits)
+	}
 }
 func TestIngestWorkerAndAnalysisResponseLossDoNotReanalyzeOrDuplicate(t *testing.T) {
 	e, r, c, now := pipelineFixture()
@@ -153,6 +183,9 @@ func TestIngestWorkerAndAnalysisResponseLossDoNotReanalyzeOrDuplicate(t *testing
 	worker := workers.AnalysisWorker{Store: store, Framework: framework, Provider: provider, Clock: clock, WorkerID: "fixture-worker", Lease: time.Minute, AllowMock: true, MaxOutboxes: 10}
 	if processed, err := worker.ProcessOne(context.Background()); err != nil || !processed {
 		t.Fatal("analysis", err)
+	}
+	if store.job.State != "COMPLETED" || store.outbox == nil {
+		t.Fatal("logical clock task failed before delivery", store.job.State, store.job.ReasonCodes)
 	}
 	if err := worker.Dispatch(context.Background()); err != nil || store.outbox.DeliveryState != "DELIVERY_UNKNOWN" {
 		t.Fatal("unknown delivery", err)

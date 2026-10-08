@@ -180,7 +180,7 @@ func (s *PipelineStore) Projection(ctx context.Context, o ProjectionOptions) (d.
 		if s.decode(raw, &report) != nil || !report.Valid() || report.Binding != s.binding {
 			return d.Fail("REPORT_RECORD_INVALID", 503)
 		}
-		state.Reports = append(state.Reports, report.View)
+		state.Reports = append(state.Reports, report.PublicView())
 		return nil
 	})
 	if err != nil {

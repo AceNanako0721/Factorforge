@@ -7956,6 +7956,180 @@
                                     "pattern": "Z$",
                                     "type": "string"
                                   },
+                                  "report_details": {
+                                    "anyOf": [
+                                      {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "changes": {
+                                            "items": {
+                                              "additionalProperties": false,
+                                              "properties": {
+                                                "activation_id": {
+                                                  "type": "string"
+                                                },
+                                                "evidence_refs": {
+                                                  "items": {
+                                                    "type": "string"
+                                                  },
+                                                  "type": "array"
+                                                },
+                                                "parameter_version": {
+                                                  "anyOf": [
+                                                    {
+                                                      "type": "string"
+                                                    },
+                                                    {
+                                                      "type": "null"
+                                                    }
+                                                  ]
+                                                },
+                                                "previous_version": {
+                                                  "anyOf": [
+                                                    {
+                                                      "type": "string"
+                                                    },
+                                                    {
+                                                      "type": "null"
+                                                    }
+                                                  ]
+                                                },
+                                                "reason_codes": {
+                                                  "items": {
+                                                    "type": "string"
+                                                  },
+                                                  "type": "array"
+                                                },
+                                                "recorded_at": {
+                                                  "anyOf": [
+                                                    {
+                                                      "format": "date-time",
+                                                      "pattern": "Z$",
+                                                      "type": "string"
+                                                    },
+                                                    {
+                                                      "type": "null"
+                                                    }
+                                                  ]
+                                                },
+                                                "state": {
+                                                  "anyOf": [
+                                                    {
+                                                      "type": "string"
+                                                    },
+                                                    {
+                                                      "type": "null"
+                                                    }
+                                                  ]
+                                                }
+                                              },
+                                              "required": [
+                                                "activation_id",
+                                                "recorded_at",
+                                                "state",
+                                                "previous_version",
+                                                "parameter_version",
+                                                "reason_codes",
+                                                "evidence_refs"
+                                              ],
+                                              "type": "object"
+                                            },
+                                            "type": "array"
+                                          },
+                                          "frozen_control_difference": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "learning": {
+                                            "items": {
+                                              "additionalProperties": false,
+                                              "properties": {
+                                                "at": {
+                                                  "format": "date-time",
+                                                  "pattern": "Z$",
+                                                  "type": "string"
+                                                },
+                                                "error": {
+                                                  "type": "string"
+                                                },
+                                                "groups": {
+                                                  "type": "integer"
+                                                },
+                                                "neff": {
+                                                  "type": "string"
+                                                },
+                                                "object_id": {
+                                                  "type": "string"
+                                                },
+                                                "parameter": {
+                                                  "type": "string"
+                                                },
+                                                "reason": {
+                                                  "anyOf": [
+                                                    {
+                                                      "type": "string"
+                                                    },
+                                                    {
+                                                      "type": "null"
+                                                    }
+                                                  ]
+                                                }
+                                              },
+                                              "required": [
+                                                "object_id",
+                                                "parameter",
+                                                "at",
+                                                "reason",
+                                                "error",
+                                                "neff",
+                                                "groups"
+                                              ],
+                                              "type": "object"
+                                            },
+                                            "type": "array"
+                                          },
+                                          "object_id": {
+                                            "type": "string"
+                                          },
+                                          "total_cases": {
+                                            "type": "integer"
+                                          },
+                                          "unknown_cases": {
+                                            "type": "integer"
+                                          },
+                                          "unknown_ratio": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "required": [
+                                          "object_id",
+                                          "learning",
+                                          "changes",
+                                          "total_cases",
+                                          "unknown_cases",
+                                          "unknown_ratio",
+                                          "frozen_control_difference"
+                                        ],
+                                        "type": "object"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
                                   "report_id": {
                                     "type": "string"
                                   },

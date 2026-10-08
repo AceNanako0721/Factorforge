@@ -188,6 +188,29 @@ func projectBound(service, path string, raw []byte, allowOriginal bool, objectID
 	if service == "strategy" && objectID != "" {
 		value = scopeLegacy(path, value, objectID)
 	}
+	if service == "instances" && path == Routes["reports"].Path {
+		if !ID(objectID) {
+			return SafeDTO{}, Fail("OBJECT_SCOPE_REQUIRED", 403)
+		}
+		page, ok := value.(map[string]any)
+		if !ok {
+			return SafeDTO{}, Fail("LOWER_RESPONSE_INVALID", 503)
+		}
+		rows, ok := page["items"].([]any)
+		if !ok {
+			return SafeDTO{}, Fail("LOWER_RESPONSE_INVALID", 503)
+		}
+		filtered := []any{}
+		for _, row := range rows {
+			m, _ := row.(map[string]any)
+			detail, _ := m["report_details"].(map[string]any)
+			if detail != nil && detail["object_id"] != objectID {
+				continue
+			}
+			filtered = append(filtered, row)
+		}
+		page["items"] = filtered
+	}
 	safe, e := project(shape.Doc, shape.Routes[path], value, allowOriginal, 0)
 	if e != nil {
 		return SafeDTO{}, Fail("LOWER_RESPONSE_INVALID", 503)
