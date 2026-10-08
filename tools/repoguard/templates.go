@@ -167,6 +167,36 @@ query_max_records = 0
 query_cursor_age_seconds = 0
 query_cursor_key = ""
 `
+const expectedConsole = `
+[console]
+schema_version = 0
+origin = ""
+host = ""
+port = 0
+tls_cert_file = ""
+tls_key_file = ""
+static_dir = ""
+fixture_only = false
+session_seconds = 0
+challenge_seconds = 0
+rate_window_seconds = 0
+cursor_seconds = 0
+timeout_seconds = 0
+refresh_seconds = 0
+max_retries = 0
+max_attempts = 0
+max_sessions = 0
+max_challenges = 0
+max_bytes = 0
+max_records = 0
+default_limit = 0
+max_limit = 0
+max_pages = 0
+max_hash_iterations = 0
+cursor_key = ""
+users = []
+bindings = []
+`
 const expectedPrompts = `{
   "schema_version": 1,
   "asset_kind": "EXAMPLE_OR_MOCK",

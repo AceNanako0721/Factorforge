@@ -82,3 +82,41 @@ The OpenAPI Initiative's official dated OpenAPI 3.1 meta-schema is bundled
 unchanged in contracts/meta for offline validation. Its source URL, SHA-256,
 scope and Apache 2.0 license are included there. Distributions must retain the
 licenses of these dependencies and the bundled schema. Factorforge remains MIT.
+
+## shadcn-admin
+
+The console adapts the local layout, button variants and read-table lifecycle from [satnaing/shadcn-admin](https://github.com/satnaing/shadcn-admin/tree/e16c87f213a5ba5e45964e9b67c792105ec74d26), commit `e16c87f213a5ba5e45964e9b67c792105ec74d26`:
+
+- `src/components/layout/authenticated-layout.tsx`: shell/skip-to-main/sidebar organisation; local Go session replaces Clerk.
+- `src/components/ui/button.tsx`: Radix Slot and CVA variants; Factorforge styles and reduced variants.
+- `src/features/tasks/components/tasks-table.tsx`: TanStack filtering/sorting/pagination/column visibility; no editable demo/bulk deletion.
+
+MIT License
+
+Copyright (c) 2024 Sat Naing
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+## Lightweight Charts
+
+The console uses the public API of `lightweight-charts@5.2.1` (Apache-2.0), with its installed licence retained in distributions. The baseline API/examples reference is TradingView commit `6777212d1d62eb4611fb2b98ef06062ddf9a9ef3`; it is not a floating source/build dependency. TradingView attribution remains enabled in the chart and linked on the page. See [upstream licence](https://github.com/tradingview/lightweight-charts/blob/6777212d1d62eb4611fb2b98ef06062ddf9a9ef3/LICENSE).
+
+## FreqUI
+
+The baseline references FreqUI `2e6a0907ed2e990b9e905331888dfa9824024d2d` for the distinction between frequent market refresh and slower trade state refresh. FreqUI is GPL-3.0. No FreqUI code, translations, styles or data models are copied or adapted into this MIT project.

@@ -47,6 +47,9 @@ func Check(root string) ([]string, error) {
 		if err != nil {
 			return err
 		}
+		if entry.IsDir() && has([]string{"node_modules", ".vite", ".pnpm-store"}, entry.Name()) {
+			return filepath.SkipDir
+		}
 		if entry.IsDir() || !strings.HasSuffix(path, ".go") {
 			return nil
 		}
