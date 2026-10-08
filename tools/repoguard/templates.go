@@ -205,6 +205,27 @@ const expectedPrompts = `{
   "instructions": "",
   "state_template": "",
   "questions": [
+    {"id": "event_type", "type": "Choice", "instructions": "", "criteria": {}, "choices": []},
+    {"id": "direction", "type": "Choice", "instructions": "", "criteria": {}, "choices": ["NEGATIVE", "NEUTRAL", "POSITIVE", "UNKNOWN"]},
+    {"id": "impact", "type": "Score", "instructions": "", "criteria": [], "scale_ref": ""},
+    {"id": "relevance", "type": "Score", "instructions": "", "criteria": [], "scale_ref": ""},
+    {"id": "expectation", "type": "Score", "instructions": "", "criteria": [], "scale_ref": ""},
+    {"id": "half_life", "type": "Score", "instructions": "", "criteria": [], "scale_ref": ""},
+    {"id": "claim_supported", "type": "Noul", "instructions": "", "criteria": {}}
+  ]
+}
+`
+
+// Exact empty template published before v2.1.3. Historical commits are frozen;
+// accepting this known shape must not admit arbitrary old prompt contents.
+const historicalPrompts = `{
+  "schema_version": 1,
+  "asset_kind": "EXAMPLE_OR_MOCK",
+  "production_ready": false,
+  "prompt_version": "",
+  "instructions": "",
+  "state_template": "",
+  "questions": [
     {"id": "direction", "type": "Choice", "instructions": "", "criteria": [], "choices": ["NEGATIVE", "NEUTRAL", "POSITIVE"]},
     {"id": "impact", "type": "Score", "instructions": "", "criteria": [], "scale_ref": ""},
     {"id": "facts", "type": "Noul", "instructions": "", "criteria": []}
