@@ -2598,6 +2598,35 @@
         "title": "Policy",
         "type": "object"
       },
+      "PolicyWindow": {
+        "additionalProperties": false,
+        "properties": {
+          "end": {
+            "format": "date-time",
+            "pattern": "Z$",
+            "type": "string"
+          },
+          "enforce_limits": {
+            "type": "boolean"
+          },
+          "start": {
+            "format": "date-time",
+            "pattern": "Z$",
+            "type": "string"
+          },
+          "window_id": {
+            "pattern": "^[A-Za-z0-9_.-]{1,160}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "end",
+          "enforce_limits",
+          "start",
+          "window_id"
+        ],
+        "type": "object"
+      },
       "PoolView": {
         "additionalProperties": false,
         "properties": {
@@ -3661,6 +3690,66 @@
         "title": "TargetOutbox",
         "type": "object"
       },
+      "TimeWindowPlan": {
+        "additionalProperties": false,
+        "properties": {
+          "object_id": {
+            "pattern": "^[A-Za-z0-9_.-]{1,160}$",
+            "type": "string"
+          },
+          "plan_id": {
+            "pattern": "^[A-Za-z0-9_.-]{1,160}$",
+            "type": "string"
+          },
+          "policy_version": {
+            "pattern": "^[A-Za-z0-9_.-]{1,160}$",
+            "type": "string"
+          },
+          "source_version": {
+            "pattern": "^[A-Za-z0-9_.-]{1,160}$",
+            "type": "string"
+          },
+          "windows": {
+            "items": {
+              "$ref": "#/components/schemas/PolicyWindow"
+            },
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "object_id",
+          "plan_id",
+          "policy_version",
+          "source_version",
+          "windows"
+        ],
+        "type": "object"
+      },
+      "TimeWindowRegistry": {
+        "additionalProperties": false,
+        "properties": {
+          "object_id": {
+            "pattern": "^[A-Za-z0-9_.-]{1,160}$",
+            "type": "string"
+          },
+          "plans": {
+            "items": {
+              "$ref": "#/components/schemas/TimeWindowPlan"
+            },
+            "type": "array"
+          },
+          "snapshot_version": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "object_id",
+          "plans",
+          "snapshot_version"
+        ],
+        "type": "object"
+      },
       "ValidationRunView": {
         "additionalProperties": false,
         "properties": {
@@ -3697,6 +3786,51 @@
           "production_upgrade"
         ],
         "title": "ValidationRunView",
+        "type": "object"
+      },
+      "WindowCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_version": {
+            "minimum": 0,
+            "title": "Expected Version",
+            "type": "integer"
+          },
+          "idempotency_key": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/TimeWindowPlan"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "request_id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Request Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "strategy-2.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expected_version",
+          "idempotency_key",
+          "plan",
+          "reason",
+          "request_id",
+          "schema_version"
+        ],
         "type": "object"
       }
     },
@@ -6292,6 +6426,110 @@
           }
         ],
         "summary": "Targets"
+      }
+    },
+    "/api/v2/strategy/objects/{object_id}/time-windows": {
+      "get": {
+        "operationId": "read_time_windows",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "object_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[A-Za-z0-9_.-]{1,160}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimeWindowRegistry"
+                }
+              }
+            },
+            "description": "Recorded immutable UTC plan"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Registration or query rejected"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Registration or query rejected"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Registration or query rejected"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Registration or query rejected"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Registration or query rejected"
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Registration or query rejected"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Registration or query rejected"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Read immutable UTC intervals without side effects"
       }
     },
     "/api/v2/strategy/parameter-activations": {

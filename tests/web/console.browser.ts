@@ -58,6 +58,13 @@ test("native SIM facts, detail, final candles, export, failures and logout", asy
   await page.getByRole("button", { name: "应用范围" }).click();
   await expect(page.getByRole("img", { name: "已记录最终K线" })).toBeVisible();
   await page.getByRole("link", { name: "总览", exact: true }).click();
+	await page.getByRole("link", { name: "周期报告", exact: true }).click();
+	await expect(page.getByText("fixture-periodic-report", {exact:true}).first()).toBeVisible();
+	await page.getByText("7 个字段", {exact:true}).first().click();
+	await expect(page.getByText("未知或未成熟比例", {exact:true})).toBeVisible();
+	await expect(page.getByText("0.5", {exact:true})).toBeVisible();
+	await page.screenshot({path:"../../../../../runtime/console-report-detail.png",fullPage:true});
+	await page.getByRole("link", { name: "总览", exact: true }).click();
   await page.locator("summary").filter({ hasText: "导出" }).click();
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "JSON", exact: true }).click();

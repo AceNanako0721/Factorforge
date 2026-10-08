@@ -135,6 +135,7 @@ func OpenAPI(internal bool) []byte {
 		}
 		item["get"] = map[string]any{"summary": route.summary, "description": "Requires public query scope or an existing workload capability in the bound instance/environment/object range. Limits and cursor retention require registered configuration; snapshot or authorization changes invalidate the signed cursor.", "operationId": "trace_" + route.view + strings.NewReplacer("/", "_", "{", "", "}", "", "-", "_").Replace(route.path), "parameters": parameters, "security": []any{map[string]any{"bearerAuth": []string{}}}, "responses": responses}
 	}
+	addWindowContract(paths, schemas, internal)
 	raw, err := json.MarshalIndent(document, "", "  ")
 	if err != nil {
 		panic("strategy contract serialization failed")

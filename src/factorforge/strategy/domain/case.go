@@ -68,6 +68,9 @@ func FeedbackCases(s *StrategyState, obj *ObservedObject, snap *TradingSnapshot,
 					}
 				}
 				window := WindowID(obj.ObjectID, at, p)
+				if registered, _, err := RiskWindow(s, obj, at, p); err == nil {
+					window = registered
+				}
 				if intent != nil && intent.ReservationID != nil {
 					if r := s.Reservations.Value(*intent.ReservationID); r != nil {
 						window = r.WindowID

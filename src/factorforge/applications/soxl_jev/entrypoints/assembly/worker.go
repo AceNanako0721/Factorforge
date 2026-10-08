@@ -73,6 +73,23 @@ func RunWorker(role string) error {
 		} else if p.Mode != "mock" {
 			return d.Fail("INSTANCE_BOOTSTRAP_REQUIRED", 503)
 		}
+		if assets.Calendar != nil {
+			object, e := framework.Object(ctx, p.Settings.ObjectID)
+			if e != nil {
+				return e
+			}
+			if object == nil {
+				return d.Fail("CALENDAR_OBJECT_REQUIRED", 404)
+			}
+			work, done := context.WithTimeout(ctx, timeout)
+			e = framework.InstallCalendar(work, *assets.Calendar, object.ObjectID, object.TimePolicyVersion, time.Now().UTC())
+			done()
+			if e != nil {
+				return e
+			}
+		} else if p.Mode != "mock" {
+			return d.Fail("CALENDAR_REGISTRATION_REQUIRED", 503)
+		}
 		policy := assets.RoutingPolicy
 		if p.Settings.Stage != "R2" {
 			policy.CalibrationVerified = false

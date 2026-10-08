@@ -278,6 +278,7 @@ type CaseRecord struct {
 	LossCounted          bool                `json:"loss_counted"`
 }
 type StrategyState struct {
+	TimeWindows           map[string]TimeWindowPlan   `json:"time_windows,omitempty"`
 	InstanceID            string                      `json:"instance_id"`
 	Environment           string                      `json:"environment"`
 	Version               int                         `json:"version"`

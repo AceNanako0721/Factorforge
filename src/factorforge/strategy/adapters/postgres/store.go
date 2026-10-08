@@ -385,6 +385,9 @@ func (s *Store) Transaction(ctx context.Context, id string, fn func(*d.StrategyS
 	if _, err = tx.Exec(ctx, "UPDATE "+s.table("public_state")+" SET payload=$1 WHERE instance_id=$2", public, id); err != nil {
 		return dbError(err)
 	}
+	if err = d.PreserveWindowPlans(before, state); err != nil {
+		return err
+	}
 	if err = s.appendRows(ctx, tx, id, before.Audit, state.Audit, before.Ledger, state.Ledger); err != nil {
 		return dbError(err)
 	}

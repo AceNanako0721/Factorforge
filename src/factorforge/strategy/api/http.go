@@ -8,6 +8,7 @@ import (
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/strategy/domain"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/strategy/ports"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 )
@@ -139,6 +140,47 @@ func New(options Options) (http.Handler, error) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write(OpenAPI(options.Internal))
 	})
+	registerWithAudit("GET", "/objects/{object_id}/time-windows", func(_ http.ResponseWriter, r *http.Request, p d.Identity) (any, int, error) {
+		id := r.PathValue("object_id")
+		if len(r.URL.Query()) != 0 {
+			return nil, 0, &d.Error{Code: "INVALID_QUERY_PARAMETER", Status: 422}
+		}
+		s, e := query(r, p, id)
+		if e != nil {
+			return nil, 0, e
+		}
+		if worker := p.Worker(); worker != nil {
+			if e = options.Store.CheckWorkload(r.Context(), *worker, id); e != nil {
+				return nil, 0, e
+			}
+		}
+		plans := []d.TimeWindowPlan{}
+		records := 0
+		for _, plan := range s.TimeWindows {
+			if plan.ObjectID == id {
+				plans = append(plans, plan)
+				records += len(plan.Windows)
+			}
+		}
+		if options.ReadPolicy.MaxRecords < 1 || records > options.ReadPolicy.MaxRecords {
+			return nil, 0, &d.Error{Code: "READ_RECORD_BUDGET", Status: 503}
+		}
+		sort.Slice(plans, func(i, j int) bool { return plans[i].PlanID < plans[j].PlanID })
+		return map[string]any{"object_id": id, "snapshot_version": s.Version, "plans": plans}, 200, nil
+	}, false)
+	if options.Internal {
+		register("POST", "/objects/{object_id}/time-windows", func(_ http.ResponseWriter, r *http.Request, p d.Identity) (any, int, error) {
+			var body d.WindowCommand
+			if e := d.Decode(r.Body, &body); e != nil {
+				return nil, 0, e
+			}
+			if len(body.Plan.Windows) > options.ReadPolicy.MaxRecords || options.ReadPolicy.MaxRecords < 1 {
+				return nil, 0, &d.Error{Code: "READ_RECORD_BUDGET", Status: 503}
+			}
+			value, e := service.InstallWindows(r.Context(), p, body, r.PathValue("object_id"))
+			return value, 201, e
+		})
+	}
 	register("POST", "/objects", func(_ http.ResponseWriter, r *http.Request, p d.Identity) (any, int, error) {
 		var body d.CreateObject
 		if err := d.Decode(r.Body, &body); err != nil {

@@ -7,6 +7,10 @@ import (
 	"io"
 )
 
+type PolicyWindow = d.PolicyWindow
+type TimeWindowPlan = d.TimeWindowPlan
+type WindowCommand = d.WindowCommand
+
 type Command = d.Command
 type CreateObject = d.CreateObject
 type ObservedObject = d.ObservedObject

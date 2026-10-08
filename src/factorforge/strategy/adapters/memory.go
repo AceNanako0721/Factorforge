@@ -48,6 +48,9 @@ func (s *MemoryStore) Transaction(ctx context.Context, id string, fn func(*d.Str
 	if s.FailCommit {
 		return &d.Error{Code: "STORE_UNAVAILABLE", Status: 503}
 	}
+	if err := d.PreserveWindowPlans(old, work); err != nil {
+		return err
+	}
 	s.states[id] = work
 	return nil
 }

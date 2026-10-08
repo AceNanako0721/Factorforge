@@ -44,3 +44,5 @@ G4 首批实例链路的 [PR #15](https://github.com/AceNanako0721/Factorforge/p
 管理台追加 console-checks，第五项固定 Go/Node/pnpm 版本、无依赖生命周期脚本构建、TypeScript/单元/实际 Chromium 测试及静态资产检查。Node 只在构建测试 job 使用；四项既有检查名称保持。涉及 YAML 的推送继续沿用上述仓库限定 SSH；本任务等待全部五项成功再合并，不把四项旧保护检查通过当第五项已通过。
 
 [PR #16](https://github.com/AceNanako0721/Factorforge/pull/16) 的 [五项 CI](https://github.com/AceNanako0721/Factorforge/actions/runs/37708667804) 全部成功，以精确 head `764e3996cd6029a84a4edcd38819a8df0db17cc2` squash 合并。main 提交 `ee1cb938f39f27986d176960d376e526e2e5730c` 的 [五项 CI](https://github.com/AceNanako0721/Factorforge/actions/runs/37708881703) 全部成功；主分支保护没有放宽。推送前索引 420 个、可达历史 816 个 Git 文件版本扫描通过。
+
+[PR #17](https://github.com/AceNanako0721/Factorforge/pull/17) 以精确 head 59aa35938c3725496e3a7e50b42f64fa094afa56 的五项 CI 成功后 squash 合并；main 59721f1fbdb883058b7442b76c94c411bc3a25aa 的 [五项 CI](https://github.com/AceNanako0721/Factorforge/actions/runs/37772988086) 均成功。运行记录/周期报告和模型时钟一致性修复已交付；后续日历/报告投影设计发布独立修订版，旧 HTML 不覆盖。

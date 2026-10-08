@@ -169,6 +169,9 @@ func jsonValue(v reflect.Value) any {
 			if !f.IsExported() {
 				continue
 			}
+			if strings.Contains(f.Tag.Get("json"), ",omitempty") && v.Field(i).IsZero() {
+				continue
+			}
 			key := strings.Split(f.Tag.Get("json"), ",")[0]
 			if key == "-" {
 				continue
@@ -375,6 +378,16 @@ func walkValidate(v reflect.Value) error {
 		return nil
 	}
 	switch x := v.Interface().(type) {
+	case TimeWindowPlan:
+		if !x.Valid() {
+			return invalid()
+		}
+	case StrategyState:
+		for id, plan := range x.TimeWindows {
+			if id != plan.PlanID || !plan.Valid() || x.Objects.Value(plan.ObjectID) == nil || x.Policies.Value(plan.PolicyVersion) == nil {
+				return invalid()
+			}
+		}
 	case ParameterSnapshot:
 		for key, b := range x.Bounds {
 			if b[0].Cmp(b[1]) > 0 {
@@ -440,17 +453,20 @@ func Reserve(s *StrategyState, o *ObservedObject, at time.Time, p *Policy, id st
 	if r, ok := s.Reservations.Get(id); ok {
 		return r, nil
 	}
-	window := WindowID(o.ObjectID, at, p)
+	window, enforce, err := RiskWindow(s, o, at, p)
+	if err != nil {
+		return nil, err
+	}
 	used := 0
 	for _, r := range s.Reservations.Values() {
 		if r.WindowID == window && r.State != "RELEASED" {
 			used++
 		}
 	}
-	if used >= p.MaxNewRisk {
+	if enforce && used >= p.MaxNewRisk {
 		return nil, &Error{"NEW_RISK_WINDOW_LIMIT", 423}
 	}
-	if len(s.LossCases.Value(window)) >= p.MaxLossCases {
+	if enforce && len(s.LossCases.Value(window)) >= p.MaxLossCases {
 		return nil, &Error{"LOSS_CASE_WINDOW_LIMIT", 423}
 	}
 	r := &Reservation{ReservationID: id, ObjectID: o.ObjectID, WindowID: window, State: "RESERVED"}

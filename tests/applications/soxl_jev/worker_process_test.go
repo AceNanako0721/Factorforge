@@ -8,6 +8,7 @@ import (
 	a "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/analysis"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/config"
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/domain"
+	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/operations"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/reports"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/submission"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/strategy/adapters"
@@ -135,6 +136,8 @@ func TestNativeInstanceWorkerProfilesAndProcessWithoutPythonNode(t *testing.T) {
 	settings := config.PipelineSettings{Environment: "SIM", InstanceID: r.Binding.InstanceID, ObjectID: r.ObjectID, Stage: "R2", AssetsFile: filepath.Join(private, "assets.json"), FixtureInputFile: filepath.Join(private, "inputs.json"), PollSeconds: 1, TimeoutSeconds: 10, LeaseSeconds: 60, TaskTTLSeconds: 3600, MaxInputBytes: 100000, MaxOutboxes: 10, MaxFrameworkPages: 10, ResearchBucket: "fixture-budget", TradingBucket: "fixture-budget", QuestionSetVersion: r.QuestionSetVersion, PromptVersion: r.PromptVersion, RubricVersion: r.RubricVersion, CalibrationVersion: r.CalibrationVersion, ModelVersion: r.ModelVersion}
 	asset := config.PipelineAssets{Version: "fixture-assets", FixtureOnly: true, RoutingPolicy: d.RoutingPolicy{Version: "fixture-policy", Binding: r.Binding, ObjectID: r.ObjectID, CalibrationVersion: r.CalibrationVersion}, Calibration: a.CalibrationMapping{Version: r.CalibrationVersion, RubricVersion: r.RubricVersion, ProducerVersion: "fixture-producer", Impact: []dec.Decimal{number("0"), number("5")}, Relevance: []dec.Decimal{number("0"), number("1")}, Expectation: []dec.Decimal{number("0"), number("1")}, HalfLife: []dec.Decimal{number("60"), number("300")}, Credibility: number("1"), Quality: number("1"), Novelty: number("1"), Prepricing: number("0"), ClaimSupportMinimum: number("0.9"), Verified: true}}
 	asset.ReportSchedule = &reports.Schedule{Anchor: now.Add(-time.Hour), PeriodSeconds: 3600, MaxRecords: 100}
+	day := now.Truncate(24 * time.Hour)
+	asset.Calendar = &operations.Calendar{Version: "fixture-process-calendar", Zone: "UTC", ValidFrom: day.Add(-24 * time.Hour), ValidUntil: day.Add(48 * time.Hour), Sessions: []operations.MarketSession{{Date: day.Add(-24 * time.Hour).Format("2006-01-02"), OpenLocal: "00:00", CloseLocal: "00:01"}, {Date: day.Add(24 * time.Hour).Format("2006-01-02"), OpenLocal: "00:00", CloseLocal: "00:01"}}}
 	data, _ := json.Marshal(asset)
 	if err = os.WriteFile(settings.AssetsFile, data, 0600); err != nil {
 		t.Fatal(err)
