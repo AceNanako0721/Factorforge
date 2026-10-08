@@ -63,6 +63,14 @@ runtime/bin/instance-cli --action publish-projection --config config/config.toml
 
 ## 已验证与剩余范围
 
+G4 后续追加 `003_operations.sql`：来源、搜索、输入、模型和提交的稳定代码/真实检查时间进入不可改 operation_fact；没有私有 URL、异常正文或供应商载荷。实际认证角色、RLS 及操作分区校验阻止研究伪造交易/采集活动；只读角色不能写。来源失败不会抹掉其他来源成功结果，保留最后成功/失败、当前未完成任务的最早时间和已记录降级原因。job 审计使用实际创建/领取/开始/完成时间，发布读取时间不会替代历史事件时间。
+
+私有 PipelineAssets 的可选 report_schedule 登记 UTC anchor、period_seconds 和 max_records；生产 jev 模式必须登记，mock 未登记时保持报告无记录。INGEST 派生文件另读取既有 services.framework_api_url / credentials.framework_api_token 的公共只读身份，分析进程不获得它。报告请求仅固定公共 GET：health、对象目录/已存在对象详情、parameter-activations、learning-decisions、当前对象 cases 和 attribution。先后快照版本相同才保存；分页/字节/记录预算、对象/环境/实例和 UTC 全部核验。不会运行归因、学习或模型，也不增加候选审批门。
+
+最近闭合周期只记录一次，不补问历史模型、不重写旧报告。私有不可改 framework_report 保留学习原因、发布/拒绝/冻结/回滚及前后版本、证据引用、案例总数和未知/未成熟数；未知比例没有分母时保留未知，冻结对照差异没有记录时保留 null。原生 ReportView 当前只发布有限版本/引用/状态/原因，详细数值后续按契约扩展才能展示，不用 reason_codes 伪造金额或比例。报告和采集降级随现有操作者 CAS 发布进入只读投影与管理台，没有新增对外通知服务。
+
+实际 Go 公共 P2 → 报告读取前后完整框架状态相同；真实 PostgreSQL 的活动/报告幂等、不可改、角色/RLS、降级投影和重开保持通过。原生 ingest-worker 在 PATH=/nonexistent 下读取实际公共 P2 并在两次独立启动后仍只有一份周期报告；分析进程继续保留只调用一次模型的回执验证。全部使用虚构配置与本地服务。
+
 本地夹具验证证据哈希/跨度/单位、许可拒绝、JEV 官方 wire 映射/格式/版本/限流、原文网络边界、真实 PostgreSQL 的幂等预算/权限/租约/候选/outbox/重启、UTC/CAS 发布。实际 Go P3 HTTP→Go P2 完成对象、事件、首次评分、评分/事实修订和撤销；新夹具缺注册标定时保持 QUARANTINED。原生分析进程在 PATH=/nonexistent 下完成 SQL→供应商夹具→实际 Go P2→回执→重启，模型调用一次。
 
-真实来源许可、生产 JEV/搜索探针、OD-01 抽取选型/盲标、OD-02 共享供应商隔离、风险标定/DEC-06、人工复核与 LIVE 准入未关闭。采集监控/告警和框架周期报告的完整运行装配、时段政策注入及同层管理台继续 G4；不得将本页的局部验证写成整个 P3/G4 已完成。
+真实来源许可、生产 JEV/搜索探针、OD-01 抽取选型/盲标、OD-02 共享供应商隔离、风险标定/DEC-06、人工复核与 LIVE 准入未关闭。来源状态和有限周期报告已装配，同层管理台已合并；时段政策注入及报告详细只读契约继续 G4，不得将本页局部验证写成整个 P3/G4 已完成。

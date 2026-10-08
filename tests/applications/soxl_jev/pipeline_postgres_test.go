@@ -241,6 +241,72 @@ func TestPipelinePostgresQueuesBudgetsLeasesIsolationAndOutboxRestart(t *testing
 	if _, err = tradeConn.Exec(ctx, "UPDATE instance_pipeline_sim.app_trading_analysis_job SET payload=$1 WHERE job_id=$2", encoded, job.JobID); err == nil {
 		t.Fatal("direct request rewrite allowed")
 	}
+	sourceID := e.Raw.SourceID
+	fact := d.OperationFact{ID: "fixture-operation-success", Binding: binding, WorkerKind: "INGEST", Component: "SOURCE", SourceID: &sourceID, CheckedAt: now, Success: true, Code: "SOURCE_SUCCEEDED"}
+	if err = ingest.RecordOperation(ctx, fact); err != nil {
+		t.Fatal("source activity", err)
+	}
+	if err = ingest.RecordOperation(ctx, fact); err != nil {
+		t.Fatal("source duplicate", err)
+	}
+	mutated := fact
+	mutated.Success = false
+	if ingest.RecordOperation(ctx, mutated) == nil {
+		t.Fatal("source history rewritten")
+	}
+	fact.ID = "fixture-operation-failure"
+	fact.CheckedAt = now.Add(time.Second)
+	fact.Success = false
+	fact.Code = "SOURCE_TIMEOUT"
+	if err = ingest.RecordOperation(ctx, fact); err != nil {
+		t.Fatal(err)
+	}
+	if stores["RESEARCH"].RecordOperation(ctx, fact) == nil {
+		t.Fatal("research spoofed source activity")
+	}
+	fact.ID = "fixture-provider-failure"
+	fact.WorkerKind = "TRADING"
+	fact.Component = "PROVIDER"
+	fact.SourceID = nil
+	fact.Code = "PROVIDER_RATE_LIMITED"
+	if err = worker.RecordOperation(ctx, fact); err != nil {
+		t.Fatal(err)
+	}
+	if stores["RESEARCH"].RecordOperation(ctx, fact) == nil {
+		t.Fatal("research spoofed signal activity")
+	}
+	from, to := now.Add(-time.Hour), now
+	version := "1"
+	report := d.FrameworkReport{Binding: binding, ObjectID: r.ObjectID, View: d.Report{ReportID: "fixture-framework-report", RecordedAt: now, PeriodStart: &from, PeriodEnd: &to, State: "RECORDED", FrameworkSnapshotVersion: &version, ParameterVersions: []string{}, ActivationRefs: []string{}, AttributionRefs: []string{}, ReasonCodes: []string{"LEARNING_DECISION_NOT_RECORDED"}}, Learning: []d.LearningFact{}, Changes: []d.ActivationFact{}}
+	if err = ingest.RecordReport(ctx, report); err != nil {
+		t.Fatal("record report", err)
+	}
+	if err = ingest.RecordReport(ctx, report); err != nil {
+		t.Fatal("report duplicate", err)
+	}
+	changedReport := report
+	changedReport.TotalCases = 1
+	if ingest.RecordReport(ctx, changedReport) == nil {
+		t.Fatal("report revised in place")
+	}
+	if _, err = worker.RecordedReport(ctx, report.View.ReportID); err == nil {
+		t.Fatal("signal worker read report table")
+	}
+	projection, _, err = ingest.Projection(ctx, pg.ProjectionOptions{Version: 0, SourceVersion: "fixture-sources", Stage: "R2", FixtureOnly: true, Now: now.Add(3 * time.Minute), MaxRecords: 100, MaxBytes: 100000, Sources: []d.SourceRegistration{{SourceID: sourceID, Version: "fixture-registry", LicenceRef: e.Raw.LicenceRef, LicenceVerified: true, AllowOriginal: false, Enabled: true, ValidFrom: now.Add(-time.Hour), ValidUntil: now.Add(time.Hour)}}})
+	if err != nil || len(projection.Reports) != 1 || projection.Sources[0].LastSuccessAt == nil || projection.Sources[0].LastFailureAt == nil || !d.Has(projection.Health.Degradation, "SOURCE_DEGRADED") || !d.Has(projection.Health.Degradation, "PROVIDER_DEGRADED") {
+		t.Fatal("operation projection", err, projection)
+	}
+	restarted, err := pg.OpenPipeline(ctx, dsns["INGEST"], binding, "INGEST", 100000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer restarted.Close()
+	if saved, err := restarted.RecordedReport(ctx, report.View.ReportID); err != nil || saved == nil {
+		t.Fatal("report restart", err)
+	}
+	if _, err = researchConn.Exec(ctx, "INSERT INTO instance_pipeline_sim.operation_fact VALUES($1,$2,'TRADING',$3,$4)", binding.InstanceID, "spoof-direct", now, encoded); err == nil {
+		t.Fatal("RLS operation role spoof")
+	}
 	if _, err = admin.Exec(ctx, "ALTER ROLE \"fixture_TRADING\" NOLOGIN"); err != nil {
 		t.Fatal(err)
 	}

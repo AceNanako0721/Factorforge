@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/domain"
 	"github.com/jackc/pgx/v5"
+	"sort"
 	"strconv"
 	"time"
 )
@@ -113,18 +114,77 @@ func (s *PipelineStore) Projection(ctx context.Context, o ProjectionOptions) (d.
 				model = &resolved
 			}
 			state.Jobs = append(state.Jobs, d.Job{JobID: j.JobID, ObjectID: &object, QueueKind: j.QueueKind, State: j.State, CreatedAt: j.CreatedAt, ClaimedAt: j.ClaimedAt, StartedAt: j.StartedAt, CompletedAt: j.CompletedAt, Deadline: j.Deadline, ResolvedModel: model, ReceiptRef: j.ReceiptRef, ReasonCodes: j.ReasonCodes})
+			if d.Has([]string{"QUEUED", "CLAIMED", "RUNNING"}, j.State) {
+				for i := range state.Sources {
+					source := &state.Sources[i]
+					if source.SourceID == j.Request.Evidence.Raw.SourceID && (source.OldestPendingAt == nil || j.CreatedAt.Before(*source.OldestPendingAt)) {
+						at := j.CreatedAt
+						source.OldestPendingAt = &at
+					}
+				}
+			}
 			evidenceID := j.Request.Evidence.Raw.EvidenceID
 			var code *string
 			if len(j.ReasonCodes) > 0 {
 				value := j.ReasonCodes[0]
 				code = &value
 			}
-			state.Audit = append(state.Audit, d.Audit{AuditID: "activity-" + d.Digest([]any{j.JobID, j.State, j.Attempt, j.ReceiptRef}), RecordedAt: o.Now, Action: "PIPELINE_SNAPSHOT_RECORDED", Code: code, JobID: &j.JobID, EvidenceID: &evidenceID, ReceiptRef: j.ReceiptRef})
+			changedAt := j.CreatedAt
+			for _, recorded := range []*time.Time{j.ClaimedAt, j.StartedAt, j.CompletedAt} {
+				if recorded != nil {
+					changedAt = *recorded
+				}
+			}
+			state.Audit = append(state.Audit, d.Audit{AuditID: "activity-" + d.Digest([]any{j.JobID, j.State, j.Attempt, j.ReceiptRef}), RecordedAt: changedAt, Action: "PIPELINE_STATE_RECORDED", Code: code, JobID: &j.JobID, EvidenceID: &evidenceID, ReceiptRef: j.ReceiptRef})
 			return nil
 		})
 		if err != nil {
 			return state, nil, err
 		}
+	}
+	latest := map[string]d.OperationFact{}
+	err = records("operation_fact", "checked_at,operation_id", func(raw []byte) error {
+		var fact d.OperationFact
+		if s.decode(raw, &fact) != nil || !fact.Valid() || fact.Binding != s.binding || fact.CheckedAt.After(o.Now) {
+			return d.Fail("OPERATION_RECORD_INVALID", 503)
+		}
+		key := fact.WorkerKind + ":" + fact.Component
+		if fact.SourceID != nil {
+			key += ":" + *fact.SourceID
+		}
+		latest[key] = fact
+		if fact.SourceID != nil && fact.Component == "SOURCE" {
+			for i := range state.Sources {
+				source := &state.Sources[i]
+				if source.SourceID == *fact.SourceID {
+					at := fact.CheckedAt
+					if fact.Success {
+						source.LastSuccessAt = &at
+					} else {
+						code := fact.Code
+						source.LastFailureAt = &at
+						source.LastFailureCode = &code
+					}
+				}
+			}
+		}
+		code := fact.Code
+		state.Audit = append(state.Audit, d.Audit{AuditID: fact.ID, RecordedAt: fact.CheckedAt, Action: fact.Component + "_CHECK", Code: &code, JobID: fact.JobID})
+		return nil
+	})
+	if err != nil {
+		return state, nil, err
+	}
+	err = records("framework_report", "recorded_at,report_id", func(raw []byte) error {
+		var report d.FrameworkReport
+		if s.decode(raw, &report) != nil || !report.Valid() || report.Binding != s.binding {
+			return d.Fail("REPORT_RECORD_INVALID", 503)
+		}
+		state.Reports = append(state.Reports, report.View)
+		return nil
+	})
+	if err != nil {
+		return state, nil, err
 	}
 	rows, err := tx.Query(ctx, "SELECT queue_kind,policy_ref,max_jobs,used_jobs,max_concurrent,valid_from,valid_until FROM "+s.schema+".budget WHERE instance_id=$1 AND valid_from<=$2 AND valid_until>$2 ORDER BY queue_kind,bucket LIMIT $3", s.binding.InstanceID, o.Now, o.MaxRecords+1)
 	if err != nil {
@@ -164,6 +224,20 @@ func (s *PipelineStore) Projection(ctx context.Context, o ProjectionOptions) (d.
 	}
 	at := o.Now
 	state.Health = &d.Health{Stage: o.Stage, Degradation: []string{"LIVE_ADMISSION_UNRESOLVED"}, RecoveryState: "NOT_RECORDED", CheckedAt: &at, Capabilities: []d.Capability{{Name: "provider", State: provider}, {Name: "production_calibration", State: "UNKNOWN"}, {Name: "live_admission", State: "UNAVAILABLE"}}}
+	keys := []string{}
+	for key := range latest {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		fact := latest[key]
+		if !fact.Success {
+			code := fact.Component + "_DEGRADED"
+			if !d.Has(state.Health.Degradation, code) {
+				state.Health.Degradation = append(state.Health.Degradation, code)
+			}
+		}
+	}
 	if state.RecordCount() > o.MaxRecords {
 		return state, nil, d.Fail("INSTANCE_PROJECTION_RECORD_BUDGET_EXCEEDED", 503)
 	}

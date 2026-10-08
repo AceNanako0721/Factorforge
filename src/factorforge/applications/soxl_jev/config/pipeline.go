@@ -6,6 +6,7 @@ import (
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/domain"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/evidence"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/monitoring"
+	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/reports"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/workers"
 	dto "github.com/AceNanako0721/Factorforge/src/factorforge/strategy/api/dto"
 	dec "github.com/AceNanako0721/Factorforge/src/factorforge/trading/api/dto"
@@ -101,6 +102,8 @@ type WorkerProfile struct {
 	PromptFile       string           `toml:"prompt_file"`
 	SearchURL        string           `toml:"search_url"`
 	SearchToken      string           `toml:"search_token"`
+	ReportReadURL    string           `toml:"report_read_url"`
+	ReportReadToken  string           `toml:"report_read_token"`
 }
 
 func (p WorkerProfile) Binding() d.Binding {
@@ -127,7 +130,7 @@ func (p WorkerProfile) Validate(role string) error {
 		if p.ProviderURL != "" || p.ProviderToken != "" || p.PromptFile != "" {
 			return d.Fail("INSTANCE_PROFILE_CONTAINS_PEER_CREDENTIALS", 403)
 		}
-	} else if p.SearchToken != "" || p.SearchURL != "" || p.TradingReadURL != "" || p.TradingReadToken != "" {
+	} else if p.SearchToken != "" || p.SearchURL != "" || p.TradingReadURL != "" || p.TradingReadToken != "" || p.ReportReadURL != "" || p.ReportReadToken != "" {
 		return d.Fail("INSTANCE_PROFILE_CONTAINS_PEER_CREDENTIALS", 403)
 	} else if p.ProviderURL == "" || p.ProviderToken == "" || !filepath.IsAbs(p.PromptFile) {
 		return d.Fail("INSTANCE_PROVIDER_CONFIGURATION_REQUIRED", 503)
@@ -182,6 +185,7 @@ type RSSRegistration struct {
 	PublicationTimeVerified bool     `json:"publication_time_verified"`
 }
 type PipelineAssets struct {
+	ReportSchedule    *reports.Schedule               `json:"report_schedule"`
 	Bootstrap         *BootstrapAsset                 `json:"bootstrap"`
 	Version           string                          `json:"version"`
 	FixtureOnly       bool                            `json:"fixture_only"`
@@ -242,14 +246,16 @@ func PrepareWorkerProfiles(canonical, root string) ([]string, error) {
 	var c struct {
 		Mode        string `toml:"mode"`
 		Credentials struct {
-			TradingAPIToken string `toml:"trading_api_token"`
-			JevAPIKey       string `toml:"jev_api_key"`
-			SearchAPIKey    string `toml:"search_api_key"`
+			FrameworkAPIToken string `toml:"framework_api_token"`
+			TradingAPIToken   string `toml:"trading_api_token"`
+			JevAPIKey         string `toml:"jev_api_key"`
+			SearchAPIKey      string `toml:"search_api_key"`
 		} `toml:"credentials"`
 		Services struct {
-			TradingAPIURL string `toml:"trading_api_url"`
-			JevAPIURL     string `toml:"jev_api_url"`
-			SearchAPIURL  string `toml:"search_api_url"`
+			FrameworkAPIURL string `toml:"framework_api_url"`
+			TradingAPIURL   string `toml:"trading_api_url"`
+			JevAPIURL       string `toml:"jev_api_url"`
+			SearchAPIURL    string `toml:"search_api_url"`
 		} `toml:"services"`
 		Application struct {
 			PromptFile string `toml:"prompt_file"`
@@ -289,6 +295,8 @@ func PrepareWorkerProfiles(canonical, root string) ([]string, error) {
 		}
 		p := WorkerProfile{SchemaVersion: 1, Role: role, Mode: c.Mode, Settings: settings, Access: access}
 		if role == "INGEST" {
+			p.ReportReadURL = c.Services.FrameworkAPIURL
+			p.ReportReadToken = c.Credentials.FrameworkAPIToken
 			p.TradingReadURL = c.Services.TradingAPIURL
 			p.TradingReadToken = c.Credentials.TradingAPIToken
 			p.SearchURL = c.Services.SearchAPIURL

@@ -7,6 +7,7 @@ import (
 	"errors"
 	a "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/analysis"
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/domain"
+	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/operations"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/ports"
 	dto "github.com/AceNanako0721/Factorforge/src/factorforge/strategy/api/dto"
 	"time"
@@ -21,6 +22,7 @@ type AnalysisWorker struct {
 	Lease       time.Duration
 	AllowMock   bool
 	MaxOutboxes int
+	Operations  ports.OperationStore
 }
 
 func (w AnalysisWorker) Validate() error {
@@ -85,6 +87,15 @@ func (w AnalysisWorker) ProcessOne(ctx context.Context) (bool, error) {
 		callCtx, cancel := context.WithDeadline(ctx, until)
 		candidate, e := w.Provider.Analyze(callCtx, r)
 		cancel()
+		if w.Operations != nil {
+			kind := "TRADING"
+			if job.QueueKind == "RESEARCH" {
+				kind = "RESEARCH"
+			}
+			if recordErr := operations.RecordFact(ctx, w.Operations, r.Binding, kind, "PROVIDER", nil, &job.JobID, w.Clock.Now(), e); recordErr != nil {
+				return true, recordErr
+			}
+		}
 		if e != nil {
 			return true, reject("FAILED", "PROVIDER_UNAVAILABLE_OR_UNKNOWN")
 		}
@@ -142,6 +153,15 @@ func (w AnalysisWorker) Dispatch(ctx context.Context) error {
 			continue
 		}
 		received, e := w.Framework.Submit(ctx, row.Command)
+		if w.Operations != nil {
+			kind := "TRADING"
+			if row.QueueKind == "RESEARCH" {
+				kind = "RESEARCH"
+			}
+			if recordErr := operations.RecordFact(ctx, w.Operations, row.Binding, kind, "SUBMISSION", nil, &row.JobID, w.Clock.Now(), e); recordErr != nil {
+				return recordErr
+			}
+		}
 		if e != nil {
 			state := "DELIVERY_UNKNOWN"
 			var known *d.Error
