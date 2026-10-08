@@ -49,6 +49,20 @@
         "03_SOXLUSDT_JEV应用实例",
         "04_Web管理台"
       ]
+    },
+    {
+      "version": "2.1.3",
+      "directory": "doc/v2.1.3",
+      "change_kind": "design",
+      "date": "2026-10-08",
+      "reason": "先完成 JEV 实际认证、固定模型与目标事实绑定对照试验，再设计逐事实问题绑定；业务式样保持，抽取选型和生产标定仍需独立验证。",
+      "format": "html",
+      "document_pairs": [
+        "01_交易系统层",
+        "02_策略化框架层",
+        "03_SOXLUSDT_JEV应用实例",
+        "04_Web管理台"
+      ]
     }
   ]
 }

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/domain"
+	dto "github.com/AceNanako0721/Factorforge/src/factorforge/strategy/api/dto"
 	dec "github.com/AceNanako0721/Factorforge/src/factorforge/trading/api/dto"
 	"io"
 	"net/http"
@@ -121,8 +122,20 @@ func (p *JevHTTP) Analyze(ctx context.Context, request d.AnalysisRequest) (d.Ana
 	if !ok || q.Type != "noul" {
 		return empty, d.Fail("JEV_QUESTION_SET_INCOMPLETE", 503)
 	}
+	if len(request.Evidence.Claims) == 0 {
+		return empty, d.Fail("JEV_CLAIM_BINDING_INVALID", 422)
+	}
+	seenClaims := map[string]bool{}
 	for _, claim := range request.Evidence.Claims {
-		questions["claim_supported:"+claim.ClaimID] = q
+		if seenClaims[claim.ClaimID] {
+			return empty, d.Fail("JEV_CLAIM_BINDING_INVALID", 422)
+		}
+		bound, err := bindClaimQuestion(q, claim)
+		if err != nil {
+			return empty, err
+		}
+		seenClaims[claim.ClaimID] = true
+		questions["claim_supported:"+claim.ClaimID] = bound
 	}
 	// Only verified, licensed claims and their hashes leave the worker. Original
 	// documents, private paths, credentials and account/position state do not.
@@ -234,6 +247,46 @@ func (p *JevHTTP) Analyze(ctx context.Context, request d.AnalysisRequest) (d.Ana
 	candidate.Vector.UnknownFields = []string{}
 	return candidate, nil
 }
+
+// The supplier does not send question IDs to the model. Each support question
+// therefore carries its own verified target; the private policy stays private
+// and keeps its JSON type. No source document or account data is added here.
+func bindClaimQuestion(template Question, claim dto.Claim) (Question, error) {
+	invalid := func() (Question, error) { return Question{}, d.Fail("JEV_CLAIM_BINDING_INVALID", 422) }
+	if !d.ValidID(claim.ClaimID) || strings.TrimSpace(claim.NormalizedFact) == "" {
+		return invalid()
+	}
+	var instruction any
+	if d.DecodePrivate(template.Instructions, &instruction) != nil {
+		return invalid()
+	}
+	switch value := instruction.(type) {
+	case string:
+		if strings.TrimSpace(value) == "" {
+			return invalid()
+		}
+	case map[string]any:
+		if len(value) == 0 {
+			return invalid()
+		}
+	case []any:
+		if len(value) == 0 {
+			return invalid()
+		}
+	default:
+		return invalid()
+	}
+	// Marshal a fresh value per claim, rather than editing shared prompt maps.
+	bound, err := json.Marshal(struct {
+		Question    json.RawMessage `json:"question"`
+		TargetClaim dto.Claim       `json:"target_claim"`
+	}{template.Instructions, claim})
+	if err != nil {
+		return invalid()
+	}
+	return Question{Type: template.Type, Instructions: bound, Criteria: template.Criteria}, nil
+}
+
 func validateAnswer(q Question, a jevAnswer) error {
 	one, _ := dec.ParseDecimal("1")
 	bounded := func(n *json.Number) bool {

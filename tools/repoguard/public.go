@@ -142,6 +142,12 @@ func TemplateIssue(name string, data []byte, historical bool) string {
 	if equalJSON(actual, expected) {
 		return ""
 	}
+	if historical {
+		var legacy map[string]any
+		if json.Unmarshal([]byte(historicalPrompts), &legacy) == nil && equalJSON(actual, legacy) {
+			return ""
+		}
+	}
 	return "real-prompt-in-template"
 }
 func ContentIssues(name string, data []byte, historical bool) []string {

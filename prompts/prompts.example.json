@@ -6,8 +6,12 @@
   "instructions": "",
   "state_template": "",
   "questions": [
-    {"id": "direction", "type": "Choice", "instructions": "", "criteria": [], "choices": ["NEGATIVE", "NEUTRAL", "POSITIVE"]},
+    {"id": "event_type", "type": "Choice", "instructions": "", "criteria": {}, "choices": []},
+    {"id": "direction", "type": "Choice", "instructions": "", "criteria": {}, "choices": ["NEGATIVE", "NEUTRAL", "POSITIVE", "UNKNOWN"]},
     {"id": "impact", "type": "Score", "instructions": "", "criteria": [], "scale_ref": ""},
-    {"id": "facts", "type": "Noul", "instructions": "", "criteria": []}
+    {"id": "relevance", "type": "Score", "instructions": "", "criteria": [], "scale_ref": ""},
+    {"id": "expectation", "type": "Score", "instructions": "", "criteria": [], "scale_ref": ""},
+    {"id": "half_life", "type": "Score", "instructions": "", "criteria": [], "scale_ref": ""},
+    {"id": "claim_supported", "type": "Noul", "instructions": "", "criteria": {}}
   ]
 }

@@ -149,6 +149,15 @@ func TestPublicGuardTemplateShapesAndDocumentContainers(t *testing.T) {
 	if guard.TemplateIssue("prompts/prompts.example.json", prompt, false) == "" {
 		t.Fatal("prompt instructions accepted")
 	}
+	// Frozen history contains this exact old empty shape, not seven questions.
+	legacyPrompt := []byte(`{"schema_version":1,"asset_kind":"EXAMPLE_OR_MOCK","production_ready":false,"prompt_version":"","instructions":"","state_template":"","questions":[{"id":"direction","type":"Choice","instructions":"","criteria":[],"choices":["NEGATIVE","NEUTRAL","POSITIVE"]},{"id":"impact","type":"Score","instructions":"","criteria":[],"scale_ref":""},{"id":"facts","type":"Noul","instructions":"","criteria":[]}]}`)
+	if guard.TemplateIssue("prompts/prompts.example.json", legacyPrompt, false) == "" || guard.TemplateIssue("prompts/prompts.example.json", legacyPrompt, true) != "" {
+		t.Fatal("legacy empty prompt must be accepted only in history")
+	}
+	changedLegacy := bytes.Replace(legacyPrompt, []byte(`"instructions":""`), []byte(`"instructions":"private"`), 1)
+	if guard.TemplateIssue("prompts/prompts.example.json", changedLegacy, true) == "" || guard.TemplateIssue("prompts/prompts.example.json", prompt, true) == "" {
+		t.Fatal("historical policy admitted a nonempty prompt")
+	}
 	var buffer bytes.Buffer
 	archive := zip.NewWriter(&buffer)
 	file, _ := archive.Create("docProps/custom.xml")
