@@ -15,8 +15,8 @@ import (
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/domain"
 )
 
-// This laboratory is never imported by a worker. It records at most three
-// public GET responses, with an honest project identity and no credentials.
+// This laboratory is never imported by a worker. It records a fixed planned
+// list of public GET responses, with an honest identity and no credentials.
 func TestIndependentReferenceCapture(t *testing.T) {
 	lab := os.Getenv("FACTORFORGE_REFERENCE_LAB")
 	if lab == "" {
@@ -32,6 +32,21 @@ func TestFedCorpusCapture(t *testing.T) {
 		t.Skip("opt-in official statement corpus")
 	}
 	captureReferences(t, lab, []string{"https://www.federalreserve.gov/monetarypolicy/openmarket.htm", "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm", "https://www.federalreserve.gov/newsevents/pressreleases/monetary20251210a.htm", "https://www.federalreserve.gov/newsevents/pressreleases/monetary20250319a.htm"}, []string{"rate-history.html", "statement-20260916.html", "statement-20251210.html", "statement-20250319.html"})
+}
+
+func TestFedUnscoredCandidateCapture(t *testing.T) {
+	lab := os.Getenv("FACTORFORGE_FED_UNSCORED_LAB")
+	if lab == "" {
+		t.Skip("opt-in unscored official source candidate pool")
+	}
+	// Dates selected from the official calendar before inspecting statement
+	// contents. No labels, extraction, questions or inference are prepared.
+	urls, names := []string{}, []string{}
+	for _, date := range []string{"20260128", "20260318", "20260429", "20260617"} {
+		urls = append(urls, "https://www.federalreserve.gov/newsevents/pressreleases/monetary"+date+"a.htm")
+		names = append(names, "statement-"+date+".html")
+	}
+	captureReferences(t, lab, urls, names)
 }
 
 func TestFederalRegisterSourceCapture(t *testing.T) {
