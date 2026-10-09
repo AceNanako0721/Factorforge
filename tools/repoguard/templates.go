@@ -48,6 +48,12 @@ query_max_original_bytes = 0
 query_cursor_age_seconds = 0
 query_cursor_key = ""
 
+[[application.pipeline.search_backends]]
+id = ""
+kind = ""
+endpoint = ""
+token = ""
+
 [application.pipeline.settings]
 environment = ""
 instance_id = ""
