@@ -1,0 +1,967 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="ff:version" content="2.1.8"><meta name="ff:kind" content="migration"><title>v1.1需求迁移与待决事项 · Factorforge v2.1.8</title><style>
+:root{--ink:#172d40;--muted:#587083;--accent:#006e82;--line:#cfdee5;--paper:#fff;--bg:#edf3f6}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.8 system-ui,'Microsoft YaHei',sans-serif}
+a{color:var(--accent);text-underline-offset:3px;overflow-wrap:anywhere}header{background:#15384a;color:white;padding:28px max(24px,calc((100vw - 1320px)/2));border-bottom:5px solid #2eb6ad}
+header p{margin:0}header strong{font-size:23px}header a{color:#a9eee9}.shell{display:grid;grid-template-columns:245px minmax(0,1fr);gap:26px;max-width:1320px;margin:28px auto;padding:0 24px}
+nav{position:sticky;top:16px;align-self:start;max-height:calc(100vh - 32px);overflow:auto;padding:18px;background:var(--paper);border:1px solid var(--line);border-radius:12px;font-size:14px}
+nav a{display:block;padding:6px 0;text-decoration:none}main{overflow-wrap:anywhere;min-width:0;background:var(--paper);padding:30px 38px;border:1px solid var(--line);border-radius:12px}
+h1{font-size:30px;line-height:1.35;margin:0 0 18px}h2{font-size:23px;border-bottom:2px solid var(--line);padding:10px 0;margin:34px 0 18px;scroll-margin-top:20px}h3{font-size:18px;margin:25px 0 10px;scroll-margin-top:20px}p{margin:12px 0}
+.meta,.note{background:#eef7f8;border-left:4px solid var(--accent);padding:12px 16px;margin:18px 0;color:#294c60}.warning{background:#fff7e9;border-color:#d09b39}.table-wrap{overflow:auto;margin:18px 0}
+table{width:100%;border-collapse:collapse;font-size:14px}th{background:#e8f1f4;text-align:left}th,td{padding:11px 13px;border:1px solid var(--line);vertical-align:top;overflow-wrap:anywhere}td code{white-space:normal;overflow-wrap:anywhere}
+pre{padding:16px;background:#102d3d;color:#d8f2ed;border-radius:8px;overflow:auto;font:13px/1.7 Consolas,monospace}code{overflow-wrap:anywhere;font-family:Consolas,monospace;font-size:.9em;background:#edf3f6;padding:1px 4px;border-radius:3px}pre code{background:none;color:inherit;padding:0}
+figure{margin:24px 0;border:1px solid var(--line);border-radius:10px;padding:16px;background:#f8fbfc;overflow:auto}figure svg{display:block;width:100%;height:auto;min-width:520px}figcaption{font-size:14px;color:var(--muted);margin-top:12px}details{margin:12px 0}footer{color:var(--muted);font-size:13px;margin-top:28px;border-top:1px solid var(--line);padding-top:15px}li{margin:5px 0}.badge{display:inline-block;background:#d6eee8;color:#15564b;border-radius:5px;padding:0 7px;font-size:13px}
+@media(max-width:900px){.shell{display:block;padding:0 12px;margin:16px auto}nav{position:static;max-height:220px;margin-bottom:16px}main{padding:22px 18px}h1{font-size:25px}}
+@media print{body{background:white;font-size:11pt}.shell{display:block;margin:0;padding:0;max-width:none}nav,header{display:none}main{padding:0;border:0}h2,h3{break-after:avoid}figure,tr{break-inside:avoid}figure svg{min-width:0}pre{white-space:pre-wrap;overflow-wrap:anywhere}a{color:inherit}table{font-size:9pt}}
+</style></head><body><header><strong>Factorforge / 文档基线</strong><p>v2.1.8 · 2026-10-09 · 三层架构 · HTML 正文</p></header><div class="shell"><nav aria-label="文档目录"><a href="index.html">版本索引</a><a href="#section-1">1 保留及结构变更</a><a href="#section-2">2 继承的决策及未决状态</a><a href="#section-3">3 逐项迁移矩阵</a><a href="#section-4">需求及质量</a><a href="#section-5">合约专项</a><a href="#section-6">待决事项</a><a href="#section-7">历史工作包</a><a href="#section-8">历史功能验收</a><a href="#section-9">历史专项测试</a></nav><main><div class="meta">v1.1需求迁移与待决事项</div><article id="document-body"><div class="note">本版采用 Go 后端与浏览器 JavaScript（React/TypeScript 编译），三层职责和全部业务式样不变。G0～G3 的迁移及 GitHub 收尾已完成；G4 实例/管理台、日历与报告已完成本地集成。原 Python 仅保留历史对照；来源许可、供应商评测、生产标定和 LIVE 准入继续单独验证，不能由代码或 CI 代替。</div><div data-source-sha256="4fb71caaf74ffba4c330d3a2dd156698cb204cb9f11fa2bc097b054a5cf1d51c" data-source-document="v1.1需求迁移与待决事项.md"><h1>v1.1 需求迁移与待决事项</h1>
+<p>版本：2.1.4；日期：2026年10月8日。本表追踪历史规则的归属，不向开发规划复制详细工作包。新版式样编号S1/S2/S3及验收编号T1/T2/T3是当前真源，旧编号只用于迁移。</p>
+<h2 id="section-1">1 保留及结构变更</h2>
+<p>v1.1 的需求和质量要求全部有新版落点。数学、事件修订、守恒、风险优先、固定步长门控与自动生效保留；目标/模型/搜索属于应用，确定性量化属于框架，执行/最终账户风控属于交易。旧规划的估算人日和大量工作包不作为新版工程顺序，改以P1～P5管理，历史任务去向列在下表。</p>
+<p>原两层Core/Upper以及“JEV在Core内部”的结构被本次三层要求取代。交易信号资格仍由框架服务独立核验，但评分worker和Provider运行在应用层。允许从已有事件提交评分或修订；事件创建不自动注入。该结构变更是本次用户要求，不能据旧结构阻止应用提交评分。</p>
+<h2 id="section-2">2 继承的决策及未决状态</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>编号</th>
+<th>当前状态与需完成的工作</th>
+<th>所属层/最迟时点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DEC-01</td>
+<td>SOXLUSDT、双向、全天和本版JEV主要判断已明确；实际账户产品/API能力未知</td>
+<td>应用绑定、交易探针；使用相应真实能力前</td>
+</tr>
+<tr>
+<td>DEC-02</td>
+<td>时基明确；周期、漏周期恢复策略细节及观察窗待标定</td>
+<td>框架；数据/模拟方案冻结前</td>
+</tr>
+<tr>
+<td>DEC-03</td>
+<td>非实盘4000、实盘测试400名义上限明确；本金及风险日未确认</td>
+<td>应用配置/交易账务；资金仿真及R3前</td>
+</tr>
+<tr>
+<td>DEC-04</td>
+<td>数据源许可、价格/成交代理、执行能力及成本未完全确认</td>
+<td>应用/交易；可信研究及对应执行前</td>
+</tr>
+<tr>
+<td>DEC-05</td>
+<td>启用事件类型、最少因子/参数及量表待标定</td>
+<td>框架/应用；首次标定前</td>
+</tr>
+<tr>
+<td>DEC-06</td>
+<td>实盘ENFORCE明确；触限后存量保留/减仓/退出及恢复仍未定</td>
+<td>交易政策/应用；R3前</td>
+</tr>
+<tr>
+<td>DEC-07</td>
+<td>非实盘账户亏损只观察；日亏损默认值、非传统双次数与冷却待验证</td>
+<td>应用研究/通用框架；R3前</td>
+</tr>
+<tr>
+<td>DEC-08</td>
+<td>主指标、功效、样本量、最小效应及验证门槛待登记</td>
+<td>框架研究/应用评测；独立验证前</td>
+</tr>
+<tr>
+<td>DEC-09</td>
+<td>白名单门控后自动生效已明确；周期检查、漂移及回滚阈值待标定</td>
+<td>框架；参数试用前</td>
+</tr>
+<tr>
+<td>DEC-10</td>
+<td>本地局域网全天运行明确；资源、断网断电、告警和保留待验证</td>
+<td>各层设施/应用运维；R1验收前</td>
+</tr>
+<tr>
+<td>OD-01</td>
+<td>生产事实抽取器、完整性/漏抽量表、成本许可及复核方式未定</td>
+<td>应用；真实可交易评分前</td>
+</tr>
+<tr>
+<td>OD-02</td>
+<td>LIVE来源白名单、映射/新鲜度政策及共享JEV配额隔离尚需验证</td>
+<td>应用路由/框架准入；R3前</td>
+</tr>
+<tr>
+<td>OD-03</td>
+<td>目标账户官方操作、备用访问、存量政策及独立复核安排未验证</td>
+<td>交易人工预案/应用运维；R3前</td>
+</tr>
+</tbody>
+</table></div>
+<p>JEV产品身份沿用历史TypeSafe AI Jev；本次明确其归应用。生产协议、版本、费用/隐私/保留和许可仍需目标环境探针，不因指定主要模型而自动关闭这些条件。用户与AI没有新增成员，独立复核职责不能描述成已有第二人。以上未决项不妨碍使用Mock完成分层骨架。</p>
+<h2 id="section-3">3 逐项迁移矩阵</h2>
+<h3 id="section-4">需求及质量</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>v1.1编号</th>
+<th>v2.0要求/验收/阶段</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NFR-001</td>
+<td>S1-015 S3-008</td>
+</tr>
+<tr>
+<td>NFR-002</td>
+<td>S1-014 S2-023</td>
+</tr>
+<tr>
+<td>NFR-003</td>
+<td>S1-015 S2-023</td>
+</tr>
+<tr>
+<td>NFR-004</td>
+<td>S1-015 S2-023 S3-006</td>
+</tr>
+<tr>
+<td>NFR-005</td>
+<td>S1-012 S2-023</td>
+</tr>
+<tr>
+<td>REQ-ATR-001</td>
+<td>S2-017</td>
+</tr>
+<tr>
+<td>REQ-ATR-002</td>
+<td>S2-017</td>
+</tr>
+<tr>
+<td>REQ-ATR-003</td>
+<td>S2-017</td>
+</tr>
+<tr>
+<td>REQ-ATR-004</td>
+<td>S2-017</td>
+</tr>
+<tr>
+<td>REQ-ATR-005</td>
+<td>S2-018</td>
+</tr>
+<tr>
+<td>REQ-AUT-001</td>
+<td>S2-021 S3-014</td>
+</tr>
+<tr>
+<td>REQ-CAP-001</td>
+<td>S1-008 S3-012</td>
+</tr>
+<tr>
+<td>REQ-CAP-002</td>
+<td>S1-009 S3-012</td>
+</tr>
+<tr>
+<td>REQ-CAP-003</td>
+<td>S3-013</td>
+</tr>
+<tr>
+<td>REQ-CAS-001</td>
+<td>S2-016</td>
+</tr>
+<tr>
+<td>REQ-CAS-002</td>
+<td>S2-016</td>
+</tr>
+<tr>
+<td>REQ-CFT-001</td>
+<td>S2-018</td>
+</tr>
+<tr>
+<td>REQ-CFT-002</td>
+<td>S2-018</td>
+</tr>
+<tr>
+<td>REQ-CFT-003</td>
+<td>S2-018</td>
+</tr>
+<tr>
+<td>REQ-DAT-001</td>
+<td>S1-003 S2-010 S3-003</td>
+</tr>
+<tr>
+<td>REQ-DAT-002</td>
+<td>S1-004 S2-012 S3-010</td>
+</tr>
+<tr>
+<td>REQ-EVT-001</td>
+<td>S2-002</td>
+</tr>
+<tr>
+<td>REQ-EVT-002</td>
+<td>S2-003 S3-003 S3-005</td>
+</tr>
+<tr>
+<td>REQ-EVT-003</td>
+<td>S2-004</td>
+</tr>
+<tr>
+<td>REQ-EVT-004</td>
+<td>S2-004</td>
+</tr>
+<tr>
+<td>REQ-EVT-005</td>
+<td>S2-005</td>
+</tr>
+<tr>
+<td>REQ-EVT-006</td>
+<td>S2-006</td>
+</tr>
+<tr>
+<td>REQ-EVT-007</td>
+<td>S2-006 S2-023</td>
+</tr>
+<tr>
+<td>REQ-EXE-001</td>
+<td>S1-005 S1-011</td>
+</tr>
+<tr>
+<td>REQ-EXE-002</td>
+<td>S1-005 S2-013</td>
+</tr>
+<tr>
+<td>REQ-FAC-001</td>
+<td>S2-011</td>
+</tr>
+<tr>
+<td>REQ-FAC-002</td>
+<td>S2-011 S2-022</td>
+</tr>
+<tr>
+<td>REQ-GOV-001</td>
+<td>S1-015 S3-017</td>
+</tr>
+<tr>
+<td>REQ-GOV-002</td>
+<td>S2-019 S3-015</td>
+</tr>
+<tr>
+<td>REQ-LRN-001</td>
+<td>S2-019</td>
+</tr>
+<tr>
+<td>REQ-LRN-002</td>
+<td>S2-019</td>
+</tr>
+<tr>
+<td>REQ-LRN-003</td>
+<td>S2-019</td>
+</tr>
+<tr>
+<td>REQ-LRN-004</td>
+<td>S2-019</td>
+</tr>
+<tr>
+<td>REQ-LRN-005</td>
+<td>S2-020</td>
+</tr>
+<tr>
+<td>REQ-LRN-006</td>
+<td>S2-020</td>
+</tr>
+<tr>
+<td>REQ-LRN-007</td>
+<td>S2-020</td>
+</tr>
+<tr>
+<td>REQ-LRN-008</td>
+<td>S2-021</td>
+</tr>
+<tr>
+<td>REQ-LRN-009</td>
+<td>S2-021</td>
+</tr>
+<tr>
+<td>REQ-LRN-010</td>
+<td>S2-021 S3-014</td>
+</tr>
+<tr>
+<td>REQ-MET-001</td>
+<td>S2-022</td>
+</tr>
+<tr>
+<td>REQ-MET-002</td>
+<td>S1-010 S2-022</td>
+</tr>
+<tr>
+<td>REQ-MET-003</td>
+<td>S2-022</td>
+</tr>
+<tr>
+<td>REQ-OBJ-001</td>
+<td>S2-022</td>
+</tr>
+<tr>
+<td>REQ-OBJ-002</td>
+<td>S2-023 S3-014</td>
+</tr>
+<tr>
+<td>REQ-OBS-001</td>
+<td>S2-016</td>
+</tr>
+<tr>
+<td>REQ-OBS-002</td>
+<td>S2-017</td>
+</tr>
+<tr>
+<td>REQ-OPS-001</td>
+<td>S1-013 S3-016 S3-017</td>
+</tr>
+<tr>
+<td>REQ-PAR-001</td>
+<td>S2-019 S2-023</td>
+</tr>
+<tr>
+<td>REQ-POS-001</td>
+<td>S2-012</td>
+</tr>
+<tr>
+<td>REQ-POS-002</td>
+<td>S2-012</td>
+</tr>
+<tr>
+<td>REQ-POS-003</td>
+<td>S1-006 S1-008 S2-013</td>
+</tr>
+<tr>
+<td>REQ-POS-004</td>
+<td>S2-013</td>
+</tr>
+<tr>
+<td>REQ-POS-005</td>
+<td>S2-023</td>
+</tr>
+<tr>
+<td>REQ-REG-001</td>
+<td>S2-011</td>
+</tr>
+<tr>
+<td>REQ-REG-002</td>
+<td>S2-011 S2-020</td>
+</tr>
+<tr>
+<td>REQ-REL-001</td>
+<td>S3-015</td>
+</tr>
+<tr>
+<td>REQ-RSK-001</td>
+<td>S1-008 S1-009 S3-012</td>
+</tr>
+<tr>
+<td>REQ-RSK-002</td>
+<td>S1-008 S2-013</td>
+</tr>
+<tr>
+<td>REQ-RSK-003</td>
+<td>S1-009 S1-010</td>
+</tr>
+<tr>
+<td>REQ-RSK-004</td>
+<td>S1-009 S3-013</td>
+</tr>
+<tr>
+<td>REQ-RSK-005</td>
+<td>S1-009 S2-015 S3-011</td>
+</tr>
+<tr>
+<td>REQ-RSK-006</td>
+<td>S1-012 S1-013 S2-023</td>
+</tr>
+<tr>
+<td>REQ-SEC-001</td>
+<td>S3-016</td>
+</tr>
+<tr>
+<td>REQ-SEC-002</td>
+<td>S3-017</td>
+</tr>
+<tr>
+<td>REQ-SEC-003</td>
+<td>S3-017</td>
+</tr>
+<tr>
+<td>REQ-SEN-001</td>
+<td>S2-006 S2-007</td>
+</tr>
+<tr>
+<td>REQ-SEN-002</td>
+<td>S2-006</td>
+</tr>
+<tr>
+<td>REQ-SEN-003</td>
+<td>S2-008</td>
+</tr>
+<tr>
+<td>REQ-SEN-004</td>
+<td>S2-008 S2-009</td>
+</tr>
+<tr>
+<td>REQ-SEN-005</td>
+<td>S2-009</td>
+</tr>
+<tr>
+<td>REQ-STA-001</td>
+<td>S1-012 S1-013 S2-023</td>
+</tr>
+<tr>
+<td>REQ-STA-002</td>
+<td>S1-006 S2-006 S2-016</td>
+</tr>
+<tr>
+<td>REQ-STA-003</td>
+<td>S2-010 S3-011</td>
+</tr>
+<tr>
+<td>REQ-STA-004</td>
+<td>S2-013 S2-014</td>
+</tr>
+<tr>
+<td>REQ-STP-001</td>
+<td>S2-014</td>
+</tr>
+<tr>
+<td>REQ-STP-002</td>
+<td>S1-007 S1-008 S2-014</td>
+</tr>
+<tr>
+<td>REQ-STP-003</td>
+<td>S1-007 S2-014</td>
+</tr>
+<tr>
+<td>REQ-STP-004</td>
+<td>S2-014 S2-016</td>
+</tr>
+<tr>
+<td>REQ-TIM-001</td>
+<td>S2-010 S3-011</td>
+</tr>
+<tr>
+<td>REQ-TIM-002</td>
+<td>S2-015 S3-011</td>
+</tr>
+<tr>
+<td>REQ-TIM-003</td>
+<td>S2-015 S3-011</td>
+</tr>
+<tr>
+<td>REQ-TRD-001</td>
+<td>S1-004 S3-001 S3-010</td>
+</tr>
+<tr>
+<td>REQ-TRD-002</td>
+<td>S1-003 S3-010</td>
+</tr>
+<tr>
+<td>REQ-TRD-003</td>
+<td>S1-004 S1-010 S3-010</td>
+</tr>
+<tr>
+<td>REQ-TRD-004</td>
+<td>S1-007 S1-011 S1-012</td>
+</tr>
+<tr>
+<td>REQ-TST-001</td>
+<td>S1-015 S2-022 S3-015</td>
+</tr>
+<tr>
+<td>REQ-VAL-001</td>
+<td>S1-014 S2-022</td>
+</tr>
+<tr>
+<td>REQ-VAL-002</td>
+<td>S1-014 S2-022</td>
+</tr>
+<tr>
+<td>REQ-VAL-003</td>
+<td>S3-015</td>
+</tr>
+<tr>
+<td>REQ-VAL-004</td>
+<td>S2-022</td>
+</tr>
+<tr>
+<td>REQ-VAL-005</td>
+<td>S2-022</td>
+</tr>
+<tr>
+<td>REQ-VAL-006</td>
+<td>S2-022</td>
+</tr>
+<tr>
+<td>REQ-VAL-007</td>
+<td>S2-022</td>
+</tr>
+<tr>
+<td>REQ-VAL-008</td>
+<td>S2-022</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="section-5">合约专项</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>v1.1编号</th>
+<th>v2.0要求/验收/阶段</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CR-01</td>
+<td>S1-004 S3-001</td>
+</tr>
+<tr>
+<td>CR-02</td>
+<td>S1-003 S3-010</td>
+</tr>
+<tr>
+<td>CR-03</td>
+<td>S1-008 S1-010</td>
+</tr>
+<tr>
+<td>CR-04</td>
+<td>S1-005 S1-007 S1-011</td>
+</tr>
+<tr>
+<td>CR-05</td>
+<td>S1-004 S3-010</td>
+</tr>
+<tr>
+<td>CR-06</td>
+<td>S2-022 S3-015</td>
+</tr>
+<tr>
+<td>CR-07</td>
+<td>S3-012 S3-013 S3-017</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="section-6">待决事项</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>v1.1编号</th>
+<th>v2.0要求/验收/阶段</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DEC-01</td>
+<td>S3-001</td>
+</tr>
+<tr>
+<td>DEC-02</td>
+<td>S2-010 S2-016</td>
+</tr>
+<tr>
+<td>DEC-03</td>
+<td>S3-012 S1-010</td>
+</tr>
+<tr>
+<td>DEC-04</td>
+<td>S1-004 S3-003 S3-010</td>
+</tr>
+<tr>
+<td>DEC-05</td>
+<td>S2-002 S2-011 S2-019</td>
+</tr>
+<tr>
+<td>DEC-06</td>
+<td>S1-009 S3-013</td>
+</tr>
+<tr>
+<td>DEC-07</td>
+<td>S3-011 S3-013</td>
+</tr>
+<tr>
+<td>DEC-08</td>
+<td>S2-022 S3-015</td>
+</tr>
+<tr>
+<td>DEC-09</td>
+<td>S2-021 S3-014</td>
+</tr>
+<tr>
+<td>DEC-10</td>
+<td>S1-015 S3-016 S3-017</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="section-7">历史工作包</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>v1.1编号</th>
+<th>v2.0要求/验收/阶段</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>WP-01</td>
+<td>P1</td>
+</tr>
+<tr>
+<td>WP-02</td>
+<td>P1 P3</td>
+</tr>
+<tr>
+<td>WP-03</td>
+<td>P1</td>
+</tr>
+<tr>
+<td>WP-04</td>
+<td>P4</td>
+</tr>
+<tr>
+<td>WP-05</td>
+<td>P1 P3</td>
+</tr>
+<tr>
+<td>WP-06</td>
+<td>P2 P3</td>
+</tr>
+<tr>
+<td>WP-07</td>
+<td>P2</td>
+</tr>
+<tr>
+<td>WP-08</td>
+<td>P4</td>
+</tr>
+<tr>
+<td>WP-09</td>
+<td>P1</td>
+</tr>
+<tr>
+<td>WP-10</td>
+<td>P1</td>
+</tr>
+<tr>
+<td>WP-11</td>
+<td>P2</td>
+</tr>
+<tr>
+<td>WP-12</td>
+<td>P3 P5</td>
+</tr>
+<tr>
+<td>WP-13</td>
+<td>P1 P2 P3 P4</td>
+</tr>
+<tr>
+<td>WP-14</td>
+<td>P4</td>
+</tr>
+<tr>
+<td>WP-15</td>
+<td>P5</td>
+</tr>
+<tr>
+<td>WP-16</td>
+<td>P4 P5</td>
+</tr>
+<tr>
+<td>WP-17</td>
+<td>P1 P2 P3 P4 P5</td>
+</tr>
+<tr>
+<td>WP-18</td>
+<td>P5</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="section-8">历史功能验收</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>v1.1编号</th>
+<th>v2.0要求/验收/阶段</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>AC-01</td>
+<td>S1-015</td>
+</tr>
+<tr>
+<td>AC-02</td>
+<td>S3-015</td>
+</tr>
+<tr>
+<td>AC-03</td>
+<td>T1-09 T2-06</td>
+</tr>
+<tr>
+<td>AC-04</td>
+<td>T2-02 T3-04</td>
+</tr>
+<tr>
+<td>AC-05</td>
+<td>T2-03</td>
+</tr>
+<tr>
+<td>AC-06</td>
+<td>T2-04</td>
+</tr>
+<tr>
+<td>AC-07</td>
+<td>T2-02 T2-05</td>
+</tr>
+<tr>
+<td>AC-08</td>
+<td>T2-05</td>
+</tr>
+<tr>
+<td>AC-09</td>
+<td>T2-05</td>
+</tr>
+<tr>
+<td>AC-10</td>
+<td>T2-05</td>
+</tr>
+<tr>
+<td>AC-11</td>
+<td>T2-07 T2-14</td>
+</tr>
+<tr>
+<td>AC-12</td>
+<td>T2-07</td>
+</tr>
+<tr>
+<td>AC-13</td>
+<td>T1-06 T2-07</td>
+</tr>
+<tr>
+<td>AC-14</td>
+<td>T1-04</td>
+</tr>
+<tr>
+<td>AC-15</td>
+<td>T2-08</td>
+</tr>
+<tr>
+<td>AC-16</td>
+<td>T2-08</td>
+</tr>
+<tr>
+<td>AC-17</td>
+<td>T1-06</td>
+</tr>
+<tr>
+<td>AC-18</td>
+<td>T1-07 T1-08</td>
+</tr>
+<tr>
+<td>AC-19</td>
+<td>T1-09 T2-06</td>
+</tr>
+<tr>
+<td>AC-20</td>
+<td>T2-10</td>
+</tr>
+<tr>
+<td>AC-21</td>
+<td>T2-10</td>
+</tr>
+<tr>
+<td>AC-22</td>
+<td>T2-11</td>
+</tr>
+<tr>
+<td>AC-23</td>
+<td>T2-12</td>
+</tr>
+<tr>
+<td>AC-24</td>
+<td>T2-12</td>
+</tr>
+<tr>
+<td>AC-25</td>
+<td>T2-12</td>
+</tr>
+<tr>
+<td>AC-26</td>
+<td>T2-13</td>
+</tr>
+<tr>
+<td>AC-27</td>
+<td>T1-12 T2-15 T3-13</td>
+</tr>
+<tr>
+<td>AC-28</td>
+<td>T2-14</td>
+</tr>
+<tr>
+<td>AC-29</td>
+<td>T1-11 T3-12</td>
+</tr>
+<tr>
+<td>AC-30</td>
+<td>T2-14</td>
+</tr>
+<tr>
+<td>AC-31</td>
+<td>T2-14</td>
+</tr>
+<tr>
+<td>AC-32</td>
+<td>T3-10 T3-12</td>
+</tr>
+<tr>
+<td>AC-33</td>
+<td>T1-08 T3-07</td>
+</tr>
+<tr>
+<td>AC-34</td>
+<td>T1-04 T1-05</td>
+</tr>
+<tr>
+<td>AC-35</td>
+<td>T2-06 T3-08</td>
+</tr>
+<tr>
+<td>AC-36</td>
+<td>T2-09 T3-08</td>
+</tr>
+<tr>
+<td>AC-37</td>
+<td>T1-06 T3-09</td>
+</tr>
+<tr>
+<td>AC-38</td>
+<td>T1-07 T3-09</td>
+</tr>
+<tr>
+<td>AC-39</td>
+<td>T3-10</td>
+</tr>
+<tr>
+<td>AC-40</td>
+<td>T2-13 T3-11</td>
+</tr>
+<tr>
+<td>AC-41</td>
+<td>T1-09 T3-14</td>
+</tr>
+<tr>
+<td>AC-42</td>
+<td>T3-13</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="section-9">历史专项测试</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>v1.1编号</th>
+<th>v2.0要求/验收/阶段</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>TC-01</td>
+<td>T1-03 T3-01</td>
+</tr>
+<tr>
+<td>TC-02</td>
+<td>T1-03 T1-06</td>
+</tr>
+<tr>
+<td>TC-03</td>
+<td>T1-08 T3-07</td>
+</tr>
+<tr>
+<td>TC-04</td>
+<td>T3-07 T3-08</td>
+</tr>
+<tr>
+<td>TC-05</td>
+<td>T1-03 T3-07</td>
+</tr>
+<tr>
+<td>TC-06</td>
+<td>T1-08 T3-07</td>
+</tr>
+<tr>
+<td>TC-07</td>
+<td>T1-10 T3-07</td>
+</tr>
+<tr>
+<td>TC-08</td>
+<td>T1-04</td>
+</tr>
+<tr>
+<td>TC-09</td>
+<td>T1-05</td>
+</tr>
+<tr>
+<td>TC-10</td>
+<td>T1-05</td>
+</tr>
+<tr>
+<td>TC-11</td>
+<td>T1-05 T3-07</td>
+</tr>
+<tr>
+<td>TC-12</td>
+<td>T1-06 T1-10</td>
+</tr>
+<tr>
+<td>TC-13</td>
+<td>T1-05 T1-09</td>
+</tr>
+<tr>
+<td>TC-14</td>
+<td>T1-09 T1-10</td>
+</tr>
+<tr>
+<td>TC-15</td>
+<td>T1-08 T1-10</td>
+</tr>
+<tr>
+<td>TC-16</td>
+<td>T3-01 T3-10</td>
+</tr>
+<tr>
+<td>TC-17</td>
+<td>T2-15 T3-04 T3-06</td>
+</tr>
+<tr>
+<td>TC-18</td>
+<td>T1-12 T3-14</td>
+</tr>
+<tr>
+<td>TC-19</td>
+<td>T2-06 T3-08</td>
+</tr>
+<tr>
+<td>TC-20</td>
+<td>T2-09 T3-08</td>
+</tr>
+<tr>
+<td>TC-21</td>
+<td>T1-07 T3-09 T3-10</td>
+</tr>
+<tr>
+<td>TC-22</td>
+<td>T2-13 T3-11</td>
+</tr>
+<tr>
+<td>TC-23</td>
+<td>T1-09 T3-14</td>
+</tr>
+<tr>
+<td>TC-24</td>
+<td>T3-13</td>
+</tr>
+</tbody>
+</table></div>
+<p>本矩阵的覆盖只是文档追踪，未执行的T验收与P阶段仍为未完成；不能将迁移条目存在写成运行验收通过。</p>
+</div><p>v2.1.6 实际认证/固定版本和目标绑定试验完成，详见 <a href="03_SOXLUSDT_JEV应用实例设计书.html#jev-probe-evidence">P3 证据</a>；OD-01 完整性、OD-02 共享配额及生产标定仍未关闭。</p><p>v2.1.6 细化辅助候选准备，参见 <a href="03_SOXLUSDT_JEV应用实例设计书.html#proposal-experiment">离线试验与设计</a>；不解除 OD-01 语义完整性与独立盲标、自动事件关系及 OD-02。</p></article><footer>HTML 是本版唯一发布正文。图表为内嵌 SVG，无需联网或运行脚本。文档通过不代表程序实现、交易运行或实盘准入通过。</footer></main></div></body></html>
