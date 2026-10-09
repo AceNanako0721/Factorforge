@@ -25,3 +25,13 @@ EventExists仅证明已登记的绑定和版本，不代表完整输入摘要相
 复用并增强 `TestNativeInstanceWorkerProfilesAndProcessWithoutPythonNode`：INGEST/分析使用不同Framework Token和WorkloadID、不同PostgreSQL登录角色；实际P2 HTTP及临时原生PG、原生INGEST/分析二进制在PATH=/nonexistent下执行。重复启动分析进程后Provider仅调用一次、回执持久ACK；来源隔离、Brave429/Exa缓存、审阅原文、周期报告和缺共享供应商授权仍阻断真实模式的回归通过。测试预置任务先用INGEST身份登记事件，使夹具符合真实交接前提。
 
 相关定向测试通过；全库/竞态/工程检查及GitHub交付另行核对。无外部供应商调用、生产配置变更或交易。
+
+## 相邻问题：拒绝的事实版本仍被入队
+
+身份修复提交5375283后，用 `event_conflict_lab_test.go` 的独立显式试验复现另一问题：两篇合成原文分别为收入12USD/13USD，有不同原文哈希、证据/Claim/跨度ID，但被计划错误分配同一EventID/FactVersion=1。两个不同证据槽用内存夹具，P2授权/CAS/事实版本/幂等均经实际HTTP；没有数据库或外部模型。第一项登记/入队成功，P2明确拒绝第二项；当前IngestWorker却将EventExists=true当成登记成功，返回nil并把第二项入队一次。
+
+报告 `runtime/event-conflict-lab-20261009/report.json`，SHA-256 `f9f4df77d59b6474c5ec806692ee57b7dfa2479ba8986f23d128af1eb2181151`，0700/0600。这是明确的接受结果错误，不是来源语义标定：即使原文和跨度有效，也不能越过下层事实版本拒绝。原报告保持不可覆盖。
+
+按既有框架冲突不改版本、已接受事件才进入分析的设计修复：RegisterEvent错误继续返回错误，不再因只读存在检查进入Enqueue。原文/路由记录可保留，但交易候选路由不等于下层登记/队列成功。相同身份的完全相同payload/幂等键在实际P2已证明可重做成功，聚合版本变化不改变这一点；因此响应丢失后的后续正常摄入仍可凭原幂等结果继续，不需要用弱存在检查把冲突当成功，也不新增自动恢复操作。
+
+实现后须验证实际HTTP内容冲突不入队、已登记但响应丢失时第一次不入队且后续相同命令只入队一次，以及数据库重启/双事件与身份交接回归。完整输入的异步读取核验仍不是EventExists的能力；本修复通过保证INGEST未接受的输入不产生新任务来处理本次错误。
