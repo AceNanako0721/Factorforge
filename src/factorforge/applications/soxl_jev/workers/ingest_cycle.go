@@ -2,10 +2,12 @@ package workers
 
 import (
 	"context"
+	"errors"
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/domain"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/operations"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/ports"
 	"sort"
+	"strings"
 )
 
 type IngestCycle struct {
@@ -64,6 +66,18 @@ func (c IngestCycle) Run(ctx context.Context, inputs []d.RawEvidence) error {
 		}
 		return err, false
 	}
+	// Persist every independently acquired original before spending this cycle's
+	// remaining time on supplementary search or backend failover.
+	for _, raw := range inputs {
+		if ctx.Err() != nil {
+			return d.Fail("INGEST_ITERATION_EXPIRED", 503)
+		}
+		if err, fatal := process(raw); fatal {
+			return err
+		} else if err != nil && first == nil {
+			first = err
+		}
+	}
 	for _, raw := range inputs {
 		if ctx.Err() != nil {
 			return d.Fail("INGEST_ITERATION_EXPIRED", 503)
@@ -74,6 +88,10 @@ func (c IngestCycle) Run(ctx context.Context, inputs []d.RawEvidence) error {
 				return e
 			}
 			if err != nil {
+				var failure *d.Error
+				if errors.As(err, &failure) && (strings.HasPrefix(failure.Code, "PIPELINE_") || d.Has([]string{"INSTANCE_STORE_UNAVAILABLE", "SEARCH_STATE_INVALID", "SEARCH_STATE_UNAVAILABLE", "SEARCH_STATE_FORBIDDEN"}, failure.Code)) {
+					return err
+				}
 				if first == nil {
 					first = err
 				}
@@ -86,11 +104,6 @@ func (c IngestCycle) Run(ctx context.Context, inputs []d.RawEvidence) error {
 					}
 				}
 			}
-		}
-		if err, fatal := process(raw); fatal {
-			return err
-		} else if err != nil && first == nil {
-			first = err
 		}
 	}
 	return first

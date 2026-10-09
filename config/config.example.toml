@@ -77,6 +77,12 @@ cursor_key = ""
 users = []
 bindings = []
 
+[[application.pipeline.search_backends]]
+id = ""
+kind = ""
+endpoint = ""
+token = ""
+
 [application.pipeline.settings]
 environment = ""
 instance_id = ""

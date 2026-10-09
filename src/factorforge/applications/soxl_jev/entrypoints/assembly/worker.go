@@ -125,7 +125,20 @@ func RunWorker(role string) error {
 			if err != nil {
 				return err
 			}
-			search, err = monitoring.NewBrave(monitoring.BraveOptions{Endpoint: p.SearchURL, Token: p.SearchToken, Client: &http.Client{Timeout: timeout}, Fetcher: fetcher, MaxBytes: p.Settings.MaxInputBytes, Plans: assets.SearchPlans, SourcesByHost: registry, Environment: p.Settings.Environment, FixtureOnly: p.Mode == "mock", Clock: clock{}.Now})
+			accesses, err := p.ResolveSearchAccess(*assets.SearchRouting)
+			if err != nil {
+				return err
+			}
+			backends := map[string]ports.SearchBackend{}
+			for _, policy := range assets.SearchRouting.Providers {
+				a := accesses[policy.ID]
+				backend, e := monitoring.NewSearchHTTP(monitoring.SearchHTTPOptions{Kind: a.Kind, Endpoint: a.Endpoint, Token: a.Token, Environment: p.Settings.Environment, FixtureOnly: p.Mode == "mock", Timeout: time.Duration(policy.TimeoutSeconds) * time.Second, MaxBytes: p.Settings.MaxInputBytes, Clock: clock{}.Now})
+				if e != nil {
+					return e
+				}
+				backends[policy.ID] = backend
+			}
+			search, err = monitoring.NewSearchRouter(monitoring.SearchRouterOptions{Binding: p.Binding(), Policy: *assets.SearchRouting, Store: store, Backends: backends, Fetcher: fetcher, Plans: assets.SearchPlans, SourcesByHost: registry, Clock: clock{}.Now})
 			if err != nil {
 				return err
 			}

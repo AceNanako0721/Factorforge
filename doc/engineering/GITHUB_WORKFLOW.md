@@ -48,3 +48,5 @@ G4 首批实例链路的 [PR #15](https://github.com/AceNanako0721/Factorforge/p
 [PR #17](https://github.com/AceNanako0721/Factorforge/pull/17) 以精确 head 59aa35938c3725496e3a7e50b42f64fa094afa56 的五项 CI 成功后 squash 合并；main 59721f1fbdb883058b7442b76c94c411bc3a25aa 的 [五项 CI](https://github.com/AceNanako0721/Factorforge/actions/runs/37772988086) 均成功。运行记录/周期报告和模型时钟一致性修复已交付；后续日历/报告投影设计发布独立修订版，旧 HTML 不覆盖。
 
 PR #18 的 [首轮 CI](https://github.com/AceNanako0721/Factorforge/actions/runs/37774156935) 中 contract-checks 拦截管理台契约未同步：实例新增 `report_details` 后，console 投影已生成，但 `contracts/v2/console/openapi.json` 仍是旧产物。该次其余四项成功，失败不是认证或 Actions 不可用。补齐 `tools/export-console-contract` 的生成结果，重新依序运行四类契约导出、投影输入校验与契约校验；提交实际生成文件后，等待新 head 的全部五项检查，再合并并确认 main。不得跳过生成文件差异检查。
+
+v2.1.5 PR #21 首轮 [CI 37882006107](https://github.com/AceNanako0721/Factorforge/actions/runs/37882006107) 的 repository-checks 拒绝 `PR change description and validation required`。正文有变更/验证内容，但未采用仓库模板规定的 `## 变更内容` 和 `## 验证` 固定标题；不是工作流权限、认证或源码检查故障。补齐固定标题，并以实际 PR_BODY 本地运行 check-repository 校验，再等待编辑/新提交触发的最新一轮全部五项 CI；不重试旧失败检查或放宽 ParseKind。PR 正文编辑会产生新的同 head CI，最终验收以最新轮次为准。
