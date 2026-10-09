@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
@@ -33,6 +34,40 @@ func TestFedCorpusCapture(t *testing.T) {
 	captureReferences(t, lab, []string{"https://www.federalreserve.gov/monetarypolicy/openmarket.htm", "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm", "https://www.federalreserve.gov/newsevents/pressreleases/monetary20251210a.htm", "https://www.federalreserve.gov/newsevents/pressreleases/monetary20250319a.htm"}, []string{"rate-history.html", "statement-20260916.html", "statement-20251210.html", "statement-20250319.html"})
 }
 
+func TestFederalRegisterSourceCapture(t *testing.T) {
+	lab := os.Getenv("FACTORFORGE_REGISTER_SOURCE_LAB")
+	if lab == "" {
+		t.Skip("opt-in first-party regulatory source metadata")
+	}
+	query := url.Values{"per_page": {"3"}, "order": {"newest"}, "conditions[term]": {"semiconductor"}, "conditions[publication_date][lte]": {"2026-10-09"}}.Encode()
+	captureReferences(t, lab, []string{"https://www.federalregister.gov/api/v1/documents.json?" + query, "https://www.federalregister.gov/api/v1/documents.rss?" + query}, []string{"documents.json", "documents.rss"})
+}
+
+func TestFederalRegisterDetailCapture(t *testing.T) {
+	lab := os.Getenv("FACTORFORGE_REGISTER_DETAIL_LAB")
+	if lab == "" {
+		t.Skip("opt-in regulatory notice detail")
+	}
+	captureReferences(t, lab, []string{"https://www.federalregister.gov/api/v1/documents/2026-20716.json"}, []string{"document.json"})
+}
+
+func TestFederalRegisterOriginalCapture(t *testing.T) {
+	lab := os.Getenv("FACTORFORGE_REGISTER_ORIGINAL_LAB")
+	if lab == "" {
+		t.Skip("opt-in original notice representations")
+	}
+	// Both URLs were returned by the separately archived detail response.
+	captureReferences(t, lab, []string{"https://www.federalregister.gov/documents/full_text/html/2026/10/09/2026-20716.html", "https://www.federalregister.gov/documents/full_text/xml/2026/10/09/2026-20716.xml"}, []string{"original.html", "original.xml"})
+}
+
+func TestFederalRegisterOfficialPDFCapture(t *testing.T) {
+	lab := os.Getenv("FACTORFORGE_REGISTER_PDF_LAB")
+	if lab == "" {
+		t.Skip("opt-in official edition cross-check")
+	}
+	captureReferences(t, lab, []string{"https://www.govinfo.gov/content/pkg/FR-2026-10-09/pdf/2026-20716.pdf"}, []string{"official.pdf"})
+}
+
 func captureReferences(t *testing.T, lab string, urls, names []string) {
 	t.Helper()
 	var plan struct {
@@ -43,6 +78,23 @@ func captureReferences(t *testing.T, lab string, urls, names []string) {
 	b, e := os.ReadFile(filepath.Join(lab, "plan.json"))
 	if !filepath.IsAbs(lab) || e != nil || d.DecodePrivate(b, &plan) != nil || plan.MaxBytes <= 0 || plan.TimeoutSeconds <= 0 || plan.TimeoutSeconds > 20 || plan.MaxRequests != len(urls) || len(urls) != len(names) {
 		t.Fatal("REFERENCE_PLAN_INVALID")
+	}
+	// Existing captures and uncertain interrupted requests must not be retried
+	// automatically. An operator must deliberately prepare a new laboratory.
+	for _, name := range append(append([]string{}, names...), "report.json") {
+		if _, e := os.Lstat(filepath.Join(lab, name)); !os.IsNotExist(e) {
+			t.Fatal("REFERENCE_CAPTURE_EXISTS_OR_UNAVAILABLE")
+		}
+	}
+	marker, e := os.OpenFile(filepath.Join(lab, "started.json"), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	if e != nil {
+		t.Fatal("REFERENCE_ALREADY_STARTED")
+	}
+	markerBody, _ := json.Marshal(map[string]any{"started_at": time.Now().UTC(), "max_requests": plan.MaxRequests, "retries": 0})
+	_, written := marker.Write(markerBody)
+	closed := marker.Close()
+	if written != nil || closed != nil {
+		t.Fatal("REFERENCE_START_MARKER_FAILED")
 	}
 	client := &http.Client{Timeout: time.Duration(plan.TimeoutSeconds) * time.Second, Transport: &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12}, DisableKeepAlives: true}, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	results := []map[string]any{}
@@ -86,6 +138,10 @@ func captureReferences(t *testing.T, lab string, urls, names []string) {
 		}
 		results = append(results, result)
 		t.Logf("request=%d; status=%d; bytes=%d; credentials=false; retries=0", i, response.StatusCode, len(raw))
+		// A format variant is not a reason to keep probing an access/rate denial.
+		if response.StatusCode == 403 || response.StatusCode == 429 {
+			break
+		}
 	}
 	b, _ = json.MarshalIndent(map[string]any{"requests": len(results), "results": results, "model_calls": 0, "downstream_writes": 0, "orders": 0}, "", "  ")
 	if os.WriteFile(filepath.Join(lab, "report.json"), b, 0600) != nil {
