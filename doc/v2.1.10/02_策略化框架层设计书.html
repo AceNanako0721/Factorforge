@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="ff:version" content="2.1.10"><meta name="ff:kind" content="design"><meta name="ff:pair" content="02_策略化框架层式样书.html"><title>02_策略化框架层设计书 · Factorforge v2.1.10</title><style>
+:root{--ink:#172d40;--muted:#587083;--accent:#006e82;--line:#cfdee5;--paper:#fff;--bg:#edf3f6}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.8 system-ui,'Microsoft YaHei',sans-serif}
+a{color:var(--accent);text-underline-offset:3px;overflow-wrap:anywhere}header{background:#15384a;color:white;padding:28px max(24px,calc((100vw - 1320px)/2));border-bottom:5px solid #2eb6ad}
+header p{margin:0}header strong{font-size:23px}header a{color:#a9eee9}.shell{display:grid;grid-template-columns:245px minmax(0,1fr);gap:26px;max-width:1320px;margin:28px auto;padding:0 24px}
+nav{position:sticky;top:16px;align-self:start;max-height:calc(100vh - 32px);overflow:auto;padding:18px;background:var(--paper);border:1px solid var(--line);border-radius:12px;font-size:14px}
+nav a{display:block;padding:6px 0;text-decoration:none}main{overflow-wrap:anywhere;min-width:0;background:var(--paper);padding:30px 38px;border:1px solid var(--line);border-radius:12px}
+h1{font-size:30px;line-height:1.35;margin:0 0 18px}h2{font-size:23px;border-bottom:2px solid var(--line);padding:10px 0;margin:34px 0 18px;scroll-margin-top:20px}h3{font-size:18px;margin:25px 0 10px;scroll-margin-top:20px}p{margin:12px 0}
+.meta,.note{background:#eef7f8;border-left:4px solid var(--accent);padding:12px 16px;margin:18px 0;color:#294c60}.warning{background:#fff7e9;border-color:#d09b39}.table-wrap{overflow:auto;margin:18px 0}
+table{width:100%;border-collapse:collapse;font-size:14px}th{background:#e8f1f4;text-align:left}th,td{padding:11px 13px;border:1px solid var(--line);vertical-align:top;overflow-wrap:anywhere}td code{white-space:normal;overflow-wrap:anywhere}
+pre{padding:16px;background:#102d3d;color:#d8f2ed;border-radius:8px;overflow:auto;font:13px/1.7 Consolas,monospace}code{overflow-wrap:anywhere;font-family:Consolas,monospace;font-size:.9em;background:#edf3f6;padding:1px 4px;border-radius:3px}pre code{background:none;color:inherit;padding:0}
+figure{margin:24px 0;border:1px solid var(--line);border-radius:10px;padding:16px;background:#f8fbfc;overflow:auto}figure svg{display:block;width:100%;height:auto;min-width:520px}figcaption{font-size:14px;color:var(--muted);margin-top:12px}details{margin:12px 0}footer{color:var(--muted);font-size:13px;margin-top:28px;border-top:1px solid var(--line);padding-top:15px}li{margin:5px 0}.badge{display:inline-block;background:#d6eee8;color:#15564b;border-radius:5px;padding:0 7px;font-size:13px}
+@media(max-width:900px){.shell{display:block;padding:0 12px;margin:16px auto}nav{position:static;max-height:220px;margin-bottom:16px}main{padding:22px 18px}h1{font-size:25px}}
+@media print{body{background:white;font-size:11pt}.shell{display:block;margin:0;padding:0;max-width:none}nav,header{display:none}main{padding:0;border:0}h2,h3{break-after:avoid}figure,tr{break-inside:avoid}figure svg{min-width:0}pre{white-space:pre-wrap;overflow-wrap:anywhere}a{color:inherit}table{font-size:9pt}}
+</style></head><body><header><strong>Factorforge / 文档基线</strong><p>v2.1.10 · 2026-10-09 · 三层架构 · HTML 正文</p></header><div class="shell"><nav aria-label="文档目录"><a href="index.html">版本索引</a><a href="#section-1">1 包、边界与启动</a><a href="#section-2">2 接口数据契约</a><a href="#section-3">3 API与数据所有权</a><a href="#section-4">4 事件准入、去重与时间</a><a href="#section-5">5 情绪核心算法</a><a href="#section-6">5.1 注入及账本</a><a href="#section-7">5.2 时间、兑现与失效</a><a href="#section-8">6 周期、仓位、止损与时段</a><a href="#section-9">6.1 持久周期顺序</a><a href="#section-10">6.2 状态、等级与风险投影</a><a href="#section-11">6.3 止损计算</a><a href="#section-12">6.4 通用时间门</a><a href="#section-13">7 案例、标签与归因</a><a href="#section-14">8 固定步长学习及版本</a><a href="#section-15">9 研究、指标与恢复</a><a href="#section-16">10 式样与验收映射</a><a href="#section-17">11 v2.1.0 追加：S2-024 只读 API</a><a href="#section-18">12 Go 框架用例、数值及持久化实现</a><a href="#section-19">13 P2 参考、固定对照与本版落地状态</a><a href="#section-20">Go 迁移共同约束与切换门槛</a><a href="#native-intervals">v2.1.6 运行接入细化</a></nav><main><div class="meta">02_策略化框架层设计书 · <a href="02_策略化框架层式样书.html">对应仕様书</a></div><article id="document-body"><div class="note">v2.1.6 为设计修订版，四组业务式样保持。P1/P2、活跃工具和 CI 已使用 Go；G4 实例/管理台已有代码与本地机制证据。本版细化日历窗口的通用下层接口和有限报告明细投影，不关闭供应商、生产标定或 LIVE 准入。</div><div data-source-sha256="b421edc5545daf17abf967876a3d17a1fa98af6e1b0e4b0fe411274616ee1b36" data-source-document="02_策略化框架层设计书.md"><h1>策略化框架层设计书</h1>
+<p>版本：2.1.4；日期：2026年10月8日。唯一对应式样书：<a href="02_%E7%AD%96%E7%95%A5%E5%8C%96%E6%A1%86%E6%9E%B6%E5%B1%82%E5%BC%8F%E6%A0%B7%E4%B9%A6.html">策略化框架层式样书</a>。本文实现 S2，数学核心继承 v1.1，其具体对象及模型选择留给应用。</p>
+<h2 id="section-1">1 包、边界与启动</h2>
+<p>实现 src/factorforge/strategy，子包 domain/{events,sentiment,regime,position,stop,case,attribution,learning,validation}、application/{object_service,event_service,score_admission,decision_cycle,case_service}、ports/{trading,store,clock,attribution_input}、adapters/{trading_v2,postgres}、api、workers。仅依赖 trading 公共DTO/客户端，禁止导入 trading 的数据库/执行实现，也禁止导入 applications、搜索SDK或模型SDK。</p>
+<p>启动入口 strategy-api、strategy-scheduler、strategy-feedback；scheduler 通过 ClockPort 运行，每个对象独立持久周期。手工/夹具 CLI 实现 create-object、create-event、submit-score、advance-clock、show-pool、show-target、show-case，可在只有本层和交易层时完成闭环。归因输入缺失时按确定性证据生成可识别标签或UNKNOWN；不要求外部模型存在。</p>
+<p>TradingPort调用交易设计第3章的市场/账户查询、owner绑定、目标、保护、对账和事实订阅。实例特定时段、价源、基准、参数族由配置注入。持仓保护的下单和最终账户风险属于交易层；框架计算风险匹配的目标与保护计划，不持有BrokerPort或交易凭据。</p>
+<h2 id="section-2">2 接口数据契约</h2>
+<p>schema_version为strategy-2.0；安全关键字段未知时拒绝。各写命令含request_id、idempotency_key、expected_version、reason；运行/对象绑定由认证范围核实，不以正文授予权限。十进制数学参数序列化为字符串；时间为UTC，缺值显式null及unknown_fields。以下DTO是本层设计真源，实施时生成 contracts/v2/strategy 的机器契约并逐字段测试。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>类型</th>
+<th>字段</th>
+<th>关键校验</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ObservedObject</td>
+<td>object_id, instance_id, environment, trading_run_key, instrument_key, owner_id, state, parameter_version, price_proxy_binding, regime_binding, time_policy_version?, aggregate_version</td>
+<td>一对象一个owner；状态ACTIVE/PAUSED/ARCHIVED；有未平仓/未成熟案例不能删除</td>
+</tr>
+<tr>
+<td>Event</td>
+<td>event_id, family_id, fact_version, parent_event_id?, relation, subject_id, event_type, occurred_at, first_public_at, evidence_refs, claims, object_ids, state</td>
+<td>relation=NEW/CONFIRMATION/NEW_FACT/CORRECTION/RETRACTION；event只登记事实，不含可执行订单</td>
+</tr>
+<tr>
+<td>EvidenceRef</td>
+<td>evidence_id, content_hash, source_id, licence_ref, first_public_at, received_at, available_at, span_refs, verification_ref</td>
+<td>原文由应用或外部档案保存；框架保存可核验引用，不执行正文指令</td>
+</tr>
+<tr>
+<td>Claim</td>
+<td>claim_id, normalized_fact, subject_id, economic_item, period, fact_time, numbers_with_units, evidence_refs, supersedes_claim_id?, verified_at</td>
+<td>引用及数字/单位核验；经济主体/事项/期间确定事件族候选</td>
+</tr>
+<tr>
+<td>ScoreVector</td>
+<td>direction, impact_points, credibility, relevance, novelty, expectation_coverage, prepricing_fraction?, expected_half_life, quality_score, unknown_fields</td>
+<td>direction=-1/0/+1；impact非负；概率/比例在[0,1]；半衰期正；不完整保留研究状态</td>
+</tr>
+<tr>
+<td>ScoreSubmission</td>
+<td>event_id, fact_version, object_id, score_version, previous_score_id?, revision_kind, vector, evidence_refs, producer_id, producer_version, rubric_version, calibration_version, completed_at, input_manifest_hash</td>
+<td>REVISION明确替换对象/事实/前版本；方向影响只是最低输入，交易准入需完整安全字段</td>
+</tr>
+<tr>
+<td>Contribution</td>
+<td>contribution_id, object_id, event_id, family_id, direction, initial_amount, remaining_amount, effective_at, last_updated_at, half_life, eta, high_water, reference_price, frozen_parameter_version, score_id, state</td>
+<td>m非负；H不下降；effective_at不因纯修订改变；失效贡献不能复活</td>
+</tr>
+<tr>
+<td>DecisionView</td>
+<td>decision_id, object_id, cycle_id, available_cutoff, pool_plus/minus/net, previous_level, new_level, raw_exposure, projected_exposure, target_quantity, actual_quantity, pending_quantity, stop_plan, parameter_version, input_hash, reason_codes</td>
+<td>实际来自交易事实；无交易也保存全部理由</td>
+</tr>
+<tr>
+<td>ParameterSnapshot</td>
+<td>version, parent_version?, scope, valid_from, values, bounds, steps, evidence_gates, source_manifest, applicability, quality_state</td>
+<td>quality_state=VALIDATED/REQUIRED_UNSET/EXPERIMENT_ONLY；生产不允许隐式默认</td>
+</tr>
+</tbody>
+</table></div>
+<p>ScoreVector.direction 与impact构成最低“方向、影响程度”矢量；允许只提交这两项创建DRAFT评分。缺少其他字段不可交易，不默认为1。expected_half_life必须符合已登记类型量表及界限；没有获准逐事件期限量表时使用已验证类型h，外部期限只作为候选特征。模型原始confidence不直接填credibility，必须有有效calibration_version及核验来源。基础影响b、质量c、相关r由评分输入，类型w与状态g由框架参数，提交者不能覆盖w/g或硬风险。</p>
+<p>交易资格不在ScoreVector字段中。身份输入分成PublicPrincipal和WorkloadIdentity两种语言类型，PublicPrincipal的ApiScope只允许研究评分/查询；WorkloadIdentity内部另授权signal:sim或signal:live。schema、数据库enum、表、授权函数及数据库角色物理分离：api_scope/key_scope与workload_capability/workload_capability_grant不能互相写入。公开key创建、读取、轮换、权限修改均使用ApiScope，无强制字符串转换。生产实例评分进程获得受限WorkloadIdentity；手工离线CLI可用SIM工作身份，运行不依赖应用包。未知身份或生产资格不明则RESEARCH_ONLY。</p>
+<p>AdmissionReceipt={submission_id,state,contribution_id?,eligible_from?,reason_codes,current_version}；state为DRAFT/RESEARCH_ONLY/QUARANTINED/READY/APPLIED/SUPERSEDED。外部请求不能自填READY或实盘资格；通过schema、范围、证据引用/时间、校准版本、事实版本、重复、类型启用、环境和内部身份门后才READY。</p>
+<h2 id="section-3">3 API与数据所有权</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>HTTP/命令</th>
+<th>语义</th>
+<th>返回</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>POST /api/v2/strategy/objects</td>
+<td>指定通用InstrumentKey、RunKey及配置，创建对象并绑定owner</td>
+<td>ObservedObject；冲突409</td>
+</tr>
+<tr>
+<td>GET /objects/{id}, PATCH /objects/{id}/state</td>
+<td>查询、暂停或归档；保持存量处置</td>
+<td>ObservedObject</td>
+</tr>
+<tr>
+<td>POST /events</td>
+<td>创建事实及对象关联；未评分不注入</td>
+<td>Event</td>
+</tr>
+<tr>
+<td>POST /events/{id}/revisions</td>
+<td>事实确认、新增、修订或撤销；CAS检查前版本</td>
+<td>Event新版本</td>
+</tr>
+<tr>
+<td>POST /events/{id}/scores</td>
+<td>给对象首次评分或补充DRAFT评分</td>
+<td>AdmissionReceipt</td>
+</tr>
+<tr>
+<td>POST /events/{id}/scores/{score}/revisions</td>
+<td>重评分已有对象/事实；明确差额修订</td>
+<td>AdmissionReceipt</td>
+</tr>
+<tr>
+<td>GET /objects/{id}/pool, /decisions, /targets, /cases</td>
+<td>具体类型的只读投影</td>
+<td>PoolView、DecisionView、TargetView、CaseView</td>
+</tr>
+<tr>
+<td>POST /cases/{id}/attribution-candidates</td>
+<td>接受外部解释候选；不能自授学习资格</td>
+<td>AttributionView及证据门状态</td>
+</tr>
+<tr>
+<td>GET /parameters, /learning-decisions, /validation-runs</td>
+<td>查询参数/门控/验证</td>
+<td>具体投影及游标</td>
+</tr>
+</tbody>
+</table></div>
+<p>上述短路径均带同一完整前缀。PoolView={object_id,plus,minus,net,contributions,ledger_version,quality}；CaseView={case_id,object_id,direction,risk_lots,event_groups,entry_snapshot,exit_at?,observation_end?,pnl_components,status,label_status,attribution_ids,parameter_decision_ids}。错误沿用交易层Problem语义，另增加422 SCORE_INCOMPLETE/INVALID_EVIDENCE、409 FACT_VERSION_CONFLICT、423 MODEL_LEDGER_BROKEN/RECOVERY_REQUIRED。写事件成功只证明登记，必须查询AdmissionReceipt判断评分是否应用。</p>
+<p>本层拥有observed_object、event_family、event_fact_version、object_event_link、score_submission、contribution、sentiment_entry、decision_cycle、decision、target_outbox、time_window_counter/reservation、case_record、observation、label、attribution_candidate/verified、counterfactual、sample_group、parameter_snapshot/candidate/activation、consumed_evidence、learning_decision、validation_run、audit及command_dedup。全部按instance/object/environment约束；不复写交易层fill/risk_lock真源，读取事实保存带来源版本的本层投影。</p>
+<h2 id="section-4">4 事件准入、去重与时间</h2>
+<p>EventService先以(subject,economic_item,period,关键事实)及显式supersedes关系匹配事件族，再考虑文本相似建议。正文相似不是唯一依据；无法判定族关系则隔离待核。事实权重来自冻结类型量表，新颖度 n=本次新增可核验事实权重/本次总可核验事实权重，分母0隔离；同一事实增加报道数量n=0。输入n是候选，框架用claim集合重新核对，不能只相信提交者说“全新”。</p>
+<p>首次有效时间τ=max(必要证据可用时间,评分完成时间,框架接收及校验完成时间)。原始发生、首次公开及系统接收分别保存。事件虽早已发生，晚到的首次评分不能回填τ。绑定的有效基准价格尚不可得则保持READY_PENDING_PRICE，待价格可用时确定τ及初始价格。decision_cutoff之前READY的评分才能参与周期，迟到留下一周期。</p>
+<p>首次注入冻结 b,c,r,n,u、w,g,h,eta、量表及模型/生产者版本。完全重复的(submission_id或规范正文hash)幂等返回原回执；同一事实新模型重评必须显式REVISION，不自动建立新贡献。可信度确认/纯修订保留原τ、参考价和H，将新版评分按历史时间因子及已记录价格消耗重放到当前，得到m_revised；以delta=m_revised-m_current追加修订，不改旧决策/旧消耗。相关贡献已撤销则不能因旧消息再激活；真正新事实另建子贡献并受事件族上限。</p>
+<p>为避免修订重复计入新颖度，初次NEW_FACT贡献只包含新增claim；CONFIRMATION/CORRECTION按原贡献的事实集合和原新颖度背景重新核验，不能把新n=0直接当作原贡献必须归零。撤销先记失效清除；新反向事实需单独证据，不以“撤销正面”自动生成等量负面。</p>
+<p>提前计价采用 u=(1-e)×(1-p)。e来自可核验事前预期；p只用尚未被e覆盖的价格证据。r_pre=ln(P_available/P_pre)-βr_benchmark，p=clip(max(0,d×r_pre)/ρ_pre,0,1)，ρ_pre&gt;0、基准及β在训练段冻结。未知e/p形成[u_low,u_high]，执行用可靠u_low；无法建立则不增险。基准缺失可使用已验证的绝对收益代理并标明，不把其当因果证据。</p>
+<h2 id="section-5">5 情绪核心算法</h2>
+<h3 id="section-6">5.1 注入及账本</h3>
+<p>A=min(A_cap,b×c×r×n×u×w×g)，d∈{-1,0,+1}；全部乘数非负，c/r/n/u∈[0,1]。单事件、事件族及对象幅度上限分别检查，以保留既有贡献为顺序，超额作为rejected_amount账项，不能以后自动补注入。d=0或任一乘数0不建立方向幅度。每个贡献m≥0，S_plus=Σ正向m，S_minus=Σ负向m，S=S_plus-S_minus。</p>
+<p>每次周期保持：m_end=m_start+injection+revision_delta-time_consumption-price_consumption-invalidation。反向通过新负向贡献合计，不对正向额外扣减；因此+60与-30组成仍为60/30，净值30。账差超过PAR-NUM即MODEL_LEDGER_BROKEN，冻结目标增险和学习，重放一致后才恢复。</p>
+<h3 id="section-7">5.2 时间、兑现与失效</h3>
+<p>每旧贡献先执行 m_time=m_previous×2^(-Δt/h)，Δt按真实自然经过时间；默认含停盘/停机，不以“循环执行次数”衰减。m_after=max(0,m_time-C_price)。h&gt;0，数值容差只处理计算误差，不代替清理阈值。</p>
+<p>每贡献从τ累计经批准价格代理的异常对数收益R_i。H_new=max(H_old,max(0,d_i×R_i))，deltaH=H_new-H_old。H只前进；价格回撤不返还消耗，重复快照deltaH=0。新贡献在本周期旧贡献更新后注入，冻结τ时已经可用的批准参考价，H初值0；下一次旧贡献更新计算自τ以来的高水位，不消费早于τ的涨跌。首次评分到周期注入之间的时间按τ计算衰减，并登记该段时间消耗。提前计价独立使用截至评分可用时的事前资料，不通过重放历史周期补造交易。</p>
+<p>同向本周期唯一预算 B_d=κ_object,regime×max_i(deltaH_i)。可分配集合为同向有效且deltaH&gt;0贡献，权重ω_i=m_time_i×eta_i×deltaH_i；Σω=0则消耗0。按权重分配，C_i≤m_time_i；命中上限后将余量在剩余集合重新分配，直到B用完或集合为空。ΣC_i≤B，不对每条新闻分别生成完整价格预算。eta_ref=1作为不可学习锚点；单类型独占时eta不可识别，禁止更新。预算与高水位、权重、封顶和拒收均入账，可重放。</p>
+<p>价格缺失继续时间衰减，暂停兑现和依赖价格的新风险；恢复后只处理尚未记录的高水位增量，历史决策不回写。撤销、证伪、TTL或已登记清理阈值清除相应剩余量并记录原因；部分撤销绑定claim比例。止损不是失效条件。失效贡献状态INVALID/EXPIRED永久保留，不能由旧ID复活。</p>
+<p>夹具：60经过一个半衰期变30，价格预算10后变20，新增-12后净8；撤销正向变-12。两个同向40/20、相同eta及deltaH，预算12分8/4；重复同价格再消耗0。该组数字只用于T2-05，不是生产参数。</p>
+<h2 id="section-8">6 周期、仓位、止损与时段</h2>
+<h3 id="section-9">6.1 持久周期顺序</h3>
+<p>cycle_id=(object_id,scheduled_at_utc)，唯一索引避免双执行。每周期顺序：交易成交/收入及外部变更投影 → 保护/风险结果 → 截止时间数据快照 → 事件撤销及修订 → 旧贡献时间与价格更新 → 新贡献注入 → 情绪与状态 → 滞回 → 风险匹配目标/保护 → 时段预占 → 决策和target_outbox。所有本层账项及目标outbox同事务提交；事务失败没有可发送目标。</p>
+<p>AccountDecisionCoordinator按trading_run_key收集同一截止时点已到期对象的候选，先按object_id固定排序并锁定，再统一执行组合α投影；不同频率的未到期对象保留当前目标/实际及待成交风险。这样“同时候选”有确定含义，不由线程抢先顺序选仓位；跨框架或手工订单变化仍由交易层最终原子检查拒绝过期风险快照。并发冲突后重新查询，不重复消费情绪账项。</p>
+<p>交易层和本层数据库无跨服务原子事务，target_outbox至少一次投递，用decision_id及target_version幂等；未查询交易层ACK前状态DELIVERY_UNKNOWN，不生成第二个增险目标。对账结果按外部订单/成交ID及投影游标去重，遗漏则进入RECOVERY_CHECK。漏周期记录SKIPPED，恢复用真实Δt计算，过期目标丢弃；重启不补发历史订单。止损通知即时使本周期新风险BLOCKED，不在同周期因利好重开。</p>
+<h3 id="section-10">6.2 状态、等级与风险投影</h3>
+<p>RegimeEngine输出多维trend/volatility/risk_appetite/sector/extreme及UNKNOWN，趋势T=完成窗基准收益/波动尺度、W=当前稳健波动/长窗波动，阈值、确认、驻留与滞回来自PAR-REG。状态切换不回溯放大原贡献；旧状态证据降权、新状态缺样本冻结学习。FactorRegistry每因子带用途、可用时间、缺数政策、验证manifest及依赖，防止同价格虚构独立证据。</p>
+<p>等级L=0..K，0=v0&lt;v1&lt;…&lt;vK；进入U_l，退出D_l，满足0≤D_l&lt;U_l且两组递增。E=abs(S)，升级仅E≥U_next，降级仅E&lt;D_current，E=D维持，跨级迭代到稳定等级。方向翻转旧目标归0，查询实际及待成交旧方向均无暴露后才评新方向。</p>
+<p>x_raw=sign(S)×vL×f_vol×f_liq×f_conf；f_vol=min(1,σ_ref/max(σ_current,ε))，f_liq=min(1,B_liq/max(V×vL,ε))，f_conf=Q_pool×abs(S)/(S_plus+S_minus+ε)。Q按剩余幅度加权核验质量；可靠成交额/质量缺失相应折扣0。修正因子在[0,1]，低波动不放大上限。</p>
+<p>先逐对象裁剪通用流动性、止损风险、卖空及对象预算，再对同一账户新增候选以最大合格α∈[0,1]统一缩减，满足账户总/净/分组敞口和压力约束。只依赖交易AccountView及已登记组合政策；最终仍由交易RiskEngine原子检查。OBSERVE账户亏损阈值不进入此可行域；已有风险即使α=0仍超限则提交减险，不用新增对冲隐藏硬限。</p>
+<p>q_target=toward_zero(x_target×V/(P×contract_multiplier),quantity_step)，币种先用有效FX统一。没有卖空能力时负目标只平多到0，记录SHORT_UNAVAILABLE；最小单位不足可得到0实际目标。普通调整受min_adjustment/cooldown；强制减险豁免。不要在框架再减去pending后把“差额”当目标传入交易层，TargetRequest传最终q_target，差额归交易层计算。</p>
+<h3 id="section-11">6.3 止损计算</h3>
+<p>TR=max(high-low,abs(high-prev_close),abs(low-prev_close))，N为最近W根已完成且有效K线的TR/prev_close稳健分位数。公司行动、缺数和异常跳空先标记；极端值不直接用于放宽正常噪声。δ=max(k_stop×N,δ_micro)，D=P_entry×δ；超过批准距离上限则缩数量或不交易，不缩距离假装安全。</p>
+<p>L_trade=abs(q)×multiplier×D+退出费用+滑点/跳空准备金，约束新批次数量及组合压力预算。多头参考P_entry-D，空头P_entry+D，转为交易ProtectionPlan中的已验证trigger_kind及价格步长，舍入后重验风险；不因为向不利方向舍入而隐式突破预算。新成交均价与预估入场价不同时重算并核验保护，交易层仍即时保护真实成交。存量保护维持或收紧；新k_stop不扩大旧风险批次距离。</p>
+<h3 id="section-12">6.4 通用时间门</h3>
+<p>TimePolicy输入版本化日历、窗口及max_new_risk/max_loss_cases两个独立阈值。新增业务意图在本层事务预占window_slot，派发使用reservation_id；拆单/重试/部分成交同ID不再占额。明确交易层未受理才释放，UNKNOWN继续占额。止损/减仓/保护不占增险额；反向新开仓占额。亏损按完整净成本后案例只计一次，窗口归属入场冻结；迟到成熟案例记评测，不追溯改变旧订单。具体常规/非传统市场窗口只来自实例配置。</p>
+<h2 id="section-13">7 案例、标签与归因</h2>
+<p>CaseService按方向持仓周期建案例，风险批次独立关联；以交易层实际归零关闭，partial_exit未关闭。入场冻结H_obs=clip(λ_obs×h_ref,H_min,H_max)，退出后截止=exit+H_obs，多事件主导不清按已登记组合规则。缺数/退市/观察未完标CENSORED/IMMATURE，不当零收益；成熟标签才进入学习。</p>
+<p>方向标签从事件τ到事前H_label，Y=ln(P_end/P_τ)-βr_benchmark；abs(Y)≤成本门槛+噪声带则中性。正确率分母只可判定非中性，覆盖率分母包含所有。强度Y_hat=d×γ×A，误差abs(Y_hat)-max(0,d×Y)，方向错误先标方向问题；γ与w不得同时在线学。</p>
+<p>生命周期用事前分桶正向异常收益累加，达到观察窗总正向量比例χ的时间为H_proxy；H_hat=-h×log2(1-χ)。运动不足、末端持续或新事件主导为UNKNOWN/右删失，不更新h。兑现代理Z_post=d×(ln(P_exit+Hobs/P_exit)-βr_benchmark_post)，只有可分离旧事件的观察段用于推断；不把新消息归给旧模型。</p>
+<p>AttributionPipeline固定数据/执行 → 外部异常/制度 → 去重/提前计价 → 方向/强度 → 生命周期/兑现 → 时机 → 止损。允许多个原因和UNKNOWN，不强迫最可能原因成为唯一答案。C_attr=min(C_data,C_label,C_isolation,C_stability)，每分量为已登记核验项加权通过率，关键项失败即0；量表需盲标审核校准，不是模型原始概率。外部AttributionCandidate只提供category、evidence_refs、alternative_causes、producer_version和候选信心，不可覆盖verified分量。</p>
+<p>共同经济驱动、重叠观察窗、多资产或重复入场组成sample_group，独立单位为组而非交易数。可识别时按冻结基准和逐簇移除估计边际影响，总分配≤可分配观测运动，余量为市场/未知；排列或合理基准改变修正方向则降低稳定性。无法识别只簇级评价，不生成单参数学习证据。</p>
+<p>CounterfactualRunner调用交易SimBroker，用同一信息、费用、延迟、流动性和预算，仅改无策略止损/延迟入场/预设提前或延迟退出/更宽止损且降数量之一；硬账户约束保留。scenario_id与真实run_id分离，不能写真实fill/equity。OHLC顺序不清且影响归因则保存区间并冻结更新，不选事后最优点。</p>
+<h2 id="section-14">8 固定步长学习及版本</h2>
+<p>白名单w/h/κ/非锚点eta/k_stop，ParameterRegistry每参数有初值、单位、上下限、Δ&gt;0、来源、适用分组、证据门槛、漂移/冷却和回滚点。无样本分组继承已验证上层参数并标继承，不为每笔亏损创建新组。硬限、权限、额度、阶段、评分校准、模型及Prompt版本不能进入此白名单。</p>
+<p>证据只用成熟、归因合格、对应参数可识别的组g。a_g=C_attr×Q_g×2^(-age/H_forget)×R_regime，R在[0,1]；E_j=Σa_g e_jg/max(Σa_g,ε)，N_eff=(Σa_g)^2/max(Σa_g²,ε)，独立组数另计。e有界[-1,1]：abs(z)≤deadband为0，否则sign(z)×min(1,(abs(z)-deadband)/scale)。w的z为实际方向运动-预测幅度，h为H_proxy-H_hat，κ/eta为负的可归属Z_post，k_stop为同风险预算、更宽保护后的含尾部损失效用改善；未知敏感性就不生成e。</p>
+<p>生成门同时满足成熟、校准归因及无主要替代解释、独立组/N_eff/重复数、误差死区及区块置信区间、稳定状态、冷却/漂移/边界、新证据消费要求。然后candidate=clip(current+sign(E)×Δ,lower,upper)；置信决定能否更新，不扩大Δ。实际变化0不发布；同证据不可同时更新相关w/h/κ，无法区分则冻结。</p>
+<p>候选状态PROPOSED → VALIDATING → SHADOW/TRIAL → APPROVED → ACTIVE → MONITORING；失败REJECTED或ROLLED_BACK/FROZEN。验证证据与提出证据隔离，同期冻结对照及同风险费用比较，最小改善、风险不劣化、稳定和覆盖全部合格才自动批准。按下个规定cycle边界CAS切参数版本并写audit；用户离线无需逐次审批。发布失败不部分更新参数。旧证据标consumed，仍可监测但不能独自推动下一更新；反向阈值、漂移预算和振荡检测失效则冻结。</p>
+<p>w/g/h/eta在贡献创建时冻结，新版本只用于新贡献；纯评分修订仍按原τ。κ为对象级周期预算系数，新版本下一周期前瞻作用于存量余额，不重算旧周期。k_stop仅新风险批次，旧保护不放宽。回滚只换未来适用版本，历史评分/成交/损益/消耗与消费标记不变；相关参数冻结等待新证据。合理性任务检查边界、变差、反向、重复证据、分状态效果及冻结对照，间隔配置，不把初始“24小时试验”变生产常数。</p>
+<h2 id="section-15">9 研究、指标与恢复</h2>
+<p>ValidationRunner登记数据许可、时点manifest、假设H01事件方向/H02强度/H03寿命/H04兑现/H05类型速度/H06动态仓位/H07学习/H08漂移，及主指标、最小效应、功效、窗口和成本压力。严格训练→候选验证→后续测试，按最大标签/影响跨度及发布延迟purge/embargo，共同驱动组不能跨边界；封存集仅方案定稿后一次使用。测试自适应只使用当时成熟证据和真实发布延迟，不能测试完重学重跑。</p>
+<p>分别报告未知/缺失/删失、独立样本及区间；方向正确率/覆盖、强度MAE、寿命/兑现代理误差、预设时机对照、止损触发与尾损、去重错率、更新变差及反向次数；真实成本后收益/平均盈亏/回撤/换手/成本/风险利用按交易层事实核算，Sharpe频率、年化和自相关处理事前登记。因子消融至少无学习、仅时间衰减、无兑现、无滞回及完整模型，同期同预算比较。全记录失败尝试和多重比较；不支持核心假设则不升级。</p>
+<p>确定性重放固定AI/外部评分首次输出，不重新抽样。框架重启先重建账本、周期、目标派发、观察/标签/已消费证据与参数，再查询交易层账户/owner_epoch和外部变更；不一致禁止增险。模型/数据异常仅冻结受影响对象；实际持仓的底层保护不依赖框架健康。审计或事务失效不能发新目标。</p>
+<h2 id="section-16">10 式样与验收映射</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>式样</th>
+<th>章节与组件</th>
+<th>验收</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>S2-001</td>
+<td>1～3；ObjectService/owner绑定</td>
+<td>T2-01、T2-15</td>
+</tr>
+<tr>
+<td>S2-002</td>
+<td>2～4；EventService</td>
+<td>T2-02</td>
+</tr>
+<tr>
+<td>S2-003</td>
+<td>2～4；ScoreAdmission</td>
+<td>T2-02、T2-15</td>
+</tr>
+<tr>
+<td>S2-004</td>
+<td>4；事件族及差额修订</td>
+<td>T2-03</td>
+</tr>
+<tr>
+<td>S2-005</td>
+<td>4；新颖度及提前计价</td>
+<td>T2-04</td>
+</tr>
+<tr>
+<td>S2-006</td>
+<td>5.1；ContributionLedger</td>
+<td>T2-05</td>
+</tr>
+<tr>
+<td>S2-007</td>
+<td>5.2、6.1；时间衰减</td>
+<td>T2-05、T2-06</td>
+</tr>
+<tr>
+<td>S2-008</td>
+<td>5.2；方向高水位及预算分配</td>
+<td>T2-05</td>
+</tr>
+<tr>
+<td>S2-009</td>
+<td>5、9；失效及守恒恢复</td>
+<td>T2-05、T2-06</td>
+</tr>
+<tr>
+<td>S2-010</td>
+<td>6.1；Cycle/Outbox</td>
+<td>T2-06</td>
+</tr>
+<tr>
+<td>S2-011</td>
+<td>6.2；Regime/FactorRegistry</td>
+<td>T2-07、T2-14</td>
+</tr>
+<tr>
+<td>S2-012</td>
+<td>6.2；Hysteresis/PositionMapper</td>
+<td>T2-07</td>
+</tr>
+<tr>
+<td>S2-013</td>
+<td>3、6.1～2；TradingPort</td>
+<td>T2-07、T2-15</td>
+</tr>
+<tr>
+<td>S2-014</td>
+<td>6.3；StopEstimator/RiskLot</td>
+<td>T2-08</td>
+</tr>
+<tr>
+<td>S2-015</td>
+<td>6.4；TimePolicy/Reservation</td>
+<td>T2-09</td>
+</tr>
+<tr>
+<td>S2-016</td>
+<td>7；CaseService/Observation</td>
+<td>T2-10</td>
+</tr>
+<tr>
+<td>S2-017</td>
+<td>7；Label/AttributionPipeline</td>
+<td>T2-10</td>
+</tr>
+<tr>
+<td>S2-018</td>
+<td>7；SampleGroup/CounterfactualRunner</td>
+<td>T2-10、T2-11</td>
+</tr>
+<tr>
+<td>S2-019</td>
+<td>8；EvidenceGate/FixedDelta</td>
+<td>T2-12</td>
+</tr>
+<tr>
+<td>S2-020</td>
+<td>8；消费/冷却/漂移/可识别门</td>
+<td>T2-12</td>
+</tr>
+<tr>
+<td>S2-021</td>
+<td>8；AutoActivation/Monitor/Rollback</td>
+<td>T2-13</td>
+</tr>
+<tr>
+<td>S2-022</td>
+<td>9；ValidationRunner/Metrics</td>
+<td>T2-14</td>
+</tr>
+<tr>
+<td>S2-023</td>
+<td>2、6.1、9；Auth/Recovery/Reasons</td>
+<td>T2-15、T2-06</td>
+</tr>
+</tbody>
+</table></div>
+<p>必须用序列/属性测试验证账本守恒、非负、H单调、预算不超额、滞回等号及OBSERVE不间接冻结；用事务/重启测试验证目标幂等和时段预占，隔离成熟证据验证自动发布/回滚。把应用目录从测试安装中移除，T2-01仍须完成，才证明本层没有隐含上层依赖。</p>
+</div><h2 id="section-17">11 v2.1.0 追加：S2-024 只读 API</h2><p>实现在strategy/application/query_service.py、api/read_dto.py和公共api/app.py，通过本层存储事务读取，禁止调用周期/准入/学习写用例。PublicPrincipal必须具有ApiScope.QUERY；内部WorkloadIdentity不因读取需要改为公共身份。所有资源根据principal.instance_id及environment定位，object_id/case_id/event_id二次核验所属对象。</p><p>全部GET，前缀/api/v2/strategy：/objects，/events，/events/{event_id}，/events/{event_id}/scores，/objects/{object_id}/ledger，/cases/{case_id}/attributions，/cases/{case_id}/counterfactuals，/parameter-activations，/audit。列表支持cursor/limit；事件、激活及审计按object_id/from/to过滤，账本可增加contribution_id；event详情可传revision。limit由登记配置上限约束，时间均UTC。</p><p>ReadPage[T]={items,cursor,snapshot_version,observed_at}。事务读取取得StrategyState.version作为snapshot_version并保留每项实际时间；observed_at只用于真正有相应事实时点的数据，没有则null。游标由服务端签名，绑定principal实例/环境、过滤hash、snapshot_version和稳定排序键；不一致/过期返回409，不回退到其他实例。分页快照保留与大小必须有资源上限，不能无限复制全量状态。</p><p>ObjectSummary保留object_id/state/instrument_key及绑定版本；EventReadView保留event_id/family_id/fact_version/claim和各可用时间；ScoreReadView使用显式字段投影并配对AdmissionReceipt，剔除workload身份/完整routing内部数据/Prompt。LedgerEntry直接取持久ledger；AttributionReadView与CounterfactualReadView分别标记候选/验证、研究manifest与真实case引用。ActivationReadView={activation_id,object_id,previous_version,new_version,state,recorded_at,effective_at,evidence_refs,reason_codes,source_record_id}，state限定PUBLISHED/REJECTED/FROZEN/ROLLED_BACK；字段只能来自已保存发布/拒绝/冻结/回滚记录，旧记录不够则报告NOT_RECORDED，不能以参数值变化推断。AuditReadView按事件字段白名单公开。</p><p>更新本层生成OpenAPI和查询DTO测试，使用交易/框架已安装包验证，不导入console。T2-16验证查询前后业务状态及outbox无变化、错误身份和跨对象请求、分页乱序/过期、自由字典脱敏、缺激活记录与未知归因。对应S2-024，既有S2-001～023与计算规则保持。</p><h2 id="section-18">12 Go 框架用例、数值及持久化实现</h2>
+<p>domain/{sentiment,position,stop,events,case,attribution,learning,validation,regime,time_policy,performance}.go 与原域函数对应，不导入交易层执行/账务/存储或绑定标的/模型。本版首先落地 numerical_types.go 定义纯算法输入，不宣称已经替换完整 StrategyState 或 HTTP 请求 DTO。身份使用 identity.go 中独立 ApiScope 与 WorkloadCapability 命名类型，各自 JSON 枚举校验；PublicPrincipal 不能解码 signal:sim/live，WorkloadIdentity 不使用公共 scope 代替内部能力。</p>
+<p>sentiment.Decay 沿用局部 40 位上下文；seconds/half_life → 负号 → ln(2) → 乘法 → exp → amount 的逐步舍入保持。apd 默认同精度 Exp 在前期样例有末位差异，Math.Exp 使用 2×/3×输出精度的工作计算，再分别舍入到原精度；两者不一致则返回数值错误，不注入情绪。额外位数是实现工作精度，不是业务容差/标定参数，原 numerical_tolerance 不改。较大指数、下溢/异常和长期停机仍需对照，不能用少量样例覆盖整个输入域。</p>
+<p>sentiment.{AppendEntry,VerifyLedger,Waterfill,AdvanceContributions,Pool} 保留逐贡献账本、真实时间消耗、共同价格预算、high_water 与过期原因。Advance 在局部副本计算，通过数值错误及账本守恒检查才提交。原 Python 集合迭代顺序不稳定；Go 分配使用稳定键顺序，完整多贡献回放须在登记容差内核验且逐条保存差异；不能因此扩大业务容差。停机时间使用原 elapsed-time 转换语义，时间戳因果与极长时段由专门边界测试验证。</p>
+<p>position 保留 Financier 来源的滞回等号规则、理论暴露、数量趋零舍入、先降险后增险的共同 alpha 投影。ExistingRiskScale 保留净额对冲可行区间下界和上界，未管理风险已经超限或区间为空仍要求核验，不能宣称归零已解决。二分使用原 numerical_tolerance；无法继续表示中点时报数值故障，不无限循环。stop 保留已完成且当时可用 K 线、鲁棒噪声、异常缺口不放宽止损、价格向入场方向取 tick、费用/滑点/缺口的单笔风险以及实际已核验保护减险。</p>
+<p>application/{commands,injection,decision_cycle,cases,validation_runner}.go 通过 ports.Store 的事务计算周期并写 Decision/TargetOutbox/账本/审计，原 clock cutoff、TTL、owner_epoch 与目标反馈保持。adapters/trading_v2.go 仅用 P1 /api/v2/trading：市场/账户/仓位/所有权/成交/保护/外部事实 GET 与 owner 目标/保护写契约，不直接复用 P1 执行或数据库。写目标保留请求版本及期限；DELIVERY_UNKNOWN 查询回执后才能决定续接。</p>
+<p>api/http.go、api/dto/models.go 用 net/http 注册原两个 listener，公共写研究/对象权限与内部 signal 资格分别校验；SIM/LIVE 身份固定到部署、实例和对象。adapters/postgres/store.go 用 pgx/v5、独立角色与原 migrations/001_strategy.sql；保留公开/工作负载隔离、交易账本与研究回执分表及追加审计。case/learning/validation 的去重、污染隔离、封存数据、固定步长、候选/验证/激活/回滚状态不因 Go 迁移改变。完整持久化模型、数据库重开/权限/并发和独立进程已完成本地验收。</p>
+<p>entrypoints/{strategy-api,strategy-scheduler,strategy-feedback,factorforge-strategy}/main.go 独立装配；执行保护仍由 P1 负责。S2-024 查询由 application/query_service.go 和 api/read_dto.go 提供有限只读投影；管理台仍通过公开 HTTP 调用，不能直接连接下层数据库。workers 明确取消/关闭生命周期，不能以 goroutine 数量冒充研究/交易及 SIM/LIVE 的资源隔离。</p><figure id="go-p2"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 500" role="img" aria-labelledby="go-p2-title go-p2-desc"><title id="go-p2-title">图 D2-Go：资格、账本、投影与执行事实</title><desc id="go-p2-desc">public listener / workload listener，独立身份类型 → score_admission；研究不授予信号；decision_cycle → 前周期成交 / 保护反馈，sentiment 衰减 / 兑现 → VerifyLedger；position + stop → 先降险 / 目标投影，登记容差 / hard risk / owner_epoch；Store.Transaction → 决策 + TargetOutbox，trading_v2 HTTP → ACK / UNKNOWN / REJECTED；案例观察 → 归因 / 验证 → 固定步长学习，激活 / 监测 / 回滚保持原控制流</desc><defs><marker id="go-p2-arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L9,3 L0,6" fill="#39768a"/></marker></defs><path d="M450.0,85 L450.0,100.0 L450.0,100.0 L450.0,115" fill="none" stroke="#39768a" stroke-width="2" marker-end="url(#go-p2-arrow)"/><path d="M450.0,185 L450.0,200.0 L450.0,200.0 L450.0,215" fill="none" stroke="#39768a" stroke-width="2" marker-end="url(#go-p2-arrow)"/><path d="M450.0,285 L450.0,300.0 L450.0,300.0 L450.0,315" fill="none" stroke="#39768a" stroke-width="2" marker-end="url(#go-p2-arrow)"/><path d="M450.0,385 L450.0,400.0 L450.0,400.0 L450.0,415" fill="none" stroke="#39768a" stroke-width="2" marker-end="url(#go-p2-arrow)"/><rect x="100" y="15" width="700" height="70" rx="9" fill="#e5f2f3" stroke="#72a4b2"/><text x="450.0" y="44.5" text-anchor="middle" font-size="15" fill="#17384a">public listener / workload listener</text><text x="450.0" y="65.5" text-anchor="middle" font-size="15" fill="#17384a">独立身份类型 → score_admission；研究不授予信号</text><rect x="100" y="115" width="700" height="70" rx="9" fill="#e5f2f3" stroke="#72a4b2"/><text x="450.0" y="144.5" text-anchor="middle" font-size="15" fill="#17384a">decision_cycle → 前周期成交 / 保护反馈</text><text x="450.0" y="165.5" text-anchor="middle" font-size="15" fill="#17384a">sentiment 衰减 / 兑现 → VerifyLedger</text><rect x="100" y="215" width="700" height="70" rx="9" fill="#e5f2f3" stroke="#72a4b2"/><text x="450.0" y="244.5" text-anchor="middle" font-size="15" fill="#17384a">position + stop → 先降险 / 目标投影</text><text x="450.0" y="265.5" text-anchor="middle" font-size="15" fill="#17384a">登记容差 / hard risk / owner_epoch</text><rect x="100" y="315" width="700" height="70" rx="9" fill="#e5f2f3" stroke="#72a4b2"/><text x="450.0" y="344.5" text-anchor="middle" font-size="15" fill="#17384a">Store.Transaction → 决策 + TargetOutbox</text><text x="450.0" y="365.5" text-anchor="middle" font-size="15" fill="#17384a">trading_v2 HTTP → ACK / UNKNOWN / REJECTED</text><rect x="100" y="415" width="700" height="70" rx="9" fill="#e5f2f3" stroke="#72a4b2"/><text x="450.0" y="444.5" text-anchor="middle" font-size="15" fill="#17384a">案例观察 → 归因 / 验证 → 固定步长学习</text><text x="450.0" y="465.5" text-anchor="middle" font-size="15" fill="#17384a">激活 / 监测 / 回滚保持原控制流</text></svg><figcaption>图 D2-Go：资格、账本、投影与执行事实</figcaption></figure><h2 id="section-19">13 P2 参考、固定对照与本版落地状态</h2>
+<p>本版复用当前已审查的 Financier 固定提交 3708a31d77cb57c0f972828488449efc341dfbf1 / engine/app/core/fusion_hub.py 的 _gate_direction 等号边界；Go position.LevelFor 延续现有改编，保留 MIT 与版权声明。timeseriescv 固定提交 cb04fb6ea7a0b2c15920ca253f882336fe336ba8 / timeseriescv/cross_validation.py 的 purge 思路已用于 validation_runner.go 的原生迁移，不引入 pandas/NumPy，不增加未来训练分支。</p>
+<p>P2 全部 Go 域、API、周期事务、案例/学习/验证、PostgreSQL 与四入口已迁移。固定合成结果在 tests/strategy/fixtures/go_migration.json，源提交与 fixture_only 可查；209 个冻结状态转换比较完整结果、状态、账本及 P1 调用，原生 P2→P1 SIM 另验证实际成交和费用。旧 capture_migration_fixtures.py 已退役到 Git 历史，Go 测试不运行 Python、不读取真实配置或调用供应商；本地机制不能替代生产标定。</p><h2 id="section-20">Go 迁移共同约束与切换门槛</h2>
+<p>根 go.mod 是 Go 模块唯一真源，go.sum 固定依赖校验；本版工具链 Go 1.27.1。Go 生产代码仍只放 src/factorforge 对应层，domain、application、ports、adapters、api、workers 六类职责保留；独立 main 放本层 entrypoints/入口名。P1 不导入上层，P2 仅引用 P1 api/dto 的公开值类型和 HTTP 客户端；不创建承载跨层业务的 common。Go 测试放 tests 对应层，数据库迁移仍归属本层 PostgreSQL 适配器。</p>
+<p>迁移以 v2.1.0 标签 e97c9e9a380d105a7e96933bdd325e1d9af06d93 的源码、冻结业务式样和 contracts/v2 契约为对照。HTTP 方法/路径、schema_version、十进制字符串、UTC/空值/未知语义、错误码、状态机和授权范围保持；OpenAPI 3.1.0 及历史 JSON Schema Draft 2020-12 不降级。接口不是因 Go 类型名变化自动升版。</p>
+<p>新实现不调用 Python 子进程、不嵌 Python 解释器，也不以 Python HTTP 服务作为最终 Go 后端。迁移期间旧源码与入口保留，用合成夹具捕获对照；不得双启动同一账户的执行者、双写同一运行，或因 Go 模块编译通过就替换运行服务。切换前记录当前版本、运行状态和库快照，停止旧执行者并取得隔离证据，由新进程恢复对账；回退也须停止并隔离新执行者，不能同时使用同一签名身份。</p>
+<p>替换全部活跃初始化、布局/版本/HTML/公开内容/历史契约检查、构建、hooks、CI 与运行工具；最终用没有 Python 的受控环境完成 Go 构建、单元/故障/真实 PostgreSQL/独立进程/SIM 验收。历史冻结文档中的 Python 文字或文件保留为历史，不要求运行其作者脚本；旧活跃作者工具在 Go 替代检查通过后退役。迁移夹具 JSON 自带源提交和 fixture_only，Go 测试读取固定结果，不依赖即时 Python oracle。真实配置及 Prompt 不迁移进夹具。</p>
+<p>发布记录逐模块区分本地机制、真实环境和生产准入证据。P1/P2 已完成 Go 运行迁移，G3 已退役活跃 Python 工具；原 Python 证据只作历史对照。P3 原生工作池、管理台 Go BFF/React 和日历/报告已完成本地集成，具体结果见进度记录。外部来源许可、抽取/模型评测、生产参数、DEC-06、独立复核和 LIVE 准入仍未关闭。本次不授权实际交易。</p><h2 id="native-intervals">v2.1.6 通用时段窗口运行设计</h2>
+<p>对应原 S2-010/S2-013/S2-023 及上层 S3-011；业务效果不变。新增 domain/time_intervals.go、application/time_intervals.go、api/window_contract.go，公开值在 api/dto。P2 不导入市场日历、时区、标的或模型。原固定 window_seconds/window_anchor 是未登记窗口计划的兼容路径；一旦对象登记计划，缺覆盖禁止新增风险，不回落到固定窗口。</p>
+<table><thead><tr><th>接口/记录</th><th>实际行为</th></tr></thead><tbody>
+<tr><td><code>GET /api/v2/strategy/objects/{object_id}/time-windows</code></td><td>公共 Query 或绑定 workload，只读 object_id、snapshot_version、plans；拒绝也无写入/时钟推进。注册的 MaxRecords 约束总窗口数，无默认值。</td></tr>
+<tr><td><code>POST /api/v2/strategy/objects/{object_id}/time-windows</code></td><td>仅 WORKLOAD listener；已有 signal:sim/signal:live 能力与对象范围、数据库授权均核验。WindowCommand 继承 Command，使用全实例 expected_version、请求/幂等 ID；不赋予公共研究身份注册能力。</td></tr>
+<tr><td>TimeWindowPlan / PolicyWindow</td><td>plan_id、object_id、policy_version、source_version；连续 UTC start/end、唯一 window_id、enforce_limits。阈值读取对象已登记 Policy.max_new_risk/max_loss_cases，本接口不接受阈值或修改政策。边界为 [start,end)。</td></tr>
+<tr><td>不可改与追加</td><td>同 ID 同内容可恢复；同 ID 改写拒绝。首次附加要求无既有预约/案例及对象零方向/等级，旧有运行必须另作排空迁移；后续只在最后已登记边界追加尚未开始的窗口。历史窗口、预约和净亏损案例不清零，内存及 PostgreSQL 事务均拒绝窗口重写。</td></tr>
+<tr><td>计数与保护</td><td>Reserve 按 object/policy/window_id 读取独立的非 RELEASED 预约数及 LossCases。任一触限只拦截增险目标，原周期减仓、止损与反馈继续。enforce_limits=false 用于调用者登记的不限这两计数窗口，其他全部风险门保持。既有案例沿用实际预约窗口；迟到/外部事实没有覆盖时仍处理账务，不据此允许增险。</td></tr>
+<tr><td>存储兼容</td><td>StrategyState.time_windows 为可缺省有限计划字典；无计划时 JSON/hash 和 209 个冻结状态转换保持。已有 pgx internal_state 保存计划；公共数据库角色不能改计划。窗口过期返回 TIME_WINDOW_COVERAGE_REQUIRED，不自动补造日历或机会。</td></tr>
+</tbody></table>
+<figure><svg role="img" viewBox="0 0 860 250"><title>通用窗口与双计数</title><desc>上层登记不可改 UTC 窗口。增险时检查覆盖及两个独立计数；缺数或触限保持已有目标。减险和保护继续走原路径。</desc><rect x="20" y="30" width="235" height="65" fill="#e5f2f3" stroke="#72a4b2"/><text x="35" y="58">P3 日历 → UTC 计划</text><text x="35" y="82">绑定 / CAS / 幂等登记</text><path d="M255 62H300" stroke="#006e82"/><rect x="300" y="30" width="255" height="65" fill="#e5f2f3" stroke="#72a4b2"/><text x="315" y="58">P2 Reserve：有效覆盖</text><text x="315" y="82">新增风险数 / 净亏损案例数</text><path d="M555 62H600" stroke="#006e82"/><rect x="600" y="30" width="235" height="65" fill="#e5f2f3" stroke="#72a4b2"/><text x="615" y="58">符合限制才新增风险</text><text x="615" y="82">缺覆盖 / 触限保留原因</text><rect x="190" y="155" width="480" height="60" fill="#d6eee8" stroke="#72a4b2"/><text x="210" y="190">原有减仓、止损、成交反馈继续；重启不重置计数</text></svg><figcaption>图 D2-I：通用窗口接入现有决策周期，测试阈值仅属合成夹具。</figcaption></figure>
+<p>实际接口契约见 <a href="../../contracts/v2/strategy/workload.openapi.json">工作负载契约</a> / <a href="../../contracts/v2/strategy/openapi.json">公共契约</a>。实现沿用已有 P2 Command/CAS/pgx 与 P1 HTTP 执行，日历计算不引入新的交易框架。测试覆盖实际 P3→Go P2 HTTP、周末/夏令时/提前收市、两项分别触限、边界恢复、不可改、PostgreSQL 重开、公共只读及减险路径。</p></article><footer>HTML 是本版唯一发布正文。图表为内嵌 SVG，无需联网或运行脚本。文档通过不代表程序实现、交易运行或实盘准入通过。</footer></main></div></body></html>
