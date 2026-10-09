@@ -221,6 +221,32 @@ func TestEvaluateFinancialScaleRefinement(t *testing.T) {
 		} `json:"cases"`
 	}
 	labelRaw := financialRead(t, lab, "labels.json", &labels)
+	// Compare labels to the immutable upstream answers again, so editing a
+	// local label after a response cannot improve the frozen numeric metric.
+	var reference []financialContext
+	goldRaw := financialRead(t, filepath.Join(lab, "..", "financial-gold-lab-20261009"), "test-gold.json", &reference)
+	if d.ContentDigest(goldRaw) != "c4d08418359c1d76468dec420ee748a37f48c06b63cb8ec2766f19d5d314b597" {
+		t.Fatal("SCALE_EVALUATION_GOLD_CHANGED")
+	}
+	answers := map[string]financialQuestion{}
+	for _, c := range reference {
+		for _, raw := range c.Questions {
+			var meta struct {
+				Type string `json:"answer_type"`
+			}
+			if json.Unmarshal(raw, &meta) != nil {
+				t.Fatal("SCALE_EVALUATION_GOLD_SCHEMA")
+			}
+			if meta.Type != "span" {
+				continue
+			}
+			var q financialQuestion
+			if json.Unmarshal(raw, &q) != nil {
+				t.Fatal("SCALE_EVALUATION_GOLD_SCHEMA")
+			}
+			answers[q.UID] = q
+		}
+	}
 	var report struct {
 		Rows []struct {
 			Request  string `json:"request_hash"`
@@ -237,6 +263,10 @@ func TestEvaluateFinancialScaleRefinement(t *testing.T) {
 	narrow, boundCount, input, output := 0, 0, 0, 0
 	results := []map[string]any{}
 	for i, item := range labels.Cases {
+		gold, ok := answers[item.UID]
+		if !ok || len(gold.Answer) != 1 || item.Answer != gold.Answer[0] || item.Scale != gold.Scale || item.Source != gold.AnswerSource {
+			t.Fatal("SCALE_EVALUATION_LABEL_CHANGED")
+		}
 		var request financialRequest
 		reqRaw := financialRead(t, lab, item.Request, &request)
 		var response struct {
@@ -288,4 +318,22 @@ func TestEvaluateFinancialScaleRefinement(t *testing.T) {
 	}
 	frozenRateWrite(t, lab, "evaluation.json", map[string]any{"at": time.Now().UTC(), "literal_scale_matches": narrow, "literal_scale_and_present_unit": boundCount, "cases": 4, "input_tokens": input, "output_tokens": output, "results": results, "labels_hash": d.ContentDigest(labelRaw), "report_hash": d.ContentDigest(reportRaw), "independent_unseen_holdout": false, "whole_document_complete": false, "production_installed": false, "billed_cost": nil, "orders": 0})
 	t.Logf("new_context_literal_scale=%d/4; with_present_unit=%d/4; tokens=%d/%d; unit_semantic_scope_not_proven", narrow, boundCount, input, output)
+}
+
+// Presence and spelling cannot establish applicability: this header explicitly
+// excludes per-share data. Keep the limitation executable rather than treating
+// a successful bound-ID result as automatic semantic verification.
+func TestFinancialUnitCoordinatePresenceDoesNotProveScope(t *testing.T) {
+	var r financialRequest
+	r.State.Table = [][]string{{"in thousands, except per-share data"}, {"earnings per share", "0.22"}}
+	n := financialCandidate{Origin: "TABLE", Literal: "0.22", Row: 1, Column: 1}
+	u := financialCandidate{Origin: "TABLE", Literal: r.State.Table[0][0], Row: 0, Column: 0}
+	if !financialLiteralPresent(r, n) || !financialLiteralPresent(r, u) || !financialUnitLabelMatches(u.Literal, "thousand") {
+		t.Fatal("the diagnostic must expose that coordinate presence alone permits a semantically excluded header")
+	}
+	// Removal still blocks the unit while preserving the numerical cell.
+	r.State.Table[0][0] = ""
+	if financialLiteralPresent(r, u) || !financialLiteralPresent(r, n) {
+		t.Fatal("unit and numeric evidence must be bound independently")
+	}
 }
