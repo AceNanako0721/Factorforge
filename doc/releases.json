@@ -133,6 +133,20 @@
         "03_SOXLUSDT_JEV应用实例",
         "04_Web管理台"
       ]
+    },
+    {
+      "version": "2.1.9",
+      "directory": "doc/v2.1.9",
+      "change_kind": "design",
+      "date": "2026-10-09",
+      "reason": "先完成官方跨来源事实与分数词面原型试验，再设计显式算法版本及旧审阅产物兼容；业务式样保持。",
+      "format": "html",
+      "document_pairs": [
+        "01_交易系统层",
+        "02_策略化框架层",
+        "03_SOXLUSDT_JEV应用实例",
+        "04_Web管理台"
+      ]
     }
   ]
 }

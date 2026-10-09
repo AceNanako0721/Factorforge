@@ -1,0 +1,23 @@
+# P3 独立来源与分数词面试验
+
+日期2026-10-09。先完成本实验和设计，再变更生产词面算法；试验程序全部在tests/applications/soxl_jev/experiments，普通CI不请求网络。真实正文、对照与实验标签仅存忽略的私有runtime，没有接入实际业务或交易。
+
+## 独立市场来源
+
+[NYSE官方日历/时段](https://www.nyse.com/trade/hours-calendars)实际GET HTTP200，109229字节。解析2026年度10个假期和NYSE Arca常规开闭时刻，针对已归档Binance日历2026-10-01～10-14逐日期核对：10个常规交易日、09:30～16:00，零不一致。范围只覆盖该段，不把试验DOM方法当全年生产日历，未完成独立人员复核或未来临时休市验证。原文和calendar-reference-report.json在runtime/reference-lab-20261009。
+
+尝试SEC无Key的公开公司概念/提交记录各一次GET，共两次403、各4819字节；响应标题为未声明自动工具，网站表示其网络识别不符合自动工具访问政策。请求声明了Factorforge/版本及公开项目URL，但没有操作者联系邮箱；不能单凭响应确定是邮箱、IP信誉或其他网络分类原因。不自动重试、不变换代理或绕过限制，不把HTML错误页解析成结构化披露。后续若采用SEC须先解决符合官方访问政策的身份/网络条件。[官方API](https://www.sec.gov/search-filings/edgar-application-programming-interfaces)、[自动访问政策](https://www.sec.gov/about/developer-resources)及[内容复用说明](https://www.sec.gov/files/about/webmaster-faq.htm)分别记录，不能把一次访问失败说成API需要付费或Key。
+
+## 美联储跨来源事实对照
+
+通过4次GET取得官方[历史目标利率表](https://www.federalreserve.gov/monetarypolicy/openmarket.htm)及2026-09-16、2025-12-10、2025-03-19三份第一方声明，均HTTP200；字节106220/82636/82679/82597。正文适用既有美联储第一方文字许可边界，未复制页面图片/标识或把实验资产安装生产。完整hash/接收时间见runtime/fed-corpus-lab-20261009/report.json。
+
+实验从历史表2024～2026的7次变化取得独立来源数值，按有效日期核对声明目标区间及增/减/维持方向；声明日期与政策生效次日明确区分，不能将下一日当公告首发。三例精确有理数数值及方向一致。历史表哈希34dd5e67b853346b62d680a0903379a9bee1bc8f472871a34dc5ef5e8ab95e70；声明分别ebd06c5d12b3a307a1d36a91ca887ee2ac8e337b5787fcf602173b296ba851d1、c19824c550974219677b55af71c96869337c8fdb87e9d5a6a5302677cc6f3dc6、2b9ab017cc7488cd01279ad95a51fba3a51cb33b535dd47955ebdcd5eb5a69b1。
+
+这是不同页面的官方事实对照，不是独立盲标保留集或全文抽取完成。原型只定位一类明确决策句，未覆盖经济限定、投票、资产负债表等全部事实；历史模型知识污染亦未排除。first_public_at仍UNKNOWN；未调用JEV、数据库或下层写入。测试代码中的有理数比较只用于对照，不接入生产归一化或交易评分。
+
+## 原字节词面缺口及试验决定
+
+现有paragraph-literal-1将1/4、3-3/4、3‑3/4等拆开，三份真实声明共7处所需完整词面缺失；已冻结before-design-cross-source-rate-report.json。八个分数/混合数、Unicode连字符、带符号、普通小数/指数、斜杠日期/链、HTML标签/实体及无效数学表达开发例通过。原型在相同原文中保留全部7处完整字节词面，范围/哈希不经过HTML解码或数学归一化。
+
+采用显式paragraph-literal-2供新私有请求选择，旧请求缺method_version继续paragraph-literal-1；不能悄悄用新算法重建旧bundle/review或保持同ID改内容。新请求字段进入原请求哈希，因此产物ID区分；新模式只保留词面，无数学有效性、语义、单位、完整性或事件关系资格。连续斜杠链跳过，标签/实体不拼接；1/0等原样表达不声称数学有效。现有独立审阅及同跨度/单位核验仍是准入路径。定稿配对设计后才更改生产算法。
