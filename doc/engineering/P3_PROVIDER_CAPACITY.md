@@ -37,3 +37,15 @@
 真实HTTP夹具验证200/非法响应/429/529/拒绝/传输/读体失败，预占拒绝时零HTTP，完成保存失败时零候选。实际ProviderControl→JEV夹具同请求只发一次；撤销数据库函数权限后新请求零HTTP。原生worker在PATH=/nonexistent下缺共享账户登记阻断；原生CLI两次登记保持身份/政策且供应商调用数不变。配置文件的运行目录/链接/闭合JSON/字节上限另有反例。
 
 这些是实现机制证据，仍不是本账户共享token限额或真实LIVE容量认证。完整Go/vet及原生构建通过；最终P3回归、P3/实验/工程race、布局/契约/版本式样语义/11份HTML/历史检查和22项浏览器检查通过，新图和窄屏截图已查看。最终CI单独继续记录。
+
+## 真实供应商经过生产队列及预占门（2026-10-09）
+
+基线main `1fa5969381231a6adce16d55570bb6952623702a`（v2.1.12）。新增 `guarded_provider_integration_test.go`，先通过本地协议夹具，再显式执行一次真实JEV。复用既有JevHTTP、ProviderControl、PipelineStore、AnalysisWorker和P2 HTTP；没有新实现方法、生产源码或文档基线变更。不是直接HTTP探针，也不是原生worker二进制的真实账户试验。
+
+临时原生PostgreSQL内设独立INGEST/RESEARCH登录身份，共享账户政策仅RESEARCH有1次/1并发，SIM/LIVE均0；本实例队列另有1任务/1并发。数值为这次有界实验的停止条件，不能用作生产政策。合成已核验Claim经INGEST身份登记到实际本地P2、保存原文/路由并入研究队列；分析使用P2独立公共研究监听与query/score:research身份。真实Key只读canonical config/config.toml。实验Prompt在新0700 runtime目录、0600文件内，无production-ready标记，不经生产资产安装。请求上限20000字节、响应65536字节、HTTP20秒，固定jev-1.13.0；独立传输观察器最多一次，持久started标记阻止再次执行，不重试未知投递。
+
+实际HTTP200，2898请求字节，354ms，1196输入/168输出token；候选example_or_mock=false、未弃权，通过既有封闭协议/Claim绑定核验。队列任务COMPLETED、预算扣额1次；账户调用记录1条、COMPLETE。关闭并重开PipelineStore与ProviderControl后，候选摘要保持，完成任务不再领取；从持久outbox提交实际P2，收到RESEARCH_ONLY且ACK，重复dispatch不重复。再次直接分析相同请求由数据库返回PROVIDER_CALL_ALREADY_RESERVED，供应商HTTP始终1次。P2研究回执1条、贡献0、交易目标outbox0；没有账户查询或订单。
+
+私有证据 `runtime/guarded-jev-lab-20261009/`：report SHA-256 `be07fb316ba1d617961b2b6d39dd6b1662dde9eeb49944d8f7e3ef2957bdb691`；plan `be3c1d7f93c9140b708ee770ca1e8b75a2de3d5f9b9dc3d26f0463f97f4e4cf2`；request `03c2cc8963a7992b5a0e92895adc186d541e6a39714ac2bd5f929634bf665d75`；response `85de890ad785546b2bf2017a7185df9bb8ddcfdadd88b1de410ed57429e64bae`。正文、Prompt、完整候选和响应均不公开，日志只记录稳定码/计数。不能重跑该目录；普通CI只跑本地夹具、跳过显式真实账户入口。
+
+这是单条合成事实的真实传输、持久预算和研究回执证据，不是未见新闻抽取、业务量表标定、动态token限额、费用账单、长期故障/外部程序共享负载或LIVE延迟认证。实际业务实例尚未启用，OD-01/OD-02及生产准入保持独立。
