@@ -191,3 +191,15 @@ PipelineAssets.calendar_file 可登记绝对 runtime 产物路径，只由INGEST
 ## v2.1.9 显式分数词面方法
 
 新ProposalRequest可显式指定method_version=paragraph-literal-2，export-evidence私有计划同名字段透传；未提供继续paragraph-literal-1，旧Bundle/ReviewRequest与产物身份保持。算法版本字段属于完整请求hash，不能仅修改页面或审阅后的派生方法。v2保留1/4、3-3/4及U+2010/U+2011混合数原字节范围，连续斜杠链跳过，标签/实体不拼接。FRACTION_LEXEMES_UNINTERPRETED提示未做数学/语义解释；同跨度原词面和完整单位仍须审核，不能填归一化的小数代替原词面。无公共API或配置/Prompt模板变更。方法证据与限制见[P3数字原文试验](P3_NUMERIC_EVIDENCE.md)。
+
+## v2.1.10 共享JEV账户控制
+
+真实模式的分析worker使用已有的本角色数据库连接，必须已有ProviderControl授权；缺失时在JEV前拒绝。各共享同一实际账户的实例/环境使用同一控制数据库、同一pool_id；研究/SIM/LIVE调用资源各自硬分区，业务队列与RLS保持。账户或token配额不能由Key字符串推断，映射和政策限额需要实际证据。
+
+操作者在canonical配置的既有publication管理连接执行init-storage，创建空控制schema；没有政策/授权时不能调用。将明确的ProviderPoolPolicy及ProviderGrant列表写入仓库runtime下0600的私有JSON，执行instance-cli --action register-provider-budget --config <canonical-config> --proposal-input <absolute-runtime-file> --max-proposal-bytes <explicit-byte-budget>。输入结构为policy/grants，字段见当前配对设计第16章和domain/provider_control.go；不提供生产示例数值，不需要另填JEV Key或数据库DSN。
+
+每项行政登记分别提交，失败可能保留之前成功登记的政策/授权；按相同输入重做是幂等的，不会清计数/暂停。禁止改版本或池来重置旧调用；同版本内容/重叠窗口/身份重绑拒绝。管理连接和文件只由操作者CLI读取，不派发给worker。配置/Prompt模板保持各一个空文件。
+
+Acquire失败没有HTTP；成功预占后仅一次HTTP，完整交付保存COMPLETE，传输/读取未知保存UNKNOWN并继续占名额。429/529保存RATE_LIMITED并暂停全池。完成写入失败保持STARTED且没有候选。重复请求拒绝重新投递，完成不退款，重启/新窗口不清旧未知或暂停；本版没有自动回收/解暂停操作。稳定PROVIDER_*错误用于现有降级投影，不打印账户、原文、Prompt、响应或Key。
+
+本门控制本项目的请求次数、在途数、投递间隔和字节；不能证明上游动态token容量、外部程序、不同Key同账户、实际账单及LIVE延迟。保持OD-02和LIVE门。实施/小负载证据见[P3共享账户验证](P3_PROVIDER_CAPACITY.md)。

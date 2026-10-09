@@ -303,4 +303,59 @@ func TestNativeInstanceWorkerProfilesAndProcessWithoutPythonNode(t *testing.T) {
 	if err = admin.QueryRow(ctx, "SELECT state FROM instance_pipeline_sim.trading_submission_outbox").Scan(&delivery); err != nil || delivery != "ACK" {
 		t.Fatal("framework receipt not durable", delivery, err)
 	}
+	// A real-mode native worker must fail on missing shared-account registration
+	// before attempting its configured provider. All assets here remain synthetic.
+	profile, err := config.LoadWorker(paths[2], "TRADING")
+	if err != nil {
+		t.Fatal(err)
+	}
+	profile.Mode = "jev"
+	asset.FixtureOnly = false
+	data, _ = json.Marshal(asset)
+	if err = os.WriteFile(settings.AssetsFile, data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	data, _ = toml.Marshal(profile)
+	realProfile := filepath.Join(private, "missing-provider-control.toml")
+	if err = os.WriteFile(realProfile, data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	command := exec.Command(binary, "--config", realProfile, "--once")
+	command.Env = []string{"PATH=/nonexistent", "TZ=UTC"}
+	output, err := command.CombinedOutput()
+	if err == nil || !strings.Contains(string(output), "PROVIDER_CONTROL_UNAVAILABLE") || providerCalls.Load() != 1 {
+		t.Fatal("native worker bypassed missing account control", err, string(output))
+	}
+	// Provision via the actual operator binary using its canonical admin identity.
+	sections["application"].(map[string]any)["pipeline"].(map[string]any)["publication"] = config.PublicationAccess{DatabaseURL: server.AdminDSN, SourceVersion: "fixture-source-version", MaxRecords: 100, MaxBytes: 100000}
+	data, _ = toml.Marshal(sections)
+	if err = os.WriteFile(canonical, data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	operator := filepath.Join(private, "instance-cli")
+	build = exec.Command("go", "build", "-o", operator, "../../../src/factorforge/applications/soxl_jev/entrypoints/instance-cli")
+	if output, err = build.CombinedOutput(); err != nil {
+		t.Fatal(err, string(output))
+	}
+	registration := config.ProviderBudgetRegistration{Policy: providerPolicy(), Grants: []d.ProviderGrant{{Login: "fixture_process_trading", Binding: r.Binding, QueueKind: "SIM", PoolID: "fixture-pool"}, {Login: "fixture_process_research", Binding: r.Binding, QueueKind: "RESEARCH", PoolID: "fixture-pool"}}}
+	registrationFile := filepath.Join(private, "provider-registration.json")
+	data, _ = json.Marshal(registration)
+	if err = os.WriteFile(registrationFile, data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{{"--action", "init-storage", "--config", canonical}, {"--action", "register-provider-budget", "--config", canonical, "--proposal-input", registrationFile, "--max-proposal-bytes", "100000"}, {"--action", "register-provider-budget", "--config", canonical, "--proposal-input", registrationFile, "--max-proposal-bytes", "100000"}} {
+		command = exec.Command(operator, args...)
+		command.Dir = root
+		command.Env = []string{"PATH=/nonexistent", "TZ=UTC"}
+		if output, err = command.CombinedOutput(); err != nil {
+			t.Fatal("native provider registration", err, string(output))
+		}
+	}
+	var grantCount, callCount int
+	if err = admin.QueryRow(ctx, "SELECT count(*) FROM instance_provider_control.worker_grant").Scan(&grantCount); err != nil || grantCount != 2 {
+		t.Fatal(grantCount, err)
+	}
+	if err = admin.QueryRow(ctx, "SELECT count(*) FROM instance_provider_control.call").Scan(&callCount); err != nil || callCount != 0 || providerCalls.Load() != 1 {
+		t.Fatal("registration made supplier call", callCount, err)
+	}
 }

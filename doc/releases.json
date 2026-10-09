@@ -147,6 +147,20 @@
         "03_SOXLUSDT_JEV应用实例",
         "04_Web管理台"
       ]
+    },
+    {
+      "version": "2.1.10",
+      "directory": "doc/v2.1.10",
+      "change_kind": "design",
+      "date": "2026-10-09",
+      "reason": "先完成实际JEV小负载、队列反例与共享SQL原型，再设计跨实例账户预算预占；业务式样保持。",
+      "format": "html",
+      "document_pairs": [
+        "01_交易系统层",
+        "02_策略化框架层",
+        "03_SOXLUSDT_JEV应用实例",
+        "04_Web管理台"
+      ]
     }
   ]
 }
