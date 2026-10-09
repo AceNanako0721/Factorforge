@@ -205,7 +205,7 @@ func TestReviewedFileCompilationLoadingAndNativeCLI(t *testing.T) {
 		t.Fatal("CLI acquired configuration")
 	}
 	var extracted d.ExtractedEvidence
-	extractor := evidence.AnnotatedExtractor{Annotations: map[string]evidence.Annotation{a.Raw.ContentHash: a.Annotation}, Clock: func() time.Time { return r.Review.ReviewedAt }, MaxBytes: 100000}
+	extractor := evidence.AnnotatedExtractor{ReviewedEvents: map[string]evidence.ReviewedAsset{a.ReviewID: {Annotation: a.Annotation, EventPlan: a.EventPlan}}, Clock: func() time.Time { return r.Review.ReviewedAt }, MaxBytes: 100000}
 	if extracted, err = extractor.Extract(context.Background(), a.Raw); err != nil || !extracted.Complete {
 		t.Fatal("review not consumable by existing extractor", err)
 	}
@@ -278,7 +278,7 @@ func TestReviewAssetsOnlyIngestReadsPrivateArtifacts(t *testing.T) {
 	}
 	write()
 	loaded, err := config.LoadPipelineAssets(p)
-	if err != nil || len(loaded.ReviewedOriginals) != 1 || loaded.Annotations[compiled.Raw.ContentHash].VerificationManifest != compiled.ReviewID {
+	if err != nil || len(loaded.ReviewedOriginals) != 1 || loaded.ReviewedEvents[compiled.ReviewID].Annotation.VerificationManifest != compiled.ReviewID || len(loaded.Annotations) != 0 || len(loaded.EventPlans) != 0 {
 		t.Fatal("review assets not assembled", err)
 	}
 	a.ReviewedEvidenceFiles = append(a.ReviewedEvidenceFiles, file)
@@ -298,7 +298,7 @@ func TestReviewAssetsOnlyIngestReadsPrivateArtifacts(t *testing.T) {
 	for _, role := range []string{"RESEARCH", "TRADING"} {
 		p.Role = role
 		loaded, err = config.LoadPipelineAssets(p)
-		if err != nil || len(loaded.ReviewedOriginals) != 0 || len(loaded.Annotations) != 0 {
+		if err != nil || len(loaded.ReviewedOriginals) != 0 || len(loaded.Annotations) != 0 || len(loaded.ReviewedEvents) != 0 {
 			t.Fatal("analysis read the ingest review file", role, err)
 		}
 	}

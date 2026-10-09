@@ -69,7 +69,8 @@ func TestReviewedEvidencePostgresPreservesFailureAndRestartIdentity(t *testing.T
 		t.Fatal("failure not stored", err)
 	}
 	originalHash := d.Digest(original)
-	worker.Extractor = evidence.AnnotatedExtractor{Clock: clock.Now, MaxBytes: 100000, Annotations: map[string]evidence.Annotation{raw.ContentHash: artifact.Annotation}}
+	worker.ReviewedEvents = map[string]evidence.ReviewedAsset{artifact.ReviewID: {Annotation: artifact.Annotation, EventPlan: artifact.EventPlan}}
+	worker.Extractor = evidence.AnnotatedExtractor{Clock: clock.Now, MaxBytes: 100000, ReviewedEvents: worker.ReviewedEvents}
 	receipt, err := worker.Process(ctx, artifact.Raw)
 	if err != nil || receipt.Route != "TRADING_CANDIDATE" {
 		t.Fatal("review not ingested", err, receipt.ReasonCodes)

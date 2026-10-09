@@ -17,3 +17,11 @@ P2 `strategy/application/commands.go: Service.RegisterEvent` 按 EventID/FactVer
 按设计修订发布 v2.1.11，再实现审阅 ID → 成对 Annotation/EventPlan 的内部索引。原 reviewed_evidence_files、ReviewRequest 和 ReviewArtifact 格式与复算算法保持；旧 ContentHash 索引仅用于既有非编译审阅输入。重复 review ID、绑定/重编译失败、与显式旧资产冲突仍拒绝。保留一份审阅一个经济身份的约束，不把多份局部审阅标为原文的自动全量抽取。
 
 本试验只能证明索引方法可区分同源事件并保留既有机械核验。原文是否遗漏其他事实、审阅者语义判断、来源许可、独立评测和生产标定均未由此证明。真实 P2 HTTP/数据库摄入、重启幂等和运行预算结果须在设计提交后的实现验收记录中单独填写。
+
+## 设计后的实现验证
+
+研究提交 `df09665`，设计先行提交 `380c34d`，此后才修改生产代码。v2.1.11 使用内部 ReviewedAsset 成对值，以不可改 ReviewID 装配；每份文件仍完整重编译比对。两个经济事件共享原文时互不覆盖；缺少编译审阅 ID 不回退旧哈希资产。原文件和非编译输入兼容，显式旧资产冲突、重复审阅 ID/事件事实版本、外部 JSON 注入内部索引和跨环境审阅拒绝；分析角色不读取文件。
+
+`TestSharedOriginalReviewsActualP2HTTPAndPostgresRestart` 使用实际 Go P2 HTTP、原生临时 PostgreSQL 和 INGEST 最小角色：两个独立事件、两个不可改审阅 manifest、两个任务和两次预算扣款。数据库关闭再打开、重复摄入后计数保持，事件/Claim/证据 ID、原文哈希和公开/接收时间逐一核对。P2 未登记的夹具事实仍为 QUARANTINED；未调用 JEV、真实账户或订单。另一个具备有效抽取但缺少成对计划的审阅保持隔离，即使旧 Plans 存在同哈希条目也不入队、不花预算。
+
+首次计数查询把 bytea 当 JSON 操作导致 SQLSTATE 42883；修正测试查询为 UTF8 JSON 解码后重跑通过。旧 CLI 测试仍直接传哈希索引，也已按新设计改为成对审阅索引后回归通过；这不是生产网络/数据库恢复规则变更。P3/实验/工程 race、全库 vet、目录/契约检查及独立实例二进制构建通过。11份离线HTML、四组式样保持/历史冻结与1440/390宽22次浏览器检查通过；新增图和窄屏正文已检查。全库go test ./...通过；GitHub结果另随交付核对。

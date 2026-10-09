@@ -54,8 +54,9 @@ func multiEventReviews(t *testing.T) []operations.ReviewArtifact {
 	return artifacts
 }
 
-// This opt-in experiment records the installed loader's behavior. Its prototype
-// is confined to the test: no production selection path is changed here.
+// The initial opt-in capture preceded the design and production change. This
+// entry now exercises the same scenario with the scoped production extractor;
+// the initial private capture cannot be overwritten or automatically rerun.
 func TestSharedOriginalReviewLab(t *testing.T) {
 	if os.Getenv("FACTORFORGE_REVIEW_MULTIEVENT_LAB") != "1" {
 		t.Skip("explicit offline experiment only")
@@ -100,7 +101,7 @@ func TestSharedOriginalReviewLab(t *testing.T) {
 		// Prototype: select the paired artifact by immutable review identity first,
 		// then use the existing extraction verifier without weakening any checks.
 		selected := byID[a.Raw.EvidenceID]
-		x := evidence.AnnotatedExtractor{Annotations: map[string]evidence.Annotation{a.Raw.ContentHash: selected.Annotation}, Clock: func() time.Time { return a.Request.Review.ReviewedAt }, MaxBytes: 100000}
+		x := evidence.AnnotatedExtractor{ReviewedEvents: map[string]evidence.ReviewedAsset{a.Raw.EvidenceID: {Annotation: selected.Annotation, EventPlan: selected.EventPlan}}, Clock: func() time.Time { return a.Request.Review.ReviewedAt }, MaxBytes: 100000}
 		if _, e := x.Extract(context.Background(), a.Raw); e != nil {
 			t.Fatal("scoped prototype", e)
 		}
@@ -108,11 +109,11 @@ func TestSharedOriginalReviewLab(t *testing.T) {
 		if other.ReviewID == a.ReviewID {
 			other = artifacts[1]
 		}
-		x.Annotations[a.Raw.ContentHash] = other.Annotation
+		x.ReviewedEvents[a.Raw.EvidenceID] = evidence.ReviewedAsset{Annotation: other.Annotation, EventPlan: other.EventPlan}
 		if _, e := x.Extract(context.Background(), a.Raw); e == nil {
 			t.Fatal("cross-wired review borrowed another event's claims")
 		}
 	}
-	write("report.json", map[string]any{"fixture_only": true, "base_commit": "28fd2a258d0c536a8168585edb79201b7e6a80b0", "compiled_reviews": len(artifacts), "same_content_hash": true, "loader_error": fmt.Sprint(loadErr), "loader_originals": len(loaded.ReviewedOriginals), "prototype_scoped_verified": 2, "cross_wired_rejected": 2, "network_calls": 0, "database_writes": 0, "orders": 0})
+	write("report.json", map[string]any{"fixture_only": true, "original_reproduction_base": "28fd2a258d0c536a8168585edb79201b7e6a80b0", "compiled_reviews": len(artifacts), "same_content_hash": true, "loader_error": fmt.Sprint(loadErr), "loader_originals": len(loaded.ReviewedOriginals), "scoped_verified": 2, "cross_wired_rejected": 2, "network_calls": 0, "database_writes": 0, "orders": 0})
 	t.Logf("current loader: %v; scoped prototype verified both reviews and rejected both cross-wires", loadErr)
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/domain"
 	dto "github.com/AceNanako0721/Factorforge/src/factorforge/strategy/api/dto"
+	"strings"
 	"time"
 )
 
@@ -18,10 +19,19 @@ type Annotation struct {
 	Spans                []d.Span    `json:"spans"`
 	Complete             bool        `json:"complete"`
 }
+
+// ReviewedAsset keeps a compiled review's extraction and event plan together.
+// Its map key is the immutable review ID, not the original document hash.
+type ReviewedAsset struct {
+	Annotation Annotation
+	EventPlan  d.EventPlan
+}
+
 type AnnotatedExtractor struct {
-	Annotations map[string]Annotation
-	Clock       func() time.Time
-	MaxBytes    int
+	Annotations    map[string]Annotation
+	ReviewedEvents map[string]ReviewedAsset
+	Clock          func() time.Time
+	MaxBytes       int
 }
 
 func (x AnnotatedExtractor) Extract(ctx context.Context, raw d.RawEvidence) (d.ExtractedEvidence, error) {
@@ -32,6 +42,12 @@ func (x AnnotatedExtractor) Extract(ctx context.Context, raw d.RawEvidence) (d.E
 		return d.ExtractedEvidence{}, d.Fail("EXTRACTOR_CONFIGURATION_REQUIRED", 503)
 	}
 	a, exists := x.Annotations[raw.ContentHash]
+	if reviewed, scoped := x.ReviewedEvents[raw.EvidenceID]; scoped {
+		a, exists = reviewed.Annotation, reviewed.Annotation.VerificationManifest == raw.EvidenceID
+	} else if strings.HasPrefix(raw.EvidenceID, "review-") {
+		// A missing compiled identity cannot borrow another event's hash entry.
+		exists = false
+	}
 	if !exists || a.ContentHash != raw.ContentHash {
 		return d.ExtractedEvidence{}, d.Fail("EXTRACTION_NOT_RECORDED", 422)
 	}
