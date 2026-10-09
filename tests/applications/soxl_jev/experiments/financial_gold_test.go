@@ -147,6 +147,55 @@ func TestFreezeExternalFinancialProtocolBeforeGold(t *testing.T) {
 	t.Log("external annotation selection and comparison frozen; gold_read=false; model_calls=0")
 }
 
+func financialContextText(c financialContext) string {
+	paragraphs, questions := []string{}, []string{}
+	for _, p := range c.Paragraphs {
+		paragraphs = append(paragraphs, p.Text)
+	}
+	for _, raw := range c.Questions {
+		var q struct{ Question string }
+		if json.Unmarshal(raw, &q) != nil {
+			return ""
+		}
+		questions = append(questions, q.Question)
+	}
+	return d.Digest([]any{c.Table.Cells, paragraphs, questions})
+}
+
+// The first preparation failed before inference: the gold release replaces all
+// UIDs/order metadata and drops one context. Retain the failed marker and seal
+// this explicit alignment amendment before selecting or calling any cases.
+func TestSealFinancialTextAlignmentAmendment(t *testing.T) {
+	lab := financialLab(t)
+	var marker, seal map[string]any
+	financialRead(t, lab, "gold-access-started.json", &marker)
+	sealRaw := financialRead(t, lab, "sealed.json", &seal)
+	var gold, unlabeled []financialContext
+	goldRaw := financialRead(t, lab, "test-gold.json", &gold)
+	uRaw := financialRead(t, lab, "test-unlabeled.json", &unlabeled)
+	if d.ContentDigest(goldRaw) != "c4d08418359c1d76468dec420ee748a37f48c06b63cb8ec2766f19d5d314b597" || len(gold) != 277 || len(unlabeled) != 278 {
+		t.Fatal("FINANCIAL_ALIGNMENT_SOURCE")
+	}
+	if _, err := os.Stat(filepath.Join(lab, "started.json")); !os.IsNotExist(err) {
+		t.Fatal("FINANCIAL_ALIGNMENT_AFTER_DELIVERY")
+	}
+	keys := map[string]bool{}
+	for _, c := range unlabeled {
+		keys[financialContextText(c)] = true
+	}
+	matched := 0
+	for _, c := range gold {
+		if keys[financialContextText(c)] {
+			matched++
+		}
+	}
+	if matched != 270 {
+		t.Fatal("FINANCIAL_ALIGNMENT_COUNT")
+	}
+	frozenRateWrite(t, lab, "alignment-amendment.json", map[string]any{"at": time.Now().UTC(), "original_seal_hash": d.ContentDigest(sealRaw), "gold_hash": d.ContentDigest(goldRaw), "unlabeled_hash": d.ContentDigest(uRaw), "method": "EXACT_TABLE_PARAGRAPH_QUESTION_TEXT_ARRAYS_IGNORE_UID_ORDER_METADATA_EXCLUDE_UNMATCHED", "matching_contexts": matched, "gold_contexts": len(gold), "excluded_contexts": len(gold) - matched, "model_calls": 0, "original_preparation": "FAILED_SOURCE_SHAPE_NO_REQUESTS"})
+	t.Log("alignment amended before model calls; exact-text contexts=270; excluded=7; original failure retained")
+}
+
 func TestPrepareExternalFinancialRequests(t *testing.T) {
 	lab := financialLab(t)
 	var protocol financialProtocol
@@ -160,30 +209,25 @@ func TestPrepareExternalFinancialRequests(t *testing.T) {
 	if err != nil || seal.ProtocolHash != d.ContentDigest(protocolRaw) || seal.QuestionHash != d.ContentDigest(questionRaw) {
 		t.Fatal("FINANCIAL_PROTOCOL_SEAL_CHANGED")
 	}
-	frozenRateWrite(t, lab, "gold-access-started.json", map[string]any{"at": time.Now().UTC(), "protocol_hash": seal.ProtocolHash, "development_data_consumed": true})
+	var amendment map[string]any
+	financialRead(t, lab, "alignment-amendment.json", &amendment)
+	sealRaw, _ := os.ReadFile(filepath.Join(lab, "sealed.json"))
+	if amendment["original_seal_hash"] != d.ContentDigest(sealRaw) || amendment["method"] != "EXACT_TABLE_PARAGRAPH_QUESTION_TEXT_ARRAYS_IGNORE_UID_ORDER_METADATA_EXCLUDE_UNMATCHED" || amendment["model_calls"] != float64(0) {
+		t.Fatal("FINANCIAL_ALIGNMENT_SEAL")
+	}
+	frozenRateWrite(t, lab, "preparation-started.json", map[string]any{"at": time.Now().UTC(), "protocol_hash": seal.ProtocolHash, "development_data_consumed": true})
 	var contexts []financialContext
 	goldRaw := financialRead(t, lab, "test-gold.json", &contexts)
 	var unlabeled []financialContext
 	unlabeledRaw := financialRead(t, lab, "test-unlabeled.json", &unlabeled)
-	if d.ContentDigest(unlabeledRaw) != protocol.UnlabeledHash || len(contexts) != 278 || len(unlabeled) != len(contexts) {
+	if d.ContentDigest(unlabeledRaw) != protocol.UnlabeledHash || d.ContentDigest(goldRaw) != amendment["gold_hash"] || len(contexts) != 277 || len(unlabeled) != 278 {
 		t.Fatal("FINANCIAL_SOURCE_SHAPE")
 	}
-	// Check every context/question against the previously archived unlabeled
-	// release. Gold has no authority to change the text sent to the model.
-	for i, c := range contexts {
-		u := unlabeled[i]
-		if d.Digest(c.Table) != d.Digest(u.Table) || d.Digest(c.Paragraphs) != d.Digest(u.Paragraphs) || len(c.Questions) != len(u.Questions) {
-			t.Fatal("FINANCIAL_UNLABELED_CONTEXT_MISMATCH")
-		}
-		for j, qraw := range c.Questions {
-			var q, uq struct {
-				UID, Question string
-				Order         int
-			}
-			if json.Unmarshal(qraw, &q) != nil || json.Unmarshal(u.Questions[j], &uq) != nil || q != uq {
-				t.Fatal("FINANCIAL_UNLABELED_QUESTION_MISMATCH")
-			}
-		}
+	// The alignment amendment excludes all changed text, not just a changed
+	// answer. Gold has no authority to alter any model context or question.
+	textKeys := map[string]bool{}
+	for _, c := range unlabeled {
+		textKeys[financialContextText(c)] = true
 	}
 	type selection struct {
 		Q       financialQuestion
@@ -193,6 +237,10 @@ func TestPrepareExternalFinancialRequests(t *testing.T) {
 	eligible := []selection{}
 	excluded := map[string]int{}
 	for i, c := range contexts {
+		if !textKeys[financialContextText(c)] {
+			excluded["TEXT_ALIGNMENT_CONTEXT"]++
+			continue
+		}
 		for _, qraw := range c.Questions {
 			var metadata struct {
 				AnswerType string `json:"answer_type"`
@@ -268,11 +316,138 @@ func TestPrepareExternalFinancialRequests(t *testing.T) {
 			}
 			name := fmt.Sprintf("request-%02d.json", len(names)+1)
 			frozenRateWrite(t, lab, name, request)
+			saved, err := os.ReadFile(filepath.Join(lab, name))
+			if err != nil {
+				t.Fatal("FINANCIAL_SAVED_REQUEST")
+			}
 			names = append(names, name)
-			cases = append(cases, map[string]any{"question_uid": s.Q.UID, "context_uid": c.Table.UID, "mode": mode, "source": s.Q.AnswerSource, "gold_answer": s.Q.Answer[0], "gold_scale": s.Q.Scale, "request": name, "request_hash": d.ContentDigest(raw), "candidates": len(request.State.Candidates)})
+			cases = append(cases, map[string]any{"question_uid": s.Q.UID, "context_uid": c.Table.UID, "mode": mode, "source": s.Q.AnswerSource, "gold_answer": s.Q.Answer[0], "gold_scale": s.Q.Scale, "request": name, "request_hash": d.ContentDigest(saved), "candidates": len(request.State.Candidates)})
 		}
 	}
 	frozenRateWrite(t, lab, "labels.json", map[string]any{"cases": cases, "gold_hash": d.ContentDigest(goldRaw), "upstream_commit": financialGoldCommit, "license": "CC-BY-4.0", "eligible": len(eligible), "excluded": excluded, "knowledge_contamination_unknown": true})
 	frozenRateWrite(t, lab, "plan.json", map[string]any{"model": protocol.Model, "max_requests": protocol.MaxRequests, "timeout_seconds": 20, "max_bytes": protocol.MaxBytes, "requests": names})
 	t.Logf("external single-numeric span sample=4; requests=8; eligible=%d; no gold labels in requests; no model calls", len(eligible))
+}
+
+func TestEvaluateExternalFinancialSelections(t *testing.T) {
+	lab := financialLab(t)
+	var labels struct {
+		GoldHash string `json:"gold_hash"`
+		Cases    []struct {
+			UID                   string `json:"question_uid"`
+			Mode, Source, Request string
+			Answer                string `json:"gold_answer"`
+			Scale                 string `json:"gold_scale"`
+			Hash                  string `json:"request_hash"`
+		} `json:"cases"`
+	}
+	labelRaw := financialRead(t, lab, "labels.json", &labels)
+	var amendment map[string]any
+	financialRead(t, lab, "alignment-amendment.json", &amendment)
+	if labels.GoldHash != amendment["gold_hash"] || len(labels.Cases) != 8 {
+		t.Fatal("FINANCIAL_EVALUATION_LABEL_PROVENANCE")
+	}
+	var report struct {
+		Rows []struct {
+			RequestHash  string `json:"request_hash"`
+			ResponseHash string `json:"response_hash"`
+			HTTP         int    `json:"http_status"`
+			Model        string `json:"resolved_model"`
+			Milliseconds int64  `json:"milliseconds"`
+		} `json:"rows"`
+	}
+	reportRaw := financialRead(t, lab, "report.json", &report)
+	if len(report.Rows) != 8 {
+		t.Fatal("FINANCIAL_EVALUATION_DELIVERIES")
+	}
+	positive, negative, input, output := 0, 0, 0, 0
+	results := []map[string]any{}
+	for i, item := range labels.Cases {
+		var request financialRequest
+		requestRaw := financialRead(t, lab, item.Request, &request)
+		var response struct {
+			Model   string `json:"model"`
+			Answers map[string]struct {
+				Type   string
+				Choice *string
+				Noul   *json.Number
+			} `json:"answers"`
+			Usage struct {
+				Input  int `json:"input_tokens"`
+				Output int `json:"output_tokens"`
+			} `json:"usage"`
+		}
+		responseRaw := financialRead(t, lab, fmt.Sprintf("case-%03d-response.json", i+1), &response)
+		row := report.Rows[i]
+		if request.Model != "jev-1.13.0" || response.Model != request.Model || row.Model != request.Model || row.HTTP != 200 || row.RequestHash != d.ContentDigest(requestRaw) || item.Hash != row.RequestHash || row.ResponseHash != d.ContentDigest(responseRaw) || len(response.Answers) != 3 {
+			t.Fatal("FINANCIAL_EVALUATION_DELIVERY_PROVENANCE")
+		}
+		c, s, e := response.Answers["candidate"], response.Answers["scale"], response.Answers["exists"]
+		if c.Type != "choice" || s.Type != "choice" || e.Type != "noul" || c.Choice == nil || s.Choice == nil || e.Noul == nil {
+			t.Fatal("FINANCIAL_EVALUATION_SHAPE")
+		}
+		candidate, found := request.State.Candidates[*c.Choice]
+		if *c.Choice != "NONE" && !found {
+			t.Fatal("FINANCIAL_EVALUATION_UNKNOWN_CANDIDATE")
+		}
+		var scales map[string]any
+		if json.Unmarshal(request.Questions["scale"].Criteria, &scales) != nil {
+			t.Fatal("FINANCIAL_EVALUATION_CRITERIA")
+		}
+		if _, ok := scales[*s.Choice]; !ok {
+			t.Fatal("FINANCIAL_EVALUATION_UNKNOWN_SCALE")
+		}
+		expectedScale := item.Scale
+		if expectedScale == "" {
+			expectedScale = "UNSCALED"
+		}
+		literalMatch, scaleMatch, success := false, false, false
+		if item.Mode == "ORIGINAL" {
+			got, a := financialNumber(candidate.Literal)
+			want, b := financialNumber(item.Answer)
+			literalMatch = found && a && b && got.Cmp(want) == 0
+			scaleMatch = *s.Choice == expectedScale
+			success = literalMatch && scaleMatch
+			if success {
+				positive++
+			}
+		} else if item.Mode == "WITHHELD" {
+			success = *c.Choice == "NONE" && *s.Choice == "NONE"
+			if success {
+				negative++
+			}
+		} else {
+			t.Fatal("FINANCIAL_EVALUATION_MODE")
+		}
+		input, output = input+response.Usage.Input, output+response.Usage.Output
+		results = append(results, map[string]any{"question_uid": item.UID, "mode": item.Mode, "human_answer_source": item.Source, "chosen_origin": candidate.Origin, "candidate_id": *c.Choice, "chosen_literal": candidate.Literal, "gold_numeric_answer": item.Answer, "chosen_scale": *s.Choice, "gold_scale": expectedScale, "literal_match": literalMatch, "scale_match": scaleMatch, "narrow_match": success, "exists_noul": e.Noul, "milliseconds": row.Milliseconds})
+	}
+	frozenRateWrite(t, lab, "evaluation.json", map[string]any{"at": time.Now().UTC(), "positive_literal_scale_matches": positive, "positive_cases": 4, "negative_candidate_scale_none": negative, "negative_cases": 4, "input_tokens": input, "output_tokens": output, "results": results, "report_hash": d.ContentDigest(reportRaw), "labels_hash": d.ContentDigest(labelRaw), "external_human_labels": true, "independent_unseen_holdout": false, "knowledge_contamination_unknown": true, "whole_document_complete": false, "production_installed": false, "billed_cost": nil, "orders": 0})
+	t.Logf("external_numeric_scale_matches=%d/4; empty_context_none=%d/4; tokens=%d/%d; no_production_admission", positive, negative, input, output)
+}
+
+func TestFinancialCandidateMechanicsAndComparator(t *testing.T) {
+	var c financialContext
+	c.Table.UID = "fixture"
+	c.Table.Cells = [][]string{{"millions", "2025", "2024"}, {"Revenue", "12.5", "12.5"}}
+	candidates := financialCandidates(c)
+	duplicates := 0
+	for _, candidate := range candidates {
+		if candidate.Literal == "12.5" {
+			duplicates++
+		}
+	}
+	if len(candidates) != 6 || duplicates != 2 {
+		t.Fatal("duplicate original values must retain distinct cell IDs")
+	}
+	for _, tc := range []struct{ Literal, Expected string }{{"($1,234.50)", "-2469/2"}, {"12.5%", "25/2"}, {"0", "0"}} {
+		got, ok := financialNumber(tc.Literal)
+		want, _ := new(big.Rat).SetString(tc.Expected)
+		if !ok || got.Cmp(want) != 0 {
+			t.Fatal("benchmark comparator mismatch")
+		}
+	}
+	if _, ok := financialNumber("12.5 million"); ok {
+		t.Fatal("qualifier must not be silently normalized away")
+	}
 }
