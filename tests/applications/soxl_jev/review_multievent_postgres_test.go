@@ -123,7 +123,7 @@ func TestSharedOriginalReviewsActualP2HTTPAndPostgresRestart(t *testing.T) {
 	}
 	for _, a := range artifacts {
 		event := registered.Events.Value(a.EventPlan.EventID)
-		if event == nil || len(event.Claims) != 1 || event.Claims[0].EconomicItem != a.Annotation.Claims[0].EconomicItem || len(event.EvidenceRefs) != 1 || event.EvidenceRefs[0].EvidenceID != a.ReviewID || event.EvidenceRefs[0].ContentHash != a.Raw.ContentHash || event.State != "QUARANTINED" {
+		if event == nil || len(event.Claims) != 1 || event.Claims[0].EconomicItem != a.Annotation.Claims[0].EconomicItem || len(event.EvidenceRefs) != 1 || event.EvidenceRefs[0].EvidenceID != a.ReviewID || event.EvidenceRefs[0].ContentHash != a.Raw.ContentHash || event.EvidenceRefs[0].AvailableAt != a.Raw.ReceivedAt || event.State != "QUARANTINED" {
 			t.Fatal("actual P2 changed event identity or admitted unregistered fixture")
 		}
 	}

@@ -36,11 +36,11 @@ func (p originalAvailabilityPrototype) RegisterEvent(ctx context.Context, c dto.
 }
 
 type reviewClockOutcome struct {
-	EventState, ScoreState                                                                                string
-	OriginalReceivedAt, ReviewedAt, ExtractedAt, EventEvidenceAvailableAt, ScoreCompletedAt, EligibleFrom time.Time
+	EventState, ScoreState                                                                                                     string
+	OriginalReceivedAt, ReviewedAt, ExtractedAt, EventEvidenceAvailableAt, ScoreCompletedAt, FrameworkReceivedAt, EligibleFrom time.Time
 }
 
-func reviewedEvidenceClockCase(t *testing.T, prototype bool) reviewClockOutcome {
+func reviewedEvidenceClockCase(t *testing.T, prototype bool, delays ...time.Duration) reviewClockOutcome {
 	t.Helper()
 	ctx := context.Background()
 	state, identity, create := p2Fixture(t)
@@ -59,7 +59,8 @@ func reviewedEvidenceClockCase(t *testing.T, prototype bool) reviewClockOutcome 
 	create.Policy.VerificationManifests = append(create.Policy.VerificationManifests, artifact.ReviewID)
 	create.Policy.ClaimWeights[artifact.Annotation.Claims[0].EconomicItem] = artifact.Annotation.Claims[0].Weight
 	p2store := adapters.NewMemory(state)
-	handler, err := sapi.New(sapi.Options{Store: p2store, Clock: adapters.NewReplay(now), Internal: true, Tokens: map[string]sd.Identity{"fixture-only-worker": identity}, ReadPolicy: app.ReadPolicy{DefaultLimit: 10, MaxLimit: 50, MaxRecords: 1000, CursorAge: time.Hour, CursorKey: []byte("fixture-only-cursor-secret")}})
+	frameworkClock := adapters.NewReplay(now)
+	handler, err := sapi.New(sapi.Options{Store: p2store, Clock: frameworkClock, Internal: true, Tokens: map[string]sd.Identity{"fixture-only-worker": identity}, ReadPolicy: app.ReadPolicy{DefaultLimit: 10, MaxLimit: 50, MaxRecords: 1000, CursorAge: time.Hour, CursorKey: []byte("fixture-only-cursor-secret")}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,6 +90,13 @@ func reviewedEvidenceClockCase(t *testing.T, prototype bool) reviewClockOutcome 
 	if _, err = worker.Process(ctx, raw); err != nil || store.job == nil {
 		t.Fatal("review clock ingest", err)
 	}
+	// A later poll must reuse durable availability instead of refreshing any
+	// original or extraction clock. This also exercises P2's exact idempotency.
+	later := raw
+	later.ReceivedAt = now
+	if _, err = worker.Process(ctx, later); err != nil || store.enqueues != 1 || store.job.Request.Routing.AvailableAt != now {
+		t.Fatal("repeat poll refreshed time or duplicated job", err)
+	}
 	saved, err := p2store.Read(ctx, r.Binding.InstanceID)
 	if err != nil {
 		t.Fatal(err)
@@ -102,13 +110,20 @@ func reviewedEvidenceClockCase(t *testing.T, prototype bool) reviewClockOutcome 
 	if err != nil {
 		t.Fatal(err)
 	}
+	scoreAt, receivedAt := now, now
+	if len(delays) == 2 {
+		scoreAt, receivedAt = now.Add(delays[0]), now.Add(delays[1])
+	}
+	if receivedAt.Before(scoreAt) || frameworkClock.Advance(receivedAt) != nil {
+		t.Fatal("invalid synthetic time order")
+	}
 	command := dto.Command{SchemaVersion: "strategy-2.0", RequestID: "fixture-clock-score", IdempotencyKey: "fixture-clock-score", ExpectedVersion: version, Reason: "FIXTURE_ONLY"}
-	score := dto.ScoreSubmission{SubmissionID: command.RequestID, EventID: event.EventID, FactVersion: 1, ObjectID: object.ObjectID, ScoreVersion: 1, RevisionKind: "INITIAL", Vector: candidate.Vector, EvidenceRefs: []string{artifact.ReviewID}, ProducerID: "fixture-provider", ProducerVersion: "fixture-producer", RubricVersion: "fixture-rubric", CalibrationVersion: "fixture-calibration", CompletedAt: now, InputManifestHash: store.job.Request.Routing.ManifestHash}
+	score := dto.ScoreSubmission{SubmissionID: command.RequestID, EventID: event.EventID, FactVersion: 1, ObjectID: object.ObjectID, ScoreVersion: 1, RevisionKind: "INITIAL", Vector: candidate.Vector, EvidenceRefs: []string{artifact.ReviewID}, ProducerID: "fixture-provider", ProducerVersion: "fixture-producer", RubricVersion: "fixture-rubric", CalibrationVersion: "fixture-calibration", CompletedAt: scoreAt, InputManifestHash: store.job.Request.Routing.ManifestHash}
 	receipt, err := client.Submit(ctx, dto.ScoreCommand{Command: command, Score: score})
-	if err != nil || receipt.EligibleFrom == nil || receipt.EligibleFrom.Before(now) || receipt.State != "QUARANTINED" {
+	if err != nil || receipt.EligibleFrom == nil || receipt.EligibleFrom.Before(scoreAt) || receipt.EligibleFrom.Before(receivedAt) || receipt.State != "QUARANTINED" {
 		t.Fatal("score time was backfilled or unregistered calibration admitted", err, receipt)
 	}
-	return reviewClockOutcome{event.State, receipt.State, raw.ReceivedAt, artifact.Annotation.Claims[0].VerifiedAt, store.job.Request.Evidence.CompletedAt, event.EvidenceRefs[0].AvailableAt, score.CompletedAt, *receipt.EligibleFrom}
+	return reviewClockOutcome{event.State, receipt.State, raw.ReceivedAt, artifact.Annotation.Claims[0].VerifiedAt, store.job.Request.Evidence.CompletedAt, event.EvidenceRefs[0].AvailableAt, score.CompletedAt, receivedAt, *receipt.EligibleFrom}
 }
 
 func TestReviewedEvidenceAvailabilityClockLab(t *testing.T) {
@@ -116,7 +131,7 @@ func TestReviewedEvidenceAvailabilityClockLab(t *testing.T) {
 		t.Skip("explicit offline experiment only")
 	}
 	current, prototype := reviewedEvidenceClockCase(t, false), reviewedEvidenceClockCase(t, true)
-	if current.EventState != "QUARANTINED" || prototype.EventState != "VERIFIED" || !current.EventEvidenceAvailableAt.After(current.ReviewedAt) || prototype.EventEvidenceAvailableAt != prototype.OriginalReceivedAt {
+	if prototype.EventState != "VERIFIED" || prototype.EventEvidenceAvailableAt != prototype.OriginalReceivedAt || current.EventEvidenceAvailableAt != current.ExtractedAt && current.EventEvidenceAvailableAt != current.OriginalReceivedAt {
 		t.Fatal("time mapping comparison not isolated", current, prototype)
 	}
 	root, err := filepath.Abs(filepath.Join("..", "..", ".."))

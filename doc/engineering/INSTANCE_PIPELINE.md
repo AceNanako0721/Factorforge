@@ -211,3 +211,9 @@ Acquire失败没有HTTP；成功预占后仅一次HTTP，完整交付保存COMPL
 不要把这些产物手工合并回ContentHash索引。annotations/event_plans仍支持既有非编译输入，但与审阅产物冲突时拒绝；重复review ID、同一EventID/FactVersion重复装配、跨绑定/篡改同样拒绝。review-前缀对应的编译身份缺项不会回退到旧哈希条目。审阅范围中的IRRELEVANT不表示整篇没有其他经济事实，多份审阅也不是自动全量抽取证明。
 
 实际P2 HTTP/原生PostgreSQL双事件及重开幂等证据见[同原文审阅验证](P3_SHARED_ORIGINAL_REVIEWS.md)；缺项保持隔离、不调用模型或交易，来源/许可/时间/标定和P2资格继续独立检查。
+
+## v2.1.12 原文与抽取的可用时间
+
+出站P2事件的EvidenceRef.AvailableAt表示原文在本系统的首次可用，取已保存Raw.ReceivedAt；本次抽取CompletedAt及路由AvailableAt仍是实际完成时间，Claim.VerifiedAt仍取冻结审阅时间。评分和框架接收继续控制真正贡献的EligibleFrom，不会因原文较早而提前引用。没有新配置、接口或编译文件格式。
+
+有效旧审阅文件在首次摄入时使用正确映射；已持久化的旧原文、事件、任务和评分保持。旧payload若与新映射冲突会继续失败、不入队，不自动改事实版本、补偿或升级；该类历史修复需要另行审查，当前没有迁移操作。事件VERIFIED不等同评分READY、交易运行或LIVE准入。完整证据见[时间链验证](P3_EVIDENCE_CLOCK.md)。
