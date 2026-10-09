@@ -7,25 +7,12 @@ import (
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/ports"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/routing"
 	dto "github.com/AceNanako0721/Factorforge/src/factorforge/strategy/api/dto"
-	dec "github.com/AceNanako0721/Factorforge/src/factorforge/trading/api/dto"
 	"time"
 )
 
 // EventPlan preserves the reviewed family/revision relationship. The model
 // cannot invent facts, pick a new revision to evade CAS, or grant signal scope.
-type EventPlan struct {
-	EventID         string      `json:"event_id"`
-	FamilyID        string      `json:"family_id"`
-	EventType       string      `json:"event_type"`
-	Relation        string      `json:"relation"`
-	FactVersion     int         `json:"fact_version"`
-	ParentEventID   *string     `json:"parent_event_id"`
-	OccurredAt      time.Time   `json:"occurred_at"`
-	Novelty         dec.Decimal `json:"novelty"`
-	PreviousScoreID *string     `json:"previous_score_id"`
-	ScoreVersion    int         `json:"score_version"`
-	RevisionKind    string      `json:"revision_kind"`
-}
+type EventPlan = d.EventPlan
 type IngestWorker struct {
 	Store                                                                              ports.IngestStore
 	Framework                                                                          ports.FrameworkClient
@@ -150,8 +137,5 @@ func (w IngestWorker) Process(ctx context.Context, raw d.RawEvidence) (d.Routing
 	return receipt, w.Store.Enqueue(ctx, job, bucket)
 }
 func validPlan(p EventPlan) bool {
-	return d.ValidID(p.EventID) && d.ValidID(p.FamilyID) && d.ValidID(p.EventType) && p.FactVersion > 0 && d.UTC(p.OccurredAt) &&
-		d.Has([]string{"NEW", "CONFIRMATION", "NEW_FACT", "CORRECTION", "RETRACTION"}, p.Relation) &&
-		(p.ParentEventID == nil || d.ValidID(*p.ParentEventID)) && p.ScoreVersion > 0 && d.Has([]string{"INITIAL", "REVISION"}, p.RevisionKind) &&
-		(p.RevisionKind != "REVISION" || p.PreviousScoreID != nil && d.ValidID(*p.PreviousScoreID))
+	return p.Valid()
 }

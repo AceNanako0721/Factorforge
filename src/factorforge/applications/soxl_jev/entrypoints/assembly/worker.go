@@ -181,6 +181,7 @@ func RunWorker(role string) error {
 					return e
 				}
 			}
+			inputs = append(inputs, assets.ReviewedOriginals...)
 			result := (workers.IngestCycle{Worker: *ingest, Store: store, Sources: sources, Search: search}).Run(work, inputs)
 			if reporter != nil {
 				e := reporter.Tick(work)

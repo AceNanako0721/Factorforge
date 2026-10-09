@@ -125,3 +125,21 @@ runtime/bin/instance-cli --action prepare-evidence \
 SEARCH_IN_PROGRESS 表示同查询已在执行；SEARCH_CACHE_CAPACITY 表示有效缓存/租约已达登记容量；SEARCH_BACKENDS_UNAVAILABLE 表示候选链均不可用或预算/暂停限制。429/402 等暂停持久化到数据库，重启继续有效。不要为了获得期望方向而改查询键/重试，也不要把匿名免费路径当作生产 SLA。多实例/环境共用同一外部账户的总额度仍需 OD-02 单独验证。
 
 URL 线索命中缓存仍重新检查来源许可并获取原文。来源抓取继续通过注册域名、HTTPS/公共 DNS、体积/时限和禁止跳转边界；只保存原文真实哈希及接收时间，不采用搜索摘要或搜索时间。独立采集原文先完成处理，后端故障不能撤销已保存原文。自动语义抽取/事件关系盲标及业务标定未因此完成。
+## v2.1.6：逐段审阅与独立摄入
+
+先用 prepare-evidence 生成完整原文/段落候选；再由审阅者填写 ReviewRequest，而不是把 EvidenceProposal 改成 Complete=true。每个段落必须明确 INCLUDE（关联 Claim）或 IRRELEVANT；主体、事项、期间、事实时间、权重、原文跨度和事件/修订关系都来自显式审阅，没有自动默认。类型和完整字段以当前 HTML 设计第12章及 operations/review.go 为准。
+
+```sh
+./instance-cli --action compile-evidence \
+  --proposal-input runtime/reviews/review-input.json \
+  --proposal-output runtime/reviews/review-artifact.json \
+  --max-proposal-bytes <explicit-positive-byte-budget>
+```
+
+此操作不读 config/config.toml、不访问模型/数据库/下层，输出仅在本仓库 runtime，无覆盖。数字原词面和完整单位必须同时位于该 Claim 的同一原文跨度；不能借其他主体的数值、把 1 当成 12，或把 USD 当成 USDT。完整性是审阅者明确的决定，代码机械核验不证明独立语义审查已经通过。
+
+在既有私有 assets JSON 中登记 reviewed_evidence_files 绝对路径数组，并从仓库根工作目录启动 INGEST。启动时重编译并对比完整产物/实例/环境，拒绝篡改、符号链接/逃逸、重复原文或与 annotations/event_plans 冲突；只给 INGEST 装配审阅原文，分析角色不读取文件。修改审阅需新产物及重新启动加载；不动态覆盖已加载资产。
+
+既有失败 raw_evidence_manifest 不会升级。审阅产生 review-摘要的独立证据 ID，保留 original_evidence_id、原哈希、真实首次公开/接收时间，旧记录不改；再经既有核验/许可/路由、P2 事件注册及隔离入队。没有来源许可、公开时间、有效映射或标定时仍研究/隔离，不能靠审阅包授予交易资格。相同审阅重复与重启只入队/扣预算一次。
+
+本版未安装实验 Prompt、自动语义抽取器或生产常数；真实配置未改、实际实例未启用。生产自动抽取的独立标签/保留集、来源许可与账单/共享配额验证仍待完成。设计和试验见当前基线及 P3_EXTRACTION_EVALUATION.md。

@@ -14,6 +14,21 @@ import (
 // PrepareEvidenceFile owns only private review artifacts. It does not load any
 // credentials, initialize storage or acquire a framework/provider interface.
 func PrepareEvidenceFile(root, input, output string, maxBytes int) error {
+	return transformEvidenceFile(root, input, output, maxBytes, func(raw []byte) ([]byte, error) {
+		var request evidence.ProposalRequest
+		if d.DecodePrivate(raw, &request) != nil {
+			return nil, d.Fail("PROPOSAL_FILE_INVALID", 422)
+		}
+		proposal, err := evidence.PrepareProposal(request)
+		if err != nil {
+			return nil, err
+		}
+		return json.MarshalIndent(proposal, "", "  ")
+	})
+}
+
+// Both operator actions share the same private-file and no-overwrite boundary.
+func transformEvidenceFile(root, input, output string, maxBytes int, compile func([]byte) ([]byte, error)) error {
 	if maxBytes <= 0 || input == "" || output == "" {
 		return d.Fail("PROPOSAL_FILE_INVALID", 422)
 	}
@@ -31,17 +46,9 @@ func PrepareEvidenceFile(root, input, output string, maxBytes int) error {
 	if readErr != nil || statErr != nil || closeErr != nil || !os.SameFile(info, opened) || opened.Size() != int64(len(raw)) || opened.Size() > int64(maxBytes) {
 		return d.Fail("PROPOSAL_FILE_INVALID", 422)
 	}
-	var request evidence.ProposalRequest
-	if d.DecodePrivate(raw, &request) != nil {
-		return d.Fail("PROPOSAL_FILE_INVALID", 422)
-	}
-	proposal, err := evidence.PrepareProposal(request)
+	data, err := compile(raw)
 	if err != nil {
 		return err
-	}
-	data, err := json.MarshalIndent(proposal, "", "  ")
-	if err != nil {
-		return d.Fail("PROPOSAL_WRITE_FAILED", 503)
 	}
 	if len(data) > maxBytes {
 		return d.Fail("PROPOSAL_BUDGET_EXCEEDED", 422)
