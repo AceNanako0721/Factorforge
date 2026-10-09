@@ -147,7 +147,7 @@ func TestAnalysisWorkerLeaseTimeoutStopsProviderWithoutReasking(t *testing.T) {
 	store := &pipelineMemory{binding: request.Binding, kind: "SIM", job: &d.PipelineJob{
 		JobID: request.RequestID, QueueKind: "SIM", State: "QUEUED", Request: request, Deadline: request.Deadline,
 	}}
-	framework := &fixtureFramework{binding: request.Binding}
+	framework := &fixtureFramework{binding: request.Binding, events: 1}
 	provider := &fixtureJev{candidate: candidate, waitForCancellation: true}
 	worker := workers.AnalysisWorker{Store: store, Framework: framework, Provider: provider,
 		Clock: &pipelineClock{now}, WorkerID: "fixture-worker", Lease: 15 * time.Millisecond, AllowMock: true, MaxOutboxes: 10}

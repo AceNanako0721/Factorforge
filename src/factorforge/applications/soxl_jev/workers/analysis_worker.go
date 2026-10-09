@@ -62,19 +62,12 @@ func (w AnalysisWorker) ProcessOne(ctx context.Context) (bool, error) {
 	if r.Event.FirstPublicAt != *r.Evidence.Raw.FirstPublicAt || r.Event.FactVersion < 1 || !d.Has(r.Event.ObjectIDs, r.ObjectID) {
 		return true, reject("FAILED", "EVENT_BINDING_INVALID")
 	}
-	version, err := w.Framework.Version(ctx, r.ObjectID)
-	if err != nil {
-		return true, reject("FAILED", "FRAMEWORK_UNAVAILABLE")
-	}
-	eventKey := "event-" + d.Digest([]any{r.Binding, r.Event.EventID, r.Event.FactVersion, r.Event.Relation, r.Evidence.Raw.ContentHash})
-	eventCommand := dto.EventCommand{Command: dto.Command{SchemaVersion: "strategy-2.0", RequestID: eventKey, IdempotencyKey: eventKey, ExpectedVersion: version, Reason: "VERIFIED_INSTANCE_EVIDENCE"}, Event: r.Event}
-	if w.Framework.ResearchOnly() {
-		exists, e := w.Framework.EventExists(ctx, r.Event.EventID, r.ObjectID, r.Event.FactVersion)
-		if e != nil || !exists {
-			return true, reject("FAILED", "FRAMEWORK_EVENT_NOT_RECORDED")
-		}
-	} else if _, err = w.Framework.RegisterEvent(ctx, eventCommand, r.Event.FactVersion > 1); err != nil {
-		return true, reject("FAILED", "FRAMEWORK_EVENT_NOT_ACCEPTED")
+	// INGEST registers the fact before enqueueing it. Repeating that command
+	// under an analysis identity conflicts with P2's identity-bound idempotency.
+	// Both analysis roles must confirm the recorded version before model use.
+	exists, e := w.Framework.EventExists(ctx, r.Event.EventID, r.ObjectID, r.Event.FactVersion)
+	if e != nil || !exists {
+		return true, reject("FAILED", "FRAMEWORK_EVENT_NOT_RECORDED")
 	}
 	if job.Candidate == nil {
 		if err = w.Store.StartProvider(ctx, *job, w.Clock.Now().UTC()); err != nil {
@@ -114,7 +107,7 @@ func (w AnalysisWorker) ProcessOne(ctx context.Context) (bool, error) {
 	if err = a.Validate(r, *job.Candidate, w.Clock.Now().UTC(), w.AllowMock); err != nil {
 		return true, reject("ABSTAINED", "CANDIDATE_NOT_ADMITTED")
 	}
-	version, err = w.Framework.Version(ctx, r.ObjectID)
+	version, err := w.Framework.Version(ctx, r.ObjectID)
 	if err != nil {
 		return true, reject("FAILED", "FRAMEWORK_UNAVAILABLE")
 	}
