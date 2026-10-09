@@ -141,7 +141,7 @@ func (w AnalysisWorker) Dispatch(ctx context.Context) error {
 			continue
 		}
 		// A missing response is reconciled against recorded framework receipts before
-		// repeating the exact command/key. No new model call or score ID is created.
+		// repeating the same score/key. No new model call or score ID is created.
 		receipt, e := w.Framework.Receipt(ctx, row.Command.Score.EventID, row.Command.Score.ObjectID, row.OutboxID)
 		if e != nil {
 			return e
@@ -152,7 +152,21 @@ func (w AnalysisWorker) Dispatch(ctx context.Context) error {
 			}
 			continue
 		}
-		received, e := w.Framework.Submit(ctx, row.Command)
+		version, e := w.Framework.Version(ctx, row.Command.Score.ObjectID)
+		if e != nil {
+			return e
+		}
+		if !w.Clock.Now().UTC().Before(row.ExpiresAt) {
+			if err = w.Store.SetDelivery(ctx, row, "EXPIRED", nil); err != nil {
+				return err
+			}
+			continue
+		}
+		// CAS is transport metadata, excluded from P2's identity/payload digest.
+		// Keep the durable command untouched for receipt and storage checks.
+		command := row.Command
+		command.ExpectedVersion = version
+		received, e := w.Framework.Submit(ctx, command)
 		if w.Operations != nil {
 			kind := "TRADING"
 			if row.QueueKind == "RESEARCH" {
@@ -165,6 +179,12 @@ func (w AnalysisWorker) Dispatch(ctx context.Context) error {
 		if e != nil {
 			state := "DELIVERY_UNKNOWN"
 			var known *d.Error
+			if errors.As(e, &known) && known.Status == 409 && known.Code == "FRAMEWORK_AGGREGATE_VERSION_CONFLICT" {
+				// Another accepted command (or rejection audit) advanced P2 after
+				// our read. Leave this row unchanged for the next scheduled pass;
+				// do not spin, alter the score, or reopen a terminal delivery.
+				continue
+			}
 			if errors.As(e, &known) && known.Status >= 400 && known.Status < 500 {
 				state = "REJECTED"
 			}

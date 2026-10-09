@@ -78,6 +78,18 @@ func (c *HTTPClient) call(ctx context.Context, method, path string, query url.Va
 			code = "FRAMEWORK_SCOPE_FORBIDDEN"
 		case 409:
 			code = "FRAMEWORK_CONFLICT"
+			// Only the existing closed P2 envelope can identify a retryable CAS
+			// conflict. Other conflicts must not acquire retry eligibility.
+			var problem struct {
+				Code          string  `json:"code"`
+				Message       string  `json:"message"`
+				Field         *string `json:"field"`
+				CorrelationID *string `json:"correlation_id"`
+				Retryable     bool    `json:"retryable"`
+			}
+			if d.DecodePrivate(data, &problem) == nil && problem.Code == "AGGREGATE_VERSION_CONFLICT" && problem.Message == problem.Code {
+				code = "FRAMEWORK_AGGREGATE_VERSION_CONFLICT"
+			}
 		case 422:
 			code = "FRAMEWORK_REQUEST_INVALID"
 		}
