@@ -178,6 +178,26 @@ func TestPublicGuardTemplateShapesAndDocumentContainers(t *testing.T) {
 	}
 }
 
+func TestPublicGuardHistoricalSearchTemplateIsExactAndHistoryOnly(t *testing.T) {
+	config, e := os.ReadFile(filepath.Join(repoRoot(t), "config/config.example.toml"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	body := strings.ReplaceAll(string(config), "\r\n", "\n")
+	block := "[[application.pipeline.search_backends]]\nid = \"\"\nkind = \"\"\nendpoint = \"\"\ntoken = \"\"\n\n"
+	legacy := strings.Replace(body, block, "", 1)
+	if legacy == body || guard.TemplateIssue("config/config.example.toml", []byte(legacy), true) != "" || guard.TemplateIssue("config/config.example.toml", []byte(legacy), false) == "" {
+		t.Fatal("pre-v2.1.5 format not confined to history")
+	}
+	for _, invalid := range []string{strings.Replace(legacy, "jev_api_key = \"\"", "jev_api_key = \"short\"", 1), legacy + "\n[unexpected]\nvalue = \"\"\n", strings.Replace(body, block, strings.Replace(block, "token = \"\"", "token = \"short\"", 1), 1)} {
+		for _, history := range []bool{true, false} {
+			if guard.TemplateIssue("config/config.example.toml", []byte(invalid), history) == "" {
+				t.Fatal("historical policy admitted nonempty or unknown fields")
+			}
+		}
+	}
+}
+
 func TestPrivateInitializerPreservesExistingValues(t *testing.T) {
 	root := fixtureRepo(t)
 	if os.Getenv("FACTORFORGE_TEST_NO_SUBPROCESS") != "" {

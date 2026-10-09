@@ -99,11 +99,20 @@ func TemplateIssue(name string, data []byte, historical bool) string {
 		}
 		if historical {
 			old := cloneMap(expected)
+			// The exact pre-v2.1.5 empty format is accepted only in history.
+			application := cloneMap(asMap(old["application"]))
+			pipeline := cloneMap(asMap(application["pipeline"]))
+			delete(pipeline, "search_backends")
+			application["pipeline"] = pipeline
+			old["application"] = application
+			if equalJSON(actual, old) {
+				return ""
+			}
 			delete(old, "console")
 			if equalJSON(actual, old) {
 				return ""
 			}
-			application := cloneMap(asMap(old["application"]))
+			application = cloneMap(asMap(old["application"]))
 			delete(application, "pipeline")
 			old["application"] = application
 			old["services"] = actual["services"]
