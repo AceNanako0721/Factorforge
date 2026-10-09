@@ -62,6 +62,23 @@ func financialScopeKind(c financialContext, q financialQuestion) string {
 	return ""
 }
 
+// The planned two per-share contexts were unavailable after exact alignment
+// and direct-numeric filtering. Preserve the failed preparation and reduce the
+// sample before delivery instead of weakening those eligibility boundaries.
+func TestSealFinancialScopeSampleReduction(t *testing.T) {
+	lab := financialScopeLab(t)
+	var seal, failed map[string]any
+	sRaw := financialRead(t, lab, "sealed.json", &seal)
+	financialRead(t, lab, "preparation-started.json", &failed)
+	for _, name := range []string{"plan.json", "started.json"} {
+		if _, err := os.Stat(filepath.Join(lab, name)); !os.IsNotExist(err) {
+			t.Fatal("SCOPE_AMENDMENT_AFTER_PREPARATION_OR_DELIVERY")
+		}
+	}
+	frozenRateWrite(t, lab, "sample-amendment.json", map[string]any{"at": time.Now().UTC(), "original_seal_hash": d.ContentDigest(sRaw), "reason": "ONE_DIRECT_NUMERIC_PER_SHARE_CONTEXT_AFTER_ALIGNMENT_AND_PREVIOUS_CONTEXT_EXCLUSION", "per_share": 1, "year": 2, "max_requests": 3, "selection_order": "PER_SHARE_THEN_YEAR_SHA_WITHIN_EACH", "previous_failed_preparation_preserved": true, "model_calls": 0})
+	t.Log("sample reduced before delivery: per-share=1; year=2; max_calls=3; original failure preserved")
+}
+
 func TestPrepareFinancialScopeCases(t *testing.T) {
 	lab := financialScopeLab(t)
 	var protocol, seal map[string]any
@@ -72,7 +89,13 @@ func TestPrepareFinancialScopeCases(t *testing.T) {
 	if err != nil || previousErr != nil || seal["protocol_hash"] != d.ContentDigest(pRaw) || seal["question_hash"] != d.ContentDigest(questions) || d.ContentDigest(questions) != d.ContentDigest(previousQ) {
 		t.Fatal("SCOPE_SEAL")
 	}
-	frozenRateWrite(t, lab, "preparation-started.json", map[string]any{"at": time.Now().UTC(), "model_calls": 0})
+	var amendment map[string]any
+	financialRead(t, lab, "sample-amendment.json", &amendment)
+	sRaw, _ := os.ReadFile(filepath.Join(lab, "sealed.json"))
+	if amendment["original_seal_hash"] != d.ContentDigest(sRaw) || amendment["per_share"] != float64(1) || amendment["year"] != float64(2) || amendment["max_requests"] != float64(3) || amendment["selection_order"] != "PER_SHARE_THEN_YEAR_SHA_WITHIN_EACH" || amendment["model_calls"] != float64(0) {
+		t.Fatal("SCOPE_SAMPLE_AMENDMENT")
+	}
+	frozenRateWrite(t, lab, "preparation-started-v2.json", map[string]any{"at": time.Now().UTC(), "model_calls": 0})
 	archive := filepath.Join(lab, "..", "financial-gold-lab-20261009")
 	var contexts, unlabeled []financialContext
 	goldRaw := financialRead(t, archive, "test-gold.json", &contexts)
@@ -135,15 +158,21 @@ func TestPrepareFinancialScopeCases(t *testing.T) {
 	sort.Slice(eligible, func(i, j int) bool { return eligible[i].Key < eligible[j].Key })
 	counts := map[string]int{}
 	selected := []item{}
-	for _, v := range eligible {
-		c := contexts[v.Context]
-		if used[c.Table.UID] || counts[v.Kind] >= 2 {
-			continue
+	for _, kind := range []string{"PER_SHARE", "YEAR"} {
+		limit := 2
+		if kind == "PER_SHARE" {
+			limit = 1
 		}
-		used[c.Table.UID], counts[v.Kind] = true, counts[v.Kind]+1
-		selected = append(selected, v)
+		for _, v := range eligible {
+			c := contexts[v.Context]
+			if v.Kind != kind || used[c.Table.UID] || counts[v.Kind] >= limit {
+				continue
+			}
+			used[c.Table.UID], counts[v.Kind] = true, counts[v.Kind]+1
+			selected = append(selected, v)
+		}
 	}
-	if len(selected) != 4 || counts["YEAR"] != 2 || counts["PER_SHARE"] != 2 {
+	if len(selected) != 3 || counts["YEAR"] != 2 || counts["PER_SHARE"] != 1 {
 		t.Fatal("SCOPE_SAMPLE_INSUFFICIENT")
 	}
 	names, cases := []string{}, []map[string]any{}
@@ -187,8 +216,8 @@ func TestPrepareFinancialScopeCases(t *testing.T) {
 		cases = append(cases, map[string]any{"question_uid": v.Q.UID, "context_uid": c.Table.UID, "kind": v.Kind, "answer": v.Q.Answer[0], "scale": "UNSCALED", "unit": "NOT_APPLICABLE", "request": name, "request_hash": d.ContentDigest(saved), "numeric_candidates": len(request.State.Candidates), "unit_candidates": len(request.State.Units)})
 	}
 	frozenRateWrite(t, lab, "labels.json", map[string]any{"cases": cases, "eligible": len(eligible), "gold_hash": d.ContentDigest(goldRaw), "excluded_previous_contexts": 8, "external_human_labels": true, "historical_development_corpus": true})
-	frozenRateWrite(t, lab, "plan.json", map[string]any{"model": "jev-1.13.0", "max_requests": 4, "timeout_seconds": 20, "max_bytes": 65536, "requests": names})
-	t.Logf("per-share=2; year=2; eligible=%d; previous eight contexts excluded; no inference", len(eligible))
+	frozenRateWrite(t, lab, "plan.json", map[string]any{"model": "jev-1.13.0", "max_requests": 3, "timeout_seconds": 20, "max_bytes": 65536, "requests": names})
+	t.Logf("per-share=1; year=2; eligible=%d; previous eight contexts excluded; no inference", len(eligible))
 }
 
 func TestEvaluateFinancialScopeCases(t *testing.T) {
@@ -211,7 +240,7 @@ func TestEvaluateFinancialScopeCases(t *testing.T) {
 		} `json:"rows"`
 	}
 	rRaw := financialRead(t, lab, "report.json", &report)
-	if len(labels.Cases) != 4 || len(report.Rows) != 4 {
+	if len(labels.Cases) != 3 || len(report.Rows) != 3 {
 		t.Fatal("SCOPE_DELIVERY_COUNT")
 	}
 	var gold []financialContext
@@ -284,8 +313,8 @@ func TestEvaluateFinancialScopeCases(t *testing.T) {
 		input, output = input+res.Usage.Input, output+res.Usage.Output
 		results = append(results, map[string]any{"kind": item.Kind, "question_uid": item.UID, "chosen_literal": candidate.Literal, "gold_answer": item.Answer, "literal_bound_match": literal, "chosen_scale": choices["scale"], "chosen_unit": choices["unit"], "expected_scale": item.Scale, "expected_unit": item.Unit, "narrow_match": pass, "milliseconds": row.MS})
 	}
-	frozenRateWrite(t, lab, "evaluation.json", map[string]any{"at": time.Now().UTC(), "literal_unscaled_not_applicable_matches": matched, "cases": 4, "input_tokens": input, "output_tokens": output, "results": results, "labels_hash": d.ContentDigest(lRaw), "report_hash": d.ContentDigest(rRaw), "unit_not_applicable_is_protocol_expectation_not_upstream_span_gold": true, "historical_development_corpus": true, "whole_document_complete": false, "production_installed": false, "billed_cost": nil, "orders": 0})
-	t.Logf("per-share/year scope matches=%d/4; tokens=%d/%d; no_production_admission", matched, input, output)
+	frozenRateWrite(t, lab, "evaluation.json", map[string]any{"at": time.Now().UTC(), "literal_unscaled_not_applicable_matches": matched, "cases": 3, "input_tokens": input, "output_tokens": output, "results": results, "labels_hash": d.ContentDigest(lRaw), "report_hash": d.ContentDigest(rRaw), "unit_not_applicable_is_protocol_expectation_not_upstream_span_gold": true, "historical_development_corpus": true, "whole_document_complete": false, "production_installed": false, "billed_cost": nil, "orders": 0})
+	t.Logf("per-share/year scope matches=%d/3; tokens=%d/%d; no_production_admission", matched, input, output)
 }
 
 func TestFinancialScopeSelectionDoesNotTreatAmountAsYear(t *testing.T) {
