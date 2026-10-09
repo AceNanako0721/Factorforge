@@ -50,3 +50,11 @@ G4 首批实例链路的 [PR #15](https://github.com/AceNanako0721/Factorforge/p
 PR #18 的 [首轮 CI](https://github.com/AceNanako0721/Factorforge/actions/runs/37774156935) 中 contract-checks 拦截管理台契约未同步：实例新增 `report_details` 后，console 投影已生成，但 `contracts/v2/console/openapi.json` 仍是旧产物。该次其余四项成功，失败不是认证或 Actions 不可用。补齐 `tools/export-console-contract` 的生成结果，重新依序运行四类契约导出、投影输入校验与契约校验；提交实际生成文件后，等待新 head 的全部五项检查，再合并并确认 main。不得跳过生成文件差异检查。
 
 v2.1.5 PR #21 首轮 [CI 37882006107](https://github.com/AceNanako0721/Factorforge/actions/runs/37882006107) 的 repository-checks 拒绝 `PR change description and validation required`。正文有变更/验证内容，但未采用仓库模板规定的 `## 变更内容` 和 `## 验证` 固定标题；不是工作流权限、认证或源码检查故障。补齐固定标题，并以实际 PR_BODY 本地运行 check-repository 校验，再等待编辑/新提交触发的最新一轮全部五项 CI；不重试旧失败检查或放宽 ParseKind。PR 正文编辑会产生新的同 head CI，最终验收以最新轮次为准。
+
+## 合并事件未产生运行时的手动入口
+
+2026-10-09，PR #23 的精确 head 9a781f1099ad7ef3d19a4ed18c2c0e1bc96f9f63 在 [CI 37891182042](https://github.com/AceNanako0721/Factorforge/actions/runs/37891182042) 五项成功后合并到 main 1fa0b6cf472b25f0879c25bfe889216e945da41d。两者 Git tree 都为 7a9442c89b754b39a8b028aa57ec20e6b74e50fa。合并后一段时间多次读取 run list、该提交 check-runs/check-suites 都未出现 main push 运行；Actions 权限 enabled=true、Repository workflow active，YAML 仍明确监听 main push。没有检出源码检查失败，也没有证据证明具体平台事件根因。
+
+旧 YAML 没有 workflow_dispatch，因此没有可用的手动启动入口。按 [GitHub 官方手动运行文档](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow) 增加该事件，保留原 push/PR 触发、五个 job、版本/历史/源码检查及 contents:read 权限。此变更归 code-only，不另建文档版本，不通过空提交或取消保护制造通过状态。
+
+合并该入口后，先查询 main 的真实运行；若已有覆盖同一提交的运行就等待该轮，不重复调度。确无运行时才执行 `gh workflow run contracts.yml --ref main`，确认 workflow_dispatch 的 headSha 等于要验收的 main，并等待全部五项成功后发布。手动运行是事件缺失时的恢复手段，不表示平台根因已修复，不替代 PR 分类或生产验收。使用仓库限定 SSH 推送工作流，不要求重新索取现有认证。
