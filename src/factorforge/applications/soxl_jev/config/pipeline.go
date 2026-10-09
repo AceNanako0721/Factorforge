@@ -231,21 +231,23 @@ type RSSRegistration struct {
 	PublicationTimeVerified bool     `json:"publication_time_verified"`
 }
 type PipelineAssets struct {
-	Calendar          *operations.Calendar            `json:"calendar"`
-	ReportSchedule    *reports.Schedule               `json:"report_schedule"`
-	Bootstrap         *BootstrapAsset                 `json:"bootstrap"`
-	Version           string                          `json:"version"`
-	FixtureOnly       bool                            `json:"fixture_only"`
-	RoutingPolicy     d.RoutingPolicy                 `json:"routing_policy"`
-	Sources           map[string]d.SourceRegistration `json:"sources"`
-	Mappings          map[string]d.EntityMapping      `json:"mappings"`
-	EventPlans        map[string]workers.EventPlan    `json:"event_plans"`
-	Annotations       map[string]evidence.Annotation  `json:"annotations"`
-	RSS               []RSSRegistration               `json:"rss"`
-	Calibration       analysis.CalibrationMapping     `json:"calibration"`
-	SearchPlans       []monitoring.SearchPlan         `json:"search_plans"`
-	SearchRouting     *d.SearchRoutingPolicy          `json:"search_routing"`
-	SearchSourceHosts map[string]string               `json:"search_source_hosts"`
+	ReviewedEvidenceFiles []string                        `json:"reviewed_evidence_files,omitempty"`
+	ReviewedOriginals     []d.RawEvidence                 `json:"-"`
+	Calendar              *operations.Calendar            `json:"calendar"`
+	ReportSchedule        *reports.Schedule               `json:"report_schedule"`
+	Bootstrap             *BootstrapAsset                 `json:"bootstrap"`
+	Version               string                          `json:"version"`
+	FixtureOnly           bool                            `json:"fixture_only"`
+	RoutingPolicy         d.RoutingPolicy                 `json:"routing_policy"`
+	Sources               map[string]d.SourceRegistration `json:"sources"`
+	Mappings              map[string]d.EntityMapping      `json:"mappings"`
+	EventPlans            map[string]workers.EventPlan    `json:"event_plans"`
+	Annotations           map[string]evidence.Annotation  `json:"annotations"`
+	RSS                   []RSSRegistration               `json:"rss"`
+	Calibration           analysis.CalibrationMapping     `json:"calibration"`
+	SearchPlans           []monitoring.SearchPlan         `json:"search_plans"`
+	SearchRouting         *d.SearchRoutingPolicy          `json:"search_routing"`
+	SearchSourceHosts     map[string]string               `json:"search_source_hosts"`
 }
 
 type BootstrapAsset struct {
@@ -272,6 +274,34 @@ func LoadPipelineAssets(p WorkerProfile) (PipelineAssets, error) {
 		}
 		if a.SearchRouting.TimeoutSeconds > p.Settings.TimeoutSeconds {
 			return a, d.Fail("SEARCH_BACKEND_TIMEOUT_INVALID", 422)
+		}
+	}
+	if p.Role == "INGEST" && len(a.ReviewedEvidenceFiles) > 0 {
+		root, e := os.Getwd()
+		if e != nil {
+			return a, d.Fail("REVIEW_ARTIFACT_INVALID", 422)
+		}
+		if a.Annotations == nil {
+			a.Annotations = map[string]evidence.Annotation{}
+		}
+		if a.EventPlans == nil {
+			a.EventPlans = map[string]workers.EventPlan{}
+		}
+		seen := map[string]bool{}
+		for _, path := range a.ReviewedEvidenceFiles {
+			artifact, e := operations.LoadReviewedEvidence(root, path, p.Binding(), time.Now().UTC(), p.Settings.MaxInputBytes)
+			if e != nil {
+				return a, e
+			}
+			hash := artifact.Raw.ContentHash
+			annotation, annotated := a.Annotations[hash]
+			plan, planned := a.EventPlans[hash]
+			if seen[hash] || annotated && d.Digest(annotation) != d.Digest(artifact.Annotation) || planned && d.Digest(plan) != d.Digest(artifact.EventPlan) {
+				return a, d.Fail("REVIEW_ASSET_CONFLICT", 409)
+			}
+			seen[hash] = true
+			a.Annotations[hash], a.EventPlans[hash] = artifact.Annotation, artifact.EventPlan
+			a.ReviewedOriginals = append(a.ReviewedOriginals, artifact.Raw)
 		}
 	}
 	return a, nil

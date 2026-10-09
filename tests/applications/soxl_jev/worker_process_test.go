@@ -136,6 +136,20 @@ func TestNativeInstanceWorkerProfilesAndProcessWithoutPythonNode(t *testing.T) {
 	}
 	settings := config.PipelineSettings{Environment: "SIM", InstanceID: r.Binding.InstanceID, ObjectID: r.ObjectID, Stage: "R2", AssetsFile: filepath.Join(private, "assets.json"), FixtureInputFile: filepath.Join(private, "inputs.json"), PollSeconds: 1, TimeoutSeconds: 10, LeaseSeconds: 60, TaskTTLSeconds: 3600, MaxInputBytes: 100000, MaxOutboxes: 10, MaxFrameworkPages: 10, ResearchBucket: "fixture-budget", TradingBucket: "fixture-budget", QuestionSetVersion: r.QuestionSetVersion, PromptVersion: r.PromptVersion, RubricVersion: r.RubricVersion, CalibrationVersion: r.CalibrationVersion, ModelVersion: r.ModelVersion}
 	asset := config.PipelineAssets{Version: "fixture-assets", FixtureOnly: true, RoutingPolicy: d.RoutingPolicy{Version: "fixture-policy", Binding: r.Binding, ObjectID: r.ObjectID, CalibrationVersion: r.CalibrationVersion}, Calibration: a.CalibrationMapping{Version: r.CalibrationVersion, RubricVersion: r.RubricVersion, ProducerVersion: "fixture-producer", Impact: []dec.Decimal{number("0"), number("5")}, Relevance: []dec.Decimal{number("0"), number("1")}, Expectation: []dec.Decimal{number("0"), number("1")}, HalfLife: []dec.Decimal{number("60"), number("300")}, Credibility: number("1"), Quality: number("1"), Novelty: number("1"), Prepricing: number("0"), ClaimSupportMinimum: number("0.9"), Verified: true}}
+	// A compiled reviewed original uses the same actual worker, role and durable
+	// store. Its unregistered source stays quarantined and cannot call the model.
+	reviewRequest := reviewedRequest(t)
+	reviewRequest.Binding = r.Binding
+	reviewArtifact, err := operations.CompileReviewedEvidence(reviewRequest, now, 100000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reviewFile := filepath.Join(private, "review.json")
+	reviewBytes, _ := json.Marshal(reviewArtifact)
+	if err = os.WriteFile(reviewFile, reviewBytes, 0600); err != nil {
+		t.Fatal(err)
+	}
+	asset.ReviewedEvidenceFiles = []string{reviewFile}
 	asset.ReportSchedule = &reports.Schedule{Anchor: now.Add(-time.Hour), PeriodSeconds: 3600, MaxRecords: 100}
 	day := now.Truncate(24 * time.Hour)
 	asset.Calendar = &operations.Calendar{Version: "fixture-process-calendar", Zone: "UTC", ValidFrom: day.Add(-24 * time.Hour), ValidUntil: day.Add(48 * time.Hour), Sessions: []operations.MarketSession{{Date: day.Add(-24 * time.Hour).Format("2006-01-02"), OpenLocal: "00:00", CloseLocal: "00:01"}, {Date: day.Add(24 * time.Hour).Format("2006-01-02"), OpenLocal: "00:00", CloseLocal: "00:01"}}}
@@ -238,6 +252,7 @@ func TestNativeInstanceWorkerProfilesAndProcessWithoutPythonNode(t *testing.T) {
 	}
 	for i := 0; i < 2; i++ {
 		command := exec.Command(ingestBinary, "--config", paths[0], "--once")
+		command.Dir = root
 		command.Env = []string{"PATH=/nonexistent", "TZ=UTC"}
 		if output, e := command.CombinedOutput(); e != nil {
 			t.Fatal("native report iteration", e, string(output))
@@ -259,8 +274,11 @@ func TestNativeInstanceWorkerProfilesAndProcessWithoutPythonNode(t *testing.T) {
 		t.Fatal("native per-provider result lost")
 	}
 	var originalCount int
-	if err = admin.QueryRow(ctx, "SELECT count(*) FROM instance_pipeline_sim.raw_evidence_manifest WHERE instance_id=$1", r.Binding.InstanceID).Scan(&originalCount); err != nil || originalCount != 3 {
+	if err = admin.QueryRow(ctx, "SELECT count(*) FROM instance_pipeline_sim.raw_evidence_manifest WHERE instance_id=$1", r.Binding.InstanceID).Scan(&originalCount); err != nil || originalCount != 4 {
 		t.Fatal("native seed/supplement persistence", err, originalCount)
+	}
+	if reviewed, e := ingest.Evidence(ctx, reviewArtifact.Raw.EvidenceID); e != nil || reviewed == nil || !reviewed.Complete || reviewed.Raw.ReceivedAt != reviewArtifact.Raw.ReceivedAt {
+		t.Fatal("native reviewed artifact not persisted", e)
 	}
 	if err = admin.QueryRow(ctx, "SELECT count(*) FROM instance_pipeline_sim.framework_report").Scan(&reportCount); err != nil || reportCount != 1 {
 		t.Fatal("native periodic report once", reportCount, err)

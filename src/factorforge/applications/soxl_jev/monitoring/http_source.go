@@ -141,11 +141,8 @@ func (s RSSSource) Poll(ctx context.Context, cutoff time.Time) ([]d.RawEvidence,
 	}
 	result := []d.RawEvidence{}
 	for _, item := range feed.Channel.Items {
-		published, err := time.Parse(time.RFC1123Z, item.Published)
-		if err != nil {
-			published, err = time.Parse(time.RFC1123, item.Published)
-		}
-		if err != nil || published.After(cutoff) {
+		published, known := ParseRSSPublished(item.Published)
+		if !known || published.After(cutoff) {
 			continue
 		}
 		published = published.UTC()
