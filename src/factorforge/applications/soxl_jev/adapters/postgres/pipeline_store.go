@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-//go:embed migrations/002_pipeline.sql migrations/003_operations.sql
+//go:embed migrations/002_pipeline.sql migrations/003_operations.sql migrations/004_search.sql
 var pipelineFiles embed.FS
 
 type QueueBudget struct {
@@ -58,7 +58,7 @@ func InitializePipeline(ctx context.Context, dsn string, b d.Binding) error {
 		return safe(err)
 	}
 	defer tx.Rollback(ctx)
-	for _, file := range []string{"migrations/002_pipeline.sql", "migrations/003_operations.sql"} {
+	for _, file := range []string{"migrations/002_pipeline.sql", "migrations/003_operations.sql", "migrations/004_search.sql"} {
 		raw, e := pipelineFiles.ReadFile(file)
 		if e != nil {
 			return d.Fail("MIGRATION_UNAVAILABLE", 503)
@@ -94,6 +94,8 @@ func InitializePipeline(ctx context.Context, dsn string, b d.Binding) error {
 				"GRANT INSERT ON " + schema + ".raw_evidence_manifest," + schema + ".routing_receipt TO " + role,
 				"GRANT UPDATE(used_jobs) ON " + schema + ".budget TO " + role,
 				"GRANT SELECT,INSERT ON " + schema + ".framework_report TO " + role,
+				"GRANT SELECT,INSERT ON " + schema + ".search_state TO " + role,
+				"GRANT UPDATE(payload) ON " + schema + ".search_state TO " + role,
 			} {
 				if _, err = tx.Exec(ctx, sql); err != nil {
 					return safe(err)
@@ -195,8 +197,16 @@ func (s *PipelineStore) Kind() string {
 	return s.kind
 }
 func (s *PipelineStore) VerifyRole(ctx context.Context) error {
+	return s.verifyRole(ctx, s.pool)
+}
+
+type pipelineQuerier interface {
+	QueryRow(context.Context, string, ...any) pgx.Row
+}
+
+func (s *PipelineStore) verifyRole(ctx context.Context, q pipelineQuerier) error {
 	var allowed bool
-	err := s.pool.QueryRow(ctx, `SELECT r.rolcanlogin AND NOT r.rolsuper AND NOT r.rolbypassrls
+	err := q.QueryRow(ctx, `SELECT r.rolcanlogin AND NOT r.rolsuper AND NOT r.rolbypassrls
  AND NOT r.rolcreaterole AND NOT r.rolcreatedb AND NOT r.rolreplication
  AND pg_has_role(session_user,$1,'MEMBER')
  AND NOT EXISTS(SELECT 1 FROM pg_roles p WHERE p.rolname LIKE 'factorforge_pipeline_%'
@@ -215,7 +225,7 @@ func (s *PipelineStore) VerifyRole(ctx context.Context) error {
 	if !allowed {
 		return d.Fail("PIPELINE_DATABASE_ROLE_NOT_ISOLATED", 403)
 	}
-	err = s.pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM "+s.schema+".worker_grant WHERE authenticated_role=session_user AND instance_id=$1 AND environment=$2 AND worker_kind=$3)", s.binding.InstanceID, s.binding.Environment, s.kind).Scan(&allowed)
+	err = q.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM "+s.schema+".worker_grant WHERE authenticated_role=session_user AND instance_id=$1 AND environment=$2 AND worker_kind=$3)", s.binding.InstanceID, s.binding.Environment, s.kind).Scan(&allowed)
 	if err != nil {
 		return safe(err)
 	}
@@ -223,23 +233,27 @@ func (s *PipelineStore) VerifyRole(ctx context.Context) error {
 		return d.Fail("PIPELINE_DATABASE_SCOPE_FORBIDDEN", 403)
 	}
 	// Extra privileges on peer queues or grant tables must not survive a grant.
-	tables := []string{"worker_grant", "budget", "raw_evidence_manifest", "routing_receipt", "app_research_analysis_job", "app_trading_analysis_job", "research_submission_outbox", "trading_submission_outbox", "operation_fact", "framework_report"}
+	tables := []string{"worker_grant", "budget", "raw_evidence_manifest", "routing_receipt", "app_research_analysis_job", "app_trading_analysis_job", "research_submission_outbox", "trading_submission_outbox", "operation_fact", "framework_report", "search_state"}
 	for _, table := range tables {
 		var read, write, insert, remove bool
-		err = s.pool.QueryRow(ctx, "SELECT has_any_column_privilege(session_user,$1,'SELECT'),has_any_column_privilege(session_user,$1,'UPDATE'),has_any_column_privilege(session_user,$1,'INSERT'),has_table_privilege(session_user,$1,'DELETE,TRUNCATE,TRIGGER')", s.schema+"."+table).Scan(&read, &write, &insert, &remove)
+		err = q.QueryRow(ctx, "SELECT has_any_column_privilege(session_user,$1,'SELECT'),has_any_column_privilege(session_user,$1,'UPDATE'),has_any_column_privilege(session_user,$1,'INSERT'),has_table_privilege(session_user,$1,'DELETE,TRUNCATE,TRIGGER')", s.schema+"."+table).Scan(&read, &write, &insert, &remove)
 		if err != nil {
 			return safe(err)
 		}
 		shared := d.Has([]string{"worker_grant", "budget", "raw_evidence_manifest", "routing_receipt"}, table)
-		readAllowed := shared || table == "operation_fact" || s.kind == "INGEST" && table == "framework_report" || table == s.table || table == s.outbox || s.kind == "INGEST" && strings.HasPrefix(table, "app_")
-		writeAllowed := table == s.table || table == s.outbox || s.kind == "INGEST" && table == "budget"
-		insertAllowed := table == "operation_fact" || table == s.outbox || s.kind == "INGEST" && d.Has([]string{"raw_evidence_manifest", "routing_receipt", "app_research_analysis_job", "app_trading_analysis_job", "framework_report"}, table)
+		readAllowed := shared || table == "operation_fact" || s.kind == "INGEST" && d.Has([]string{"framework_report", "search_state"}, table) || table == s.table || table == s.outbox || s.kind == "INGEST" && strings.HasPrefix(table, "app_")
+		writeAllowed := table == s.table || table == s.outbox || s.kind == "INGEST" && d.Has([]string{"budget", "search_state"}, table)
+		insertAllowed := table == "operation_fact" || table == s.outbox || s.kind == "INGEST" && d.Has([]string{"raw_evidence_manifest", "routing_receipt", "app_research_analysis_job", "app_trading_analysis_job", "framework_report", "search_state"}, table)
 		if remove || read && !readAllowed || write && !writeAllowed || insert && !insertAllowed {
 			return d.Fail("PIPELINE_DATABASE_ROLE_NOT_ISOLATED", 403)
 		}
-		if s.kind == "INGEST" && table == "budget" {
+		if s.kind == "INGEST" && d.Has([]string{"budget", "search_state"}, table) {
+			column := "used_jobs"
+			if table == "search_state" {
+				column = "payload"
+			}
 			var excessive bool
-			err = s.pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM pg_attribute a WHERE a.attrelid=$1::regclass AND a.attnum>0 AND NOT a.attisdropped AND a.attname<>'used_jobs' AND has_column_privilege(session_user,a.attrelid,a.attnum,'UPDATE'))", s.schema+".budget").Scan(&excessive)
+			err = q.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM pg_attribute a WHERE a.attrelid=$1::regclass AND a.attnum>0 AND NOT a.attisdropped AND a.attname<>$2 AND has_column_privilege(session_user,a.attrelid,a.attnum,'UPDATE'))", s.schema+"."+table, column).Scan(&excessive)
 			if err != nil {
 				return safe(err)
 			}

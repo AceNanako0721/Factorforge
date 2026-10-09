@@ -1,6 +1,6 @@
 # P3 采集、分析和提交运行说明
 
-更新：2026-10-08。当前设计基线 v2.1.3；继承 v2.1.1 的 Go 链路及 v2.1.2 日历/报告设计，按已定稿设计追加逐事实 JEV 问题绑定。本页是当前实现/操作记录，不能代替冻结式样、设计或生产准入。
+更新：2026-10-09。当前设计基线 v2.1.5；继承 v2.1.1 的 Go 链路及 v2.1.2 日历/报告设计，按已定稿设计追加逐事实 JEV 问题绑定。本页是当前实现/操作记录，不能代替冻结式样、设计或生产准入。
 
 ## 进程和权限
 
@@ -109,3 +109,19 @@ runtime/bin/instance-cli --action prepare-evidence \
 段落保留换行、否定与限定词，不拆句；CRLF/LF/CR 都按完整行结束处理。数字只是词面，1,234.50/1.234,50 不自动解释成金额，中文数字和相对日期保留原文。目录词按原样匹配，ASCII 边界防止名称或期间前缀命中；大小写别名需显式登记。一个段落中主体、事项和期间来自不同分句时也可能列出候选；这说明候选需要审阅，不能据同段共现确认同一事件。
 
 审阅者依据完整上下文、来源许可和历史事件独立完成现有 Annotation 和 EventPlan 后，仍经 AnnotatedExtractor、Verify、Routing 和 P2 准入。此命令不会转换候选为已核验事实。十四项对照是开发参照，新增机械/文件/原生进程测试也不替代 OD-01 独立完整性盲标、语义事件识别、生产标定或 OD-02。
+
+## v2.1.5 多后端搜索与持久额度
+
+设计与探针见 [P3 HTML 第 11 章](../v2.1.5/03_SOXLUSDT_JEV应用实例设计书.html#search-backend-routing) 和 [选材/验证证据](P3_SEARCH_UPSTREAM_REVIEW.md)。本次只实现 Go 协议与控制逻辑，未改真实配置或启用服务。
+
+1. 升级前由独立操作者执行既有 `instance-cli --action init-storage --config config/config.toml`，应用 `004_search.sql` 与 INGEST 最小权限；worker 不持管理员连接或自动迁移。已有工作库必须先升级，缺表不能绕过角色检查。
+2. 真实配置的 `application.pipeline.search_backends` 数组登记 id/kind/endpoint/token，与私有资产 `search_routing.providers` 按 ID/类型一一匹配，后者的顺序决定候选链。允许的生产端点仅 `https://api.search.brave.com/res/v1/web/search`、`https://mcp.exa.ai/mcp`、`https://search.parallel.ai/mcp`。模板仍只有一个；不用搜索时删除空数组占位，不填写模拟值启动。
+3. BRAVE 的 token 必填；EXA 本版仅验证匿名路径，token 必须为空，不接受密钥查询参数；PARALLEL 可以显式匿名或使用官方 Bearer。已有 services.search_api_url / credentials.search_api_key 只在唯一显式 BRAVE 政策下兼容；两种配置形式并存会拒绝。没有任何自动启用的匿名备用。
+4. 私有资产存在 search_plans 时，必须提供 search_routing：version、timeout_seconds、lease_seconds、cache_ttl_seconds、max_cache_entries、max_result_urls，以及每个后端的 id/kind/version/window_anchor/window_seconds/max_requests/min_interval_milliseconds/timeout_seconds/cooldown_seconds。字段均明确正数；lease 大于总时限，总时限不得超过 worker 时限；最多每种后端一次。窗口锚点使用整秒 UTC，必须按实际账户额度周期登记。不能假设自然月或通用 2000 次上限。
+5. 更新资产/访问后重新生成私有 role profiles 到新 runtime 目录。采集身份持搜索配置，分析身份不得包含它。政策/计划新版本使旧网址缓存失效，但不清计数；同一后端 ID 修改类型/窗口会报 SEARCH_WINDOW_POLICY_CHANGED，须明确处理已有账户窗口，不能盲删状态重新发放额度。
+
+`search_state` 仅保存本实例/环境计数、暂停/最早请求时间、URL 缓存与 pending 租约；仅 INGEST 可读/插入及更新 payload，不能更新 instance_id，分析角色无表权限。事务外发请求，每个后端至多一次；失败、超时和不确定结果仍消耗本地额度。数据库失效或状态/容量不合格时不走无状态网络。
+
+SEARCH_IN_PROGRESS 表示同查询已在执行；SEARCH_CACHE_CAPACITY 表示有效缓存/租约已达登记容量；SEARCH_BACKENDS_UNAVAILABLE 表示候选链均不可用或预算/暂停限制。429/402 等暂停持久化到数据库，重启继续有效。不要为了获得期望方向而改查询键/重试，也不要把匿名免费路径当作生产 SLA。多实例/环境共用同一外部账户的总额度仍需 OD-02 单独验证。
+
+URL 线索命中缓存仍重新检查来源许可并获取原文。来源抓取继续通过注册域名、HTTPS/公共 DNS、体积/时限和禁止跳转边界；只保存原文真实哈希及接收时间，不采用搜索摘要或搜索时间。独立采集原文先完成处理，后端故障不能撤销已保存原文。自动语义抽取/事件关系盲标及业务标定未因此完成。

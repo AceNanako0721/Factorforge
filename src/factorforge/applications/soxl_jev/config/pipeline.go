@@ -91,6 +91,7 @@ func LoadPublication(path string) (WorkerProfile, PublicationAccess, error) {
 }
 
 type WorkerProfile struct {
+	SearchBackends   []SearchAccess   `toml:"search_backends"`
 	TradingReadURL   string           `toml:"trading_read_url"`
 	TradingReadToken string           `toml:"trading_read_token"`
 	SchemaVersion    int              `toml:"schema_version"`
@@ -131,7 +132,7 @@ func (p WorkerProfile) Validate(role string) error {
 		if p.ProviderURL != "" || p.ProviderToken != "" || p.PromptFile != "" {
 			return d.Fail("INSTANCE_PROFILE_CONTAINS_PEER_CREDENTIALS", 403)
 		}
-	} else if p.SearchToken != "" || p.SearchURL != "" || p.TradingReadURL != "" || p.TradingReadToken != "" || p.ReportReadURL != "" || p.ReportReadToken != "" {
+	} else if len(p.SearchBackends) != 0 || p.SearchToken != "" || p.SearchURL != "" || p.TradingReadURL != "" || p.TradingReadToken != "" || p.ReportReadURL != "" || p.ReportReadToken != "" {
 		return d.Fail("INSTANCE_PROFILE_CONTAINS_PEER_CREDENTIALS", 403)
 	} else if p.ProviderURL == "" || p.ProviderToken == "" || !filepath.IsAbs(p.PromptFile) {
 		return d.Fail("INSTANCE_PROVIDER_CONFIGURATION_REQUIRED", 503)
@@ -139,7 +140,51 @@ func (p WorkerProfile) Validate(role string) error {
 	if p.Mode == "mock" && role == "INGEST" && !filepath.IsAbs(s.FixtureInputFile) {
 		return d.Fail("INSTANCE_FIXTURE_INPUT_REQUIRED", 503)
 	}
+	if len(p.SearchBackends) > 0 && (p.SearchToken != "" || p.SearchURL != "") {
+		return d.Fail("SEARCH_CONFIGURATION_AMBIGUOUS", 422)
+	}
 	return nil
+}
+
+// Access and policy are separate: credentials never enter routing assets or
+// persistent accounting. Legacy Brave access requires one explicit Brave policy.
+type SearchAccess struct {
+	ID       string `toml:"id"`
+	Kind     string `toml:"kind"`
+	Endpoint string `toml:"endpoint"`
+	Token    string `toml:"token"`
+}
+
+func (p WorkerProfile) ResolveSearchAccess(policy d.SearchRoutingPolicy) (map[string]SearchAccess, error) {
+	if p.Role != "INGEST" {
+		return nil, d.Fail("SEARCH_STATE_FORBIDDEN", 403)
+	}
+	if e := policy.Validate(); e != nil {
+		return nil, e
+	}
+	accesses := p.SearchBackends
+	if len(accesses) > 0 && (p.SearchURL != "" || p.SearchToken != "") {
+		return nil, d.Fail("SEARCH_CONFIGURATION_AMBIGUOUS", 422)
+	}
+	if len(accesses) == 0 && len(policy.Providers) == 1 && policy.Providers[0].Kind == "BRAVE" {
+		accesses = []SearchAccess{{ID: policy.Providers[0].ID, Kind: "BRAVE", Endpoint: p.SearchURL, Token: p.SearchToken}}
+	}
+	if len(accesses) != len(policy.Providers) {
+		return nil, d.Fail("SEARCH_BACKEND_CONFIGURATION_REQUIRED", 503)
+	}
+	result := map[string]SearchAccess{}
+	for _, a := range accesses {
+		if !d.ValidID(a.ID) || result[a.ID].ID != "" || a.Endpoint == "" {
+			return nil, d.Fail("SEARCH_BACKEND_CONFIGURATION_REQUIRED", 503)
+		}
+		result[a.ID] = a
+	}
+	for _, b := range policy.Providers {
+		if result[b.ID].Kind != b.Kind {
+			return nil, d.Fail("SEARCH_BACKEND_CONFIGURATION_REQUIRED", 503)
+		}
+	}
+	return result, nil
 }
 
 // LoadWorker accepts only a derived role profile, never the canonical file
@@ -199,6 +244,7 @@ type PipelineAssets struct {
 	RSS               []RSSRegistration               `json:"rss"`
 	Calibration       analysis.CalibrationMapping     `json:"calibration"`
 	SearchPlans       []monitoring.SearchPlan         `json:"search_plans"`
+	SearchRouting     *d.SearchRoutingPolicy          `json:"search_routing"`
 	SearchSourceHosts map[string]string               `json:"search_source_hosts"`
 }
 
@@ -216,6 +262,17 @@ func LoadPipelineAssets(p WorkerProfile) (PipelineAssets, error) {
 	}
 	if d.DecodePrivate(raw, &a) != nil || !d.ValidID(a.Version) || a.RoutingPolicy.Binding != p.Binding() || a.RoutingPolicy.ObjectID != p.Settings.ObjectID || a.RoutingPolicy.CalibrationVersion != p.Settings.CalibrationVersion || a.Calibration.Version != p.Settings.CalibrationVersion || a.Calibration.RubricVersion != p.Settings.RubricVersion || a.FixtureOnly != (p.Mode == "mock") {
 		return a, d.Fail("INSTANCE_PIPELINE_ASSET_INVALID", 503)
+	}
+	if len(a.SearchPlans) > 0 && a.SearchRouting == nil {
+		return a, d.Fail("SEARCH_POLICY_REQUIRED", 503)
+	}
+	if a.SearchRouting != nil {
+		if e := a.SearchRouting.Validate(); e != nil {
+			return a, e
+		}
+		if a.SearchRouting.TimeoutSeconds > p.Settings.TimeoutSeconds {
+			return a, d.Fail("SEARCH_BACKEND_TIMEOUT_INVALID", 422)
+		}
 	}
 	return a, nil
 }
@@ -262,10 +319,11 @@ func PrepareWorkerProfiles(canonical, root string) ([]string, error) {
 		Application struct {
 			PromptFile string `toml:"prompt_file"`
 			Pipeline   struct {
-				Settings PipelineSettings `toml:"settings"`
-				Ingest   WorkerAccess     `toml:"ingest"`
-				Research WorkerAccess     `toml:"research"`
-				Trading  WorkerAccess     `toml:"trading"`
+				SearchBackends []SearchAccess   `toml:"search_backends"`
+				Settings       PipelineSettings `toml:"settings"`
+				Ingest         WorkerAccess     `toml:"ingest"`
+				Research       WorkerAccess     `toml:"research"`
+				Trading        WorkerAccess     `toml:"trading"`
 			} `toml:"pipeline"`
 		} `toml:"application"`
 	}
@@ -303,6 +361,7 @@ func PrepareWorkerProfiles(canonical, root string) ([]string, error) {
 			p.TradingReadToken = c.Credentials.TradingAPIToken
 			p.SearchURL = c.Services.SearchAPIURL
 			p.SearchToken = c.Credentials.SearchAPIKey
+			p.SearchBackends = c.Application.Pipeline.SearchBackends
 		}
 		if role != "INGEST" {
 			p.ProviderToken = c.Credentials.JevAPIKey

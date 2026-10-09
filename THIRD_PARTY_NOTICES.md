@@ -120,3 +120,7 @@ The console uses the public API of `lightweight-charts@5.2.1` (Apache-2.0), with
 ## FreqUI
 
 The baseline references FreqUI `2e6a0907ed2e990b9e905331888dfa9824024d2d` for the distinction between frequent market refresh and slower trade state refresh. FreqUI is GPL-3.0. No FreqUI code, translations, styles or data models are copied or adapted into this MIT project.
+
+## Search harness implementation references
+
+The Go search adapters reference protocol and control-flow patterns from Oh My Pi (MIT), pinned at `579da1d661c5cb8d43bc2ddd429ab72e67165ad8`, and OpenCode (MIT), pinned at `388406238bd5ca15564a762840a2362c3a45bd9c`. No upstream code is copied or adapted, and neither harness is a runtime dependency. Exact files, probe evidence and limits are recorded in [P3 search review](doc/engineering/P3_SEARCH_UPSTREAM_REVIEW.md). Codex (Apache-2.0) and Gemini CLI (Apache-2.0) are comparison references only, with no copied implementation or authenticated service integration.

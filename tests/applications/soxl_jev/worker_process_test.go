@@ -8,6 +8,7 @@ import (
 	a "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/analysis"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/config"
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/domain"
+	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/monitoring"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/operations"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/reports"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/submission"
@@ -138,6 +139,46 @@ func TestNativeInstanceWorkerProfilesAndProcessWithoutPythonNode(t *testing.T) {
 	asset.ReportSchedule = &reports.Schedule{Anchor: now.Add(-time.Hour), PeriodSeconds: 3600, MaxRecords: 100}
 	day := now.Truncate(24 * time.Hour)
 	asset.Calendar = &operations.Calendar{Version: "fixture-process-calendar", Zone: "UTC", ValidFrom: day.Add(-24 * time.Hour), ValidUntil: day.Add(48 * time.Hour), Sessions: []operations.MarketSession{{Date: day.Add(-24 * time.Hour).Format("2006-01-02"), OpenLocal: "00:00", CloseLocal: "00:01"}, {Date: day.Add(24 * time.Hour).Format("2006-01-02"), OpenLocal: "00:00", CloseLocal: "00:01"}}}
+	// Run RSS -> stored seed -> Brave 429 -> Exa URL -> fetched original through
+	// the actual executable. Restart must reuse the durable clue cache.
+	var searchEndpoint string
+	var braveCalls, exaCalls atomic.Int64
+	searchServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		switch request.URL.Path {
+		case "/feed":
+			w.Header().Set("Content-Type", "application/rss+xml")
+			fmt.Fprintf(w, "<rss version=\"2.0\"><channel><item><link>%s/seed</link><pubDate>%s</pubDate></item></channel></rss>", searchEndpoint, now.Add(-time.Minute).Format(time.RFC1123Z))
+		case "/brave":
+			braveCalls.Add(1)
+			var stored int
+			if e := admin.QueryRow(ctx, "SELECT count(*) FROM instance_pipeline_sim.raw_evidence_manifest WHERE instance_id=$1", r.Binding.InstanceID).Scan(&stored); e != nil || stored < 2 {
+				t.Error("independent seed not persisted before search", e, stored)
+			}
+			w.Header().Set("Retry-After", "60")
+			w.WriteHeader(429)
+		case "/exa":
+			exaCalls.Add(1)
+			var envelope struct {
+				ID string `json:"id"`
+			}
+			if json.NewDecoder(request.Body).Decode(&envelope) != nil {
+				t.Error("RPC request")
+			}
+			json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": envelope.ID, "result": map[string]any{"content": []any{map[string]any{"type": "text", "text": "Title: fixture\nURL: " + searchEndpoint + "/supplement\nText: ignored snippet"}}}})
+		default:
+			w.Header().Set("Content-Type", "text/plain")
+			fmt.Fprint(w, "fixture original "+request.URL.Path)
+		}
+	}))
+	defer searchServer.Close()
+	searchEndpoint = searchServer.URL
+	asset.Sources = map[string]d.SourceRegistration{"fixture-rss": {SourceID: "fixture-rss", Version: "fixture-source-version", LicenceRef: "fixture-licence", Enabled: true, LicenceVerified: true, AllowAnalysis: true, Environments: []string{"SIM"}, ValidFrom: now.Add(-time.Hour), ValidUntil: now.Add(time.Hour), MaxAge: time.Hour}}
+	asset.RSS = []config.RSSRegistration{{FeedURL: searchEndpoint + "/feed", SourceID: "fixture-rss", LicenceRef: "fixture-licence", Hosts: []string{"127.0.0.1"}, MaxItems: 2}}
+	asset.SearchPlans = []monitoring.SearchPlan{{Version: "fixture-search-plan", SourceID: "fixture-rss", Query: "fixture approved topic", Count: 2}}
+	asset.SearchSourceHosts = map[string]string{"127.0.0.1": "fixture-rss"}
+	searchPolicy := searchPolicy(now.Truncate(time.Second), "BRAVE", "EXA")
+	searchPolicy.CacheTTLSeconds = 300
+	asset.SearchRouting = &searchPolicy
 	data, _ := json.Marshal(asset)
 	if err = os.WriteFile(settings.AssetsFile, data, 0600); err != nil {
 		t.Fatal(err)
@@ -156,6 +197,7 @@ func TestNativeInstanceWorkerProfilesAndProcessWithoutPythonNode(t *testing.T) {
 	}
 	canonical := filepath.Join(private, "canonical.toml")
 	sections := map[string]any{"mode": "mock", "services": map[string]any{"jev_api_url": model.URL + "/v1/systemone", "framework_api_url": publicFramework.URL}, "credentials": map[string]any{"jev_api_key": "fixture-token", "framework_api_token": "fixture-report-read"}, "application": map[string]any{"prompt_file": prompt, "pipeline": map[string]any{"settings": settings, "ingest": config.WorkerAccess{DatabaseURL: dsns["INGEST"], FrameworkURL: framework.URL, FrameworkToken: "fixture-only-worker"}, "trading": config.WorkerAccess{DatabaseURL: dsns["TRADING"], FrameworkURL: framework.URL, FrameworkToken: "fixture-only-worker"}, "research": config.WorkerAccess{DatabaseURL: dsns["RESEARCH"], FrameworkURL: framework.URL, FrameworkToken: "fixture-only-research"}}}}
+	sections["application"].(map[string]any)["pipeline"].(map[string]any)["search_backends"] = []config.SearchAccess{{ID: "brave", Kind: "BRAVE", Endpoint: searchEndpoint + "/brave", Token: "fixture-search-token"}, {ID: "exa", Kind: "EXA", Endpoint: searchEndpoint + "/exa"}}
 	data, err = toml.Marshal(sections)
 	if err != nil {
 		t.Fatal(err)
@@ -182,6 +224,9 @@ func TestNativeInstanceWorkerProfilesAndProcessWithoutPythonNode(t *testing.T) {
 		if profile.Role != "INGEST" && (profile.ReportReadURL != "" || profile.ReportReadToken != "") {
 			t.Fatal("report token copied to analysis")
 		}
+		if profile.Role != "INGEST" && (len(profile.SearchBackends) != 0 || strings.Contains(string(bytes), "fixture-search-token")) {
+			t.Fatal("search credentials copied to analysis")
+		}
 	}
 	if _, err = config.LoadWorker(paths[1], "TRADING"); err == nil {
 		t.Fatal("role profile rebound")
@@ -199,6 +244,24 @@ func TestNativeInstanceWorkerProfilesAndProcessWithoutPythonNode(t *testing.T) {
 		}
 	}
 	var reportCount int
+	if braveCalls.Load() != 1 || exaCalls.Load() != 1 {
+		t.Fatal("native failover/cache across restart", braveCalls.Load(), exaCalls.Load())
+	}
+	var searchPayload []byte
+	if err = admin.QueryRow(ctx, "SELECT payload FROM instance_pipeline_sim.search_state WHERE instance_id=$1", r.Binding.InstanceID).Scan(&searchPayload); err != nil {
+		t.Fatal(err)
+	}
+	var searchState d.SearchState
+	if d.DecodePrivate(searchPayload, &searchState) != nil || searchState.Providers["brave"].UsedRequests != 1 || searchState.Providers["exa"].UsedRequests != 1 || len(searchState.Pending) != 0 {
+		t.Fatal("native allowance not durable")
+	}
+	if searchState.Providers["brave"].LastCode != "SEARCH_RATE_LIMITED" || searchState.Providers["exa"].LastCode != "SEARCH_OK" {
+		t.Fatal("native per-provider result lost")
+	}
+	var originalCount int
+	if err = admin.QueryRow(ctx, "SELECT count(*) FROM instance_pipeline_sim.raw_evidence_manifest WHERE instance_id=$1", r.Binding.InstanceID).Scan(&originalCount); err != nil || originalCount != 3 {
+		t.Fatal("native seed/supplement persistence", err, originalCount)
+	}
 	if err = admin.QueryRow(ctx, "SELECT count(*) FROM instance_pipeline_sim.framework_report").Scan(&reportCount); err != nil || reportCount != 1 {
 		t.Fatal("native periodic report once", reportCount, err)
 	}
