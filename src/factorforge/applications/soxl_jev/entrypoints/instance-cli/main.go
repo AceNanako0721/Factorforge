@@ -16,20 +16,23 @@ import (
 )
 
 func run() error {
-	action := flag.String("action", "", "init-storage, publish-projection, prepare-evidence, compile-evidence, prepare-review, render-review or export-evidence (no trades)")
+	action := flag.String("action", "", "init-storage, publish-projection, prepare-evidence, compile-evidence, prepare-review, render-review, compile-calendar or export-evidence (no trades)")
 	source := flag.String("config", "config/config.toml", "Canonical private config for this operator command only")
 	version := flag.Int64("expected-version", -1, "Existing read version; -1 only for initial publication")
 	proposalInput := flag.String("proposal-input", "", "Private closed JSON evidence and catalog request")
 	proposalOutput := flag.String("proposal-output", "", "New private JSON file under this repository runtime")
 	proposalBytes := flag.Int("max-proposal-bytes", 0, "Explicit input and output file byte budget")
 	flag.Parse()
-	if d.Has([]string{"prepare-evidence", "compile-evidence", "prepare-review", "render-review"}, *action) {
+	if d.Has([]string{"prepare-evidence", "compile-evidence", "prepare-review", "render-review", "compile-calendar"}, *action) {
 		root, err := os.Getwd()
 		if err != nil {
 			return d.Fail("PROPOSAL_FILE_INVALID", 422)
 		}
 		if *action == "compile-evidence" {
 			return operations.CompileEvidenceFile(root, *proposalInput, *proposalOutput, *proposalBytes, time.Now().UTC())
+		}
+		if *action == "compile-calendar" {
+			return operations.CompileVenueCalendarFile(root, *proposalInput, *proposalOutput, *proposalBytes, time.Now().UTC())
 		}
 		if *action == "prepare-review" {
 			return operations.PrepareReviewBundleFile(root, *proposalInput, *proposalOutput, *proposalBytes)

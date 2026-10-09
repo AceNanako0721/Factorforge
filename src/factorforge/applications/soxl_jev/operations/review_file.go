@@ -29,6 +29,18 @@ func CompileEvidenceFile(root, input, output string, maxBytes int, now time.Time
 // the whole immutable artifact. Reading cannot install a new review or policy.
 func LoadReviewedEvidence(root, path string, binding d.Binding, now time.Time, maxBytes int) (ReviewArtifact, error) {
 	empty := ReviewArtifact{}
+	raw, err := readPrivateArtifact(root, path, maxBytes)
+	var a ReviewArtifact
+	if err != nil || d.DecodePrivate(raw, &a) != nil || ValidateReviewArtifact(a, binding, now, maxBytes) != nil {
+		return empty, d.Fail("REVIEW_ARTIFACT_INVALID", 422)
+	}
+	return a, nil
+}
+
+// Shared runtime reader preserves the existing no-symlink and bounded read
+// boundary. Each caller supplies its own closed schema and full recompilation.
+func readPrivateArtifact(root, path string, maxBytes int) ([]byte, error) {
+	var empty []byte
 	if maxBytes <= 0 || !filepath.IsAbs(path) {
 		return empty, d.Fail("REVIEW_ARTIFACT_INVALID", 422)
 	}
@@ -70,9 +82,8 @@ func LoadReviewedEvidence(root, path string, binding d.Binding, now time.Time, m
 		return empty, d.Fail("REVIEW_ARTIFACT_INVALID", 422)
 	}
 	raw, err := io.ReadAll(io.LimitReader(f, int64(maxBytes)+1))
-	var a ReviewArtifact
-	if err != nil || len(raw) > maxBytes || d.DecodePrivate(raw, &a) != nil || ValidateReviewArtifact(a, binding, now, maxBytes) != nil {
+	if err != nil || len(raw) > maxBytes {
 		return empty, d.Fail("REVIEW_ARTIFACT_INVALID", 422)
 	}
-	return a, nil
+	return raw, nil
 }

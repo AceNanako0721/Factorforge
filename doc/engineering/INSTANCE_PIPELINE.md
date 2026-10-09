@@ -177,3 +177,12 @@ go run ./src/factorforge/applications/soxl_jev/entrypoints/instance-cli \
 渲染前完整重算 Bundle；页面离线、无脚本/外部资源、原文全部转义。TEXT 的实体解码只便于阅读，坐标仍为原始 UTF-8 字节。导航、隐藏内容、script/style、注释/属性、表格、SVG及EOF未闭合尾部都没有自动判为无关；完整原文仍可核对。超限整体拒绝，不截断。解析缓存受完整输入预算约束，实际 token 大小另单独检查。
 
 Bundle/页面没有审阅答案、完整性或交易资格。完成审阅仍从 bundle.request.proposal_request 与 bundle.proposal 按 v2.1.6 的规则生成 ReviewRequest，再 compile-evidence；原始段落不得漏审，实体解码数字不能绕过原词面核验，未知首发/旧接收时间保持。私有原文/页面不可上传 GitHub。真实来源、独立评测和标定门仍单独验收。
+
+
+## v2.1.8 私有交易所日历快照
+
+先读取当前配对设计及 [只读产品/日历试验](P3_VENUE_VERIFICATION.md)。instance-cli 新动作 compile-calendar 与其他离线准备动作共用 --proposal-input、--proposal-output、--max-proposal-bytes，配置读取前执行，不要求API Key或数据库。输出只能是本仓库 runtime 下新的0600文件。输入为闭合 VenueCalendarRequest：schema_version=1，SIM binding，version，provider_environment（DEMO/PUBLIC_MAIN），product_snapshot、schedule_snapshot（url/content/content_hash/received_at）和显式 limits（max_input_bytes/max_sessions/max_update_age_seconds）。完整私有格式以 operations/venue_calendar.go 与设计为准，不能用实际JSON/来源正文填公开模板。
+
+完整快照必须匹配各环境固定官方GET路径；编译器拒绝重复JSON键、错环境/身份/哈希、过期/未来时间、时段缺口/重叠/未知及不精确的分钟。只有EQUITY的REGULAR映射为纽约时段，其余间隔沿已有Calendar生成连续非传统窗口。产物保留原请求、摘要和派生日历，加载全量复算；有效期限不会因重新生成文件延长。
+
+PipelineAssets.calendar_file 可登记绝对 runtime 产物路径，只由INGEST读取；如同时指定inline calendar，两者必须一致。装配沿已有对象TimePolicy和框架GET/POST窗口接口，刷新只追加未来边界。与已发布窗口不一致、末端回退或边界不连续均拒绝，刷新不会补发次数。当前没有自动联网刷新任务；启动核验源时效，运行超出已注册覆盖则禁增险，操作者需取得和复核新快照后重新编译。公有产品信息不替代账户协议、合约单位、保护或LIVE准入。

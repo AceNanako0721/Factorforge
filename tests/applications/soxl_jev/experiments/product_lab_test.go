@@ -134,6 +134,9 @@ func TestArchivedSOXLAdapterLab(t *testing.T) {
 	if !d.Has([]string{"before-design", "after-implementation"}, phase) {
 		t.Fatal("PRODUCT_LAB_PHASE_INVALID")
 	}
+	if phase == "after-implementation" && len(specs) != 1 {
+		t.Fatal("PRODUCT_LAB_TARGET_RULE_MISSING")
+	}
 	encoded, _ := json.MarshalIndent(report, "", "  ")
 	f, err := os.OpenFile(filepath.Join(lab, "adapter-"+phase+".json"), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
@@ -145,6 +148,71 @@ func TestArchivedSOXLAdapterLab(t *testing.T) {
 		t.Fatal("PRODUCT_LAB_REPORT_WRITE_FAILED")
 	}
 	t.Logf("archived_SOXLUSDT_matches=%d; development_multiplier_only=true; public_network_calls=0; orders=0", len(specs))
+}
+
+// Post-design verification uses the production compiler on immutable captures;
+// budgets and fixture binding here are laboratory inputs, never installed assets.
+func TestArchivedProductionCalendar(t *testing.T) {
+	lab := os.Getenv("FACTORFORGE_PRODUCT_LAB")
+	if lab == "" {
+		t.Skip("opt-in production calendar archive replay")
+	}
+	wd, _ := os.Getwd()
+	root := filepath.Clean(filepath.Join(wd, "..", "..", "..", ".."))
+	var report struct {
+		Results []struct {
+			Host       string    `json:"host"`
+			Path       string    `json:"path"`
+			ReceivedAt time.Time `json:"received_at"`
+		} `json:"results"`
+	}
+	raw, err := os.ReadFile(filepath.Join(lab, "report.json"))
+	if err != nil || json.Unmarshal(raw, &report) != nil {
+		t.Fatal("PRODUCT_LAB_REPORT_INVALID")
+	}
+	for environment, host := range map[string]string{"DEMO": "demo-fapi.binance.com", "PUBLIC_MAIN": "fapi.binance.com"} {
+		snap := func(index int, path string) operations.VenueSnapshot {
+			t.Helper()
+			body, e := os.ReadFile(filepath.Join(lab, fmt.Sprintf("%s-%d.json", host, index)))
+			if e != nil {
+				t.Fatal(e)
+			}
+			var at time.Time
+			for _, r := range report.Results {
+				if r.Host == host && r.Path == path {
+					at = r.ReceivedAt
+				}
+			}
+			return operations.VenueSnapshot{URL: "https://" + host + path, Content: string(body), ContentHash: d.ContentDigest(body), ReceivedAt: at}
+		}
+		r := operations.VenueCalendarRequest{SchemaVersion: 1, Binding: d.Binding{InstanceID: "lab-soxl-calendar", Environment: "SIM"}, Version: "lab-calendar-snapshot-20261009", ProviderEnvironment: environment, ProductSnapshot: snap(0, "/fapi/v1/exchangeInfo"), ScheduleSnapshot: snap(3, "/fapi/v1/tradingSchedule"), Limits: operations.VenueCalendarLimits{MaxInputBytes: 2000000, MaxSessions: 1000, MaxUpdateAgeSeconds: 86400}}
+		input, output := filepath.Join(lab, environment+"-calendar-request.json"), filepath.Join(lab, environment+"-calendar-artifact.json")
+		body, _ := json.Marshal(r)
+		if os.WriteFile(input, body, 0600) != nil {
+			t.Fatal("PRODUCT_LAB_WRITE_FAILED")
+		}
+		now := time.Now().UTC()
+		if e := operations.CompileVenueCalendarFile(root, input, output, 4000000, now); e != nil {
+			t.Fatal(e)
+		}
+		a, e := operations.LoadVenueCalendar(root, output, r.Binding, now, 4000000)
+		if e != nil {
+			t.Fatal(e)
+		}
+		windows, e := a.Calendar.Windows(context.Background())
+		if e != nil || len(windows) != 19 {
+			t.Fatal("PRODUCT_LAB_WINDOW_COUNT", e)
+		}
+		weekend, e := a.Calendar.Window(context.Background(), time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC))
+		if e != nil || weekend.End.Sub(weekend.Start) != 65*time.Hour+30*time.Minute {
+			t.Fatal("PRODUCT_LAB_WEEKEND_CHANGED", e)
+		}
+		result, _ := json.MarshalIndent(map[string]any{"environment": environment, "artifact_id": a.ArtifactID, "regular_sessions": len(a.Calendar.Sessions), "windows": len(windows), "calendar_version": a.Calendar.Version, "valid_from": a.Calendar.ValidFrom, "valid_until": a.Calendar.ValidUntil, "weekend_hours": weekend.End.Sub(weekend.Start).Hours(), "production_installed": false, "network_calls": 0, "downstream_writes": 0, "orders": 0}, "", "  ")
+		if os.WriteFile(filepath.Join(lab, environment+"-production-calendar-report.json"), result, 0600) != nil {
+			t.Fatal("PRODUCT_LAB_WRITE_FAILED")
+		}
+		t.Logf("environment=%s; windows=%d; weekend_hours=65.5; downstream_writes=0; orders=0", environment, len(windows))
+	}
 }
 
 func TestArchivedEquityCalendarLab(t *testing.T) {

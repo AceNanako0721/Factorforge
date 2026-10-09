@@ -30,7 +30,16 @@ func (c *HTTPClient) InstallCalendar(ctx context.Context, calendar operations.Ca
 	if registry.ObjectID != objectID || registry.Version < 0 || registry.Plans == nil {
 		return d.Fail("CALENDAR_REGISTRY_INVALID", 503)
 	}
+	windows, e := calendar.Windows(ctx)
+	if e != nil {
+		return e
+	}
+	byStart := map[time.Time]d.TimeWindow{}
+	for _, w := range windows {
+		byStart[w.Start.UTC()] = w
+	}
 	var last *time.Time
+	sameVersion := false
 	for _, p := range registry.Plans {
 		if !p.Valid() || p.ObjectID != objectID || p.PolicyVersion != policyVersion {
 			return d.Fail("CALENDAR_REGISTRY_INVALID", 503)
@@ -41,13 +50,31 @@ func (c *HTTPClient) InstallCalendar(ctx context.Context, calendar operations.Ca
 			if err != nil || d.Digest(expected) != d.Digest(p) {
 				return d.Fail("CALENDAR_VERSION_IMMUTABLE", 409)
 			}
-			return nil
+			sameVersion = true
+		}
+		// Refreshes cannot reinterpret a published interval, and therefore cannot
+		// manufacture a fresh counter within an already registered time span.
+		for _, old := range p.Windows {
+			if !old.End.After(calendar.ValidFrom) || !old.Start.Before(calendar.ValidUntil) {
+				continue
+			}
+			w, ok := byStart[old.Start.UTC()]
+			if !ok || !w.End.Equal(old.End) || (w.Kind == "NON_TRADITIONAL") != old.EnforceLimits {
+				return d.Fail("CALENDAR_REGISTERED_WINDOW_CONFLICT", 409)
+			}
 		}
 		end := p.Windows[len(p.Windows)-1].End
 		if last == nil || end.After(*last) {
 			value := end
 			last = &value
 		}
+	}
+	horizon := windows[len(windows)-1].End
+	if last != nil && horizon.Before(*last) {
+		return d.Fail("CALENDAR_HORIZON_REGRESSION", 409)
+	}
+	if sameVersion || last != nil && horizon.Equal(*last) {
+		return nil
 	}
 	plan, e := calendar.Plan(ctx, objectID, policyVersion, last)
 	if e != nil {

@@ -19,6 +19,12 @@ import (
 )
 
 func TestPublicMarketCollectorThroughHTTP(t *testing.T) {
+	for _, contractType := range []string{"PERPETUAL", "TRADIFI_PERPETUAL"} {
+		t.Run(contractType, func(t *testing.T) { testPublicMarketCollector(t, contractType) })
+	}
+}
+
+func testPublicMarketCollector(t *testing.T, contractType string) {
 	ctx := context.Background()
 	run, p, _, _ := serviceBase(t)
 	now := run.Clock.Add(2 * time.Minute).Truncate(time.Minute)
@@ -31,7 +37,7 @@ func TestPublicMarketCollectorThroughHTTP(t *testing.T) {
 		var reply any
 		switch r.URL.Path {
 		case "/fapi/v1/exchangeInfo":
-			reply = map[string]any{"symbols": []any{map[string]any{"symbol": "TESTUSD", "contractType": "PERPETUAL", "status": "TRADING", "quoteAsset": "USD", "marginAsset": "USD", "orderTypes": []string{"MARKET", "LIMIT", "STOP_MARKET"}, "filters": []any{map[string]string{"filterType": "PRICE_FILTER", "tickSize": "0.01"}, map[string]string{"filterType": "LOT_SIZE", "stepSize": "0.1"}, map[string]string{"filterType": "MIN_NOTIONAL", "notional": "1"}}}}}
+			reply = map[string]any{"symbols": []any{map[string]any{"symbol": "TESTUSD", "contractType": contractType, "baseAsset": "TEST", "underlyingType": "EQUITY", "status": "TRADING", "quoteAsset": "USD", "marginAsset": "USD", "orderTypes": []string{"MARKET", "LIMIT", "STOP_MARKET"}, "filters": []any{map[string]string{"filterType": "PRICE_FILTER", "tickSize": "0.01"}, map[string]string{"filterType": "LOT_SIZE", "stepSize": "0.1"}, map[string]string{"filterType": "MIN_NOTIONAL", "notional": "1"}}}}}
 		case "/fapi/v1/ticker/bookTicker":
 			reply = map[string]any{"bidPrice": "99", "askPrice": "101", "time": now.UnixMilli()}
 		case "/fapi/v1/premiumIndex":
