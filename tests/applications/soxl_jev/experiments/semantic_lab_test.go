@@ -61,6 +61,22 @@ func TestJevSemanticMethodProbe(t *testing.T) {
 	}
 	client := &http.Client{Timeout: time.Duration(plan.TimeoutSeconds) * time.Second,
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	// An opt-in probe is still a delivery. Do not repeat a partially completed
+	// private run just because the process or response capture was interrupted.
+	for i := range plan.Requests {
+		if _, e := os.Lstat(filepath.Join(lab, fmt.Sprintf("case-%03d-response.json", i+1))); !os.IsNotExist(e) {
+			t.Fatal("LAB_PREVIOUS_DELIVERY_EXISTS_NO_RETRY")
+		}
+	}
+	marker, e := os.OpenFile(filepath.Join(lab, "started.json"), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	if e != nil {
+		t.Fatal("LAB_ALREADY_STARTED_NO_RETRY")
+	}
+	_, e = marker.Write([]byte(fmt.Sprintf(`{"started_at":%q,"retries":0}`, time.Now().UTC().Format(time.RFC3339Nano))))
+	closed := marker.Close()
+	if e != nil || closed != nil {
+		t.Fatal("LAB_START_WRITE_FAILED")
+	}
 	type row struct {
 		ID           string          `json:"id"`
 		RequestHash  string          `json:"request_hash"`
