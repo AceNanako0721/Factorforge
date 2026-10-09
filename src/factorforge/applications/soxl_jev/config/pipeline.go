@@ -231,24 +231,25 @@ type RSSRegistration struct {
 	PublicationTimeVerified bool     `json:"publication_time_verified"`
 }
 type PipelineAssets struct {
-	CalendarFile          string                          `json:"calendar_file,omitempty"`
-	ReviewedEvidenceFiles []string                        `json:"reviewed_evidence_files,omitempty"`
-	ReviewedOriginals     []d.RawEvidence                 `json:"-"`
-	Calendar              *operations.Calendar            `json:"calendar"`
-	ReportSchedule        *reports.Schedule               `json:"report_schedule"`
-	Bootstrap             *BootstrapAsset                 `json:"bootstrap"`
-	Version               string                          `json:"version"`
-	FixtureOnly           bool                            `json:"fixture_only"`
-	RoutingPolicy         d.RoutingPolicy                 `json:"routing_policy"`
-	Sources               map[string]d.SourceRegistration `json:"sources"`
-	Mappings              map[string]d.EntityMapping      `json:"mappings"`
-	EventPlans            map[string]workers.EventPlan    `json:"event_plans"`
-	Annotations           map[string]evidence.Annotation  `json:"annotations"`
-	RSS                   []RSSRegistration               `json:"rss"`
-	Calibration           analysis.CalibrationMapping     `json:"calibration"`
-	SearchPlans           []monitoring.SearchPlan         `json:"search_plans"`
-	SearchRouting         *d.SearchRoutingPolicy          `json:"search_routing"`
-	SearchSourceHosts     map[string]string               `json:"search_source_hosts"`
+	CalendarFile          string                            `json:"calendar_file,omitempty"`
+	ReviewedEvidenceFiles []string                          `json:"reviewed_evidence_files,omitempty"`
+	ReviewedOriginals     []d.RawEvidence                   `json:"-"`
+	ReviewedEvents        map[string]evidence.ReviewedAsset `json:"-"`
+	Calendar              *operations.Calendar              `json:"calendar"`
+	ReportSchedule        *reports.Schedule                 `json:"report_schedule"`
+	Bootstrap             *BootstrapAsset                   `json:"bootstrap"`
+	Version               string                            `json:"version"`
+	FixtureOnly           bool                              `json:"fixture_only"`
+	RoutingPolicy         d.RoutingPolicy                   `json:"routing_policy"`
+	Sources               map[string]d.SourceRegistration   `json:"sources"`
+	Mappings              map[string]d.EntityMapping        `json:"mappings"`
+	EventPlans            map[string]workers.EventPlan      `json:"event_plans"`
+	Annotations           map[string]evidence.Annotation    `json:"annotations"`
+	RSS                   []RSSRegistration                 `json:"rss"`
+	Calibration           analysis.CalibrationMapping       `json:"calibration"`
+	SearchPlans           []monitoring.SearchPlan           `json:"search_plans"`
+	SearchRouting         *d.SearchRoutingPolicy            `json:"search_routing"`
+	SearchSourceHosts     map[string]string                 `json:"search_source_hosts"`
 }
 
 type BootstrapAsset struct {
@@ -296,26 +297,23 @@ func LoadPipelineAssets(p WorkerProfile) (PipelineAssets, error) {
 		if e != nil {
 			return a, d.Fail("REVIEW_ARTIFACT_INVALID", 422)
 		}
-		if a.Annotations == nil {
-			a.Annotations = map[string]evidence.Annotation{}
-		}
-		if a.EventPlans == nil {
-			a.EventPlans = map[string]workers.EventPlan{}
-		}
-		seen := map[string]bool{}
+		a.ReviewedEvents = map[string]evidence.ReviewedAsset{}
+		versions := map[string]bool{}
 		for _, path := range a.ReviewedEvidenceFiles {
 			artifact, e := operations.LoadReviewedEvidence(root, path, p.Binding(), time.Now().UTC(), p.Settings.MaxInputBytes)
 			if e != nil {
 				return a, e
 			}
 			hash := artifact.Raw.ContentHash
+			_, seen := a.ReviewedEvents[artifact.ReviewID]
+			version := d.Digest([]any{artifact.EventPlan.EventID, artifact.EventPlan.FactVersion})
 			annotation, annotated := a.Annotations[hash]
 			plan, planned := a.EventPlans[hash]
-			if seen[hash] || annotated && d.Digest(annotation) != d.Digest(artifact.Annotation) || planned && d.Digest(plan) != d.Digest(artifact.EventPlan) {
+			if seen || versions[version] || annotated && d.Digest(annotation) != d.Digest(artifact.Annotation) || planned && d.Digest(plan) != d.Digest(artifact.EventPlan) {
 				return a, d.Fail("REVIEW_ASSET_CONFLICT", 409)
 			}
-			seen[hash] = true
-			a.Annotations[hash], a.EventPlans[hash] = artifact.Annotation, artifact.EventPlan
+			versions[version] = true
+			a.ReviewedEvents[artifact.ReviewID] = evidence.ReviewedAsset{Annotation: artifact.Annotation, EventPlan: artifact.EventPlan}
 			a.ReviewedOriginals = append(a.ReviewedOriginals, artifact.Raw)
 		}
 	}

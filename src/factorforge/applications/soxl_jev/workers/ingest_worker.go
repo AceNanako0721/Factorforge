@@ -7,6 +7,7 @@ import (
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/ports"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/routing"
 	dto "github.com/AceNanako0721/Factorforge/src/factorforge/strategy/api/dto"
+	"strings"
 	"time"
 )
 
@@ -22,6 +23,7 @@ type IngestWorker struct {
 	Sources                                                                            map[string]d.SourceRegistration
 	Mappings                                                                           map[string]d.EntityMapping
 	Plans                                                                              map[string]EventPlan
+	ReviewedEvents                                                                     map[string]evidence.ReviewedAsset
 	MaxBytes                                                                           int
 	TaskTTL                                                                            time.Duration
 	ResearchBucket, TradingBucket                                                      string
@@ -62,6 +64,11 @@ func (w IngestWorker) Process(ctx context.Context, raw d.RawEvidence) (d.Routing
 		}
 	}
 	plan, planned := w.Plans[raw.ContentHash]
+	if reviewed, scoped := w.ReviewedEvents[raw.EvidenceID]; scoped {
+		plan, planned = reviewed.EventPlan, true
+	} else if strings.HasPrefix(raw.EvidenceID, "review-") {
+		planned = false
+	}
 	receipt, err := routing.Evaluate(w.Policy, w.Sources[raw.SourceID], w.Mappings[w.Policy.ObjectID], extracted, plan.EventType, now)
 	if err != nil {
 		return empty, err

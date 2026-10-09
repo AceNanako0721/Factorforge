@@ -203,3 +203,11 @@ PipelineAssets.calendar_file 可登记绝对 runtime 产物路径，只由INGEST
 Acquire失败没有HTTP；成功预占后仅一次HTTP，完整交付保存COMPLETE，传输/读取未知保存UNKNOWN并继续占名额。429/529保存RATE_LIMITED并暂停全池。完成写入失败保持STARTED且没有候选。重复请求拒绝重新投递，完成不退款，重启/新窗口不清旧未知或暂停；本版没有自动回收/解暂停操作。稳定PROVIDER_*错误用于现有降级投影，不打印账户、原文、Prompt、响应或Key。
 
 本门控制本项目的请求次数、在途数、投递间隔和字节；不能证明上游动态token容量、外部程序、不同Key同账户、实际账单及LIVE延迟。保持OD-02和LIVE门。实施/小负载证据见[P3共享账户验证](P3_PROVIDER_CAPACITY.md)。
+
+## v2.1.11 同一原文的独立事件审阅
+
+沿用 compile-evidence 和 reviewed_evidence_files，分别为每个经济身份准备完整逐段审阅并编译；不需要新配置字段、模型Key或提示词。INGEST核对每份产物后按review ID装配成对Annotation/EventPlan，同一原文字节可对应多个独立事件；生产文件格式与编译算法保持，旧已编译文件自动进入新索引。
+
+不要把这些产物手工合并回ContentHash索引。annotations/event_plans仍支持既有非编译输入，但与审阅产物冲突时拒绝；重复review ID、同一EventID/FactVersion重复装配、跨绑定/篡改同样拒绝。review-前缀对应的编译身份缺项不会回退到旧哈希条目。审阅范围中的IRRELEVANT不表示整篇没有其他经济事实，多份审阅也不是自动全量抽取证明。
+
+实际P2 HTTP/原生PostgreSQL双事件及重开幂等证据见[同原文审阅验证](P3_SHARED_ORIGINAL_REVIEWS.md)；缺项保持隔离、不调用模型或交易，来源/许可/时间/标定和P2资格继续独立检查。
