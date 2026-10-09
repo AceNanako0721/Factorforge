@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/domain"
+	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/ports"
 	dto "github.com/AceNanako0721/Factorforge/src/factorforge/strategy/api/dto"
 	dec "github.com/AceNanako0721/Factorforge/src/factorforge/trading/api/dto"
 	"io"
@@ -27,6 +28,7 @@ type JevOptions struct {
 	FixtureOnly                       bool
 	Clock                             func() time.Time
 	Mapping                           CalibrationMapping
+	Admission                         ports.ProviderAdmission
 }
 type CalibrationMapping struct {
 	Version, RubricVersion, ProducerVersion string
@@ -71,6 +73,9 @@ func NewJev(options JevOptions) (*JevHTTP, error) {
 		}
 	} else if u.Scheme != "https" || u.Host != "api.typesafe.ai" || u.Path != "/v1/systemone" {
 		return nil, d.Fail("JEV_PROTOCOL_ENDPOINT_INVALID", 403)
+	}
+	if !options.FixtureOnly && options.Admission == nil {
+		return nil, d.Fail("JEV_CONFIGURATION_REQUIRED", 503)
 	}
 	if options.Prompt.Mock && !options.FixtureOnly {
 		return nil, d.Fail("MOCK_PROMPT_NOT_ADMITTED", 403)
@@ -167,20 +172,47 @@ func (p *JevHTTP) Analyze(ctx context.Context, request d.AnalysisRequest) (d.Ana
 	}
 	req.Header.Set("Authorization", "Bearer "+o.Token)
 	req.Header.Set("Content-Type", "application/json")
+	requestHash := d.ContentDigest(raw)
+	if o.Admission != nil {
+		if err = o.Admission.Acquire(ctx, request.Binding, request.RequestID, requestHash, len(raw), request.Deadline); err != nil {
+			return empty, err
+		}
+	}
+	finish := func(outcome string) error {
+		if o.Admission == nil {
+			return nil
+		}
+		return o.Admission.Finish(ctx, request.RequestID, requestHash, outcome)
+	}
 	response, err := o.Client.Do(req)
 	if err != nil {
+		if e := finish("UNKNOWN"); e != nil {
+			return empty, e
+		}
 		return empty, d.Fail("JEV_DELIVERY_UNKNOWN", 503)
 	}
 	defer response.Body.Close()
 	if response.StatusCode != 200 {
 		if response.StatusCode == 429 || response.StatusCode == 529 {
+			if e := finish("RATE_LIMITED"); e != nil {
+				return empty, e
+			}
 			return empty, d.Fail("JEV_RATE_LIMITED", 429)
+		}
+		if e := finish("COMPLETE"); e != nil {
+			return empty, e
 		}
 		return empty, d.Fail("JEV_REQUEST_REJECTED", 503)
 	}
 	body, err := io.ReadAll(io.LimitReader(response.Body, int64(o.MaxResponseBytes)+1))
 	if err != nil || len(body) > o.MaxResponseBytes {
+		if e := finish("UNKNOWN"); e != nil {
+			return empty, e
+		}
 		return empty, d.Fail("JEV_RESPONSE_BUDGET_EXCEEDED", 503)
+	}
+	if e := finish("COMPLETE"); e != nil {
+		return empty, e
 	}
 	var result jevResponse
 	if d.DecodePrivate(body, &result) != nil || result.Model != o.ModelVersion || result.Usage == nil ||

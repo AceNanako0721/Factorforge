@@ -16,7 +16,7 @@ import (
 )
 
 func run() error {
-	action := flag.String("action", "", "init-storage, publish-projection, prepare-evidence, compile-evidence, prepare-review, render-review, compile-calendar or export-evidence (no trades)")
+	action := flag.String("action", "", "init-storage, register-provider-budget, publish-projection, prepare-evidence, compile-evidence, prepare-review, render-review, compile-calendar or export-evidence (no trades)")
 	source := flag.String("config", "config/config.toml", "Canonical private config for this operator command only")
 	version := flag.Int64("expected-version", -1, "Existing read version; -1 only for initial publication")
 	proposalInput := flag.String("proposal-input", "", "Private closed JSON evidence and catalog request")
@@ -64,7 +64,7 @@ func run() error {
 		defer store.Close()
 		return operations.ExportReviewBundleFile(ctx, store, profile.Binding(), root, *proposalInput, *proposalOutput, *proposalBytes)
 	}
-	if *action != "init-storage" && *action != "publish-projection" {
+	if *action != "init-storage" && *action != "publish-projection" && *action != "register-provider-budget" {
 		return d.Fail("INSTANCE_CLI_ACTION_REQUIRED", 422)
 	}
 	path, err := filepath.Abs(*source)
@@ -77,7 +77,29 @@ func run() error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(profile.Settings.TimeoutSeconds)*time.Second)
 	defer cancel()
+	if *action == "register-provider-budget" {
+		root, err := os.Getwd()
+		if err != nil {
+			return d.Fail("PROVIDER_REGISTRATION_INVALID", 422)
+		}
+		registration, err := config.LoadProviderBudgetRegistration(root, *proposalInput, *proposalBytes)
+		if err != nil {
+			return err
+		}
+		if err = pg.ConfigureProviderPool(ctx, publication.DatabaseURL, registration.Policy); err != nil {
+			return err
+		}
+		for _, grant := range registration.Grants {
+			if err = pg.GrantProviderAccess(ctx, publication.DatabaseURL, grant); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
 	if *action == "init-storage" {
+		if err = pg.InitializeProviderControl(ctx, publication.DatabaseURL); err != nil {
+			return err
+		}
 		if err = pg.InitializePipeline(ctx, publication.DatabaseURL, profile.Binding()); err != nil {
 			return err
 		}

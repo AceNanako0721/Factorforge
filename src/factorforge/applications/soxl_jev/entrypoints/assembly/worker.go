@@ -160,7 +160,18 @@ func RunWorker(role string) error {
 		if err != nil {
 			return err
 		}
-		provider, err := analysis.NewJev(analysis.JevOptions{Endpoint: p.ProviderURL, Token: p.ProviderToken, ModelVersion: p.Settings.ModelVersion, Prompt: prompt, MaxRequestBytes: p.Settings.MaxInputBytes, MaxResponseBytes: p.Settings.MaxInputBytes, Client: &http.Client{Timeout: timeout}, FixtureOnly: p.Mode == "mock", Clock: clock{}.Now, Mapping: assets.Calibration})
+		var admission ports.ProviderAdmission
+		if p.Mode != "mock" {
+			open, done := context.WithTimeout(ctx, timeout)
+			control, e := pg.OpenProviderControl(open, p.Access.DatabaseURL, p.Binding(), store.Kind())
+			done()
+			if e != nil {
+				return e
+			}
+			defer control.Close()
+			admission = control
+		}
+		provider, err := analysis.NewJev(analysis.JevOptions{Endpoint: p.ProviderURL, Token: p.ProviderToken, ModelVersion: p.Settings.ModelVersion, Prompt: prompt, MaxRequestBytes: p.Settings.MaxInputBytes, MaxResponseBytes: p.Settings.MaxInputBytes, Client: &http.Client{Timeout: timeout}, FixtureOnly: p.Mode == "mock", Clock: clock{}.Now, Mapping: assets.Calibration, Admission: admission})
 		if err != nil {
 			return err
 		}
