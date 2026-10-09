@@ -212,7 +212,7 @@ func runGuardedProviderIntegration(t *testing.T, lab string) {
 	request.Event.EvidenceRefs[0].AvailableAt = request.Evidence.Raw.ReceivedAt
 	request.ModelVersion, request.PromptVersion = model, prompt.Version
 	request.Deadline = time.Now().UTC().Add(time.Minute)
-	registerHandoffEvent(t, owner, request)
+	registered := registerHandoffEvent(t, owner, request)
 	now := time.Now().UTC()
 	if err := pg.ConfigureQueueBudget(ctx, f.dsn, pg.QueueBudget{Binding: binding, Kind: "RESEARCH", Bucket: "fixture-guarded-budget", PolicyRef: "fixture-guarded-policy", MaxJobs: 1, MaxConcurrent: 1, ValidFrom: now.Add(-time.Minute), ValidUntil: now.Add(time.Hour)}); err != nil {
 		t.Fatal("GUARDED_LAB_QUEUE_BUDGET")
@@ -277,6 +277,19 @@ func runGuardedProviderIntegration(t *testing.T, lab string) {
 	if saved.State != "COMPLETED" || saved.Candidate == nil || saved.Candidate.Mock != (lab == "") || a.Validate(request, *saved.Candidate, time.Now().UTC(), lab == "") != nil || observer.calls.Load() != 1 {
 		t.Fatal("GUARDED_LAB_CANDIDATE_NOT_ADMITTED", saved.State, saved.ReasonCodes)
 	}
+	var originalOutbox []byte
+	var originalCommand d.SubmissionOutbox
+	if f.admin.QueryRow(ctx, "SELECT payload FROM instance_pipeline_sim.research_submission_outbox WHERE job_id=$1", job.JobID).Scan(&originalOutbox) != nil || d.DecodePrivate(originalOutbox, &originalCommand) != nil {
+		t.Fatal("GUARDED_LAB_OUTBOX_READ")
+	}
+	if lab == "" {
+		// Ordinary CI also advances P2 after the outbox was frozen. The rejected
+		// command changes only audit/version, never a business fact or score.
+		registered.RequestID, registered.IdempotencyKey, registered.ExpectedVersion = "fixture-guarded-version-audit", "fixture-guarded-version-audit", 0
+		if _, err := owner.RegisterEvent(ctx, registered, false); providerError(err) != "FRAMEWORK_AGGREGATE_VERSION_CONFLICT" {
+			t.Fatal("GUARDED_LAB_VERSION_ADVANCE")
+		}
+	}
 	// Reopen both durable boundaries before dispatch; recovery may read/submit
 	// the recorded candidate but must not issue another supplier request.
 	store.Close()
@@ -307,6 +320,9 @@ func runGuardedProviderIntegration(t *testing.T, lab string) {
 		t.Fatal("GUARDED_LAB_RESEARCH_RECEIPT")
 	}
 	receiptState = out.Receipt.State
+	if d.Digest(out.Command) != d.Digest(originalCommand.Command) || out.CandidateHash != originalCommand.CandidateHash {
+		t.Fatal("GUARDED_LAB_IMMUTABLE_OUTBOX_CHANGED")
+	}
 	// The identical request is independently blocked by durable account control.
 	if _, err := worker.Provider.Analyze(ctx, request); providerError(err) != "PROVIDER_CALL_ALREADY_RESERVED" || observer.calls.Load() != 1 {
 		t.Fatal("GUARDED_LAB_DUPLICATE_HTTP", providerError(err))

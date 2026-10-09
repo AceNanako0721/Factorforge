@@ -37,9 +37,10 @@ type scoreVersionOutcome struct {
 	ProviderCalls                  int
 	SecondP2Conflict               string
 	ImmutableCommandsAndCandidates bool
+	FirstPassPending               int
 }
 
-func scoreVersionCase(t *testing.T, prototype bool) scoreVersionOutcome {
+func scoreVersionCase(t *testing.T, prototype bool, concurrent ...bool) scoreVersionOutcome {
 	t.Helper()
 	ctx := context.Background()
 	ingest, analysis, first, candidate, now, base := workerIdentityFixture(t)
@@ -97,9 +98,13 @@ func scoreVersionCase(t *testing.T, prototype bool) scoreVersionOutcome {
 	if result.PersistedVersions[0] != result.PersistedVersions[1] {
 		t.Fatal("fixture requires two scores prepared before either dispatch")
 	}
-	for _, worker := range workerSet {
-		if err := worker.Dispatch(ctx); err != nil {
-			t.Fatal("dispatch", err)
+	if len(concurrent) == 1 && concurrent[0] {
+		result.FirstPassPending = dispatchScoreWorkersTogether(t, workerSet, stores)
+	} else {
+		for _, worker := range workerSet {
+			if err := worker.Dispatch(ctx); err != nil {
+				t.Fatal("dispatch", err)
+			}
 		}
 	}
 	for i, s := range stores {

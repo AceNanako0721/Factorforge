@@ -217,3 +217,7 @@ Acquire失败没有HTTP；成功预占后仅一次HTTP，完整交付保存COMPL
 出站P2事件的EvidenceRef.AvailableAt表示原文在本系统的首次可用，取已保存Raw.ReceivedAt；本次抽取CompletedAt及路由AvailableAt仍是实际完成时间，Claim.VerifiedAt仍取冻结审阅时间。评分和框架接收继续控制真正贡献的EligibleFrom，不会因原文较早而提前引用。没有新配置、接口或编译文件格式。
 
 有效旧审阅文件在首次摄入时使用正确映射；已持久化的旧原文、事件、任务和评分保持。旧payload若与新映射冲突会继续失败、不入队，不自动改事实版本、补偿或升级；该类历史修复需要另行审查，当前没有迁移操作。事件VERIFIED不等同评分READY、交易运行或LIVE准入。完整证据见[时间链验证](P3_EVIDENCE_CLOCK.md)。
+
+## v2.1.13 评分提交的并发版本
+
+评分outbox及候选仍不可改。Dispatch先查原回执，无回执才读最新P2 Version并重查期限，发送时只在Command复制件刷新ExpectedVersion。明确的AGGREGATE_VERSION_CONFLICT保持原行到下轮，不在同轮重发；事实/幂等等其他冲突继续拒绝，未知投递继续先协调原回执。没有新配置/状态/数据库迁移，旧REJECTED终态不自动重开。验证及实际下层语义见[P3_SCORE_VERSION](P3_SCORE_VERSION.md)。
