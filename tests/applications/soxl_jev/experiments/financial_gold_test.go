@@ -60,6 +60,7 @@ type financialRequest struct {
 		Table      [][]string                    `json:"table"`
 		Paragraphs map[string]string             `json:"paragraphs"`
 		Candidates map[string]financialCandidate `json:"candidates"`
+		Units      map[string]financialCandidate `json:"unit_candidates,omitempty"`
 	} `json:"state"`
 	Questions map[string]struct {
 		Type         string          `json:"type"`
