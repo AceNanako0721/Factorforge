@@ -74,7 +74,7 @@ No application or copied implementation from them is included.
 
 | Module | Version and use | License |
 | --- | --- | --- |
-| golang.org/x/net | [v0.59.0](https://pkg.go.dev/golang.org/x/net@v0.59.0/html), html/parse.go HTML5 document validation | BSD 3-Clause; The Go Authors |
+| golang.org/x/net | [v0.59.0](https://pkg.go.dev/golang.org/x/net@v0.59.0/html), html/parse.go HTML5 document validation; html/token.go original-byte review views in the application CLI | BSD 3-Clause; The Go Authors |
 | santhosh-tekuri/jsonschema/v6 | [v6.0.2](https://github.com/santhosh-tekuri/jsonschema/tree/v6.0.2), compiler.go and validator.go for offline Draft 2020-12 | [Apache 2.0](https://github.com/santhosh-tekuri/jsonschema/blob/v6.0.2/LICENSE) |
 | dlclark/regexp2 | [v1.11.5](https://github.com/dlclark/regexp2/tree/v1.11.5), regexp.go ECMAScript lookahead compatibility for existing decimal schemas | [MIT](https://github.com/dlclark/regexp2/blob/v1.11.5/LICENSE); Doug Clark |
 

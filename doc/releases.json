@@ -105,15 +105,20 @@
         "03_SOXLUSDT_JEV应用实例",
         "04_Web管理台"
       ]
-    }
-    ,{
+    },
+    {
       "version": "2.1.7",
       "directory": "doc/v2.1.7",
       "change_kind": "design",
       "date": "2026-10-09",
       "reason": "先验证完整HTML字节映射，再设计已采集原文的绑定导出与离线审阅视图；业务式样保持。",
       "format": "html",
-      "document_pairs": ["01_交易系统层", "02_策略化框架层", "03_SOXLUSDT_JEV应用实例", "04_Web管理台"]
+      "document_pairs": [
+        "01_交易系统层",
+        "02_策略化框架层",
+        "03_SOXLUSDT_JEV应用实例",
+        "04_Web管理台"
+      ]
     }
   ]
 }
