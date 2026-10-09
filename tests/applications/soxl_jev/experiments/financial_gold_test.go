@@ -97,6 +97,7 @@ func financialRead(t *testing.T, lab, name string, dst any) []byte {
 // exact original literals and does not import this permissive normalizer.
 func financialNumber(text string) (*big.Rat, bool) {
 	text = strings.TrimSpace(text)
+	text = strings.TrimSpace(strings.TrimPrefix(text, "$"))
 	negative := strings.HasPrefix(text, "(") && strings.HasSuffix(text, ")")
 	text = strings.Trim(text, "()$% ")
 	text = strings.ReplaceAll(text, ",", "")
@@ -441,7 +442,7 @@ func TestFinancialCandidateMechanicsAndComparator(t *testing.T) {
 	if len(candidates) != 6 || duplicates != 2 {
 		t.Fatal("duplicate original values must retain distinct cell IDs")
 	}
-	for _, tc := range []struct{ Literal, Expected string }{{"($1,234.50)", "-2469/2"}, {"12.5%", "25/2"}, {"0", "0"}} {
+	for _, tc := range []struct{ Literal, Expected string }{{"($1,234.50)", "-2469/2"}, {"$(0.28)", "-7/25"}, {"12.5%", "25/2"}, {"0", "0"}} {
 		got, ok := financialNumber(tc.Literal)
 		want, _ := new(big.Rat).SetString(tc.Expected)
 		if !ok || got.Cmp(want) != 0 {

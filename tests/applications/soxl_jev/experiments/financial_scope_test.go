@@ -338,3 +338,66 @@ func TestFinancialScopeSelectionDoesNotTreatAmountAsYear(t *testing.T) {
 		t.Fatal("explicit exclusion should be exercised")
 	}
 }
+
+// Second-stage development control on already-used failures. Target values
+// come only from saved first-stage provider selections, never from gold.
+func TestPrepareScopeQuestionsBoundToRecordedNumericSelection(t *testing.T) {
+	lab := os.Getenv("FACTORFORGE_FINANCIAL_BOUND_SCOPE_LAB")
+	if lab == "" {
+		t.Skip("explicit already-used target-binding control")
+	}
+	if !filepath.IsAbs(lab) || filepath.Base(filepath.Dir(lab)) != "runtime" {
+		t.Fatal("BOUND_SCOPE_PATH")
+	}
+	archive := filepath.Join(lab, "..", "financial-scope-lab-20261009")
+	var metric map[string]any
+	mRaw := financialRead(t, archive, "evaluation.json", &metric)
+	if d.ContentDigest(mRaw) != "d8d279506da5f5bf2561c718f30fd33a327a1dc71bbb1c8a72008583c5716124" {
+		t.Fatal("BOUND_SCOPE_PRIOR_RESULT_CHANGED")
+	}
+	var labels struct {
+		Cases []map[string]any `json:"cases"`
+	}
+	labelRaw := financialRead(t, archive, "labels.json", &labels)
+	if len(labels.Cases) != 3 {
+		t.Fatal("BOUND_SCOPE_CASES")
+	}
+	names, requestHashes := []string{}, []string{}
+	for i, item := range labels.Cases {
+		name, ok := item["request"].(string)
+		if !ok {
+			t.Fatal("BOUND_SCOPE_FILE")
+		}
+		var request financialRequest
+		financialRead(t, archive, name, &request)
+		var previous struct {
+			Answers map[string]struct{ Choice *string }
+		}
+		financialRead(t, archive, fmt.Sprintf("case-%03d-response.json", i+1), &previous)
+		selected := previous.Answers["candidate"].Choice
+		if selected == nil {
+			t.Fatal("BOUND_SCOPE_SELECTION")
+		}
+		target, ok := request.State.Candidates[*selected]
+		if !ok || !financialLiteralPresent(request, target) {
+			t.Fatal("BOUND_SCOPE_SELECTION_UNSUPPORTED")
+		}
+		for key, q := range request.Questions {
+			q.Instructions, _ = json.Marshal(map[string]any{"question": q.Instructions, "task_question": request.State.Question, "target_numeric_candidate_id": *selected, "target_numeric_candidate": target})
+			request.Questions[key] = q
+		}
+		raw, _ := json.Marshal(request)
+		if len(raw) > 65536 {
+			t.Fatal("BOUND_SCOPE_REQUEST_BOUND")
+		}
+		frozenRateWrite(t, lab, name, request)
+		saved, _ := os.ReadFile(filepath.Join(lab, name))
+		item["request_hash"] = d.ContentDigest(saved)
+		requestHashes = append(requestHashes, d.ContentDigest(saved))
+		names = append(names, name)
+	}
+	frozenRateWrite(t, lab, "labels.json", labels)
+	frozenRateWrite(t, lab, "plan.json", map[string]any{"model": "jev-1.13.0", "max_requests": 3, "timeout_seconds": 20, "max_bytes": 65536, "requests": names})
+	frozenRateWrite(t, lab, "sealed-binding-plan.json", map[string]any{"at": time.Now().UTC(), "method": "STRUCTURED_QUESTION_TASK_AND_RECORDED_NUMERIC_TARGET", "prior_metric_hash": d.ContentDigest(mRaw), "prior_labels_hash": d.ContentDigest(labelRaw), "request_hashes": requestHashes, "new_gold_instructions": false, "already_used_failures": true, "maximum_calls": 3, "model_calls": 0, "production_installed": false})
+	t.Log("three already-used targets bound before new calls; no gold values inserted; not independent validation")
+}
