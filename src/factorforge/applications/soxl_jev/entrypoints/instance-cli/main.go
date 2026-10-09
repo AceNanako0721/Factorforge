@@ -8,6 +8,7 @@ import (
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/config"
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/domain"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/entrypoints/assembly"
+	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/operations"
 	"os"
 	"path/filepath"
 	"sort"
@@ -15,10 +16,20 @@ import (
 )
 
 func run() error {
-	action := flag.String("action", "", "init-storage or publish-projection (no transactions)")
+	action := flag.String("action", "", "init-storage, publish-projection or prepare-evidence (no transactions)")
 	source := flag.String("config", "config/config.toml", "Canonical private config for this operator command only")
 	version := flag.Int64("expected-version", -1, "Existing read version; -1 only for initial publication")
+	proposalInput := flag.String("proposal-input", "", "Private closed JSON evidence and catalog request")
+	proposalOutput := flag.String("proposal-output", "", "New private JSON file under this repository runtime")
+	proposalBytes := flag.Int("max-proposal-bytes", 0, "Explicit input and output file byte budget")
 	flag.Parse()
+	if *action == "prepare-evidence" {
+		root, err := os.Getwd()
+		if err != nil {
+			return d.Fail("PROPOSAL_FILE_INVALID", 422)
+		}
+		return operations.PrepareEvidenceFile(root, *proposalInput, *proposalOutput, *proposalBytes)
+	}
 	if *action != "init-storage" && *action != "publish-projection" {
 		return d.Fail("INSTANCE_CLI_ACTION_REQUIRED", 422)
 	}

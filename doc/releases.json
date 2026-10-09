@@ -63,6 +63,20 @@
         "03_SOXLUSDT_JEV应用实例",
         "04_Web管理台"
       ]
+    },
+    {
+      "version": "2.1.4",
+      "directory": "doc/v2.1.4",
+      "change_kind": "design",
+      "date": "2026-10-09",
+      "reason": "先完成机械抽取/目录匹配离线试验，再细化完整原文候选准备与独立审阅边界；业务式样和生产准入不变。",
+      "format": "html",
+      "document_pairs": [
+        "01_交易系统层",
+        "02_策略化框架层",
+        "03_SOXLUSDT_JEV应用实例",
+        "04_Web管理台"
+      ]
     }
   ]
 }

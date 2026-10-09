@@ -88,3 +88,24 @@ INGEST 从私有资产 calendar 读取版本化有效会话和 IANA 时区，在
 逐 claim 的问题现在包含结构化 instructions.question（来自私有模板）及 instructions.target_claim（当前已核验 Claim DTO）。问题 ID 仅作响应关联；私有问题必须针对 target_claim 定义判断，不能把 ID 当模型上下文。外发 state 范围保持，原文/账户/凭据不增加。空/重复/非法 Claim、空或标量 instructions、绑定后超预算在请求前阻断；未知投递不重问。公开空模板已对齐七个问题 ID，仍不能直接运行。
 
 正式更新私有问题需要登记新的 Prompt/问题集/生产者版本并验证标定组合；本轮没有自动填写或批准生产资产。完整设计与抽取候选试验顺序见 [P3 v2.1.3](../v2.1.3/03_SOXLUSDT_JEV应用实例设计书.html#jev-verified-binding)。
+
+## v2.1.4 可审阅的自动候选
+
+先执行十四项离线开发对照，再提交完整 HTML 设计基线 `ea78098`，之后实现 `evidence.PrepareProposal` 和操作者 CLI。此功能处理未预先登记 ContentHash 的新原文，自动保存完整原文、段落跨度/哈希、数值词面、ISO 日期合法性、显式主体/事项命中和可能的既有事件引用。输出固定 `REVIEW_REQUIRED`，事件关系固定 `UNKNOWN`；没有 Claim、Complete、VerificationManifest 或模型评分字段，不实现 EvidenceExtractor，也不接入队列。
+
+从仓库根运行已构建的原生 CLI：
+
+```sh
+runtime/bin/instance-cli --action prepare-evidence \
+  --proposal-input runtime/private-evidence/request.json \
+  --proposal-output runtime/private-evidence/review-001.json \
+  --max-proposal-bytes 64000
+```
+
+64000 是命令示例的离线文件预算，不能用作已标定生产常数。输入/输出文件共用此字节上限，候选展开可能比输入大；上限不足拒绝，不截断。输入结构和字段见 [当前 P3 设计](../v2.1.4/03_SOXLUSDT_JEV应用实例设计书.html#evidence-proposals)：`schema_version=1`、`raw`、`catalog`、`limits`。raw 必须有完整原文、正确 SHA-256、有效来源/许可引用与 UTC 接收时间；缺首发时间保留 null，不以接收时间代替。目录必须显式登记 version、subjects/items 的 id/terms、events 的 event_id/family_id/subject_id/item_id/period；events 可以为空，不编造未知事件。limits 的五项正整数全部明确指定，事件期间项也占目录预算，事件提示与词命中共用匹配预算。
+
+此 action 不读真实配置、不获得数据库/交易所/模型凭据、不调用下层或外发原文。输入是私有证据资产；凭据仍只在 `config/config.toml`，提示词仍在私有文件。输出只能在当前仓库 runtime 子树，拒绝路径逃逸、符号链接和覆盖，文件 0600；日志只有稳定成功/错误码。原生 CLI 已在无 Python/Node、无配置/下层服务环境下运行和重复启动验证。
+
+段落保留换行、否定与限定词，不拆句；CRLF/LF/CR 都按完整行结束处理。数字只是词面，1,234.50/1.234,50 不自动解释成金额，中文数字和相对日期保留原文。目录词按原样匹配，ASCII 边界防止名称或期间前缀命中；大小写别名需显式登记。一个段落中主体、事项和期间来自不同分句时也可能列出候选；这说明候选需要审阅，不能据同段共现确认同一事件。
+
+审阅者依据完整上下文、来源许可和历史事件独立完成现有 Annotation 和 EventPlan 后，仍经 AnnotatedExtractor、Verify、Routing 和 P2 准入。此命令不会转换候选为已核验事实。十四项对照是开发参照，新增机械/文件/原生进程测试也不替代 OD-01 独立完整性盲标、语义事件识别、生产标定或 OD-02。
