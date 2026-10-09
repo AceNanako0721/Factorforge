@@ -20,6 +20,12 @@ import (
 )
 
 func TestCalendarRealFrameworkDualLimitsAndImmutableRestart(t *testing.T) {
+	for _, source := range []string{"inline", "venue-snapshot"} {
+		t.Run(source, func(t *testing.T) { testCalendarFramework(t, source) })
+	}
+}
+
+func testCalendarFramework(t *testing.T, source string) {
 	ctx := context.Background()
 	state, identity, create := p2Fixture(t)
 	parse := func(v string) time.Time {
@@ -31,6 +37,15 @@ func TestCalendarRealFrameworkDualLimitsAndImmutableRestart(t *testing.T) {
 	}
 	at := parse("2026-10-31T23:59:00Z")
 	calendar := operations.Calendar{Version: "fixture-calendar", Zone: "America/New_York", ValidFrom: parse("2026-10-30T00:00:00Z"), ValidUntil: parse("2026-11-04T00:00:00Z"), Sessions: []operations.MarketSession{{Date: "2026-10-30", OpenLocal: "09:30", CloseLocal: "13:00"}, {Date: "2026-11-02", OpenLocal: "09:30", CloseLocal: "16:00"}, {Date: "2026-11-03", OpenLocal: "09:30", CloseLocal: "16:00"}}}
+	if source == "venue-snapshot" {
+		r := venueRequest(t, at)
+		r.Binding = d.Binding{InstanceID: state.InstanceID, Environment: "SIM"}
+		a, err := operations.CompileVenueCalendar(r, at)
+		if err != nil {
+			t.Fatal(err)
+		}
+		calendar = a.Calendar
+	}
 	store := sa.NewMemory(state)
 	clock := sa.NewReplay(at)
 	service := sapp.Service{Store: store, Clock: clock}
@@ -125,5 +140,49 @@ func TestCalendarRealFrameworkDualLimitsAndImmutableRestart(t *testing.T) {
 	result, _ := json.Marshal(after)
 	if !bytes.Equal(baseline, result) {
 		t.Fatal("rejected calendar changed state")
+	}
+	// A different source version must also preserve published UTC intervals.
+	calendar.Version = "fixture-refreshed-calendar"
+	if e = client.InstallCalendar(ctx, calendar, object.ObjectID, policy.Version, at); e == nil {
+		t.Fatal("new source rewrote published interval")
+	}
+	calendar.Sessions[0].CloseLocal = "13:00"
+	if e = client.InstallCalendar(ctx, calendar, object.ObjectID, policy.Version, at); e != nil || writes != 1 {
+		t.Fatal("identical horizon refresh created windows", writes, e)
+	}
+	short := calendar
+	short.Sessions = append([]operations.MarketSession{}, calendar.Sessions[:2]...)
+	short.ValidUntil = parse("2026-11-02T21:00:00Z")
+	if e = client.InstallCalendar(ctx, short, object.ObjectID, policy.Version, at); e == nil || writes != 1 {
+		t.Fatal("horizon regression admitted", e)
+	}
+	after, _ = store.Read(ctx, state.InstanceID)
+	result, _ = json.Marshal(after)
+	if !bytes.Equal(baseline, result) {
+		t.Fatal("refresh changed state or counters")
+	}
+	// Store a spent counter, then extend through the real P2 HTTP endpoint.
+	if e = store.Transaction(ctx, state.InstanceID, func(s *sd.StrategyState) error {
+		for i := 0; i < policy.MaxNewRisk; i++ {
+			if _, err := sd.Reserve(s, s.Objects.Value(object.ObjectID), at, s.Policies.Value(policy.Version), fmt.Sprintf("fixture-persisted-risk-%d", i)); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); e != nil {
+		t.Fatal(e)
+	}
+	calendar.Sessions = append(append([]operations.MarketSession{}, calendar.Sessions...), operations.MarketSession{Date: "2026-11-04", OpenLocal: "09:30", CloseLocal: "16:00"})
+	calendar.ValidUntil = parse("2026-11-04T21:00:00Z")
+	if e = client.InstallCalendar(ctx, calendar, object.ObjectID, policy.Version, at); e != nil || writes != 2 {
+		t.Fatal("append failed", e, writes)
+	}
+	if e = client.InstallCalendar(ctx, calendar, object.ObjectID, policy.Version, at); e != nil || writes != 2 {
+		t.Fatal("append restart rewrote plan", e, writes)
+	}
+	after, _ = store.Read(ctx, state.InstanceID)
+	_, e = sd.Reserve(after, after.Objects.Value(object.ObjectID), midnight, after.Policies.Value(policy.Version), "fixture-after-refresh-blocked")
+	if !errors.As(e, &known) || known.Code != "NEW_RISK_WINDOW_LIMIT" {
+		t.Fatal("calendar refresh replenished spent counter", e)
 	}
 }

@@ -231,6 +231,7 @@ type RSSRegistration struct {
 	PublicationTimeVerified bool     `json:"publication_time_verified"`
 }
 type PipelineAssets struct {
+	CalendarFile          string                          `json:"calendar_file,omitempty"`
 	ReviewedEvidenceFiles []string                        `json:"reviewed_evidence_files,omitempty"`
 	ReviewedOriginals     []d.RawEvidence                 `json:"-"`
 	Calendar              *operations.Calendar            `json:"calendar"`
@@ -275,6 +276,20 @@ func LoadPipelineAssets(p WorkerProfile) (PipelineAssets, error) {
 		if a.SearchRouting.TimeoutSeconds > p.Settings.TimeoutSeconds {
 			return a, d.Fail("SEARCH_BACKEND_TIMEOUT_INVALID", 422)
 		}
+	}
+	if p.Role == "INGEST" && a.CalendarFile != "" {
+		root, err := os.Getwd()
+		if err != nil {
+			return a, d.Fail("VENUE_CALENDAR_ARTIFACT_INVALID", 422)
+		}
+		artifact, err := operations.LoadVenueCalendar(root, a.CalendarFile, p.Binding(), time.Now().UTC(), p.Settings.MaxInputBytes)
+		if err != nil {
+			return a, err
+		}
+		if a.Calendar != nil && d.Digest(*a.Calendar) != d.Digest(artifact.Calendar) {
+			return a, d.Fail("CALENDAR_ASSET_CONFLICT", 409)
+		}
+		a.Calendar = &artifact.Calendar
 	}
 	if p.Role == "INGEST" && len(a.ReviewedEvidenceFiles) > 0 {
 		root, e := os.Getwd()

@@ -130,12 +130,18 @@ func (m *Market) InstrumentSpecs(ctx context.Context) ([]*d.InstrumentSpec, erro
 		if err != nil {
 			return nil, err
 		}
-		if text(item["contractType"]) != "PERPETUAL" {
+		contractType := text(item["contractType"])
+		if contractType != "PERPETUAL" && contractType != "TRADIFI_PERPETUAL" {
 			continue
 		}
 		multiplier, ok := m.Multipliers[text(item["symbol"])]
 		if !ok {
 			continue
+		}
+		// TradFi uses the existing linear perpetual domain. Its identities must
+		// establish linear settlement; a public listing grants no account access.
+		if contractType == "TRADIFI_PERPETUAL" && (text(item["baseAsset"]) == "" || text(item["underlyingType"]) == "" || text(item["quoteAsset"]) == "" || text(item["quoteAsset"]) != text(item["marginAsset"])) {
+			return nil, reject("INSTRUMENT_RULES_UNVERIFIED", 423)
 		}
 		filters := map[string]any{}
 		rows, err := array(item["filters"])
@@ -162,7 +168,15 @@ func (m *Market) InstrumentSpecs(ctx context.Context) ([]*d.InstrumentSpec, erro
 		if e1 != nil || e2 != nil || e3 != nil || e4 != nil || multiple.Sign() <= 0 {
 			return nil, reject("INSTRUMENT_RULES_UNVERIFIED", 423)
 		}
-		digest := sha256.Sum256(spacedJSON(map[string]any{"filters": filters, "multiplier": multiplier, "status": item["status"]}))
+		identity := map[string]any{"filters": filters, "multiplier": multiplier, "status": item["status"]}
+		// Preserve ordinary PERPETUAL versions. Only the newly supported mapping
+		// includes the additional venue identities in its rule version.
+		if contractType == "TRADIFI_PERPETUAL" {
+			for _, name := range []string{"contractType", "baseAsset", "quoteAsset", "marginAsset", "underlyingType"} {
+				identity[name] = item[name]
+			}
+		}
+		digest := sha256.Sum256(spacedJSON(identity))
 		types, err := array(item["orderTypes"])
 		if err != nil {
 			return nil, err
