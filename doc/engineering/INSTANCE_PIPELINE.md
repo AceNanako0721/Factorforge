@@ -186,3 +186,8 @@ Bundle/页面没有审阅答案、完整性或交易资格。完成审阅仍从 
 完整快照必须匹配各环境固定官方GET路径；编译器拒绝重复JSON键、错环境/身份/哈希、过期/未来时间、时段缺口/重叠/未知及不精确的分钟。只有EQUITY的REGULAR映射为纽约时段，其余间隔沿已有Calendar生成连续非传统窗口。产物保留原请求、摘要和派生日历，加载全量复算；有效期限不会因重新生成文件延长。
 
 PipelineAssets.calendar_file 可登记绝对 runtime 产物路径，只由INGEST读取；如同时指定inline calendar，两者必须一致。装配沿已有对象TimePolicy和框架GET/POST窗口接口，刷新只追加未来边界。与已发布窗口不一致、末端回退或边界不连续均拒绝，刷新不会补发次数。当前没有自动联网刷新任务；启动核验源时效，运行超出已注册覆盖则禁增险，操作者需取得和复核新快照后重新编译。公有产品信息不替代账户协议、合约单位、保护或LIVE准入。
+
+
+## v2.1.9 显式分数词面方法
+
+新ProposalRequest可显式指定method_version=paragraph-literal-2，export-evidence私有计划同名字段透传；未提供继续paragraph-literal-1，旧Bundle/ReviewRequest与产物身份保持。算法版本字段属于完整请求hash，不能仅修改页面或审阅后的派生方法。v2保留1/4、3-3/4及U+2010/U+2011混合数原字节范围，连续斜杠链跳过，标签/实体不拼接。FRACTION_LEXEMES_UNINTERPRETED提示未做数学/语义解释；同跨度原词面和完整单位仍须审核，不能填归一化的小数代替原词面。无公共API或配置/Prompt模板变更。方法证据与限制见[P3数字原文试验](P3_NUMERIC_EVIDENCE.md)。
