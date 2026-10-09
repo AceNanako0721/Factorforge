@@ -22,7 +22,7 @@ import (
 func TestExportReviewPostgresNativeReadOnlyAndRoleBoundary(t *testing.T) {
 	ctx := context.Background()
 	root := t.TempDir()
-	request := bundleRequest(`<p>Acme preliminary Q3 2026 revenue was 12 USD.</p>`)
+	request := bundleRequest(`<p>Acme preliminary Q3 2026 revenue was 3-3/4 USD.</p>`)
 	server, err := tradingpg.StartTemporary(ctx, t.TempDir(), nativePG(t))
 	if err != nil {
 		t.Fatal(err)
@@ -104,6 +104,27 @@ func TestExportReviewPostgresNativeReadOnlyAndRoleBoundary(t *testing.T) {
 	if d.DecodePrivate(encoded, &bundle) != nil || bundle.Proposal.Raw != unknown.Raw || bundle.Proposal.Status != "REVIEW_REQUIRED" || bundle.Proposal.Raw.FirstPublicAt != nil {
 		t.Fatal("unknown original promoted or rewritten")
 	}
+	plan.MethodVersion = "paragraph-literal-2"
+	writePrivateJSON(t, input, plan)
+	if err = operations.ExportReviewBundleFile(ctx, store, request.Binding, root, input, filepath.Join(root, "runtime", "fraction.json"), 200000); err != nil {
+		t.Fatal(err)
+	}
+	fractionRaw, _ := os.ReadFile(filepath.Join(root, "runtime", "fraction.json"))
+	var fraction operations.ReviewBundle
+	if d.DecodePrivate(fractionRaw, &fraction) != nil || fraction.Proposal.MethodVersion != "paragraph-literal-2" || fraction.BundleID == bundle.BundleID || operations.ValidateReviewBundle(fraction) != nil {
+		t.Fatal("export method not preserved")
+	}
+	found := false
+	for _, a := range fraction.Proposal.Anchors {
+		if a.Kind == "NUMBER_LEXEME" && a.Text == "3-3/4" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("fraction missing from database export")
+	}
+	plan.MethodVersion = ""
+	writePrivateJSON(t, input, plan)
 	store.Close()
 	store, err = pg.OpenPipeline(ctx, dsns["INGEST"], request.Binding, "INGEST", 200000)
 	if err != nil {

@@ -15,6 +15,7 @@ type EvidenceReader interface {
 }
 
 type ExportReviewRequest struct {
+	MethodVersion string                      `json:"method_version,omitempty"`
 	SchemaVersion int                         `json:"schema_version"`
 	Binding       d.Binding                   `json:"binding"`
 	EvidenceID    string                      `json:"evidence_id"`
@@ -43,7 +44,7 @@ func ExportReviewBundleFile(ctx context.Context, reader EvidenceReader, binding 
 		if stored.Raw.EvidenceID != request.EvidenceID {
 			return nil, d.Fail("REVIEW_EXPORT_FORBIDDEN", 403)
 		}
-		bundle, err := PrepareReviewBundle(ReviewBundleRequest{SchemaVersion: 1, Binding: binding, ProposalRequest: evidence.ProposalRequest{SchemaVersion: 1, Raw: stored.Raw, Catalog: request.Catalog, Limits: request.Limits}, MediaType: request.MediaType, ViewLimits: request.ViewLimits})
+		bundle, err := PrepareReviewBundle(ReviewBundleRequest{SchemaVersion: 1, Binding: binding, ProposalRequest: evidence.ProposalRequest{SchemaVersion: 1, MethodVersion: request.MethodVersion, Raw: stored.Raw, Catalog: request.Catalog, Limits: request.Limits}, MediaType: request.MediaType, ViewLimits: request.ViewLimits})
 		if err != nil {
 			return nil, err
 		}

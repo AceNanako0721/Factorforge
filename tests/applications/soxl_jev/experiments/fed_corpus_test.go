@@ -44,6 +44,20 @@ func TestArchivedFedRateCrossSourceCorpus(t *testing.T) {
 	if lab == "" {
 		t.Skip("opt-in captured official rate corpus")
 	}
+	method := os.Getenv("FACTORFORGE_NUMERIC_METHOD")
+	if method != "" && method != "paragraph-literal-2" {
+		t.Fatal("RATE_METHOD_INVALID")
+	}
+	var capture struct {
+		Results []struct {
+			URL        string    `json:"url"`
+			ReceivedAt time.Time `json:"received_at"`
+		} `json:"results"`
+	}
+	captured, e := os.ReadFile(filepath.Join(lab, "report.json"))
+	if e != nil || json.Unmarshal(captured, &capture) != nil {
+		t.Fatal("RATE_CAPTURE_INVALID")
+	}
 	history, e := os.ReadFile(filepath.Join(lab, "rate-history.html"))
 	if e != nil {
 		t.Fatal(e)
@@ -142,8 +156,14 @@ func TestArchivedFedRateCrossSourceCorpus(t *testing.T) {
 		if !ok1 || !ok2 || !ok3 || !ok4 || lower.Cmp(expectedLower) != 0 || upper.Cmp(expectedUpper) != 0 || actualAction != action {
 			t.Fatal("RATE_CROSS_SOURCE_MISMATCH", date)
 		}
-		now := time.Now().UTC()
-		proposal, e := evidence.PrepareProposal(evidence.ProposalRequest{SchemaVersion: 1, Raw: d.RawEvidence{EvidenceID: "lab-statement-" + date, SourceID: "lab-fed", LicenceRef: "lab-fed-first-party", URL: "https://www.federalreserve.gov/newsevents/pressreleases/monetary" + date + "a.htm", Content: string(raw), ContentHash: d.ContentDigest(raw), ReceivedAt: now}, Catalog: evidence.ProposalCatalog{Version: "lab-rate-catalog", Subjects: []evidence.CatalogEntry{{ID: "fomc", Terms: []string{"Committee"}}}, Items: []evidence.CatalogEntry{{ID: "rate-target", Terms: []string{"target range for the federal funds rate"}}}}, Limits: evidence.ProposalLimits{MaxInputBytes: 2000000, MaxParagraphs: 2000, MaxAnchors: 20000, MaxMatches: 20000, MaxCatalogTerms: 1000}})
+		url := "https://www.federalreserve.gov/newsevents/pressreleases/monetary" + date + "a.htm"
+		var received time.Time
+		for _, c := range capture.Results {
+			if c.URL == url {
+				received = c.ReceivedAt
+			}
+		}
+		proposal, e := evidence.PrepareProposal(evidence.ProposalRequest{SchemaVersion: 1, MethodVersion: method, Raw: d.RawEvidence{EvidenceID: "lab-statement-" + date, SourceID: "lab-fed", LicenceRef: "lab-fed-first-party", URL: url, Content: string(raw), ContentHash: d.ContentDigest(raw), ReceivedAt: received}, Catalog: evidence.ProposalCatalog{Version: "lab-rate-catalog", Subjects: []evidence.CatalogEntry{{ID: "fomc", Terms: []string{"Committee"}}}, Items: []evidence.CatalogEntry{{ID: "rate-target", Terms: []string{"target range for the federal funds rate"}}}}, Limits: evidence.ProposalLimits{MaxInputBytes: 2000000, MaxParagraphs: 2000, MaxAnchors: 20000, MaxMatches: 20000, MaxCatalogTerms: 1000}})
 		if e != nil {
 			t.Fatal(e)
 		}
@@ -163,7 +183,20 @@ func TestArchivedFedRateCrossSourceCorpus(t *testing.T) {
 		results = append(results, map[string]any{"date": date, "statement_hash": d.ContentDigest(raw), "oracle_effective_date": target.Effective.Format("2006-01-02"), "action_matches": true, "target_range_matches": true, "original_lower": m[3], "original_upper": m[4], "exact_lower": lower.RatString(), "exact_upper": upper.RatString(), "proposal_missing_original_lexemes": missing, "semantic_complete": false, "first_public_at": "UNKNOWN"})
 	}
 	encoded, _ := json.MarshalIndent(map[string]any{"history_url": "https://www.federalreserve.gov/monetarypolicy/openmarket.htm", "history_hash": d.ContentDigest(history), "oracle_rows": len(gold), "cases": len(results), "results": results, "missing_original_lexemes": missingLexemes, "independent_blinded_holdout": false, "whole_document_complete": false, "production_installed": false, "model_calls": 0, "network_calls": 0, "orders": 0}, "", "  ")
-	if os.WriteFile(filepath.Join(lab, "cross-source-rate-report.json"), encoded, 0600) != nil {
+	phase := "before-design"
+	if method != "" {
+		phase = "after-implementation"
+		if missingLexemes != 0 {
+			t.Fatal("RATE_FRACTION_STILL_MISSING", missingLexemes)
+		}
+	}
+	f, e := os.OpenFile(filepath.Join(lab, phase+"-cross-source-rate-report.json"), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	if e != nil {
+		t.Fatal("RATE_REFERENCE_REPORT_EXISTS_OR_UNAVAILABLE")
+	}
+	_, e = f.Write(encoded)
+	closed := f.Close()
+	if e != nil || closed != nil {
 		t.Fatal("RATE_REFERENCE_WRITE_FAILED")
 	}
 	t.Logf("official_cross_source_cases=%d; exact_rate_action_matches=3; missing_original_lexemes=%d; semantic_complete=false", len(results), missingLexemes)

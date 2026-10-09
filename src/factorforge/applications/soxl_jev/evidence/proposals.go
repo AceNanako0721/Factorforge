@@ -13,6 +13,7 @@ import (
 // Proposals deliberately contain no Claim, completeness or verification marker.
 // They are review material, not an implementation of ports.EvidenceExtractor.
 type ProposalRequest struct {
+	MethodVersion string          `json:"method_version,omitempty"`
 	SchemaVersion int             `json:"schema_version"`
 	Raw           d.RawEvidence   `json:"raw"`
 	Catalog       ProposalCatalog `json:"catalog"`
@@ -84,6 +85,10 @@ type EvidenceProposal struct {
 }
 
 var numberLexeme = regexp.MustCompile(`[+-]?[0-9]+(?:[.,][0-9]+)*(?:[eE][+-]?[0-9]+)?`)
+
+// An explicit new method preserves complete fraction lexemes, without deciding
+// whether a slash denotes a rate, date, ratio or mathematically valid number.
+var fractionNumberLexeme = regexp.MustCompile(`[+-]?(?:[0-9]+[-‐‑][0-9]+/[0-9]+|[0-9]+/[0-9]+|[0-9]+(?:[.,][0-9]+)*(?:[eE][+-]?[0-9]+)?)`)
 var isoDateLexeme = regexp.MustCompile(`[0-9]{4}-[0-9]{2}-[0-9]{2}`)
 
 func span(id, content string, start, end int) ProposalSpan {
@@ -203,6 +208,13 @@ func validateCatalog(c ProposalCatalog, maxTerms int) error {
 
 func PrepareProposal(request ProposalRequest) (EvidenceProposal, error) {
 	empty := EvidenceProposal{}
+	method := request.MethodVersion
+	if method == "" {
+		method = "paragraph-literal-1"
+	}
+	if method != "paragraph-literal-1" && method != "paragraph-literal-2" {
+		return empty, d.Fail("PROPOSAL_INPUT_INVALID", 422)
+	}
 	l := request.Limits
 	r := request.Raw
 	if request.SchemaVersion != 1 || l.MaxInputBytes <= 0 || l.MaxParagraphs <= 0 || l.MaxAnchors <= 0 || l.MaxMatches <= 0 || l.MaxCatalogTerms <= 0 || !utf8.ValidString(r.Content) || strings.TrimSpace(r.Content) == "" || !d.ValidID(r.EvidenceID) || !d.ValidID(r.SourceID) || !d.ValidID(r.LicenceRef) || !d.UTC(r.ReceivedAt) || r.ContentHash != d.ContentDigest([]byte(r.Content)) || r.RevisionOf != nil && !d.ValidID(*r.RevisionOf) {
@@ -229,7 +241,12 @@ func PrepareProposal(request ProposalRequest) (EvidenceProposal, error) {
 		return empty, d.Fail("PROPOSAL_INPUT_INVALID", 422)
 	}
 	hash := d.ContentDigest(encoded)
-	result := EvidenceProposal{SchemaVersion: 1, ProposalID: "proposal-" + hash, MethodVersion: "paragraph-literal-1", CatalogVersion: request.Catalog.Version, RequestHash: hash, Raw: frozen.Raw, Status: "REVIEW_REQUIRED", Paragraphs: []ProposalSpan{}, Anchors: []ProposalAnchor{}, Matches: []ProposalMatch{}, EventHints: []EventHint{}, Warnings: []string{"UNVERIFIED_ORIGINAL", "SEMANTIC_EXTRACTION_NOT_PERFORMED", "AMOUNTS_AND_RELATIVE_DATES_NOT_NORMALIZED", "EVENT_RELATION_UNKNOWN"}}
+	result := EvidenceProposal{SchemaVersion: 1, ProposalID: "proposal-" + hash, MethodVersion: method, CatalogVersion: request.Catalog.Version, RequestHash: hash, Raw: frozen.Raw, Status: "REVIEW_REQUIRED", Paragraphs: []ProposalSpan{}, Anchors: []ProposalAnchor{}, Matches: []ProposalMatch{}, EventHints: []EventHint{}, Warnings: []string{"UNVERIFIED_ORIGINAL", "SEMANTIC_EXTRACTION_NOT_PERFORMED", "AMOUNTS_AND_RELATIVE_DATES_NOT_NORMALIZED", "EVENT_RELATION_UNKNOWN"}}
+	numbers := numberLexeme
+	if method == "paragraph-literal-2" {
+		numbers = fractionNumberLexeme
+		result.Warnings = append(result.Warnings, "FRACTION_LEXEMES_UNINTERPRETED")
+	}
 	result.Paragraphs, err = paragraphSpans(r.Content, l.MaxParagraphs)
 	if err != nil {
 		return empty, err
@@ -238,8 +255,11 @@ func PrepareProposal(request ProposalRequest) (EvidenceProposal, error) {
 		for _, matcher := range []struct {
 			kind string
 			re   *regexp.Regexp
-		}{{"NUMBER_LEXEME", numberLexeme}, {"ISO_DATE", isoDateLexeme}} {
+		}{{"NUMBER_LEXEME", numbers}, {"ISO_DATE", isoDateLexeme}} {
 			for _, loc := range matcher.re.FindAllStringIndex(p.Text, -1) {
+				if method == "paragraph-literal-2" && matcher.kind == "NUMBER_LEXEME" && (loc[0] > 0 && p.Text[loc[0]-1] == '/' || loc[1] < len(p.Text) && p.Text[loc[1]] == '/') {
+					continue
+				}
 				if matcher.kind == "ISO_DATE" && (loc[0] > 0 && asciiWord(p.Text[loc[0]-1]) || loc[1] < len(p.Text) && asciiWord(p.Text[loc[1]])) {
 					continue
 				}
