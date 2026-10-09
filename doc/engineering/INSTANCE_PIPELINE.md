@@ -143,3 +143,37 @@ URL 线索命中缓存仍重新检查来源许可并获取原文。来源抓取�
 既有失败 raw_evidence_manifest 不会升级。审阅产生 review-摘要的独立证据 ID，保留 original_evidence_id、原哈希、真实首次公开/接收时间，旧记录不改；再经既有核验/许可/路由、P2 事件注册及隔离入队。没有来源许可、公开时间、有效映射或标定时仍研究/隔离，不能靠审阅包授予交易资格。相同审阅重复与重启只入队/扣预算一次。
 
 本版未安装实验 Prompt、自动语义抽取器或生产常数；真实配置未改、实际实例未启用。生产自动抽取的独立标签/保留集、来源许可与账单/共享配额验证仍待完成。设计和试验见当前基线及 P3_EXTRACTION_EVALUATION.md。
+
+## v2.1.7 原文导出与离线审阅页
+
+完整字段及异常见[当前设计第13章](../v2.1.7/03_SOXLUSDT_JEV应用实例设计书.html#document-review-bundles)。JSON 数据资产与 HTML 阅读页面都只写入本仓库 runtime，0600、拒覆盖；不是新增公共 API 或配置模板。
+
+`prepare-review` 不加载配置，输入 ReviewBundleRequest：schema_version=1、binding、完整 proposal_request（沿 prepare-evidence）、media_type（显式 text/html 或 text/plain）、view_limits（max_tokens/max_token_bytes/max_display_bytes 三个显式正整数）。输出含冻结请求、既有候选、完整原始字节映射的 ReviewBundle。
+
+```sh
+go run ./src/factorforge/applications/soxl_jev/entrypoints/instance-cli \
+  --action prepare-review \
+  --proposal-input runtime/reviews/bundle-request.json \
+  --proposal-output runtime/reviews/bundle.json \
+  --max-proposal-bytes <explicit-positive-byte-budget>
+```
+
+已有原文在数据库时，用 `export-evidence` 代替 prepare-review。输入 ExportReviewRequest：schema_version=1、binding、evidence_id、catalog、limits、media_type、view_limits；无需手抄 RawEvidence。`--config` 指向 prepare-instance-profiles 已生成的 INGEST TOML（不是 canonical config 或 publication 管理员配置）。它只调用单条 Evidence 读取，不加载来源资产，不联系框架、搜索或模型，也不写业务表。
+
+```sh
+go run ./src/factorforge/applications/soxl_jev/entrypoints/instance-cli \
+  --action export-evidence --config runtime/instance-profiles/ingest.toml \
+  --proposal-input runtime/reviews/export-request.json \
+  --proposal-output runtime/reviews/bundle.json \
+  --max-proposal-bytes <explicit-positive-byte-budget>
+
+go run ./src/factorforge/applications/soxl_jev/entrypoints/instance-cli \
+  --action render-review \
+  --proposal-input runtime/reviews/bundle.json \
+  --proposal-output runtime/reviews/review.html \
+  --max-proposal-bytes <explicit-positive-byte-budget>
+```
+
+渲染前完整重算 Bundle；页面离线、无脚本/外部资源、原文全部转义。TEXT 的实体解码只便于阅读，坐标仍为原始 UTF-8 字节。导航、隐藏内容、script/style、注释/属性、表格、SVG及EOF未闭合尾部都没有自动判为无关；完整原文仍可核对。超限整体拒绝，不截断。解析缓存受完整输入预算约束，实际 token 大小另单独检查。
+
+Bundle/页面没有审阅答案、完整性或交易资格。完成审阅仍从 bundle.request.proposal_request 与 bundle.proposal 按 v2.1.6 的规则生成 ReviewRequest，再 compile-evidence；原始段落不得漏审，实体解码数字不能绕过原词面核验，未知首发/旧接收时间保持。私有原文/页面不可上传 GitHub。真实来源、独立评测和标定门仍单独验收。
