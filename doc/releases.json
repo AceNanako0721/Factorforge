@@ -189,6 +189,20 @@
         "03_SOXLUSDT_JEV应用实例",
         "04_Web管理台"
       ]
+    },
+    {
+      "version": "2.1.13",
+      "directory": "doc/v2.1.13",
+      "change_kind": "design",
+      "date": "2026-10-09",
+      "reason": "先复现评分并发版本永久拒绝及不可改幂等边界，再设计投递时CAS协调；业务式样保持。",
+      "format": "html",
+      "document_pairs": [
+        "01_交易系统层",
+        "02_策略化框架层",
+        "03_SOXLUSDT_JEV应用实例",
+        "04_Web管理台"
+      ]
     }
   ]
 }
