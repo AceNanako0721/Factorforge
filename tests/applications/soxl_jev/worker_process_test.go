@@ -62,7 +62,9 @@ func TestNativeInstanceWorkerProfilesAndProcessWithoutPythonNode(t *testing.T) {
 	r.Routing.ObjectID = r.ObjectID
 	p2store := adapters.NewMemory(state)
 	clock := adapters.NewReplay(now)
-	handler, err := sapi.New(sapi.Options{Store: p2store, Clock: clock, Internal: true, Tokens: map[string]sd.Identity{"fixture-only-worker": identity}, ReadPolicy: app.ReadPolicy{DefaultLimit: 10, MaxLimit: 50, MaxRecords: 1000, CursorAge: time.Hour, CursorKey: []byte("fixture-only-cursor-secret")}})
+	analysisIdentity := identity
+	analysisIdentity.WorkloadID = "fixture-trading-analysis"
+	handler, err := sapi.New(sapi.Options{Store: p2store, Clock: clock, Internal: true, Tokens: map[string]sd.Identity{"fixture-only-worker": identity, "fixture-only-analysis-worker": analysisIdentity}, ReadPolicy: app.ReadPolicy{DefaultLimit: 10, MaxLimit: 50, MaxRecords: 1000, CursorAge: time.Hour, CursorKey: []byte("fixture-only-cursor-secret")}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,6 +77,9 @@ func TestNativeInstanceWorkerProfilesAndProcessWithoutPythonNode(t *testing.T) {
 	if _, err = client.CreateObject(ctx, create); err != nil {
 		t.Fatal(err)
 	}
+	// Seeded analysis jobs represent an event already accepted from INGEST.
+	// The native analysis process uses another workload identity below.
+	registerHandoffEvent(t, client, r)
 	publicIdentity := sd.PublicPrincipal{PrincipalID: "fixture-report", InstanceID: state.InstanceID, Environment: state.Environment, Scopes: []sd.ApiScope{sd.Query}}
 	readHandler, err := sapi.New(sapi.Options{Store: p2store, Clock: clock, Tokens: map[string]sd.Identity{"fixture-report-read": publicIdentity}, ReadPolicy: app.ReadPolicy{DefaultLimit: 10, MaxLimit: 50, MaxRecords: 1000, CursorAge: time.Hour, CursorKey: []byte("fixture-only-cursor-secret")}})
 	if err != nil {
@@ -210,7 +215,7 @@ func TestNativeInstanceWorkerProfilesAndProcessWithoutPythonNode(t *testing.T) {
 		t.Fatal(err)
 	}
 	canonical := filepath.Join(private, "canonical.toml")
-	sections := map[string]any{"mode": "mock", "services": map[string]any{"jev_api_url": model.URL + "/v1/systemone", "framework_api_url": publicFramework.URL}, "credentials": map[string]any{"jev_api_key": "fixture-token", "framework_api_token": "fixture-report-read"}, "application": map[string]any{"prompt_file": prompt, "pipeline": map[string]any{"settings": settings, "ingest": config.WorkerAccess{DatabaseURL: dsns["INGEST"], FrameworkURL: framework.URL, FrameworkToken: "fixture-only-worker"}, "trading": config.WorkerAccess{DatabaseURL: dsns["TRADING"], FrameworkURL: framework.URL, FrameworkToken: "fixture-only-worker"}, "research": config.WorkerAccess{DatabaseURL: dsns["RESEARCH"], FrameworkURL: framework.URL, FrameworkToken: "fixture-only-research"}}}}
+	sections := map[string]any{"mode": "mock", "services": map[string]any{"jev_api_url": model.URL + "/v1/systemone", "framework_api_url": publicFramework.URL}, "credentials": map[string]any{"jev_api_key": "fixture-token", "framework_api_token": "fixture-report-read"}, "application": map[string]any{"prompt_file": prompt, "pipeline": map[string]any{"settings": settings, "ingest": config.WorkerAccess{DatabaseURL: dsns["INGEST"], FrameworkURL: framework.URL, FrameworkToken: "fixture-only-worker"}, "trading": config.WorkerAccess{DatabaseURL: dsns["TRADING"], FrameworkURL: framework.URL, FrameworkToken: "fixture-only-analysis-worker"}, "research": config.WorkerAccess{DatabaseURL: dsns["RESEARCH"], FrameworkURL: framework.URL, FrameworkToken: "fixture-only-research"}}}}
 	sections["application"].(map[string]any)["pipeline"].(map[string]any)["search_backends"] = []config.SearchAccess{{ID: "brave", Kind: "BRAVE", Endpoint: searchEndpoint + "/brave", Token: "fixture-search-token"}, {ID: "exa", Kind: "EXA", Endpoint: searchEndpoint + "/exa"}}
 	data, err = toml.Marshal(sections)
 	if err != nil {
@@ -229,7 +234,7 @@ func TestNativeInstanceWorkerProfilesAndProcessWithoutPythonNode(t *testing.T) {
 			t.Fatal(err)
 		}
 		bytes, _ := os.ReadFile(path)
-		if profile.Role == "RESEARCH" && strings.Contains(string(bytes), "fixture-only-worker") {
+		if profile.Role == "RESEARCH" && (strings.Contains(string(bytes), "fixture-only-worker") || strings.Contains(string(bytes), "fixture-only-analysis-worker")) {
 			t.Fatal("signal identity copied to research profile")
 		}
 		if profile.Role == "INGEST" && profile.ProviderToken != "" {
