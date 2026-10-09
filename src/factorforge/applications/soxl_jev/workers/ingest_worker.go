@@ -107,7 +107,9 @@ func (w IngestWorker) Process(ctx context.Context, raw d.RawEvidence) (d.Routing
 	}
 	event := dto.Event{EventID: plan.EventID, FamilyID: plan.FamilyID, FactVersion: plan.FactVersion, ParentEventID: plan.ParentEventID, Relation: plan.Relation,
 		SubjectID: extracted.Claims[0].SubjectID, EventType: plan.EventType, OccurredAt: plan.OccurredAt, FirstPublicAt: *extracted.Raw.FirstPublicAt,
-		EvidenceRefs: []dto.EvidenceRef{{EvidenceID: raw.EvidenceID, ContentHash: raw.ContentHash, SourceID: raw.SourceID, LicenceRef: raw.LicenceRef, FirstPublicAt: *extracted.Raw.FirstPublicAt, ReceivedAt: extracted.Raw.ReceivedAt, AvailableAt: extracted.CompletedAt, SpanRefs: spans, VerificationRef: extracted.VerificationManifest}},
+		// This reference describes the original's availability. Extraction/routing
+		// and scoring retain their later clocks and cannot backfill contribution time.
+		EvidenceRefs: []dto.EvidenceRef{{EvidenceID: raw.EvidenceID, ContentHash: raw.ContentHash, SourceID: raw.SourceID, LicenceRef: raw.LicenceRef, FirstPublicAt: *extracted.Raw.FirstPublicAt, ReceivedAt: extracted.Raw.ReceivedAt, AvailableAt: extracted.Raw.ReceivedAt, SpanRefs: spans, VerificationRef: extracted.VerificationManifest}},
 		Claims:       extracted.Claims, ObjectIDs: []string{w.Policy.ObjectID}, State: "VERIFIED", Novelty: plan.Novelty}
 	version, err := w.Framework.Version(ctx, w.Policy.ObjectID)
 	if err != nil {
