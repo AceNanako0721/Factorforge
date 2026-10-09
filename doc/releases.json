@@ -77,6 +77,14 @@
         "03_SOXLUSDT_JEV应用实例",
         "04_Web管理台"
       ]
+    }    ,{
+      "version": "2.1.5",
+      "directory": "doc/v2.1.5",
+      "change_kind": "design",
+      "date": "2026-10-09",
+      "reason": "先验证开源搜索候选链与 Exa/Parallel 匿名协议，再设计多后端回退、持久额度预占/暂停和查询缓存；业务式样保持。",
+      "format": "html",
+      "document_pairs": ["01_交易系统层", "02_策略化框架层", "03_SOXLUSDT_JEV应用实例", "04_Web管理台"]
     }
   ]
 }
