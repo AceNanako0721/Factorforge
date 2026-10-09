@@ -38,3 +38,15 @@ v2.1.8设计先行88c54e9/c1c23d0，之后实现P1通用枚举与P3离线日历�
 生产编译器对DEMO/PUBLIC_MAIN两份完整产品及日历快照分别生成可复算私有产物：各10个常规/19个总窗口，UTC有效范围2026-10-01T13:30Z～2026-10-14T20Z，周末65.5小时。实验时效86400秒/2MB原文/1000时段和4MB文件预算仅供本次重放，没有装入真实配置。实际原生CLI额外成功离线编译同一DEMO请求；真实业务未安装。
 
 Go P3→实际Go P2 HTTP覆盖编译产物和旧inline，验证同版本重启、换版本同覆盖不写入、重叠窗口冲突与末端回退拒绝、准确末端追加后原窗口耗尽次数仍拒绝增险。与完整测试中的PostgreSQL持久重开证据分开记录，不把临时MemoryStore称为数据库持久化。
+
+## v2.1.10 后续：目标测试网账户只读验证
+
+2026-10-09T07:36:59.855833203Z～07:37:01Z，复用 config/config.toml 中已有模拟盘 Key，固定官方 demo-fapi.binance.com，只执行八次签名 GET：/fapi/v3/account、/fapi/v1/accountConfig、/fapi/v1/positionSide/dual、/fapi/v1/multiAssetsMargin、/fapi/v1/openOrders、/fapi/v1/openAlgoOrders，以及 symbol=SOXLUSDT 的 /fapi/v1/symbolConfig、/fapi/v1/commissionRate。后两项按官方 [账户 API](https://developers.binance.com/en/docs/catalog/core-trading-derivatives-trading-usd-s-m-futures/api/rest-api/account) 选择；前六项复用既有 P1 AccountProbe / ReadOnlyAccountTransport。
+
+八项 HTTP 200，单次130～733ms。既有探针确认账户可读、账户交易开关开启、单向/单资产模式；普通及条件挂单数均为零。目标配置返回一条 SOXLUSDT；费率响应包含 symbol、makerCommissionRate、takerCommissionRate、rpiCommissionRate。只证明这些账户/标的读取接口成功；没有以 GET 响应替代写权限、产品协议、实际费用结算或 SOXLUSDT 下单/保护能力验证，也没有据此声明当前所有仓位为零。具体杠杆、名义额度、费率及余额不复制到公开记录。
+
+实验源码 account_lab_test.go 默认跳过，只在显式私有目录下运行。计划固定最多8请求、每次10秒、recvWindow=5000ms、本地request_budget=1000/60秒；这些仅是本次诊断边界，不是供应商限额或生产默认。发送前不可覆盖started标记；HTTP边界再次限定官方测试网、GET、八项路径及目标symbol，预算耗尽或任一错误停止，不重试。不安装执行fence/数据库/Readiness，不接受协议、不修改保证金/杠杆/模式、不发挂撤单。
+
+报告仅存 runtime/p3-account-lab-20261009/report.json，目录0700/文件0600，SHA256 a3b7eb0a7d1c8379bf755c4d02b08061d812dc7ec3987f4148098f141d8ca564；公开日志仅路径、状态、耗时和布尔结论，不记录请求查询串/签名/Key。普通离线测试验证 POST/DELETE、订单路径、正式域名、其他symbol及超预算在底层传输前拒绝。真实配置/Prompt/生产资产不变。
+
+T3-01/T3-07 的账户只读能力已取得这份有限证据。目标产品协议/经济单位、费率政策有效期与实际结算、参考价适用、保护/执行联合验收仍未关闭；正式账户或生产业务实例不从测试网证据继承准入。
