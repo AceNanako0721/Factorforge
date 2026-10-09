@@ -102,3 +102,20 @@ func TestHTMLProjectionPrivateOriginalLab(t *testing.T) {
 	}
 	t.Logf("original_bytes=%v; tokens=%v; text_tokens=%v; normalized_text_tokens=%v; byte_partition_complete=true; model_calls=0; downstream_writes=0", report["input_bytes"], report["tokens"], report["text_tokens"], report["normalized_text_tokens"])
 }
+
+func TestHTMLTokenBufferLookaheadLab(t *testing.T) {
+	// The fixed tokenizer fails when buffered bytes reach (not exceed) maxBuf;
+	// a TEXT token also peeks into the next tag. Bound parser memory by the
+	// already bounded complete input, then check actual emitted token lengths.
+	for _, limit := range []int{3, 4, 5, len("abc<p>def") + 1} {
+		z := html.NewTokenizer(strings.NewReader("abc<p>def"))
+		z.SetMaxBuf(limit)
+		for z.Next() != html.ErrorToken {
+			z.Token()
+		}
+		if (z.Err() == io.EOF) != (limit == len("abc<p>def")+1) {
+			t.Fatalf("LAB_LOOKAHEAD_CHANGED limit=%d error=%v", limit, z.Err())
+		}
+	}
+	t.Log("raw_token_budget=3; parser_buffer=bounded_input_bytes+1; exact emitted-token budget remains separate")
+}
