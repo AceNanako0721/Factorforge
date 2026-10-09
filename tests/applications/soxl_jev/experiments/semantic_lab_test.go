@@ -145,7 +145,7 @@ func TestJevSemanticMethodProbe(t *testing.T) {
 		Cost                       *string `json:"billed_cost"`
 		Rows                       []row   `json:"rows"`
 		Labels                     any     `json:"development_labels"`
-	}{"SYNTHETIC_DEVELOPMENT_PROTOCOL_CONTROLS", false, 0, nil, rows, labels}
+	}{"BOUNDED_DEVELOPMENT_PROTOCOL_CONTROLS", false, 0, nil, rows, labels}
 	encoded, e := json.MarshalIndent(report, "", "  ")
 	if e != nil || os.WriteFile(filepath.Join(lab, "report.json"), encoded, 0600) != nil {
 		t.Fatal("LAB_WRITE_FAILED")
