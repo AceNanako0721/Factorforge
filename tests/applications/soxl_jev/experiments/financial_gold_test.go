@@ -451,3 +451,89 @@ func TestFinancialCandidateMechanicsAndComparator(t *testing.T) {
 		t.Fatal("qualifier must not be silently normalized away")
 	}
 }
+
+// A post-hoc diagnostic, not a replacement for the frozen metric. It tests
+// source binding against the saved requests without another model delivery.
+// Presence proves only literal support; it proves neither meaning nor scale.
+func financialLiteralPresent(r financialRequest, candidate financialCandidate) bool {
+	if candidate.Origin == "TABLE" {
+		return candidate.Row >= 0 && candidate.Row < len(r.State.Table) && candidate.Column >= 0 && candidate.Column < len(r.State.Table[candidate.Row]) && r.State.Table[candidate.Row][candidate.Column] == candidate.Literal
+	}
+	if candidate.Origin == "TEXT" {
+		text, ok := r.State.Paragraphs[candidate.Paragraph]
+		return ok && candidate.Start >= 0 && candidate.End > candidate.Start && candidate.End <= len(text) && text[candidate.Start:candidate.End] == candidate.Literal
+	}
+	return false
+}
+
+func TestAuditExternalFinancialRecordedSourceBinding(t *testing.T) {
+	lab := financialLab(t)
+	var labels struct {
+		Cases []struct{ Mode, Request string } `json:"cases"`
+	}
+	labelsRaw := financialRead(t, lab, "labels.json", &labels)
+	var metric map[string]any
+	metricRaw := financialRead(t, lab, "evaluation.json", &metric)
+	var transport struct {
+		Rows []struct {
+			Request  string `json:"request_hash"`
+			Response string `json:"response_hash"`
+		} `json:"rows"`
+	}
+	transportRaw := financialRead(t, lab, "report.json", &transport)
+	if len(labels.Cases) != 8 {
+		t.Fatal("FINANCIAL_AUDIT_CASES")
+	}
+	if metric["labels_hash"] != d.ContentDigest(labelsRaw) || metric["report_hash"] != d.ContentDigest(transportRaw) || len(transport.Rows) != 8 {
+		t.Fatal("FINANCIAL_AUDIT_PROVENANCE")
+	}
+	supportedPositive, unsupportedNegative := 0, 0
+	results := []map[string]any{}
+	for i, item := range labels.Cases {
+		var request financialRequest
+		requestRaw := financialRead(t, lab, item.Request, &request)
+		var response struct {
+			Answers map[string]struct{ Choice *string } `json:"answers"`
+		}
+		responseRaw := financialRead(t, lab, fmt.Sprintf("case-%03d-response.json", i+1), &response)
+		if d.ContentDigest(requestRaw) != transport.Rows[i].Request || d.ContentDigest(responseRaw) != transport.Rows[i].Response {
+			t.Fatal("FINANCIAL_AUDIT_DELIVERY_CHANGED")
+		}
+		answer := response.Answers["candidate"].Choice
+		if answer == nil {
+			t.Fatal("FINANCIAL_AUDIT_SHAPE")
+		}
+		c, found := request.State.Candidates[*answer]
+		bound := found && financialLiteralPresent(request, c)
+		if item.Mode == "ORIGINAL" && bound {
+			supportedPositive++
+		}
+		if item.Mode == "WITHHELD" && !bound {
+			unsupportedNegative++
+		}
+		results = append(results, map[string]any{"case": i + 1, "mode": item.Mode, "candidate_choice": *answer, "literal_bound_to_current_context": bound, "semantic_support_and_scale_verified": false})
+	}
+	frozenRateWrite(t, lab, "binding-diagnostic.json", map[string]any{"at": time.Now().UTC(), "frozen_metric_hash": d.ContentDigest(metricRaw), "frozen_metric_unchanged": true, "original_literal_binding": supportedPositive, "original_cases": 4, "empty_context_without_supported_literal": unsupportedNegative, "empty_context_cases": 4, "diagnostic_only": true, "model_calls": 0, "production_installed": false, "results": results})
+	t.Logf("post-hoc binding diagnostic: original=%d/4; withheld_without_supported_literal=%d/4; frozen_metric_unchanged; no_model_calls", supportedPositive, unsupportedNegative)
+}
+
+func TestFinancialLiteralBindingRejectsMissingAndAlteredContext(t *testing.T) {
+	var request financialRequest
+	request.State.Table = [][]string{{"12"}}
+	request.State.Paragraphs = map[string]string{"p": "é12"}
+	cell := financialCandidate{Origin: "TABLE", Literal: "12", Row: 0, Column: 0}
+	text := financialCandidate{Origin: "TEXT", Literal: "12", Paragraph: "p", Start: 2, End: 4}
+	if !financialLiteralPresent(request, cell) || !financialLiteralPresent(request, text) {
+		t.Fatal("intact literal binding")
+	}
+	request.State.Table = nil
+	request.State.Paragraphs = map[string]string{}
+	if financialLiteralPresent(request, cell) || financialLiteralPresent(request, text) {
+		t.Fatal("absent context accepted")
+	}
+	request.State.Table = [][]string{{"13"}}
+	request.State.Paragraphs = map[string]string{"p": "é13"}
+	if financialLiteralPresent(request, cell) || financialLiteralPresent(request, text) {
+		t.Fatal("altered context accepted")
+	}
+}
