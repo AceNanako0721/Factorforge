@@ -116,11 +116,9 @@ func (w IngestWorker) Process(ctx context.Context, raw d.RawEvidence) (d.Routing
 	key := "event-" + d.Digest([]any{w.Policy.Binding, event.EventID, event.FactVersion, event.Relation, raw.ContentHash})
 	command := dto.EventCommand{Command: dto.Command{SchemaVersion: "strategy-2.0", RequestID: key, IdempotencyKey: key, ExpectedVersion: version, Reason: "VERIFIED_INSTANCE_EVIDENCE"}, Event: event}
 	if _, err = w.Framework.RegisterEvent(ctx, command, event.FactVersion > 1); err != nil {
-		// CAS is reconciled with existing facts. Never change a fact version to
-		// manufacture a new event or force a favorable admission result.
-		if found, e := w.Framework.EventExists(ctx, event.EventID, w.Policy.ObjectID, event.FactVersion); e != nil || !found {
-			return receipt, err
-		}
+		// An existing version can contain different facts. Only an accepted
+		// command may enqueue; an identical later poll uses P2's exact idempotency.
+		return receipt, err
 	}
 	if event.Relation == "RETRACTION" {
 		return receipt, nil

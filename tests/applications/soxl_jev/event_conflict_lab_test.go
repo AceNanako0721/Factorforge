@@ -19,22 +19,31 @@ import (
 // The two in-memory store slots model distinct immutable evidence IDs; the
 // authorization, aggregate CAS, fact-version and idempotency checks are actual P2
 // HTTP. There is no external model, database, account or order in this scenario.
-func conflictingEventScenario(t *testing.T) (d.RoutingReceipt, error, *pipelineMemory) {
+func ingestHandoffFixture(t *testing.T) (workers.IngestWorker, d.AnalysisRequest, *pipelineMemory) {
 	t.Helper()
-	ctx := context.Background()
 	framework, _, r, _, now, _ := workerIdentityFixture(t)
 	e := r.Evidence
-	annotation := func(e d.ExtractedEvidence) evidence.Annotation {
-		return evidence.Annotation{ContentHash: e.Raw.ContentHash, ExtractorID: e.ExtractorID, Version: e.ExtractorVersion, VerificationManifest: e.VerificationManifest, Claims: e.Claims, Spans: e.Spans, Complete: true}
-	}
 	plan := workers.EventPlan{EventID: r.Event.EventID, FamilyID: r.Event.FamilyID, EventType: r.Event.EventType, Relation: "NEW", FactVersion: 1, OccurredAt: r.Event.OccurredAt, Novelty: number("1"), ScoreVersion: 1, RevisionKind: "INITIAL"}
 	first := &pipelineMemory{binding: r.Binding, kind: "SIM"}
 	clock := &pipelineClock{now}
-	worker := workers.IngestWorker{Store: first, Framework: framework, Clock: clock, Extractor: evidence.AnnotatedExtractor{Clock: clock.Now, MaxBytes: 100000, Annotations: map[string]evidence.Annotation{e.Raw.ContentHash: annotation(e)}},
+	worker := workers.IngestWorker{Store: first, Framework: framework, Clock: clock, Extractor: evidence.AnnotatedExtractor{Clock: clock.Now, MaxBytes: 100000, Annotations: map[string]evidence.Annotation{e.Raw.ContentHash: handoffAnnotation(e)}},
 		Policy:   d.RoutingPolicy{Version: "fixture-policy", Binding: r.Binding, ObjectID: r.ObjectID, EventTypes: []string{"EARNINGS"}, CalibrationVersion: r.CalibrationVersion, CalibrationVerified: true, ProviderVerified: true},
 		Sources:  map[string]d.SourceRegistration{e.Raw.SourceID: {SourceID: e.Raw.SourceID, Version: "fixture-registry", LicenceRef: e.Raw.LicenceRef, LicenceVerified: true, AllowAnalysis: true, AllowProvider: true, Enabled: true, Environments: []string{"SIM"}, ValidFrom: now.Add(-time.Hour), ValidUntil: now.Add(time.Hour), MaxAge: time.Hour}},
 		Mappings: map[string]d.EntityMapping{r.ObjectID: {Version: "fixture-mapping", ObjectID: r.ObjectID, SubjectID: r.Event.SubjectID, ValidFrom: now.Add(-time.Hour), ValidUntil: now.Add(time.Hour)}}, Plans: map[string]workers.EventPlan{e.Raw.ContentHash: plan},
 		MaxBytes: 100000, TaskTTL: time.Hour, ResearchBucket: "fixture-budget", TradingBucket: "fixture-budget", QuestionSetVersion: r.QuestionSetVersion, PromptVersion: r.PromptVersion, RubricVersion: r.RubricVersion, CalibrationVersion: r.CalibrationVersion, ModelVersion: r.ModelVersion}
+	return worker, r, first
+}
+
+func handoffAnnotation(e d.ExtractedEvidence) evidence.Annotation {
+	return evidence.Annotation{ContentHash: e.Raw.ContentHash, ExtractorID: e.ExtractorID, Version: e.ExtractorVersion, VerificationManifest: e.VerificationManifest, Claims: e.Claims, Spans: e.Spans, Complete: true}
+}
+
+func conflictingEventScenario(t *testing.T) (d.RoutingReceipt, error, *pipelineMemory) {
+	t.Helper()
+	ctx := context.Background()
+	worker, r, first := ingestHandoffFixture(t)
+	e, now, framework := r.Evidence, worker.Clock.Now(), worker.Framework
+	plan := worker.Plans[e.Raw.ContentHash]
 	if _, err := worker.Process(ctx, e.Raw); err != nil || first.enqueues != 1 {
 		t.Fatal("initial event not accepted", err)
 	}
@@ -68,7 +77,7 @@ func conflictingEventScenario(t *testing.T) (d.RoutingReceipt, error, *pipelineM
 	}
 	second := &pipelineMemory{binding: r.Binding, kind: "SIM"}
 	worker.Store = second
-	worker.Extractor = evidence.AnnotatedExtractor{Clock: clock.Now, MaxBytes: 100000, Annotations: map[string]evidence.Annotation{other.Raw.ContentHash: annotation(other)}}
+	worker.Extractor = evidence.AnnotatedExtractor{Clock: worker.Clock.Now, MaxBytes: 100000, Annotations: map[string]evidence.Annotation{other.Raw.ContentHash: handoffAnnotation(other)}}
 	worker.Plans = map[string]workers.EventPlan{other.Raw.ContentHash: plan}
 	receipt, err := worker.Process(ctx, other.Raw)
 	return receipt, err, second
