@@ -161,6 +161,20 @@
         "03_SOXLUSDT_JEV应用实例",
         "04_Web管理台"
       ]
+    },
+    {
+      "version": "2.1.11",
+      "directory": "doc/v2.1.11",
+      "change_kind": "design",
+      "date": "2026-10-09",
+      "reason": "先复现同一原文的多事件审阅冲突，再设计审阅ID成对索引与旧资产兼容；业务式样保持。",
+      "format": "html",
+      "document_pairs": [
+        "01_交易系统层",
+        "02_策略化框架层",
+        "03_SOXLUSDT_JEV应用实例",
+        "04_Web管理台"
+      ]
     }
   ]
 }
