@@ -54,6 +54,8 @@ GitHub 工作流修改的认证差异、历史故障及 SSH 处理方式见 [工
 
 `config/` 只提交 `config.example.toml`；真实值集中到本地 `config/config.toml`。`prompts/` 只提交 `prompts.example.json`；真实 instructions、criteria、拼接片段及生产 Prompt 放入本地 `prompts/prompts.local.json` 或其他被忽略的私有提示词文件。禁止通过硬编码、DOCX 隐藏内容、附件或 PR 复制敏感资产。
 
+用户澄清集中配置旨在防止误上传。原版官方 CLI 的登录凭据保持在官方私有目录/系统钥匙串，不要求搬进 Factorforge 配置，也不得读取/复制进仓库；Factorforge 自主管理的凭据及 CLI 路径仍集中在 config/config.toml。提交检查拒绝官方账户/凭据目录，即使通过强制暂存加入；工具和日志不收集原生终端授权链接、授权码或令牌。
+
 安装本地 hooks 后，强制暂存私有路径、往模板填真实内容、提交识别得到的密钥会被拒绝。CI 使用相同规则，并检查可达历史。模式检测不能保证识别所有任意形态的秘密，提交者仍需审查内容；不得在错误日志中打印原值。
 
 v2.1.1 是 Go 设计与迁移启动版本：业务式样保持，四本设计同步 Go 模块/进程/接口和切换门槛。旧 Python 入口在 Go 验收后退役，迁移未完成前不将 Go 域测试标为完整交易运行通过。只符合已发布 Go 设计的后续迁移代码仍按 code-only 记录；需要改设计则发布修订版本。

@@ -32,7 +32,7 @@ function walk(dir) {
           failures.push(relative + ": cross-module private import");
       } else if (
         !spec.startsWith("node:") &&
-        !["openai", "jose", "smol-toml"].includes(spec)
+        !["openai", "jose", "smol-toml", "string-width"].includes(spec)
       )
         failures.push(relative + ": unregistered dependency " + spec);
     }

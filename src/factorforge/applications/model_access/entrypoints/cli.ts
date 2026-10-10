@@ -2,12 +2,26 @@ import path from "node:path";
 import { ConfigStore, unlock } from "../config/store.js";
 import { ModelService } from "../application/service.js";
 import { safeFailure, fail, ModelError } from "../api/protocol.js";
+import { runMenu } from "./menu.js";
+import { OfficialCLI, type NativeProvider } from "../adapters/official-cli.js";
 
 async function main() {
   const args = process.argv.slice(2),
     command = args.shift() ?? "status";
-  if (args.length !== 2 || args[0] !== "--config") fail("USAGE_INVALID");
-  const file = path.resolve(args[1]!);
+  const nativeCommand = ["native-login", "native-logout", "native-status"].includes(command);
+  if (!nativeCommand && !["menu", "status", "login", "logout", "serve", "unlock"].includes(command)) fail("USAGE_INVALID");
+  if (args.length !== (nativeCommand ? 4 : 2)) fail("USAGE_INVALID");
+  const options = new Map<string, string>();
+  for (let i = 0; i < args.length; i += 2) {
+    if (!["--config", ...(nativeCommand ? ["--provider"] : [])].includes(args[i]!) || options.has(args[i]!)) fail("USAGE_INVALID");
+    options.set(args[i]!, args[i + 1]!);
+  }
+  if (!options.get("--config")) fail("USAGE_INVALID");
+  const provider = options.get("--provider");
+  if (nativeCommand && !["claude", "antigravity"].includes(provider ?? "")) fail("USAGE_INVALID");
+  if ((command === "menu" || command === "native-login" || command === "native-logout") &&
+      (!process.stdin.isTTY || !process.stdout.isTTY)) fail("TTY_REQUIRED");
+  const file = path.resolve(options.get("--config")!);
   if (command === "unlock") {
     await unlock(file);
     console.log(JSON.stringify({ ok: true, unlocked: true }));
@@ -16,7 +30,19 @@ async function main() {
   const store = await ConfigStore.open(file),
     service = new ModelService(store);
   try {
-    if (command === "login") {
+    if (command === "menu") await runMenu(store, service);
+    else if (nativeCommand) {
+      const adapter = new OfficialCLI(store);
+      if (provider === "antigravity" && command !== "native-status")
+        process.stderr.write(command === "native-logout" ? "Use /logout, then /exit in the official terminal.\n" : "Complete official login, then use /exit to return.\n");
+      const cancelled = new AbortController(), stop = () => cancelled.abort();
+      process.on("SIGINT", stop); process.on("SIGTERM", stop);
+      try {
+        const result = command === "native-status" ? await adapter.status(provider as NativeProvider, cancelled.signal) :
+          await adapter.handoff(provider as NativeProvider, command === "native-logout" ? "logout" : "login", cancelled.signal);
+        console.log(JSON.stringify({ ok: true, result }));
+      } finally { process.off("SIGINT", stop); process.off("SIGTERM", stop); }
+    } else if (command === "login") {
       const result = await service.oauth.login((url, port) =>
         process.stderr.write(
           `Continue with ChatGPT\n${url}\nLoopback callback port: ${port}\n`,

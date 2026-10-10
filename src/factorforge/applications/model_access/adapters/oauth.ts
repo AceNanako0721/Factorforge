@@ -84,9 +84,10 @@ export class OAuthAdapter {
       m.max_line_bytes,
     );
   }
-  async discovery(): Promise<Discovery> {
+  async discovery(signal?: AbortSignal): Promise<Discovery> {
     try {
-      const r = await this.http()(ISSUER + "/.well-known/openid-configuration");
+      signal?.throwIfAborted();
+      const r = await this.http()(ISSUER + "/.well-known/openid-configuration", { signal });
       if (!r.ok) fail("AUTH_DISCOVERY_FAILED");
       const d = (await r.json()) as Discovery;
       if (d.issuer !== ISSUER) fail("AUTH_DISCOVERY_INVALID");
@@ -108,25 +109,29 @@ export class OAuthAdapter {
       }
       return d;
     } catch (e) {
+      if (signal?.aborted) fail("AUTH_CANCELLED");
       if (e instanceof ModelError) throw e;
       fail("AUTH_DISCOVERY_FAILED");
     }
   }
-  private async token(endpoint: string, form: URLSearchParams) {
+  private async token(endpoint: string, form: URLSearchParams, signal?: AbortSignal) {
     let r: Response;
     try {
       r = await this.http()(endpoint, {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
         body: form,
+        signal,
       });
     } catch {
+      if (signal?.aborted) fail("AUTH_CANCELLED");
       fail("AUTH_TEMPORARY_FAILURE");
     }
     let t: Record<string, unknown>;
     try {
       t = (await r.json()) as Record<string, unknown>;
     } catch {
+      if (signal?.aborted) fail("AUTH_CANCELLED");
       fail("AUTH_TEMPORARY_FAILURE");
     }
     if (!r.ok) {
@@ -191,6 +196,7 @@ export class OAuthAdapter {
     nonce: string,
     d: Discovery,
     old?: OAuth,
+    signal?: AbortSignal,
   ) {
     const t = await this.token(
       d.token_endpoint,
@@ -202,13 +208,15 @@ export class OAuthAdapter {
         redirect_uri: redirect,
         resource: RESOURCE,
       }),
+      signal,
     );
     const next = this.credentials(t);
     next.client_id = client;
     try {
       const jwks =
         this.key ??
-        createRemoteJWKSet(new URL(d.jwks_uri), { [customFetch]: this.http() });
+        createRemoteJWKSet(new URL(d.jwks_uri), { [customFetch]: (input, init) =>
+          this.http()(input, { ...init, signal }) });
       const result = await jwtVerify(next.id_token, jwks, {
         issuer: ISSUER,
         audience: client,
@@ -224,16 +232,18 @@ export class OAuthAdapter {
         fail("AUTH_IDENTITY_MISMATCH");
       next.subject = result.payload.sub;
     } catch (e) {
+      if (signal?.aborted) fail("AUTH_CANCELLED");
       if (e instanceof ModelError) throw e;
       fail("AUTH_ID_TOKEN_INVALID");
     }
     return next;
   }
-  async login(show: (url: string, port: number) => void) {
+  async login(show: (url: string, port: number) => void, signal?: AbortSignal) {
     if (this.store.settings.login_timeout_seconds <= 0) fail("LIMITS_REQUIRED");
     if (this.store.settings.login_timeout_seconds * 1000 > 2147483647)
       fail("LIMITS_INVALID");
-    const d = await this.discovery(),
+    if (signal?.aborted) fail("AUTH_CANCELLED");
+    const d = await this.discovery(signal),
       old = this.store.state.oauth;
     const state = randomBytes(32).toString("base64url"),
       nonce = randomBytes(32).toString("base64url"),
@@ -244,6 +254,9 @@ export class OAuthAdapter {
       resolve = a;
       reject = b;
     });
+    // A failing terminal renderer can throw before callback is awaited.
+    // Keep the callback rejection observed while finally closes its listener.
+    void callback.catch(() => {});
     const server = createServer((req, res) => {
       res.setHeader("content-type", "text/plain; charset=utf-8");
       res.setHeader("cache-control", "no-store");
@@ -319,7 +332,12 @@ export class OAuthAdapter {
       () => reject(new ModelError("AUTH_TIMEOUT")),
       this.store.settings.login_timeout_seconds * 1000,
     );
+    const cancel = () => reject(new ModelError("AUTH_CANCELLED"));
+    signal?.addEventListener("abort", cancel, { once: true });
     try {
+      // Register before showing the URL, so cancellation during the UI callback
+      // cannot leave a listener awaiting a browser that will never return.
+      if (signal?.aborted) cancel();
       show(u.toString(), address.port);
       const c = await callback;
       const next = await this.exchange(
@@ -330,7 +348,9 @@ export class OAuthAdapter {
         nonce,
         d,
         old,
+        signal,
       );
+      if (signal?.aborted) fail("AUTH_CANCELLED");
       this.store.state.oauth = next;
       await this.store.save();
       return {
@@ -338,6 +358,7 @@ export class OAuthAdapter {
         plan_enabled: next.scopes.includes("chatgpt.tokens.use.direct"),
       };
     } finally {
+      signal?.removeEventListener("abort", cancel);
       clearTimeout(timer);
       server.closeAllConnections();
       await new Promise<void>((r) => server.close(() => r()));
