@@ -38,10 +38,24 @@ func pipelineFixture() (d.ExtractedEvidence, d.AnalysisRequest, d.AnalysisCandid
 	event := dto.Event{EventID: "fixture-event", FamilyID: "fixture-family", FactVersion: 1, Relation: "NEW", SubjectID: claim.SubjectID, EventType: "EARNINGS", OccurredAt: public, FirstPublicAt: public,
 		EvidenceRefs: []dto.EvidenceRef{{EvidenceID: raw.EvidenceID, ContentHash: raw.ContentHash, SourceID: raw.SourceID, LicenceRef: raw.LicenceRef, FirstPublicAt: public, ReceivedAt: raw.ReceivedAt, AvailableAt: e.CompletedAt, SpanRefs: []string{span.SpanID}, VerificationRef: e.VerificationManifest}}, Claims: e.Claims, ObjectIDs: []string{"fixture-object"}, State: "VERIFIED", Novelty: number("1")}
 	r := d.AnalysisRequest{RequestID: "fixture-job", Binding: binding, ObjectID: "fixture-object", Evidence: e, Routing: route, Event: event, Deadline: now.Add(time.Hour), QuestionSetVersion: "fixture-questions", PromptVersion: "fixture-prompt", RubricVersion: "fixture-rubric", CalibrationVersion: "fixture-calibration", ModelVersion: "fixture-model", ScoreVersion: 1, RevisionKind: "INITIAL"}
+	fixtureEligibilityWindow(&r)
 	one, half := number("1"), number("300")
 	c := d.AnalysisCandidate{RequestID: r.RequestID, ManifestHash: route.ManifestHash, ResolvedModel: r.ModelVersion, CompletedAt: now, SupportedClaims: map[string]bool{claim.ClaimID: true}, RubricVersion: r.RubricVersion, CalibrationVersion: r.CalibrationVersion, ProducerVersion: "fixture-producer", Mock: true, ReasonCodes: []string{},
 		Vector: dto.ScoreVector{Direction: 1, ImpactPoints: number("5"), Credibility: &one, Relevance: &one, Novelty: &one, ExpectationCoverage: &one, PrepricingFraction: &one, ExpectedHalfLife: &half, QualityScore: &one, UnknownFields: []string{}}}
 	return e, r, c, now
+}
+
+// Explicit test-only policy. Call again only when a test deliberately replaces
+// its synthetic time/source binding; negative tests keep their altered fields.
+func fixtureEligibilityWindow(r *d.AnalysisRequest) {
+	w := &d.EligibilityWindow{Method: "source-window-1", TaskExpiresAt: r.Deadline, SourceID: r.Evidence.Raw.SourceID,
+		SourceRegistryVersion: r.Routing.RegistryVersion, FirstPublicAt: *r.Evidence.Raw.FirstPublicAt,
+		SourceMaxAge: r.Deadline.Sub(*r.Evidence.Raw.FirstPublicAt) + time.Hour, SourceValidUntil: r.Deadline.Add(time.Hour)}
+	if r.Routing.Route == "TRADING_CANDIDATE" {
+		until := r.Deadline.Add(time.Hour)
+		w.MappingVersion, w.MappingValidUntil = r.Routing.MappingVersion, &until
+	}
+	r.EligibilityWindow = w
 }
 func TestPipelineEvidenceAndCandidateRejections(t *testing.T) {
 	e, r, c, now := pipelineFixture()

@@ -8,6 +8,12 @@ import (
 )
 
 func Validate(request d.AnalysisRequest, candidate d.AnalysisCandidate, now time.Time, allowMock bool) error {
+	if err := request.VerifyEligibilityWindow(); err != nil {
+		return err
+	}
+	if !now.Before(request.Deadline) {
+		return d.Fail("TASK_EXPIRED", 422)
+	}
 	if candidate.Abstained {
 		return d.Fail("ANALYSIS_ABSTAINED", 422)
 	}

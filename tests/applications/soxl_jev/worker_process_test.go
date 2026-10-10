@@ -130,6 +130,7 @@ func TestNativeInstanceWorkerProfilesAndProcessWithoutPythonNode(t *testing.T) {
 	if err = ingest.Record(ctx, r.Evidence, r.Routing); err != nil {
 		t.Fatal(err)
 	}
+	fixtureEligibilityWindow(&r)
 	job := d.PipelineJob{JobID: r.RequestID, Binding: r.Binding, QueueKind: "SIM", Request: r, State: "QUEUED", CreatedAt: now, Deadline: r.Deadline, ReasonCodes: []string{}}
 	if err = ingest.Enqueue(ctx, job, "fixture-budget"); err != nil {
 		t.Fatal(err)

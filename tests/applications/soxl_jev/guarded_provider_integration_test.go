@@ -212,6 +212,7 @@ func runGuardedProviderIntegration(t *testing.T, lab string) {
 	request.Event.EvidenceRefs[0].AvailableAt = request.Evidence.Raw.ReceivedAt
 	request.ModelVersion, request.PromptVersion = model, prompt.Version
 	request.Deadline = time.Now().UTC().Add(time.Minute)
+	fixtureEligibilityWindow(&request)
 	registered := registerHandoffEvent(t, owner, request)
 	now := time.Now().UTC()
 	if err := pg.ConfigureQueueBudget(ctx, f.dsn, pg.QueueBudget{Binding: binding, Kind: "RESEARCH", Bucket: "fixture-guarded-budget", PolicyRef: "fixture-guarded-policy", MaxJobs: 1, MaxConcurrent: 1, ValidFrom: now.Add(-time.Minute), ValidUntil: now.Add(time.Hour)}); err != nil {
