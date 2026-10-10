@@ -142,6 +142,8 @@ jobs:
           npm exec --yes --package=pnpm@10.33.0 -- pnpm test:browser
       - name: Build native BFF and validate public static artifacts
         run: go run ./tools/build-console --web-build runtime/web-build
+      - name: Verify current documentation at desktop and narrow widths offline
+        run: node tools/check-model-access-docs.mjs
 
   model-access-checks:
     name: model-access-checks (${{ matrix.os }})
