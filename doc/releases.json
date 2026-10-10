@@ -217,6 +217,20 @@
         "03_SOXLUSDT_JEV应用实例",
         "04_Web管理台"
       ]
+    },
+    {
+      "version": "2.1.15",
+      "directory": "doc/v2.1.15",
+      "change_kind": "design",
+      "date": "2026-10-10",
+      "reason": "澄清禁止Python但上层不必统一Go；保留P1/P2核心，允许非Python模块通过契约协作；三层职责、四组业务式样与现有接口保持，OMP/抽取选型未定。",
+      "format": "html",
+      "document_pairs": [
+        "01_交易系统层",
+        "02_策略化框架层",
+        "03_SOXLUSDT_JEV应用实例",
+        "04_Web管理台"
+      ]
     }
   ]
 }

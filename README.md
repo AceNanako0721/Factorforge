@@ -1,6 +1,6 @@
 # Factorforge
 
-Factorforge 是分为交易系统、策略化框架、应用实例三层的事件情绪量化交易项目。当前开发基线为 **v2.1.14**（Go 设计；证据与任务有效窗口），既有发布对照为 v2.1.0，代码与公开文档采用 [MIT](LICENSE) 许可证。
+Factorforge 是分为交易系统、策略化框架、应用实例三层的事件情绪量化交易项目。当前开发基线为 **v2.1.15**（无 Python 的多语言模块设计；三层接口边界），既有发布对照为 v2.1.0，代码与公开文档采用 [MIT](LICENSE) 许可证。
 
 **P1/P2 的服务、构建、检查工具和 CI 均使用 Go**；前端为 React/TypeScript 编译的 JavaScript。P1 完成交易核心、API/CLI、PostgreSQL、SIM/Binance、保护/反馈/采集、独立进程及测试网验收工具迁移。Go 测试网只读子集 12 项及完整虚拟资金交易套件 25 项实际通过，包括交易所止损触发、应急减仓、账务恢复、隔离与数据库故障阻断；最终账户平仓且无挂单，生产实盘尚未准入。P2 完整框架、四个独立入口、事务存储及公共/工作负载 API 已迁移，209 个冻结状态转换通过对照；实际 Go P2→HTTP→Go P1 SIM 完成两个对象的目标、成交、费用、保护和案例，以及独立反事实账务。S2-024 统一只读追溯已接入，旧活跃 Python 源码、包定义和作者工具退役。见 [迁移进度](doc/progress/GO_MIGRATION.md)、[P1 Go 运行说明](doc/engineering/TRADING_GO.md) 和 [P2 Go 运行说明](doc/engineering/STRATEGY_GO.md)。
 
@@ -10,9 +10,13 @@ P2 已实现通用对象、事件与评分资格、逐贡献情绪账本、持�
 
 实现先做了 [GitHub 选材调研](doc/engineering/P2_UPSTREAM_REVIEW.md)，再适配 Financier 的滞回算法和 timeseriescv 的时间清除算法；固定来源、修改范围及许可证见 [第三方声明](THIRD_PARTY_NOTICES.md)。执行、撮合和真实账务直接复用 P1 公共接口。
 
+## 语言与模块边界
+
+**禁止 Python，不要求统一 Go。**现有 P1/P2 Go 核心保留；上层可按模块需要使用 TypeScript/JavaScript 等非 Python 语言，范围包括后端、认证/模型接入和辅助模块。模块通过公开接口/契约协作，语言与运行时不改变三层依赖方向，下层不依赖上层运行时。具体引入仍须先验证、再设计、再实现；OMP 与抽取方案尚未选定，实验保持暂停。见 [需求与工程规则](doc/engineering/LANGUAGE_AND_MODULE_BOUNDARIES.md) 和 [文件树规范](doc/engineering/REPOSITORY_LAYOUT.md)。
+
 ## 文档与依赖
 
-从 [当前 HTML 文档索引](doc/v2.1.13/index.html) 阅读，再读目标层式样书及对应设计书。应用实例依赖框架与交易层，框架依赖交易层，交易层可独立运行。SOXLUSDT/JEV 分析实例与 Web 管理台在第三层平级；具体标的与模型不进入下层通用实现。
+从 [当前 HTML 文档索引](doc/v2.1.15/index.html) 阅读，再读目标层式样书及对应设计书。应用实例依赖框架与交易层，框架依赖交易层，交易层可独立运行。SOXLUSDT/JEV 分析实例与 Web 管理台在第三层平级；具体标的与模型不进入下层通用实现。
 
 v2.1.0 新增 [Web 管理台仕様书](doc/v2.1.0/04_Web管理台式样书.html) 与 [设计书](doc/v2.1.0/04_Web管理台设计书.html)，分别记录功能/业务逻辑图与模块/实际接口/开源参考文件。P2 通用只读追溯、P3 八类只读 GET 与首批采集/评分链路已实施；管理台实现和验收范围见 [P4 进度](doc/progress/P4.md) 与 [运行说明](doc/engineering/CONSOLE_GO.md)。自本版起版本基线统一使用离线 HTML 和内嵌 SVG，旧版 Markdown/Word 冻结，不产生新版配套副本。
 
@@ -30,8 +34,10 @@ v2.1.0 新增 [Web 管理台仕様书](doc/v2.1.0/04_Web管理台式样书.html)
 | `doc/v2.1.9` | 冻结设计：版本化数字词面及旧审阅产物兼容 |
 | `doc/v2.1.10` | 冻结设计：共享供应商账户调用预算与硬分区 |
 | `doc/v2.1.11` | 冻结设计：同一原文的独立事件审阅装配 |
-| `doc/v2.1.13` | 当前设计：评分outbox并发版本协调；评分与持久命令不变 |
+| `doc/v2.1.13` | 冻结设计：评分outbox并发版本协调；评分与持久命令不变 |
 | `doc/v2.1.12` | 已发布设计：原文、审阅、抽取与评分的时间映射；四组业务式样保持 |
+| `doc/v2.1.14` | 冻结设计：证据与任务有效窗口 |
+| `doc/v2.1.15` | 当前设计：禁止 Python，上层允许非 Go 模块；三层接口与业务式样保持 |
 | `go.mod`、`go.sum` | 唯一 Go 模块与固定依赖 |
 | `doc/releases.json`、`VERSION` | 文档发布记录及当前基线 |
 | `contracts` | 历史 v1.1 接口契约及检查代码 |

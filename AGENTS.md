@@ -6,6 +6,8 @@
 
 文件摆放遵守 doc/engineering/REPOSITORY_LAYOUT.md。生产源码只放 src/factorforge 对应层；测试、迁移、工具、配置与运行产物按规范归位。修改源码后运行 go run ./tools/check-layout，禁止交易层向上导入或把业务代码放入 tools/doc/runtime。G3 已替换并退役 tools/check_layout.py；不再启动旧 Python 检查。
 
+语言按模块选用，不要求全项目或上层统一 Go；TypeScript/JavaScript 等非 Python 语言允许用于上层后端和独立模块，不限前端。禁止引入活跃 Python 源码、解释器、子进程、HTTP 服务或构建/测试/hooks/CI 的必需依赖；冻结历史资料保持。现有 P1/P2 Go 实现保留，各层通过公开接口/契约协作，下层不得依赖上层代码、运行时或模型服务。跨语言需适配器及经验证的协议，不能直连下层私有代码/数据库。新增模块按文件树登记源码、manifest/lockfile、测试和运行时，并先验证再设计实现；语言放宽不视为选定 OMP/抽取方案。详见 doc/engineering/LANGUAGE_AND_MODULE_BOUNDARIES.md。
+
 按 framework/specification/design/code-only 分类管理变更。框架变更增加主版本；式样变更增加次版本；仅设计或设计+代码变更增加修订版本；仅代码变更保持版本并在 GitHub PR/合并正文记录。新文档发布使用独立三段版本目录，旧版目录冻结。一次任务包含多类变化时取最高级别。
 
 交易层不依赖上层，框架不绑定具体标的或模型，实例负责 SOXLUSDT/JEV/采集。所有非敏感源码包括工具与测试进入公开仓库。真实配置统一写入被忽略的 config/config.toml；真实提示词由应用层从私有提示词文件加载。config 和 prompts 各只上传一个空内容模板；不得在代码、设计书、PR 或日志复制真实值。

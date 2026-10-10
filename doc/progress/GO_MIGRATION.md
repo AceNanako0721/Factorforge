@@ -90,3 +90,7 @@ P2 与仓库工具的完整 race 检查通过；补充的原生 API 进程查询
 P3/console 后端和 React 页面已实现；运行记录、只读周期报告及详细字段、通用 UTC 窗口实际接入后，两计数分别持久，未知/缺覆盖不补造生产值。设计修订发布 v2.1.2，四组仕様语义及旧基线冻结。实际 Go P2 HTTP、PostgreSQL 重开/权限、无 Python/Node 的原生进程、浏览器桌面/窄屏验证分别登记在 [P3](P3.md) / [P4](P4.md)。GitHub CI 与精确合并证据见 [工作流记录](../engineering/GITHUB_WORKFLOW.md)。
 
 G4 的本地代码交付不能关闭完整生产 T3/T4：来源许可/抽取和模型真实评测、共享额度/保留容量、产品价格能力、生产参数、DEC-06 与独立复核仍需真实证据，未启动实盘或修改现有服务。
+
+## 2026-10-10：语言约束澄清
+
+[v2.1.15](../v2.1.15/index.html) 保留已经完成的 Go 迁移与全部历史证据，同时取消上层必须统一 Go 的限制。目标是禁止 Python、通过接口实现模块化；TypeScript/JavaScript 等非 Python 模块可用于上层后端。不是重新迁移 P1/P2，也不把历史“无 Node”验收扩展为全项目永久禁止 Node/Bun。OMP/辅助抽取方案仍未选定，实验继续暂停；见 [语言规则](../engineering/LANGUAGE_AND_MODULE_BOUNDARIES.md)。

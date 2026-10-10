@@ -1,12 +1,12 @@
 # 仓库文件树规范
 
-确立日期：2026-10-04；更新：2026-10-08。适用于 v2.1.3 Go 设计、P1/P2 重构与 G4 实例链路，三层职责不变。生产源码只放 src/factorforge 对应层，业务式样和实现方法以当前 HTML 基线为准。
+确立日期：2026-10-04；更新：2026-10-10。适用于 v2.1.15 多语言模块设计、P1/P2 重构与 G4 实例链路，三层职责不变。生产源码只放 src/factorforge 对应层，业务式样和实现方法以当前 HTML 基线为准。
 
 沿用 NautilusTrader 的核心/适配器划分与 Freqtrade 的源码/测试/运行数据分离；Go 使用单根模块与各层独立入口，不引入完整交易框架。
 
 ```text
 Factorforge/
-├── go.mod / go.sum              # 唯一 Go 模块与依赖校验
+├── go.mod / go.sum              # 唯一 Go 模块与依赖校验（仅约束 Go 源码）
 ├── src/factorforge/
 │   ├── trading/                 # P1，独立构建和运行
 │   │   ├── domain/              # 类型、账务、风险；decimal/ 纯十进制
@@ -37,7 +37,7 @@ Factorforge/
 │       └── console/             # 平级只读管理台，独立 Go 入口
 │           ├── domain/ / ports/ / application/ / adapters/ / api/
 │           ├── config/ / entrypoints/console-api/
-│           └── web/             # 唯一 pnpm React/TypeScript 包
+│           └── web/             # 当前 pnpm React/TypeScript 浏览器包
 ├── tests/                       # trading/、strategy/、engineering/、applications/soxl_jev/
 │   └── strategy/fixtures/       # 固定合成 JSON，不含秘密
 ├── contracts/                   # 历史 v1.1 与 v2/trading、v2/strategy、v2/instances、v2/console
@@ -57,6 +57,16 @@ P1 的正常运行入口已改为六个 Go 二进制，见 [Go 运行说明](TRA
 
 独立 Go 检查：go run ./tools/check-layout、go test ./...、go vet ./...。Go 布局检查同时验证登记的顶层树、源码层和导入边界。当前 CI 与 hooks 只调用 Go；唯一保留的 contracts/check_contract.py 是冻结 v1.1 链接的历史目标，不执行。进度见 [Go 迁移记录](../progress/GO_MIGRATION.md)。
 
-管理台唯一 package.json/pnpm-lock.yaml 放 console/web。Node/pnpm 只用于构建和浏览器测试；产物放 runtime/web-build，再由受控步骤交给 Go BFF 同源提供。node_modules、源码图和截图不进公开树，真实 config/prompts 不在静态目录。运行服务不依赖 Python 或 Node。测试放 tests/applications/console 与 tests/web；构建和操作见 [管理台说明](CONSOLE_GO.md)。
+当前管理台 package.json/pnpm-lock.yaml 放 console/web；现有管理台的 Node/pnpm 用于构建和浏览器测试。产物放 runtime/web-build，再由受控步骤交给 Go BFF 同源提供。node_modules、源码图和截图不进公开树，真实 config/prompts 不在静态目录。当前管理台运行服务不依赖 Python 或 Node；该现状不限制其他上层模块使用 Node/Bun。测试放 tests/applications/console 与 tests/web；构建和操作见 [管理台说明](CONSOLE_GO.md)。
 
 P3 当前只读 API 见 [实例说明](INSTANCE_GO.md)，私有队列/工作进程与配置身份派生见 [实例链路说明](INSTANCE_PIPELINE.md)。applications 下只登记 soxl_jev/console，应用领域和端口同样受纯领域检查；向下只通过公开 DTO/client 或 HTTP，同层应用也不导入对方数据库/业务实现。operations/reports/routing/submission 禁止反向依赖 API、适配器或入口；不为尚未实现的组件创建占位源码。
+
+## 非 Python 的多语言模块
+
+语言按模块选择，不要求上层统一 Go。TypeScript/JavaScript 等语言可用于后端、认证/模型接入或辅助模块；不得引入 Python 解释器、子进程或必需的 Python 服务/开发工具链。现有 P1/P2 Go 核心和根 Go 模块保持，下层不依赖上层运行时；三层职责和公开契约不随语言改变。
+
+自有非 Go 生产源码放 src/factorforge/applications/<所属应用>/<模块>，测试放 tests/applications/<所属应用>/<模块>，协议/schema 放 contracts/v2 对应应用。新增 TS/JS 包在已登记模块内独立保存 package.json 和所选包管理器唯一 lockfile，不在仓库根放无归属包，不给尚未选定方案建占位目录；非敏感自有源码全部公开。运行依赖和许可证须登记；node_modules/包缓存、下载模型、外部安装、构建及日志/截图只放忽略路径，不能在 runtime 藏自有业务源码。
+
+同语言进程内端口不等于跨语言 API；通过所属应用的 adapter 连接已验证的 HTTP/JSON 或 stdio/JSONL 等明确协议，具体传输须在采用前定稿。禁止跨层/平级导入私有业务、直连下层数据库、共享执行身份或形成反向运行依赖。独立模型网关是第三层模块的依赖，不成为第四层或 P1/P2 依赖。
+
+当前 check-layout 校验源码位置、活跃 .py 禁止及 Go AST/import 边界，不声称已覆盖 TS/JS 依赖图。实际引入非 Go 模块时同步补齐相应布局、构建、跨语言契约与运行隔离检查；本版仅修改文档，无新模块或新占位目录。详见 [语言与模块决策](LANGUAGE_AND_MODULE_BOUNDARIES.md)。
