@@ -96,6 +96,10 @@ export class ResponsesAdapter {
     const client = new OpenAI({
       apiKey: c.key,
       baseURL: c.base,
+      // Canonical config is the only routing authority. SDK environment
+      // defaults must not attach an unrelated account's billing project.
+      organization: null,
+      project: null,
       maxRetries: 0,
       timeout: m.timeout_seconds * 1000,
       logLevel: "off",

@@ -243,6 +243,14 @@ test("stale lock can be explicitly removed only after same-host process exits", 
   await assert.rejects(unlock(f.file), /LOCK_REQUIRES_REVIEW/);
 });
 test("official SDK emits minimum Responses body, uses private prompt, and accepts only completed output", async (t) => {
+  for (const key of ["OPENAI_ORG_ID", "OPENAI_PROJECT_ID"]) {
+    const previous = process.env[key];
+    process.env[key] = "fixture-env-routing";
+    t.after(() => {
+      if (previous === undefined) delete process.env[key];
+      else process.env[key] = previous;
+    });
+  }
   const f = await fixture(t, { prompt_file: "prompts/model.local.json" });
   await fs.writeFile(
     path.join(f.temp, "prompts/model.local.json"),
@@ -267,6 +275,9 @@ test("official SDK emits minimum Responses body, uses private prompt, and accept
   assert.equal(body.instructions, "fixture private instructions");
   assert.equal(p.inferences().length, 1);
   assert.equal(p.inferences()[0].init.redirect, "error");
+  const headers = new Headers(p.inferences()[0].init.headers);
+  assert.equal(headers.has("openai-organization"), false);
+  assert.equal(headers.has("openai-project"), false);
   const status = JSON.stringify(service.status());
   assert.ok(
     !status.includes("fixture-api-key") && !status.includes("instructions"),
