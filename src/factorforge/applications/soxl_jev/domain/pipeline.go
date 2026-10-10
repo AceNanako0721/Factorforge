@@ -78,21 +78,22 @@ type RoutingReceipt struct {
 	EvaluatedAt     time.Time `json:"evaluated_at"`
 }
 type AnalysisRequest struct {
-	RequestID          string            `json:"request_id"`
-	Binding            Binding           `json:"binding"`
-	ObjectID           string            `json:"object_id"`
-	Evidence           ExtractedEvidence `json:"evidence"`
-	Routing            RoutingReceipt    `json:"routing"`
-	Event              dto.Event         `json:"event"`
-	Deadline           time.Time         `json:"deadline"`
-	QuestionSetVersion string            `json:"question_set_version"`
-	PromptVersion      string            `json:"prompt_version_ref"`
-	RubricVersion      string            `json:"rubric_version"`
-	CalibrationVersion string            `json:"calibration_version"`
-	ModelVersion       string            `json:"model_version"`
-	PreviousScoreID    *string           `json:"previous_score_id"`
-	ScoreVersion       int               `json:"score_version"`
-	RevisionKind       string            `json:"revision_kind"`
+	EligibilityWindow  *EligibilityWindow `json:"eligibility_window,omitempty"`
+	RequestID          string             `json:"request_id"`
+	Binding            Binding            `json:"binding"`
+	ObjectID           string             `json:"object_id"`
+	Evidence           ExtractedEvidence  `json:"evidence"`
+	Routing            RoutingReceipt     `json:"routing"`
+	Event              dto.Event          `json:"event"`
+	Deadline           time.Time          `json:"deadline"`
+	QuestionSetVersion string             `json:"question_set_version"`
+	PromptVersion      string             `json:"prompt_version_ref"`
+	RubricVersion      string             `json:"rubric_version"`
+	CalibrationVersion string             `json:"calibration_version"`
+	ModelVersion       string             `json:"model_version"`
+	PreviousScoreID    *string            `json:"previous_score_id"`
+	ScoreVersion       int                `json:"score_version"`
+	RevisionKind       string             `json:"revision_kind"`
 }
 type AnalysisCandidate struct {
 	ProviderOutput      json.RawMessage `json:"provider_output"`
@@ -132,16 +133,17 @@ type PipelineJob struct {
 	ReasonCodes  []string           `json:"reason_codes"`
 }
 type SubmissionOutbox struct {
-	OutboxID      string                `json:"outbox_id"`
-	Binding       Binding               `json:"binding"`
-	JobID         string                `json:"job_id"`
-	QueueKind     string                `json:"queue_kind"`
-	Command       dto.ScoreCommand      `json:"command"`
-	CandidateHash string                `json:"candidate_hash"`
-	CreatedAt     time.Time             `json:"created_at"`
-	ExpiresAt     time.Time             `json:"expires_at"`
-	DeliveryState string                `json:"delivery_state"`
-	Receipt       *dto.AdmissionReceipt `json:"receipt"`
+	EligibilityWindow *EligibilityWindow    `json:"eligibility_window,omitempty"`
+	OutboxID          string                `json:"outbox_id"`
+	Binding           Binding               `json:"binding"`
+	JobID             string                `json:"job_id"`
+	QueueKind         string                `json:"queue_kind"`
+	Command           dto.ScoreCommand      `json:"command"`
+	CandidateHash     string                `json:"candidate_hash"`
+	CreatedAt         time.Time             `json:"created_at"`
+	ExpiresAt         time.Time             `json:"expires_at"`
+	DeliveryState     string                `json:"delivery_state"`
+	Receipt           *dto.AdmissionReceipt `json:"receipt"`
 }
 
 func Digest(value any) string {

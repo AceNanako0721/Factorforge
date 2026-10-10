@@ -119,7 +119,14 @@ func TestPipelinePostgresQueuesBudgetsLeasesIsolationAndOutboxRestart(t *testing
 	cmd.Score.ProducerID = "fixture-provider"
 	cmd.Score.CompletedAt = c.CompletedAt
 	cmd.Score.EvidenceRefs = []string{r.Evidence.Raw.EvidenceID}
-	out := d.SubmissionOutbox{OutboxID: "fixture-score", Binding: binding, JobID: job.JobID, QueueKind: "SIM", Command: cmd, CandidateHash: d.Digest(c), CreatedAt: now, ExpiresAt: r.Deadline, DeliveryState: "PENDING"}
+	out := d.SubmissionOutbox{EligibilityWindow: r.EligibilityWindow, OutboxID: "fixture-score", Binding: binding, JobID: job.JobID, QueueKind: "SIM", Command: cmd, CandidateHash: d.Digest(c), CreatedAt: now, ExpiresAt: r.Deadline, DeliveryState: "PENDING"}
+	altered := out
+	changedWindow := *out.EligibilityWindow
+	changedWindow.SourceMaxAge += time.Second
+	altered.EligibilityWindow = &changedWindow
+	if worker.SaveOutbox(ctx, *claimed, altered, now) == nil {
+		t.Fatal("outbox changed frozen source eligibility")
+	}
 	if err = worker.SaveOutbox(ctx, *claimed, out, now); err != nil {
 		t.Fatal("outbox", err)
 	}
@@ -130,7 +137,7 @@ func TestPipelinePostgresQueuesBudgetsLeasesIsolationAndOutboxRestart(t *testing
 	}
 	defer worker.Close()
 	rows, err := worker.Outboxes(ctx, 2)
-	if err != nil || len(rows) != 1 || d.Digest(rows[0].Command) != d.Digest(cmd) {
+	if err != nil || len(rows) != 1 || d.Digest(rows[0].Command) != d.Digest(cmd) || d.Digest(rows[0].EligibilityWindow) != d.Digest(r.EligibilityWindow) {
 		t.Fatal("restart outbox", err)
 	}
 	if err = worker.SetDelivery(ctx, out, "DELIVERY_UNKNOWN", nil); err != nil {

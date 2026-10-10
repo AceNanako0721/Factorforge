@@ -101,6 +101,26 @@ func (w IngestWorker) Process(ctx context.Context, raw d.RawEvidence) (d.Routing
 	if now.Sub(*extracted.Raw.FirstPublicAt) > w.Sources[raw.SourceID].MaxAge {
 		return receipt, d.Fail("EVIDENCE_EXPIRED", 422)
 	}
+	// Freeze natural expiry with the first durable routing time. Repeated polls
+	// cannot refresh the original publication or acquire a longer task window.
+	source := w.Sources[raw.SourceID]
+	window := &d.EligibilityWindow{Method: "source-window-1", TaskExpiresAt: receipt.EvaluatedAt.Add(w.TaskTTL),
+		SourceID: source.SourceID, SourceRegistryVersion: source.Version, FirstPublicAt: *extracted.Raw.FirstPublicAt,
+		SourceMaxAge: source.MaxAge, SourceValidUntil: source.ValidUntil}
+	if receipt.Route == "TRADING_CANDIDATE" {
+		mapping := w.Mappings[w.Policy.ObjectID]
+		window.MappingVersion, window.MappingValidUntil = mapping.Version, &mapping.ValidUntil
+	}
+	deadline, err := window.Deadline()
+	if err != nil {
+		return receipt, err
+	}
+	if !w.Clock.Now().UTC().Before(deadline) {
+		return receipt, d.Fail("TASK_EXPIRED", 422)
+	}
+	if err := (d.AnalysisRequest{EligibilityWindow: window, Evidence: extracted, Routing: receipt, Deadline: deadline}).VerifyEligibilityWindow(); err != nil {
+		return receipt, err
+	}
 	spans := []string{}
 	for _, span := range extracted.Spans {
 		spans = append(spans, span.SpanID)
@@ -114,6 +134,9 @@ func (w IngestWorker) Process(ctx context.Context, raw d.RawEvidence) (d.Routing
 	version, err := w.Framework.Version(ctx, w.Policy.ObjectID)
 	if err != nil {
 		return receipt, err
+	}
+	if !w.Clock.Now().UTC().Before(deadline) {
+		return receipt, d.Fail("TASK_EXPIRED", 422)
 	}
 	key := "event-" + d.Digest([]any{w.Policy.Binding, event.EventID, event.FactVersion, event.Relation, raw.ContentHash})
 	command := dto.EventCommand{Command: dto.Command{SchemaVersion: "strategy-2.0", RequestID: key, IdempotencyKey: key, ExpectedVersion: version, Reason: "VERIFIED_INSTANCE_EVIDENCE"}, Event: event}
@@ -133,11 +156,14 @@ func (w IngestWorker) Process(ctx context.Context, raw d.RawEvidence) (d.Routing
 	// Use the first durable routing time so duplicate polls do not change the
 	// request identity, deadline, budget debit or original publication evidence.
 	created := receipt.EvaluatedAt
-	deadline := created.Add(w.TaskTTL)
 	request := d.AnalysisRequest{RequestID: id, Binding: w.Policy.Binding, ObjectID: w.Policy.ObjectID, Evidence: extracted, Routing: receipt, Event: event, Deadline: deadline,
+		EligibilityWindow:  window,
 		QuestionSetVersion: w.QuestionSetVersion, PromptVersion: w.PromptVersion, RubricVersion: w.RubricVersion, CalibrationVersion: w.CalibrationVersion, ModelVersion: w.ModelVersion,
 		PreviousScoreID: plan.PreviousScoreID, ScoreVersion: plan.ScoreVersion, RevisionKind: plan.RevisionKind}
-	if !now.Before(deadline) {
+	if err := request.VerifyEligibilityWindow(); err != nil {
+		return receipt, err
+	}
+	if !w.Clock.Now().UTC().Before(deadline) {
 		return receipt, d.Fail("TASK_EXPIRED", 422)
 	}
 	job := d.PipelineJob{JobID: id, Binding: w.Policy.Binding, QueueKind: kind, Request: request, State: "QUEUED", CreatedAt: created, Deadline: deadline, ReasonCodes: []string{}}

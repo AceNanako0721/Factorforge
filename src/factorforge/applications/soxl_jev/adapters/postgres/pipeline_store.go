@@ -381,6 +381,9 @@ func (s *PipelineStore) Enqueue(ctx context.Context, job d.PipelineJob, bucket s
 		job.QueueKind != "RESEARCH" && job.Request.Routing.Route != "TRADING_CANDIDATE" || job.Candidate != nil || job.Attempt != 0 || job.ClaimedBy != "" || job.LeaseUntil != nil || job.ClaimedAt != nil || job.StartedAt != nil || job.CompletedAt != nil || job.ReceiptRef != nil {
 		return d.Fail("PIPELINE_JOB_NOT_ADMITTED", 403)
 	}
+	if job.Request.VerifyEligibilityWindow() != nil {
+		return d.Fail("PIPELINE_JOB_NOT_ADMITTED", 403)
+	}
 	if err := s.VerifyRole(ctx); err != nil {
 		return err
 	}
@@ -616,6 +619,9 @@ func (s *PipelineStore) Complete(ctx context.Context, job d.PipelineJob, state s
 }
 func (s *PipelineStore) SaveOutbox(ctx context.Context, job d.PipelineJob, row d.SubmissionOutbox, now time.Time) error {
 	return s.mutate(ctx, job, now, func(current *d.PipelineJob, tx pgx.Tx) error {
+		if current.Request.VerifyEligibilityWindow() != nil || d.Digest(row.EligibilityWindow) != d.Digest(current.Request.EligibilityWindow) || !row.ExpiresAt.Equal(current.Deadline) {
+			return d.Fail("PIPELINE_OUTBOX_INVALID", 422)
+		}
 		if current.Candidate == nil || row.Binding != s.binding || row.JobID != current.JobID || row.QueueKind != s.Kind() || row.DeliveryState != "PENDING" || row.Receipt != nil ||
 			row.CandidateHash != d.Digest(current.Candidate) || row.Command.Score.SubmissionID != row.OutboxID || row.Command.Score.ObjectID != current.Request.ObjectID ||
 			row.Command.Score.EventID != current.Request.Event.EventID || row.Command.Score.InputManifestHash != current.Request.Routing.ManifestHash ||

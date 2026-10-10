@@ -56,6 +56,9 @@ func (w AnalysisWorker) ProcessOne(ctx context.Context) (bool, error) {
 	if !now.Before(job.Deadline) {
 		return true, reject("EXPIRED", "TASK_EXPIRED")
 	}
+	if r.VerifyEligibilityWindow() != nil {
+		return true, reject("ABSTAINED", "ELIGIBILITY_WINDOW_NOT_RECORDED")
+	}
 	if r.Evidence.Raw.FirstPublicAt == nil {
 		return true, reject("ABSTAINED", "PUBLICATION_TIME_UNVERIFIED")
 	}
@@ -68,6 +71,9 @@ func (w AnalysisWorker) ProcessOne(ctx context.Context) (bool, error) {
 	exists, e := w.Framework.EventExists(ctx, r.Event.EventID, r.ObjectID, r.Event.FactVersion)
 	if e != nil || !exists {
 		return true, reject("FAILED", "FRAMEWORK_EVENT_NOT_RECORDED")
+	}
+	if !w.Clock.Now().UTC().Before(job.Deadline) {
+		return true, reject("EXPIRED", "TASK_EXPIRED")
 	}
 	if job.Candidate == nil {
 		if err = w.Store.StartProvider(ctx, *job, w.Clock.Now().UTC()); err != nil {
@@ -104,12 +110,18 @@ func (w AnalysisWorker) ProcessOne(ctx context.Context) (bool, error) {
 		}
 		job.Candidate = &candidate
 	}
+	if !w.Clock.Now().UTC().Before(job.Deadline) {
+		return true, reject("EXPIRED", "TASK_EXPIRED")
+	}
 	if err = a.Validate(r, *job.Candidate, w.Clock.Now().UTC(), w.AllowMock); err != nil {
 		return true, reject("ABSTAINED", "CANDIDATE_NOT_ADMITTED")
 	}
 	version, err := w.Framework.Version(ctx, r.ObjectID)
 	if err != nil {
 		return true, reject("FAILED", "FRAMEWORK_UNAVAILABLE")
+	}
+	if !w.Clock.Now().UTC().Before(job.Deadline) {
+		return true, reject("EXPIRED", "TASK_EXPIRED")
 	}
 	candidate := *job.Candidate
 	id := "score-" + d.Digest([]any{r.Binding, r.ObjectID, r.Event.EventID, r.Event.FactVersion, r.QuestionSetVersion, r.RubricVersion, r.CalibrationVersion, r.PromptVersion, r.RevisionKind, r.ScoreVersion})
@@ -119,7 +131,8 @@ func (w AnalysisWorker) ProcessOne(ctx context.Context) (bool, error) {
 		RubricVersion: r.RubricVersion, CalibrationVersion: r.CalibrationVersion, CompletedAt: candidate.CompletedAt, InputManifestHash: r.Routing.ManifestHash}
 	command := dto.ScoreCommand{Command: dto.Command{SchemaVersion: "strategy-2.0", RequestID: id, IdempotencyKey: id, ExpectedVersion: version, Reason: "VALIDATED_INSTANCE_ANALYSIS"}, Score: score}
 	row := d.SubmissionOutbox{OutboxID: id, Binding: r.Binding, JobID: job.JobID, QueueKind: job.QueueKind, Command: command,
-		CandidateHash: d.Digest(candidate), CreatedAt: w.Clock.Now().UTC(), ExpiresAt: job.Deadline, DeliveryState: "PENDING"}
+		EligibilityWindow: r.EligibilityWindow,
+		CandidateHash:     d.Digest(candidate), CreatedAt: w.Clock.Now().UTC(), ExpiresAt: job.Deadline, DeliveryState: "PENDING"}
 	return true, w.Store.SaveOutbox(ctx, *job, row, w.Clock.Now().UTC())
 }
 func (w AnalysisWorker) Dispatch(ctx context.Context) error {
@@ -133,6 +146,23 @@ func (w AnalysisWorker) Dispatch(ctx context.Context) error {
 	for _, row := range rows {
 		if row.Binding != w.Store.Binding() || row.QueueKind != w.Store.Kind() {
 			return d.Fail("OUTBOX_BINDING_FORBIDDEN", 403)
+		}
+		until, windowErr := row.EligibilityWindow.Deadline()
+		if windowErr != nil || !until.Equal(row.ExpiresAt) || row.QueueKind != "RESEARCH" && row.EligibilityWindow.MappingValidUntil == nil {
+			// Old pending rows can reconcile a genuine accepted receipt, but must
+			// never manufacture an admission window from today's configuration.
+			receipt, e := w.Framework.Receipt(ctx, row.Command.Score.EventID, row.Command.Score.ObjectID, row.OutboxID)
+			if e != nil {
+				return e
+			}
+			state := "REJECTED"
+			if receipt != nil {
+				state = "ACK"
+			}
+			if err = w.Store.SetDelivery(ctx, row, state, receipt); err != nil {
+				return err
+			}
+			continue
 		}
 		if !w.Clock.Now().UTC().Before(row.ExpiresAt) {
 			if err = w.Store.SetDelivery(ctx, row, "EXPIRED", nil); err != nil {
