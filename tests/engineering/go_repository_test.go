@@ -126,6 +126,8 @@ func TestPublicGuardTemplateShapesAndDocumentContainers(t *testing.T) {
 		{"state_json = \"\"", "state_json = \"private\""},
 		{"claude_cli_path = \"\"", "claude_cli_path = \"private\""},
 		{"antigravity_cli_path = \"\"", "antigravity_cli_path = \"private\""},
+		{"omp_browser_path = \"\"", "omp_browser_path = \"private\""},
+		{"omp_max_requests = 0", "omp_max_requests = 1"},
 		{"", "\npassword = \"short\"\n"},
 	} {
 		body := strings.Replace(string(config), change.old, change.new, 1)

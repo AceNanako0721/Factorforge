@@ -77,3 +77,5 @@ P3 当前只读 API 见 [实例说明](INSTANCE_GO.md)，私有队列/工作进�
 模型接入模块源码/manifest/唯一 npm lockfile 位于 applications/model_access，测试位于 tests/applications/model_access，契约位于 contracts/v2/model-access，构建产物位于 runtime/model-access-build。Go 布局检查登记 TS/MJS 放置，另以 TypeScript compiler AST 校验静态导入仅限自有模块、Node 内置和固定依赖；生产源码禁止动态 require/import。详见 [模块运行说明](../../src/factorforge/applications/model_access/README.md)。
 
 模型交互菜单沿用 model_access 已登记目录：entrypoints/menu.ts 与 terminal-menu.ts 负责装配和终端；application/menu-selection.ts、fuzzy.ts 保存适配的 OMP 纯算法；adapters/official-cli.ts 启动原版官方程序。实验位于 tests/applications/model_access/experiments，生产验收位于同层 menu.test.mjs。string-width 为固定 Node 依赖；原版 CLI 和独立工作目录只放被忽略的 runtime/model-cli 与 runtime/model-cli-workspace。官方登录凭据由官方程序的私有目录/系统钥匙串管理，不复制或跟踪。
+
+完整 OMP 接入仍在 model_access 的 api/config/adapters/application/entrypoints 五类目录；Bun入口、TOML CredentialStore、浏览器会话适配与OMP菜单均属该模块。沿用唯一 npm lockfile；Bun为执行依赖。测试与先行实验同层归位；运行/目录缓存/独立浏览器profile位于忽略的 runtime/model-access-omp，凭据只在私有TOML。

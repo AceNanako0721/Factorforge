@@ -1,21 +1,16 @@
 # 模型接入进度
 
-2026-10-10，基线 v2.2.0，Change-Type: specification。新增第三层独立模块，未改变三层框架或 JEV 决策职责。
+当前功能基线 v2.4.0。式样、设计及流程图见 [第五对文档](../v2.4.0/05_模型接入模块式样书.html)，实现方法证据见 [OMP 验证](../engineering/OMP_ACCESS_VALIDATION.md)，操作见 [模块说明](../../src/factorforge/applications/model_access/README.md)。
 
-已完成先行官方协议/依赖试验、第五对 HTML 仕様/设计、TypeScript 实现、公开 JSONL 契约、空配置区及初始化工具。API Key 和官方 ChatGPT 登录分别选择；私有 OAuth 状态存 canonical config，不复用 Codex/OMP 凭据，不自动转付费 API。
+| 项目 | 状态 |
+| --- | --- |
+| 原版 OMP 全部 82 登录入口与 TUI 组件 | 已实现；注册表/组件及真实 PTY 本地验证 |
+| 认证持久化、刷新、注销、账号隔离 | 已实现；统一私有 TOML、CAS/重启/取消测试通过 |
+| 模型发现、来源标记、选定账户推理 | 已实现；重点三家原版解析器受控测试通过 |
+| 生成预算、不重复发送、失败与终态检查 | 已实现；无真实供应商调用的失败夹具通过 |
+| 旧 Node v1 / 官方 CLI 手动入口 | 保留；43 项旧接口回归通过 |
+| GitHub 发布与部署 | 以对应 PR、Actions 与 main 标签为准 |
+| 三家真实账号登录及真实模型请求 T5-16 | 待用户登录后单独验收 |
+| 事件抽取与 P3 生产准入 | 不属于本次；实验继续暂停 |
 
-本地 Node 22.23.1：31 项机制测试通过，包括签名 ID Token/JWKS、PKCE 回调、返回账号约束、刷新轮换及保存冲突、退出远端未确认、预算重启/重复请求、真实本地 HTTP 断流超时、独立子进程 JSONL。测试使用合成数据和注入 fetch，不访问真实账户。TypeScript 构建、模块导入与 Go 布局/工程检查通过。Windows Node 24.14.0 同 31 项测试通过。原有 Go 管理台/实例/实验回归通过，实例使用已安装原生 PostgreSQL 夹具。13 份 HTML 的桌面/窄屏共 26 次检查无页面溢出；实际暂存与可达历史公开检查通过。GitHub 交付见 [PR #43](https://github.com/AceNanako0721/Factorforge/pull/43)，包含 Ubuntu/Windows Node 22.23.1 矩阵；CI 的最终状态以 PR 检查及发布记录中的合并后 main 运行证据为准。
-
-状态：ACCOUNT_VALIDATION_PENDING。尚未进行 Factorforge 官方账号授权与真实模型调用（T5-06）；需要用户本人完成官方网页授权，再从账号目录选择模型。未填入模型名、生产容量、API Key、提示词或 ChatGPT 计划资格。
-
-本模块未接入事件抽取器；Ubuntu 本地模型实验保持停止。P3 整体及 LIVE 准入仍未完成。
-
-[运行说明](../../src/factorforge/applications/model_access/README.md) · [仕様](../v2.2.0/05_模型接入模块式样书.html) · [设计](../v2.2.0/05_模型接入模块设计书.html) · [先行验证](../engineering/MODEL_ACCESS_VALIDATION.md)
-
-## v2.3.0 菜单与原版官方登录入口
-
-按用户澄清：统一配置用于防止敏感信息误上传，不要求原版官方程序搬迁凭据。AGENTS/CONTRIBUTING/语言边界已明确其私有目录或系统钥匙串由官方管理；仓库新增忽略及强制暂存拒绝检查。Factorforge 自有 API/ChatGPT 凭据仍只写 config/config.toml。
-
-先行实验→设计提交 8f24dc9→生产实现。支持键盘搜索菜单、连接/模型目录/会话选择、本地预算、退出确认、ChatGPT 可取消授权，以及原版 Claude Code/Antigravity 终端登录交接。两家原生 CLI 凭据不导入；JSONL 保持 API/ChatGPT 两通道。旧 v2.2 配置、空模板与历史扫描兼容。
-
-Linux/Windows 40 项机制测试、真实 TTY 按键/退出与 Linux 合成原生交接通过；13 份 HTML × 两种宽度共 26 次检查通过。曾发现的 TTY 输入句柄退出挂起已修复并在两平台重验。详细边界见 [先行与实现验证](../engineering/MODEL_MENU_VALIDATION.md)。三家真实账号验收仍分别待用户授权；未恢复本地模型实验、未新增自动抽取或交易。
+菜单能登录并通过公开 JSONL v2 返回生成文本；登录成功、目录可见、真实推理成功分别记录。其他原版 CLI 已有会话不会被导入，不将本地夹具称为账号通过。

@@ -21,10 +21,10 @@ export type Discovery = {
 export const scopes =
   "openid profile email offline_access resource.invoke chatgpt.tokens.use.direct";
 export function boundedFetch(
-  base: typeof fetch,
+  base: (...args: Parameters<typeof fetch>) => ReturnType<typeof fetch>,
   timeout: number,
   maxBytes: number,
-): typeof fetch {
+): (...args: Parameters<typeof fetch>) => ReturnType<typeof fetch> {
   return async (input, init) => {
     const response = await base(input, {
       ...init,
@@ -70,7 +70,7 @@ export function boundedFetch(
 export class OAuthAdapter {
   constructor(
     private readonly store: ConfigStore,
-    private readonly fetcher: typeof fetch = fetch,
+    private readonly fetcher: (...args: Parameters<typeof fetch>) => ReturnType<typeof fetch> = fetch,
     private readonly key?: JWTVerifyGetKey,
   ) {}
   private http() {
