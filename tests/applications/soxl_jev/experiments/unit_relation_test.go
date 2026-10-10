@@ -69,7 +69,8 @@ func TestPrepareFrozenUnitRelationControls(t *testing.T) {
 			if !nOK || !uOK || !financialLiteralPresent(request, n) || !financialLiteralPresent(request, u) {
 				t.Fatal("UNIT_RELATION_TARGET_UNSUPPORTED")
 			}
-			if json.Unmarshal(qRaw, &request.Questions) != nil {
+			request.Questions = nil // json.Unmarshal otherwise retains older map keys.
+			if json.Unmarshal(qRaw, &request.Questions) != nil || len(request.Questions) != 1 {
 				t.Fatal("UNIT_RELATION_QUESTION")
 			}
 			q := request.Questions["unit_applies"]
@@ -133,8 +134,13 @@ func TestEvaluateUnitRelationControls(t *testing.T) {
 		}
 		resRaw := financialRead(t, lab, fmt.Sprintf("case-%03d-response.json", i+1), &response)
 		row := report.Rows[i]
-		if row.Request != d.ContentDigest(reqRaw) || row.Request != item.Hash || row.Response != d.ContentDigest(resRaw) || row.HTTP != 200 || row.Model != "jev-1.13.0" || response.Model != row.Model || len(response.Answers) != 1 {
+		if row.Request != d.ContentDigest(reqRaw) || row.Request != item.Hash || row.Response != d.ContentDigest(resRaw) || row.HTTP != 200 || row.Model != "jev-1.13.0" || response.Model != row.Model || len(response.Answers) != len(request.Questions) {
 			t.Fatal("UNIT_RELATION_DELIVERY_PROVENANCE")
+		}
+		for key, q := range request.Questions {
+			if response.Answers[key].Type != q.Type {
+				t.Fatal("UNIT_RELATION_QUESTION_BINDING")
+			}
 		}
 		a := response.Answers["unit_applies"]
 		if a.Type != "noul" || a.Noul == nil {
@@ -156,7 +162,7 @@ func TestEvaluateUnitRelationControls(t *testing.T) {
 			t.Fatal("UNIT_RELATION_GROUP")
 		}
 		input, output = input+response.Usage.Input, output+response.Usage.Output
-		results = append(results, map[string]any{"case": i + 1, "group": item.Group, "noul": a.Noul, "milliseconds": row.MS})
+		results = append(results, map[string]any{"case": i + 1, "group": item.Group, "noul": a.Noul, "milliseconds": row.MS, "actual_question_count": len(request.Questions)})
 	}
 	frozenRateWrite(t, lab, "evaluation.json", map[string]any{"at": time.Now().UTC(), "positive_min": positiveMin, "negative_max": negativeMax, "descriptive_ranges_disjoint": positiveMin > negativeMax, "results": results, "input_tokens": input, "output_tokens": output, "labels_hash": d.ContentDigest(lRaw), "report_hash": d.ContentDigest(rRaw), "noul_threshold": nil, "independent_relational_gold": false, "whole_document_complete": false, "production_installed": false, "billed_cost": nil, "orders": 0})
 	t.Logf("positive_min=%g; negative_max=%g; tokens=%d/%d; no threshold or production admission", positiveMin, negativeMax, input, output)
