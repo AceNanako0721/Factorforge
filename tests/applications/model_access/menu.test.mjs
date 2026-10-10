@@ -124,3 +124,27 @@ test("menu ChatGPT login dispatch shares the existing service and never generate
   const service = { oauth: { async login(show) { calls++; show("https://fixture.invalid", 1234); return { plan_enabled: true }; } }, async handle() { assert.fail("unexpected model request"); } };
   await runMenu(x.store, service, ui); assert.equal(calls, 1); assert.equal(closed, true);
 });
+for (const choice of [undefined, "cancel"]) {
+  test(`Antigravity handoff ${choice === undefined ? "Esc" : "cancel"} returns without starting the official process`, async t => {
+    const x = await config(t); let calls = 0;
+    const answers = ["login", "antigravity", choice, "exit"];
+    const ui = { exit: new AbortController(), open() {}, close() {},
+      async select() { return answers.shift(); }, async notice() {},
+      async handoff() { calls++; } };
+    await runMenu(x.store, { async handle() { assert.fail("unexpected model request"); } }, ui);
+    assert.equal(calls, 0);
+  });
+}
+test("Antigravity handoff starts only after an explicit entry choice and explains the current boundary", async t => {
+  const x = await config(t); let calls = 0; const pages = [];
+  const answers = ["login", "antigravity", "continue", "exit"];
+  const ui = { exit: new AbortController(), open() {}, close() {},
+    async select(title, items, lines) { pages.push({ title, items, lines }); return answers.shift(); },
+    async notice() {}, async handoff() { calls++; } };
+  await runMenu(x.store, { async handle() { assert.fail("unexpected model request"); } }, ui);
+  assert.equal(calls, 1);
+  const entry = pages.find(page => page.title === "进入 Antigravity 官方终端");
+  assert.deepEqual(entry.items, [{ id: "continue", label: "进入官方终端" }, { id: "cancel", label: "取消并返回" }]);
+  assert.match(entry.lines.join("\n"), /已有登录状态/);
+  assert.match(entry.lines.join("\n"), /尚未接入 Factorforge 的模型调用/);
+});
