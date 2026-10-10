@@ -144,7 +144,11 @@ func TestRunFrozenLocalExtractionBatch(t *testing.T) {
 			t.Fatal("LOCAL_RUNTIME_INTEGRITY")
 		}
 	}
-	frozenRateWrite(t, lab, "local-calls-started.json", map[string]any{"at": time.Now().UTC(), "requests_sealed": true, "maximum_calls": 4, "retry": false, "orders": 0})
+	evaluationSeal, err := os.ReadFile(filepath.Join(lab, "evaluation-seal.json"))
+	if err != nil || !json.Valid(evaluationSeal) {
+		t.Fatal("LOCAL_EVALUATION_SEAL_REQUIRED")
+	}
+	frozenRateWrite(t, lab, "local-calls-started.json", map[string]any{"at": time.Now().UTC(), "requests_sealed": true, "evaluation_seal_hash": d.ContentDigest(evaluationSeal), "maximum_calls": 4, "retry": false, "orders": 0})
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal("LOCAL_PORT")

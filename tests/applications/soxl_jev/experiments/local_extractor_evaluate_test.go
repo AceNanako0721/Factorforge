@@ -61,6 +61,24 @@ type localMetrics struct {
 	Strict         bool        `json:"strict_document_match"`
 }
 
+// The independent evaluation assets are sealed separately. The model runner
+// reads only this hash receipt, never the gold annotations themselves.
+func TestSealLocalExtractionEvaluationInputs(t *testing.T) {
+	lab := localExtractorLab(t)
+	if _, err := os.Lstat(filepath.Join(lab, "local-calls-started.json")); !os.IsNotExist(err) {
+		t.Fatal("LOCAL_CALLS_ALREADY_STARTED")
+	}
+	hashes := map[string]string{}
+	for _, name := range []string{"labels.json", "corpus.jsonl", "metadata-label_schema.json", "sealed-inputs.json", "requests-seal.json"} {
+		raw, err := os.ReadFile(filepath.Join(lab, name))
+		if err != nil {
+			t.Fatal("LOCAL_EVALUATION_ASSET_REQUIRED")
+		}
+		hashes[name] = localRawHash(raw)
+	}
+	frozenRateWrite(t, lab, "evaluation-seal.json", hashes)
+}
+
 func localTokenKey(ids []int, n int) (string, error) {
 	if len(ids) == 0 || len(ids) > 80 {
 		return "", fmt.Errorf("SPAN_LENGTH")
@@ -190,6 +208,25 @@ func localEvaluateRow(row localCorpusRow, prediction localPrediction, problem st
 
 func TestEvaluateFrozenLocalExtractionBatch(t *testing.T) {
 	lab := localExtractorLab(t)
+	var hashes map[string]string
+	financialRead(t, lab, "evaluation-seal.json", &hashes)
+	if len(hashes) != 5 {
+		t.Fatal("LOCAL_EVALUATION_SEAL_SHAPE")
+	}
+	for name, hash := range hashes {
+		raw, err := os.ReadFile(filepath.Join(lab, name))
+		if err != nil || localRawHash(raw) != hash {
+			t.Fatal("LOCAL_EVALUATION_ASSET_CHANGED")
+		}
+	}
+	var started struct {
+		EvaluationSealHash string `json:"evaluation_seal_hash"`
+	}
+	financialRead(t, lab, "local-calls-started.json", &started)
+	sealRaw, err := os.ReadFile(filepath.Join(lab, "evaluation-seal.json"))
+	if err != nil || started.EvaluationSealHash != localRawHash(sealRaw) {
+		t.Fatal("LOCAL_EVALUATION_SEAL_CHANGED")
+	}
 	var labels struct {
 		Rows []localCorpusRow `json:"rows"`
 	}
