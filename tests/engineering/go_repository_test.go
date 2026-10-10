@@ -124,6 +124,8 @@ func TestPublicGuardTemplateShapesAndDocumentContainers(t *testing.T) {
 		{"query_cursor_key = \"\"", "query_cursor_key = \"short\""},
 		{"\napi_key = \"\"", "\napi_key = \"short\""},
 		{"state_json = \"\"", "state_json = \"private\""},
+		{"claude_cli_path = \"\"", "claude_cli_path = \"private\""},
+		{"antigravity_cli_path = \"\"", "antigravity_cli_path = \"private\""},
 		{"", "\npassword = \"short\"\n"},
 	} {
 		body := strings.Replace(string(config), change.old, change.new, 1)
@@ -168,7 +170,7 @@ func TestPublicGuardTemplateShapesAndDocumentContainers(t *testing.T) {
 	if rules := guard.ContentIssues("manual.docx", buffer.Bytes(), false); !strings.Contains(strings.Join(rules, ","), "github-token") {
 		t.Fatal(rules)
 	}
-	for _, path := range []string{"prompts/prompts.local.json", "runtime/data.json", "private/report.html", "config/extra.toml", "data/raw/news.json", "key.pem", ".env.local"} {
+	for _, path := range []string{"prompts/prompts.local.json", "runtime/data.json", "private/report.html", "config/extra.toml", "data/raw/news.json", "key.pem", ".env.local", ".claude/.credentials.json", "copy/.claude.json", ".gemini/oauth_creds.json", ".antigravity/auth.json"} {
 		if guard.PathIssue(path) == "" {
 			t.Fatal("private path accepted", path)
 		}

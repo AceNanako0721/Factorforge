@@ -11,3 +11,11 @@
 本模块未接入事件抽取器；Ubuntu 本地模型实验保持停止。P3 整体及 LIVE 准入仍未完成。
 
 [运行说明](../../src/factorforge/applications/model_access/README.md) · [仕様](../v2.2.0/05_模型接入模块式样书.html) · [设计](../v2.2.0/05_模型接入模块设计书.html) · [先行验证](../engineering/MODEL_ACCESS_VALIDATION.md)
+
+## v2.3.0 菜单与原版官方登录入口
+
+按用户澄清：统一配置用于防止敏感信息误上传，不要求原版官方程序搬迁凭据。AGENTS/CONTRIBUTING/语言边界已明确其私有目录或系统钥匙串由官方管理；仓库新增忽略及强制暂存拒绝检查。Factorforge 自有 API/ChatGPT 凭据仍只写 config/config.toml。
+
+先行实验→设计提交 8f24dc9→生产实现。支持键盘搜索菜单、连接/模型目录/会话选择、本地预算、退出确认、ChatGPT 可取消授权，以及原版 Claude Code/Antigravity 终端登录交接。两家原生 CLI 凭据不导入；JSONL 保持 API/ChatGPT 两通道。旧 v2.2 配置、空模板与历史扫描兼容。
+
+Linux/Windows 40 项机制测试、真实 TTY 按键/退出与 Linux 合成原生交接通过；13 份 HTML × 两种宽度共 26 次检查通过。曾发现的 TTY 输入句柄退出挂起已修复并在两平台重验。详细边界见 [先行与实现验证](../engineering/MODEL_MENU_VALIDATION.md)。三家真实账号验收仍分别待用户授权；未恢复本地模型实验、未新增自动抽取或交易。

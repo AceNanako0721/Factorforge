@@ -124,3 +124,36 @@ The baseline references FreqUI `2e6a0907ed2e990b9e905331888dfa9824024d2d` for th
 ## Search harness implementation references
 
 The Go search adapters reference protocol and control-flow patterns from Oh My Pi (MIT), pinned at `579da1d661c5cb8d43bc2ddd429ab72e67165ad8`, and OpenCode (MIT), pinned at `388406238bd5ca15564a762840a2362c3a45bd9c`. No upstream code is copied or adapted, and neither harness is a runtime dependency. Exact files, probe evidence and limits are recorded in [P3 search review](doc/engineering/P3_SEARCH_UPSTREAM_REVIEW.md). Codex (Apache-2.0) and Gemini CLI (Apache-2.0) are comparison references only, with no copied implementation or authenticated service integration.
+
+## oh-my-pi menu algorithms (v2.3.0)
+
+Source: https://github.com/can1357/oh-my-pi/tree/b07a1c146d0d12cfc855a2c65d52f892ef319040/packages/tui/src
+
+Adapted components/menu-selection.ts and fuzzy.ts into the model_access application directory; import paths and strict TypeScript compatibility only. Terminal rendering, orchestration and native CLI handoff are Factorforge code. The full TUI package, native bridge and provider OAuth identities are not copied.
+
+```text
+MIT License
+
+Copyright (c) 2025 Mario Zechner
+Copyright (c) 2025-2026 Can Bölük
+Copyright (c) 2026 Stencil Labs, Inc.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+```

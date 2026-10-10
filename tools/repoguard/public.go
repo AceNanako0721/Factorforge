@@ -33,6 +33,9 @@ func PathIssue(name string) string {
 	}
 	private := map[string]bool{"private": true, ".private": true, "secrets": true, "model_traces": true, "ai_cache": true, "runtime": true, "logs": true, "backups": true, ".venv": true, "__pycache__": true}
 	for _, part := range parts {
+		if part == ".claude" || part == ".claude.json" || part == ".gemini" || part == ".antigravity" || part == ".credentials.json" {
+			return "private-official-login-path"
+		}
 		if part == "node_modules" || part == ".vite" || part == ".pnpm-store" {
 			return "generated-dependency-path"
 		}
@@ -99,6 +102,14 @@ func TemplateIssue(name string, data []byte, historical bool) string {
 		}
 		if historical {
 			old := cloneMap(expected)
+			// Exact v2.2.0 empty model template, without native CLI paths.
+			legacyModel := cloneMap(asMap(old["model_access"]))
+			delete(legacyModel, "claude_cli_path")
+			delete(legacyModel, "antigravity_cli_path")
+			old["model_access"] = legacyModel
+			if equalJSON(actual, old) {
+				return ""
+			}
 			// Exactly the frozen pre-v2.2.0 shape; never accept a partially
 			// populated model block via the historical compatibility path.
 			if _, exists := actual["model_access"]; exists {

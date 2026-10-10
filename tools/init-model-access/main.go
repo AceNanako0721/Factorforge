@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 
 	"github.com/pelletier/go-toml/v2"
@@ -73,18 +74,53 @@ func initialize() error {
 	if err != nil {
 		return err
 	}
+	var parsedOld map[string]any
+	if err = toml.Unmarshal(raw, &parsedOld); err != nil {
+		return err
+	}
+	var next []byte
 	if bytes.Contains(raw, []byte(marker)) {
-		fmt.Println("Model access block already present; nothing changed")
-		return nil
+		const endMarker = "# END FACTORFORGE MODEL ACCESS"
+		start, end := bytes.Index(raw, []byte(marker)), bytes.Index(raw, []byte(endMarker))
+		if bytes.Count(raw, []byte(marker)) != 1 || bytes.Count(raw, []byte(endMarker)) != 1 || end < start || len(bytes.TrimSpace(raw[end+len(endMarker):])) != 0 {
+			return fmt.Errorf("model block")
+		}
+		model, ok := parsedOld["model_access"].(map[string]any)
+		if !ok {
+			return fmt.Errorf("model section")
+		}
+		// Upgrade by inserting only missing path fields. Preserve every original
+		// byte, including tokens, comments and limits, rather than rewriting TOML.
+		var additions []byte
+		for _, key := range []string{"claude_cli_path", "antigravity_cli_path"} {
+			if value, exists := model[key]; exists {
+				if _, ok := value.(string); !ok {
+					return fmt.Errorf("model path")
+				}
+			} else {
+				additions = append(additions, []byte(key+" = \"\"\n")...)
+			}
+		}
+		if len(additions) == 0 {
+			fmt.Println("Model access block already current; nothing changed")
+			return nil
+		}
+		next = append(append(append([]byte{}, raw[:end]...), additions...), raw[end:]...)
+	} else {
+		if _, exists := parsedOld["model_access"]; exists {
+			return fmt.Errorf("existing section")
+		}
+		next = append(append(append([]byte{}, raw...), '\n'), template[offset:]...)
 	}
-	if bytes.Contains(raw, []byte("[model_access")) {
-		return fmt.Errorf("existing section")
-	}
-	// Validate the complete format, preserve original bytes, and replace atomically.
-	next := append(append(append([]byte{}, raw...), '\n'), template[offset:]...)
+	// Validate complete TOML and unchanged non-model configuration before replace.
 	var parsed map[string]any
 	if err = toml.Unmarshal(next, &parsed); err != nil {
 		return err
+	}
+	delete(parsedOld, "model_access")
+	delete(parsed, "model_access")
+	if !reflect.DeepEqual(parsedOld, parsed) {
+		return fmt.Errorf("outside model changed")
 	}
 	file, err := os.CreateTemp(filepath.Dir(fileName), ".model-init-*.tmp")
 	if err != nil {

@@ -22,6 +22,8 @@ export const emptySettings = {
   budget_window_seconds: 0,
   api_max_requests: 0,
   chatgpt_max_requests: 0,
+  claude_cli_path: "",
+  antigravity_cli_path: "",
   state_json: "",
 };
 export type Settings = typeof emptySettings;
@@ -97,6 +99,12 @@ function settings(raw: string): Settings {
   split(raw);
   const all = parse(raw),
     m = all.model_access as unknown as Settings;
+  // v2.2.0 configs need no credential migration. Only the two new paths
+  // default to empty; unknown fields and missing original fields stay invalid.
+  if (m && typeof m === "object") {
+    if (!Object.hasOwn(m, "claude_cli_path")) m.claude_cli_path = "";
+    if (!Object.hasOwn(m, "antigravity_cli_path")) m.antigravity_cli_path = "";
+  }
   if (
     !m ||
     Object.keys(m).sort().join(",") !==

@@ -24,3 +24,9 @@
 - Claude 已验证 auth login --claudeai、auth status --json、auth logout；Antigravity 仅交还原版终端，在其中登录、/logout、/exit，不解析私有凭据或屏幕文本来猜登录成功。
 
 证据在 runtime/model-menu-validation；原型不接生产链路。Windows 实际菜单、取消登录清理、配置向后兼容及官方 CLI 交接仍需按设计后的生产测试验证。真实账户授权未发生，不宣称三家账号或 P3 已验收。
+
+## 按设计实现后的验证
+
+Linux Node 22.23.1、Windows Node 24.14.0：40 项测试通过；GitHub 将继续使用既有 Ubuntu/Windows Node 22.23.1 矩阵。新增 9 项覆盖键盘搜索/确认、中文裁剪/控制字符、resize/EOF/中断恢复、非TTY拒绝、旧配置兼容、允许列表环境、原生 Go 合成子进程版本/参数/cwd/状态脱敏，以及 OAuth Esc 取消关闭回调并保留原字节。原 31 项协议/预算/SDK 测试保持通过。
+
+Linux SSH PTY 实际执行生产菜单→搜索 Claude→合成原生子进程→返回菜单；未执行真实登录。Linux/Windows 真实终端都验证了方向键、搜索和 Ctrl+C 退出。首次发现恢复画面后读句柄未关闭，补上 input.pause 后两平台均正常退出码 0 并返回 TERMINAL_RESTORED。13 份 HTML 在 1440/390 宽共 26 次离线检查，无页面溢出；Go 工程、布局、历史文档、契约与 vet 通过。真实账号仍 ACCOUNT_VALIDATION_PENDING，不声称账号或抽取验收。

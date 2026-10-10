@@ -47,3 +47,9 @@ doc/private/
 doc/_archive/
 ~$*
 **/~$*
+# Original vendor CLI authentication stores must never enter the public tree.
+.claude/
+.claude.json
+.gemini/
+.antigravity/
+.credentials.json

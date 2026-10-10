@@ -67,4 +67,35 @@ func TestModelConfigInitializationPreservesPrivateBytesAndRespectsLock(t *testin
 	if !bytes.Equal(first, second) {
 		t.Fatal("second init changed config")
 	}
+	// Frozen v2.2.0 credentials/limits are upgraded by inserting two blank paths.
+	legacy := bytes.ReplaceAll(first, []byte("claude_cli_path = \"\"\n"), nil)
+	legacy = bytes.ReplaceAll(legacy, []byte("antigravity_cli_path = \"\"\n"), nil)
+	legacy = bytes.Replace(legacy, []byte("state_json = \"\""), []byte("state_json = 'fixture-private-state'"), 1)
+	if err = os.WriteFile(filepath.Join(temp, "config/config.toml"), legacy, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = run(); err != nil {
+		t.Fatal("upgrade", err)
+	}
+	upgraded, _ := os.ReadFile(filepath.Join(temp, "config/config.toml"))
+	withoutPaths := bytes.ReplaceAll(upgraded, []byte("claude_cli_path = \"\"\n"), nil)
+	withoutPaths = bytes.ReplaceAll(withoutPaths, []byte("antigravity_cli_path = \"\"\n"), nil)
+	if !bytes.Equal(withoutPaths, legacy) {
+		t.Fatal("upgrade rewrote existing private bytes")
+	}
+}
+
+func TestHistoricalModelTemplatePathsAreExactAndHistoryOnly(t *testing.T) {
+	config, err := os.ReadFile(filepath.Join(repoRoot(t), "config/config.example.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacy := strings.ReplaceAll(strings.ReplaceAll(string(config), "claude_cli_path = \"\"\n", ""), "antigravity_cli_path = \"\"\n", "")
+	if guard.TemplateIssue("config/config.example.toml", []byte(legacy), true) != "" || guard.TemplateIssue("config/config.example.toml", []byte(legacy), false) == "" {
+		t.Fatal("v2.2 template history boundary")
+	}
+	bad := strings.Replace(legacy, "state_json = \"\"", "state_json = \"private\"", 1)
+	if guard.TemplateIssue("config/config.example.toml", []byte(bad), true) == "" {
+		t.Fatal("historical private state accepted")
+	}
 }
