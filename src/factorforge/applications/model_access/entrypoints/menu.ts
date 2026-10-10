@@ -76,11 +76,19 @@ export async function runMenu(store: ConfigStore, service: ModelService, ui = ne
               await ui.notice("ChatGPT 登录完成", [`计划调用权限: ${result.plan_enabled ? "已授权" : "尚未授权"}`]);
             }
           } else {
-            if (provider === "antigravity") await ui.notice("进入 Antigravity 官方终端", [
-              "在官方终端完成浏览器授权或授权码回填。",
-              action === "logout" ? "使用 /logout 退出登录，再用 /exit 返回。" : "完成后使用 /exit 返回此菜单。",
-              "登录状态由官方终端确认；菜单不读取其凭据。",
-            ]);
+            if (provider === "antigravity") {
+              const entry = await ui.select("进入 Antigravity 官方终端", [
+                { id: "continue", label: "进入官方终端" },
+                { id: "cancel", label: "取消并返回" },
+              ], [
+                "已有登录状态时直接进入会话；否则在官方终端完成授权。",
+                action === "logout" ? "使用 /logout 退出登录，再用 /exit 返回。" : "完成后使用 /exit 返回此菜单。",
+                "此入口仅交接官方终端，尚未接入 Factorforge 的模型调用。",
+                "登录状态由官方终端确认；菜单不读取其凭据。",
+              ]);
+              // Escape and cancellation must return without starting a child.
+              if (entry !== "continue") continue;
+            }
             await ui.handoff(signal => native.handoff(provider as NativeProvider, action === "logout" ? "logout" : "login", signal));
             await ui.notice("已返回 Factorforge", ["请以官方程序显示的账户状态为准。"]);
           }

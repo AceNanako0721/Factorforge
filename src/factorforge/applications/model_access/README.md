@@ -48,4 +48,6 @@ ChatGPT 使用现有官方授权，Esc 可取消。Claude/Antigravity 是原版�
 
 Claude 使用 auth login --claudeai，状态用 auth status --json，退出用 auth logout。Antigravity 在原版 agy 终端授权，/logout 退出登录，/exit 返回菜单；没有稳定只读登录接口，菜单显示“由官方终端确认”。凭据留在官方私有目录或系统钥匙串，Factorforge 不读取、不复制、不提交。子进程使用独立 runtime 工作目录，过滤外部 API Key、账单和身份覆盖环境。
 
+Antigravity 说明页选择“进入官方终端”才会启动程序；“取消并返回”或 Esc 返回 Factorforge。若官方程序已有登录状态，会直接显示账号和会话，无需重复授权；确认后输入 /exit 返回即可。该操作仅确认官方终端的账号状态，不代表 Factorforge 已能使用该账号调用模型。
+
 这两家登录入口不等于新增 JSONL 订阅推理通道；serve 仍仅支持 API / ChatGPT。三家真实账号授权分别待用户完成，不代表事件抽取或 P3 完成。
