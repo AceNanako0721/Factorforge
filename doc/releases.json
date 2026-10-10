@@ -203,6 +203,20 @@
         "03_SOXLUSDT_JEV应用实例",
         "04_Web管理台"
       ]
+    },
+    {
+      "version": "2.1.14",
+      "directory": "doc/v2.1.14",
+      "change_kind": "design",
+      "date": "2026-10-10",
+      "reason": "先复现排队跨越来源有效期仍调用模型，再设计不可延长的任务/outbox窗口及旧未决记录阻断；业务式样保持。",
+      "format": "html",
+      "document_pairs": [
+        "01_交易系统层",
+        "02_策略化框架层",
+        "03_SOXLUSDT_JEV应用实例",
+        "04_Web管理台"
+      ]
     }
   ]
 }
