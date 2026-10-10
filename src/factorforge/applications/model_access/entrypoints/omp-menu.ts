@@ -9,7 +9,7 @@ import { ConfigStore, type Settings } from "../config/store.js";
 import { OMPAccess, onAbort } from "../adapters/omp-access.js";
 import { captureBrowserSession } from "../adapters/browser-session.js";
 import { OMPService } from "../application/omp-service.js";
-import { fail, safeFailure } from "../api/protocol.js";
+import { fail, ModelError, safeFailure } from "../api/protocol.js";
 import type { Model } from "@oh-my-pi/pi-ai";
 
 // Original OMP model browser, with no coding-agent roles or agent execution.
@@ -19,6 +19,18 @@ export const modelBrowserSource: ModelBrowserSource = {
   resolveRoleValue: () => ({ model: undefined, explicitThinkingLevel: false }),
 };
 const clean = (s: string) => s.replace(/[\x00-\x08\x0b-\x1f\x7f-\x9f]/g, "");
+function operatorFailure(error: unknown) {
+  const code = safeFailure(error).code;
+  const help: Record<string, string> = {
+    BROWSER_CONFIGURATION_REQUIRED: "在私有 config/config.toml 的 model_access.omp_browser_path 填入已安装 Chromium/Chrome 的绝对路径，然后重新选择登录。",
+    BROWSER_DISPLAY_REQUIRED: "在 Ubuntu 桌面的终端打开菜单；浏览器会话登录需要可显示的桌面环境。",
+    LOGIN_LIMIT_REQUIRED: "在私有配置填写正数 login_timeout_seconds 和 timeout_seconds，然后重新打开菜单。",
+    LIMITS_REQUIRED: "返回主菜单的“设置推理边界”，填写调用时限、字节上限和本地预算。",
+    MODULE_DISABLED: "返回主菜单的“设置推理边界”，填写并确认启用推理；登录无需启用。",
+    CHANNEL_DISABLED: "返回主菜单的“设置推理边界”，填写正数 omp_max_requests 后再显式测试。",
+  };
+  return code + (help[code] ? "\n" + help[code] : "");
+}
 export function openAuthURL(url: string) {
   if (new URL(url).protocol !== "https:") return;
   // The URL is visible only to the operator, never to the JSONL/log streams.
@@ -119,7 +131,7 @@ export async function runOMPMenu(store: ConfigStore, access: OMPAccess, service:
               onProgress: text => dialog.showProgress(text), onPrompt: prompt => dialog.showPrompt({ ...prompt, secret: prompt.secret ?? true }),
               onManualCodeInput: abort => dialog.showManualInput("粘贴授权码或完整回调网址（Enter确认；Esc取消）", abort ? AbortSignal.any([signal, abort]) : signal),
               onBrowserSession: (request, abort) => captureBrowserSession(store, request, abort ? AbortSignal.any([signal, abort]) : signal),
-            }, signal).then(() => { note = "连接已保存；可以选择账户与模型。尚未发送模型请求。"; done(true); }, e => { note = "登录未完成：" + safeFailure(e).code; done(false); });
+            }, signal).then(() => { note = "连接已保存；可以选择账户与模型。尚未发送模型请求。"; done(true); }, e => { note = "登录未完成：" + operatorFailure(e); done(false); });
             return dialog;
           });
         } else if (action === "model") {
@@ -144,7 +156,7 @@ export async function runOMPMenu(store: ConfigStore, access: OMPAccess, service:
           if (!await confirm(`使用 ${chosen.provider} #${chosen.id} / ${chosen.model} 发起一次真实模型请求？将消耗额度。`)) continue;
           const text = await input("输入此次测试内容（只在此终端和供应商之间传递）"); if (!text?.trim()) continue;
           const reply = await service.testRequest(chosen.provider, chosen.id, chosen.model, text, ending.signal);
-          await message(reply.ok ? String((reply.result as { text: string }).text) : `调用失败：${"error" in reply ? reply.error?.code : "INTERNAL_FAILURE"}`);
+          await message(reply.ok ? String((reply.result as { text: string }).text) : `调用失败：${"error" in reply ? operatorFailure(new ModelError(reply.error!.code)) : "INTERNAL_FAILURE"}`);
         } else if (action === "limits") {
           const fields = ["timeout_seconds", "max_input_bytes", "max_output_bytes", "max_line_bytes", "budget_window_seconds", "omp_max_requests"] as const;
           const values: Partial<Settings> = {}; let cancelled = false;
@@ -158,7 +170,7 @@ export async function runOMPMenu(store: ConfigStore, access: OMPAccess, service:
           if (values.timeout_seconds! * 1000 > 2147483647 || values.budget_window_seconds! * 1000 > Number.MAX_SAFE_INTEGER) fail("LIMITS_INVALID");
           if (await confirm("保存以上边界并启用模型推理？")) { Object.assign(store.settings, values, { enabled: true }); store.saveSync(); note = "推理边界已保存；没有发送请求。"; }
         }
-      } catch (e) { note = "操作未完成：" + safeFailure(e).code; await message(note); }
+      } catch (e) { note = "操作未完成：" + operatorFailure(e); await message(note); }
     }
   } finally {
     stop(); removeInput(); tui.stop(); process.stdin.pause();
