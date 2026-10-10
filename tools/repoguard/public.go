@@ -102,8 +102,15 @@ func TemplateIssue(name string, data []byte, historical bool) string {
 		}
 		if historical {
 			old := cloneMap(expected)
-			// Exact v2.2.0 empty model template, without native CLI paths.
+			// Exact v2.3.0 empty model template, before the OMP adapter fields.
 			legacyModel := cloneMap(asMap(old["model_access"]))
+			delete(legacyModel, "omp_max_requests")
+			delete(legacyModel, "omp_browser_path")
+			old["model_access"] = legacyModel
+			if equalJSON(actual, old) {
+				return ""
+			}
+			// Exact v2.2.0 empty model template, without native CLI paths.
 			delete(legacyModel, "claude_cli_path")
 			delete(legacyModel, "antigravity_cli_path")
 			old["model_access"] = legacyModel

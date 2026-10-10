@@ -4,12 +4,13 @@ import { ModelService } from "../application/service.js";
 import { safeFailure, fail, ModelError } from "../api/protocol.js";
 import { runMenu } from "./menu.js";
 import { OfficialCLI, type NativeProvider } from "../adapters/official-cli.js";
+import { launchOMP } from "./omp-launch.js";
 
 async function main() {
   const args = process.argv.slice(2),
     command = args.shift() ?? "status";
   const nativeCommand = ["native-login", "native-logout", "native-status"].includes(command);
-  if (!nativeCommand && !["menu", "status", "login", "logout", "serve", "unlock"].includes(command)) fail("USAGE_INVALID");
+  if (!nativeCommand && !["menu", "legacy-menu", "status", "login", "logout", "serve", "unlock"].includes(command)) fail("USAGE_INVALID");
   if (args.length !== (nativeCommand ? 4 : 2)) fail("USAGE_INVALID");
   const options = new Map<string, string>();
   for (let i = 0; i < args.length; i += 2) {
@@ -19,9 +20,10 @@ async function main() {
   if (!options.get("--config")) fail("USAGE_INVALID");
   const provider = options.get("--provider");
   if (nativeCommand && !["claude", "antigravity"].includes(provider ?? "")) fail("USAGE_INVALID");
-  if ((command === "menu" || command === "native-login" || command === "native-logout") &&
+  if ((command === "menu" || command === "legacy-menu" || command === "native-login" || command === "native-logout") &&
       (!process.stdin.isTTY || !process.stdout.isTTY)) fail("TTY_REQUIRED");
   const file = path.resolve(options.get("--config")!);
+  if (command === "menu") { process.exitCode = await launchOMP(file); return; }
   if (command === "unlock") {
     await unlock(file);
     console.log(JSON.stringify({ ok: true, unlocked: true }));
@@ -30,7 +32,7 @@ async function main() {
   const store = await ConfigStore.open(file),
     service = new ModelService(store);
   try {
-    if (command === "menu") await runMenu(store, service);
+    if (command === "legacy-menu") await runMenu(store, service);
     else if (nativeCommand) {
       const adapter = new OfficialCLI(store);
       if (provider === "antigravity" && command !== "native-status")

@@ -256,6 +256,8 @@ api_max_requests = 0
 chatgpt_max_requests = 0
 claude_cli_path = ""
 antigravity_cli_path = ""
+omp_max_requests = 0
+omp_browser_path = ""
 state_json = ""
 # END FACTORFORGE MODEL ACCESS
 `

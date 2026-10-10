@@ -129,7 +129,7 @@ The Go search adapters reference protocol and control-flow patterns from Oh My P
 
 Source: https://github.com/can1357/oh-my-pi/tree/b07a1c146d0d12cfc855a2c65d52f892ef319040/packages/tui/src
 
-Adapted components/menu-selection.ts and fuzzy.ts into the model_access application directory; import paths and strict TypeScript compatibility only. Terminal rendering, orchestration and native CLI handoff are Factorforge code. The full TUI package, native bridge and provider OAuth identities are not copied.
+In v2.3.0, adapted components/menu-selection.ts and fuzzy.ts into the model_access application directory; import paths and strict TypeScript compatibility only. That baseline used Factorforge terminal rendering, orchestration and native CLI handoff, without importing the full TUI or provider OAuth implementation.
 
 ```text
 MIT License
@@ -157,3 +157,11 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ```
+
+## oh-my-pi complete model access (v2.4.0)
+
+Direct runtime dependencies @oh-my-pi/pi-ai, @oh-my-pi/pi-tui, @oh-my-pi/pi-catalog and @oh-my-pi/pi-utils are fixed at 18.8.7 in the npm lockfile. Source reference: OMP commit b07a1c146d0d12cfc855a2c65d52f892ef319040. The unchanged upstream provider registry, login/refresh, stream parsers, catalogue factories and TUI components execute under Bun. Installed packages retain their licences. The complete MIT notice above applies to this reuse and to the browser-session adapter.
+
+adapters/browser-session.ts adapts packages/coding-agent/src/utils/browser-session.ts at that commit. Changes: an explicitly configured browser, canonical private runtime, configured deadlines, static imports, no logging/downloads, and cancellation/cleanup limited to owned browser resources. Copyright (c) 2025 Mario Zechner; Copyright (c) 2025-2026 Can Bölük; Copyright (c) 2026 Stencil Labs, Inc.
+
+puppeteer-core@25.3.0 is Apache-2.0; no browser binary is included or downloaded. Bun 1.3.14 is a separately installed runtime; its licence and third-party notices remain with its distribution. This module does not import other programs' credential stores.

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://factorforge.local/contracts/model-access/request-v2",
+  "title": "OMP model access request v2; private JSONL, explicit local account",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["v", "id", "op"],
+  "properties": {
+    "v": {"const": 2},
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9_-]{1,128}$"},
+    "op": {"enum": ["status", "providers", "accounts", "models", "generate"]},
+    "provider": {"type": "string", "pattern": "^[a-z0-9][a-z0-9.-]{0,127}$"},
+    "account_id": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
+    "model": {"type": "string", "minLength": 1, "maxLength": 256, "pattern": "\\S"},
+    "input": {"type": "string", "minLength": 1, "pattern": "\\S"}
+  },
+  "allOf": [
+    {"if": {"properties": {"op": {"enum": ["accounts", "models", "generate"]}}}, "then": {"required": ["provider"]}, "else": {"not": {"required": ["provider"]}}},
+    {"if": {"properties": {"op": {"enum": ["models", "generate"]}}}, "then": {"required": ["account_id"]}, "else": {"not": {"required": ["account_id"]}}},
+    {"if": {"properties": {"op": {"const": "generate"}}}, "then": {"required": ["model", "input"]}, "else": {"not": {"anyOf": [{"required": ["model"]}, {"required": ["input"]}]}}}
+  ]
+}

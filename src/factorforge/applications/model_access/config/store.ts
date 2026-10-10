@@ -1,11 +1,13 @@
 import * as fs from "node:fs/promises";
 import { constants } from "node:fs";
+import * as sync from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { randomUUID, createHash } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 import { parse, stringify } from "smol-toml";
 import { fail, type Channel } from "../api/protocol.js";
+import { validateOMPState, type OMPState } from "./omp-state.js";
 
 export const BEGIN = "# BEGIN FACTORFORGE MODEL ACCESS";
 export const END = "# END FACTORFORGE MODEL ACCESS";
@@ -24,6 +26,8 @@ export const emptySettings = {
   chatgpt_max_requests: 0,
   claude_cli_path: "",
   antigravity_cli_path: "",
+  omp_max_requests: 0,
+  omp_browser_path: "",
   state_json: "",
 };
 export type Settings = typeof emptySettings;
@@ -48,6 +52,7 @@ export type State = {
   host_id: string;
   oauth?: OAuth;
   budgets: Partial<Record<Channel, Budget>>;
+  omp?: OMPState;
 };
 const digest = (s: string) => createHash("sha256").update(s).digest("hex");
 export const block = (settings: Settings) =>
@@ -104,6 +109,8 @@ function settings(raw: string): Settings {
   if (m && typeof m === "object") {
     if (!Object.hasOwn(m, "claude_cli_path")) m.claude_cli_path = "";
     if (!Object.hasOwn(m, "antigravity_cli_path")) m.antigravity_cli_path = "";
+    if (!Object.hasOwn(m, "omp_max_requests")) m.omp_max_requests = 0;
+    if (!Object.hasOwn(m, "omp_browser_path")) m.omp_browser_path = "";
   }
   if (
     !m ||
@@ -169,7 +176,21 @@ function state(raw: string): State {
     )
       fail("MODEL_STATE_INVALID");
   }
+  if (s.omp !== undefined) validateOMPState(s.omp);
   return s;
+}
+function readPrivateSync(file: string, max: number) {
+  for (let cursor = path.resolve(file); ; cursor = path.dirname(cursor)) {
+    if (sync.lstatSync(cursor).isSymbolicLink()) fail("PRIVATE_PATH_INVALID");
+    if (cursor === path.dirname(cursor)) break;
+  }
+  const fd = sync.openSync(file, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    const s = sync.fstatSync(fd);
+    if (!s.isFile() || s.size > max || (process.platform !== "win32" &&
+        ((s.mode & 0o077) !== 0 || s.uid !== process.getuid?.()))) fail("PRIVATE_FILE_INVALID");
+    return sync.readFileSync(fd, "utf8");
+  } finally { sync.closeSync(fd); }
 }
 export class ConfigStore {
   private writeFailed = false;
@@ -234,16 +255,22 @@ export class ConfigStore {
     }
   }
   async save() {
+    this.saveSync();
+  }
+  // OMP's refresh CAS port commits synchronously. Both entrypoints use this
+  // atomic writer so an async legacy save cannot race a token rotation.
+  saveSync() {
     this.assertUsable();
     this.writeFailed = true;
     if (
-      digest(await readPrivate(this.file, 16 * 1024 * 1024)) !==
+      digest(readPrivateSync(this.file, 16 * 1024 * 1024)) !==
       digest(this.raw)
     )
       fail("CONFIG_WRITE_CONFLICT");
     const pieces = split(this.raw);
     const m = { ...this.settings, state_json: JSON.stringify(this.state) };
     const next = pieces.before + block(m) + pieces.after;
+    if (Buffer.byteLength(next) > 16 * 1024 * 1024) fail("CONFIG_PERSIST_FAILED");
     const old = parse(this.raw),
       neu = parse(next);
     delete old.model_access;
@@ -254,32 +281,32 @@ export class ConfigStore {
       ".model-access-" + randomUUID() + ".tmp",
     );
     try {
-      const h = await fs.open(temp, "wx", 0o600);
+      const h = sync.openSync(temp, "wx", 0o600);
       try {
-        await h.writeFile(next);
-        await h.sync();
+        sync.writeFileSync(h, next);
+        sync.fsyncSync(h);
       } finally {
-        await h.close();
+        sync.closeSync(h);
       }
       if (
-        digest(await readPrivate(this.file, 16 * 1024 * 1024)) !==
+        digest(readPrivateSync(this.file, 16 * 1024 * 1024)) !==
         digest(this.raw)
       )
         fail("CONFIG_WRITE_CONFLICT");
-      await fs.rename(temp, this.file);
+      sync.renameSync(temp, this.file);
       if (process.platform !== "win32") {
-        const d = await fs.open(path.dirname(this.file), "r");
+        const d = sync.openSync(path.dirname(this.file), "r");
         try {
-          await d.sync();
+          sync.fsyncSync(d);
         } finally {
-          await d.close();
+          sync.closeSync(d);
         }
       }
       this.raw = next;
       this.settings.state_json = m.state_json;
       this.writeFailed = false;
     } finally {
-      await fs.rm(temp, { force: true });
+      sync.rmSync(temp, { force: true });
     }
   }
   async prompt() {

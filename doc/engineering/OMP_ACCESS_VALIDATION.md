@@ -32,3 +32,24 @@
 82 个入口不等于 82 个已经实测的账户，更不等于搜索凭据可以生成文本。模型目录明确标注 bundled/cache/provider 来源；认证成功、目录发现成功和模型调用成功分别报告。上游内部重试/账号池不能绕过 Factorforge 的显式账号、预算和不确定投递规则，必须在生产适配器与受控失败流中验证。
 
 真实 ChatGPT、Claude、Antigravity 账户验证均待用户登录。账户/地区/订阅限制、原版协议变化及浏览器图形环境不能由离线夹具证明。抽取质量和 P3 生产准入不属于本次验收。
+
+## 实现阶段受控反例与设计补充
+
+原版 OpenAI completions 受控 SSE 在同一 delta 带 content/refusal 且 finish_reason=stop 时，归一化结果只保留可见文本，初始适配器误报成功（21项中20通过、拒绝反例失败）。因此先补充设计：在原版解析器前增加只观察元数据的有界 SSE 完结/拒绝护栏，不重写正文解析；明确终态后仍由原版 stream 返回文本。该护栏检查配置总包络字节、拒绝、三家主要协议完结证据；无完结不能成功，错误中止防止重试。
+
+注册表还有 llama.cpp 等带点号 ID；接口/持久状态允许注册表合法点号但不允许斜杠。API-key 型别名在 CredentialStore 边界统一到 storeCredentialsAs。Ollama 的显式空Key本地模式登记本地连接标记，便于接口选择，不自动启动本地服务。上游部分 Key prompt 没有 secret=true，宿主默认隐藏认证输入。
+
+## 宿主退出协议补充试验（2026-10-10）
+
+生产夹具首次 31 项中 29 通过。空闲 JSONL 收到 SIGTERM 后以 143 退出，但遗留配置锁；定位到 pi-utils/postmortem.ts 的先注册信号处理器会等待自身 cleanup 后硬退出，独立宿主 finally 尚未完成。采用上游公开 postmortem.register：宿主登记取消并等待自己的 finally 关闭 AuthStorage/ConfigStore；菜单接收同一取消信号。保留上游退出管理，不删除第三方处理器。修正设计后再执行生产适配与重复夹具验证。
+
+本地/别名登录夹具需提供原版认证验证端点要求的完整合成响应，不允许用真实端点兜底；所有新登录测试均注入受控 fetch。
+
+## 生产适配本地验收
+
+- 全新 npm ci --ignore-scripts 安装后，Node 旧接口 43/43、Bun OMP 34/34（122 断言）通过。
+- Claude、Codex、Antigravity 分别通过原版 transport/parser 的合成完整文本与 429 单次发送测试；通用链路通过拒绝、缺失终态、截断、溢出、超时和损坏流测试。所有请求由夹具拦截；不代表真实供应商访问已通过。
+- 原版 82 登录入口精确比对；完整回调、CAS、并发一次刷新、重启、指定账户注销、别名、带点号 provider、本地无 Key 连接与 TOML 冲突通过。
+- Linux util-linux script 真实 PTY 打开原版登录选择器、Esc 返回、Ctrl+C 退出；终端 stty 状态恢复且锁删除。空闲 JSONL SIGTERM 以正常信号退出码 143 关闭并释放锁（上游 postmortem 行为）。
+- Go 工程测试、源码布局/TS 静态导入、离线契约、历史冻结、当前 HTML 配对/接口引用通过。13 份 HTML 在 1440/390 宽度合计 26 检查，无横向溢出、无外部请求；桌面/窄屏第五对截图已查看，渲染产物仅保存在忽略的 runtime/model-access-review。
+- 真实账户 T5-16 均待操作者完成，未执行真实授权、生成或交易，未启动本地大模型。GitHub CI/合并以相应 PR 与 Actions 记录为准，不以本地结果替代。
