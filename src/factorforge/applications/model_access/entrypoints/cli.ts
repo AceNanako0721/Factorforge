@@ -35,9 +35,13 @@ async function main() {
       const adapter = new OfficialCLI(store);
       if (provider === "antigravity" && command !== "native-status")
         process.stderr.write(command === "native-logout" ? "Use /logout, then /exit in the official terminal.\n" : "Complete official login, then use /exit to return.\n");
-      const result = command === "native-status" ? await adapter.status(provider as NativeProvider) :
-        await adapter.handoff(provider as NativeProvider, command === "native-logout" ? "logout" : "login");
-      console.log(JSON.stringify({ ok: true, result }));
+      const cancelled = new AbortController(), stop = () => cancelled.abort();
+      process.on("SIGINT", stop); process.on("SIGTERM", stop);
+      try {
+        const result = command === "native-status" ? await adapter.status(provider as NativeProvider, cancelled.signal) :
+          await adapter.handoff(provider as NativeProvider, command === "native-logout" ? "logout" : "login", cancelled.signal);
+        console.log(JSON.stringify({ ok: true, result }));
+      } finally { process.off("SIGINT", stop); process.off("SIGTERM", stop); }
     } else if (command === "login") {
       const result = await service.oauth.login((url, port) =>
         process.stderr.write(

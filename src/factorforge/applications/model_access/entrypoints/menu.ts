@@ -42,8 +42,9 @@ export async function runMenu(store: ConfigStore, service: ModelService, ui = ne
           const m = store.settings, s = service.status();
           await ui.notice("本地预算 · 不是供应商剩余额度", [
             `窗口: ${m.budget_window_seconds} 秒；0 表示未配置`,
-            `API 上限: ${m.api_max_requests}；窗口内已占用: ${s.budgets.api?.count ?? 0}`,
-            `ChatGPT 上限: ${m.chatgpt_max_requests}；窗口内已占用: ${s.budgets.chatgpt?.count ?? 0}`,
+            `API 上限: ${m.api_max_requests}；最近记录占用: ${s.budgets.api?.count ?? 0}`,
+            `ChatGPT 上限: ${m.chatgpt_max_requests}；最近记录占用: ${s.budgets.chatgpt?.count ?? 0}`,
+            "到期窗口在下一次发送前重置；最近记录不表示当前剩余额度。",
             `当前进程暂停通道: ${s.paused_channels.join(", ") || "无"}`,
             "限额与密钥在 config/config.toml 配置；菜单不会填入默认容量。",
           ]);
