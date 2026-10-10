@@ -142,3 +142,24 @@ jobs:
           npm exec --yes --package=pnpm@10.33.0 -- pnpm test:browser
       - name: Build native BFF and validate public static artifacts
         run: go run ./tools/build-console --web-build runtime/web-build
+      - name: Verify current documentation at desktop and narrow widths offline
+        run: node tools/check-model-access-docs.mjs
+
+  model-access-checks:
+    name: model-access-checks (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+        with:
+          node-version: '22.23.1'
+      - name: Install locked SDK and verify isolated model process without accounts
+        run: |
+          npm --prefix src/factorforge/applications/model_access ci --ignore-scripts
+          node tools/check-model-access.mjs
+          npm --prefix src/factorforge/applications/model_access test

@@ -21,7 +21,7 @@ var patterns = map[string]*regexp.Regexp{
 	"slack-token":               regexp.MustCompile(`\bxox[baprs]-[A-Za-z0-9-]{20,}\b`),
 	"private-key":               regexp.MustCompile(`-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----`),
 	"url-credentials":           regexp.MustCompile(`(?i)[a-z][a-z0-9+.-]*://[^\s/:@]+:[^\s/@]+@`),
-	"credential-assignment":     regexp.MustCompile(`(?i)\b(?:[A-Za-z0-9]+_)*(?:api[_-]?key|api[_-]?secret|secret[_-]?key|cursor[_-]?key|access[_-]?token|auth[_-]?token|password)\b["']?\s*[:=]\s*["'][A-Za-z0-9_+./=-]{16,}["']`),
+	"credential-assignment":     regexp.MustCompile(`(?i)\b(?:[A-Za-z0-9]+_)*(?:api[_-]?key|api[_-]?secret|secret[_-]?key|cursor[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|auth[_-]?token|password)\b["']?\s*[:=]\s*["'][A-Za-z0-9_+./=-]{16,}["']`),
 }
 
 type Issue struct{ Path, Rule string }
@@ -78,7 +78,7 @@ func asMap(value any) map[string]any {
 func TemplateIssue(name string, data []byte, historical bool) string {
 	var actual, expected map[string]any
 	if name == "config/config.example.toml" {
-		if toml.Unmarshal(data, &actual) != nil || toml.Unmarshal([]byte(expectedConfig+expectedConsole), &expected) != nil {
+		if toml.Unmarshal(data, &actual) != nil || toml.Unmarshal([]byte(expectedConfig+expectedConsole+expectedModelAccess), &expected) != nil {
 			return "invalid-template-format"
 		}
 		// Enforce a complete, exact empty shape, including short arbitrary secrets.
@@ -99,6 +99,15 @@ func TemplateIssue(name string, data []byte, historical bool) string {
 		}
 		if historical {
 			old := cloneMap(expected)
+			// Exactly the frozen pre-v2.2.0 shape; never accept a partially
+			// populated model block via the historical compatibility path.
+			if _, exists := actual["model_access"]; exists {
+				return "nonempty-or-invalid-model-template"
+			}
+			delete(old, "model_access")
+			if equalJSON(actual, old) {
+				return ""
+			}
 			// The exact pre-v2.1.5 empty format is accepted only in history.
 			application := cloneMap(asMap(old["application"]))
 			pipeline := cloneMap(asMap(application["pipeline"]))

@@ -122,6 +122,8 @@ func TestPublicGuardTemplateShapesAndDocumentContainers(t *testing.T) {
 		{"workload_token = \"\"", "workload_token = \"short\""},
 		{"initial_registry = {}", "initial_registry = { values = [1] }"},
 		{"query_cursor_key = \"\"", "query_cursor_key = \"short\""},
+		{"\napi_key = \"\"", "\napi_key = \"short\""},
+		{"state_json = \"\"", "state_json = \"private\""},
 		{"", "\npassword = \"short\"\n"},
 	} {
 		body := strings.Replace(string(config), change.old, change.new, 1)
@@ -184,6 +186,7 @@ func TestPublicGuardHistoricalSearchTemplateIsExactAndHistoryOnly(t *testing.T) 
 		t.Fatal(e)
 	}
 	body := strings.ReplaceAll(string(config), "\r\n", "\n")
+	body = strings.Split(body, "# BEGIN FACTORFORGE MODEL ACCESS")[0]
 	block := "[[application.pipeline.search_backends]]\nid = \"\"\nkind = \"\"\nendpoint = \"\"\ntoken = \"\"\n\n"
 	legacy := strings.Replace(body, block, "", 1)
 	if legacy == body || guard.TemplateIssue("config/config.example.toml", []byte(legacy), true) != "" || guard.TemplateIssue("config/config.example.toml", []byte(legacy), false) == "" {
