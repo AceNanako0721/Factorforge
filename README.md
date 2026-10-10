@@ -1,6 +1,6 @@
 # Factorforge
 
-Factorforge 是分为交易系统、策略化框架、应用实例三层的事件情绪量化交易项目。当前开发基线为 **v2.2.0**（无 Python 的多语言模块设计；三层接口边界），既有发布对照为 v2.1.0，代码与公开文档采用 [MIT](LICENSE) 许可证。
+Factorforge 是分为交易系统、策略化框架、应用实例三层的事件情绪量化交易项目。当前开发基线为 **v2.2.0**（新增 API Key / 官方 ChatGPT 登录模型接入），既有发布对照为 v2.1.0，代码与公开文档采用 [MIT](LICENSE) 许可证。
 
 **P1/P2 的服务、构建、检查工具和 CI 均使用 Go**；前端为 React/TypeScript 编译的 JavaScript。P1 完成交易核心、API/CLI、PostgreSQL、SIM/Binance、保护/反馈/采集、独立进程及测试网验收工具迁移。Go 测试网只读子集 12 项及完整虚拟资金交易套件 25 项实际通过，包括交易所止损触发、应急减仓、账务恢复、隔离与数据库故障阻断；最终账户平仓且无挂单，生产实盘尚未准入。P2 完整框架、四个独立入口、事务存储及公共/工作负载 API 已迁移，209 个冻结状态转换通过对照；实际 Go P2→HTTP→Go P1 SIM 完成两个对象的目标、成交、费用、保护和案例，以及独立反事实账务。S2-024 统一只读追溯已接入，旧活跃 Python 源码、包定义和作者工具退役。见 [迁移进度](doc/progress/GO_MIGRATION.md)、[P1 Go 运行说明](doc/engineering/TRADING_GO.md) 和 [P2 Go 运行说明](doc/engineering/STRATEGY_GO.md)。
 

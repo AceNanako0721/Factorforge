@@ -35,3 +35,7 @@ OMP 整体外挂、抽出 TypeScript 模块、Go 实现，以及辅助抽取器/
 - [实例设计第21章](../v2.1.15/03_SOXLUSDT_JEV应用实例设计书.html#language-module-boundaries)：Go 端口与跨语言适配、实际下层调用、依赖图和故障边界。
 - [管理台设计第14章](../v2.1.15/04_Web管理台设计书.html#language-module-boundaries)：上层语言选择与平级只读边界。
 - 仓库 AGENTS.md、CONTRIBUTING.md、README.md 与文件树规范同步规则；历史发布目录和记录冻结。
+
+## 2026-10-10 v2.2.0 模型接入落地
+
+用户授权实现模型接入，完成独立协议/依赖验证后追加第五对 HTML 仕様与设计。采用第三层 TypeScript/Node 模块和官方 OpenAI SDK，参考 OMP 认证所有权/刷新分离；不直接外挂整套 OMP，不采用其固定 Codex 客户端 ID。独立 JSONL 接口只返回候选文本。配置和 OAuth 状态仍统一在 config/config.toml，无第二个凭据库。抽取方案决策及暂停的本地实验保持，P1/P2 不依赖新模块。

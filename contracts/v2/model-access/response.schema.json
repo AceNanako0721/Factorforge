@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://factorforge.local/contracts/model-access/response-v1",
+  "title": "Model access JSONL reply v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["v", "id", "ok"],
+  "properties": {
+    "v": {"const": 1},
+    "id": {"type": "string"},
+    "ok": {"type": "boolean"},
+    "result": {"type": "object"},
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "delivery_unknown"],
+      "properties": {
+        "code": {"type": "string", "pattern": "^[A-Z0-9_]+$"},
+        "delivery_unknown": {"type": "boolean"},
+        "usage_url": {"const": "https://chatgpt.com/settings/usage"}
+      }
+    }
+  },
+  "allOf": [{"if": {"properties": {"ok": {"const": true}}}, "then": {"required": ["result"], "not": {"required": ["error"]}}, "else": {"required": ["error"], "not": {"required": ["result"]}}}]
+}

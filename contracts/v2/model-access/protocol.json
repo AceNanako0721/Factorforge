@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://factorforge.local/contracts/model-access/request-v1",
+  "title": "Model access JSONL request v1; one JSON object per line",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["v", "id", "op"],
+  "properties": {
+    "v": {"const": 1},
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9_-]{1,128}$"},
+    "op": {"enum": ["status", "models", "generate"]},
+    "channel": {"enum": ["api", "chatgpt"]},
+    "model": {"type": "string", "minLength": 1, "maxLength": 256},
+    "input": {"type": "string", "minLength": 1}
+  },
+  "allOf": [
+    {"if": {"properties": {"op": {"enum": ["models", "generate"]}}}, "then": {"required": ["channel"]}},
+    {"if": {"properties": {"op": {"const": "generate"}}}, "then": {"required": ["model", "input"]}, "else": {"not": {"anyOf": [{"required": ["model"]}, {"required": ["input"]}]}}}
+  ]
+}

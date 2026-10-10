@@ -238,3 +238,22 @@ const historicalPrompts = `{
   ]
 }
 `
+
+const expectedModelAccess = `
+# BEGIN FACTORFORGE MODEL ACCESS
+[model_access]
+enabled = false
+api_base_url = ""
+api_key = ""
+prompt_file = ""
+timeout_seconds = 0
+login_timeout_seconds = 0
+max_input_bytes = 0
+max_output_bytes = 0
+max_line_bytes = 0
+budget_window_seconds = 0
+api_max_requests = 0
+chatgpt_max_requests = 0
+state_json = ""
+# END FACTORFORGE MODEL ACCESS
+`
