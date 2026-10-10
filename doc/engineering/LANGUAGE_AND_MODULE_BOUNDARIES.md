@@ -43,3 +43,7 @@ OMP 整体外挂、抽出 TypeScript 模块、Go 实现，以及辅助抽取器/
 ## 2026-10-10 用户澄清官方 CLI 凭据归属
 
 集中 config/config.toml 是为了防止敏感信息误上传 GitHub，不要求改写第三方官方程序的存储。Factorforge 直接管理的 Key/OAuth 状态继续集中；通过操作者菜单启动的原版 Claude Code/Antigravity CLI 继续管理自己的私有凭据/钥匙串，Factorforge 不读取或复制。CLI 可执行文件位置属于 Factorforge 配置，仍存 config/config.toml。只读官方状态不包含令牌/邮箱等账户明细；无法确认时显示未知。菜单交接不等于新增第三方订阅推理 API，跨模块协议和 P1/P2 边界保持。
+
+## 2026-10-10 v2.4.0 完整 OMP 接入
+
+用户选择复用 OMP 的全部登录模块。按先行验证后定稿的第五对 HTML 实现 Bun/TypeScript 认证、原版 TUI、目录和推理；保留 Node v1。通过 AuthCredentialStore 把 OMP 状态适配到 config/config.toml，没有另建凭据库，不导入原版 CLI 凭据。第三层独立 JSONL 模块，不修改下层或恢复抽取实验。
