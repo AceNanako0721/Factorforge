@@ -39,3 +39,7 @@ OMP 整体外挂、抽出 TypeScript 模块、Go 实现，以及辅助抽取器/
 ## 2026-10-10 v2.2.0 模型接入落地
 
 用户授权实现模型接入，完成独立协议/依赖验证后追加第五对 HTML 仕様与设计。采用第三层 TypeScript/Node 模块和官方 OpenAI SDK，参考 OMP 认证所有权/刷新分离；不直接外挂整套 OMP，不采用其固定 Codex 客户端 ID。独立 JSONL 接口只返回候选文本。配置和 OAuth 状态仍统一在 config/config.toml，无第二个凭据库。抽取方案决策及暂停的本地实验保持，P1/P2 不依赖新模块。
+
+## 2026-10-10 用户澄清官方 CLI 凭据归属
+
+集中 config/config.toml 是为了防止敏感信息误上传 GitHub，不要求改写第三方官方程序的存储。Factorforge 直接管理的 Key/OAuth 状态继续集中；通过操作者菜单启动的原版 Claude Code/Antigravity CLI 继续管理自己的私有凭据/钥匙串，Factorforge 不读取或复制。CLI 可执行文件位置属于 Factorforge 配置，仍存 config/config.toml。只读官方状态不包含令牌/邮箱等账户明细；无法确认时显示未知。菜单交接不等于新增第三方订阅推理 API，跨模块协议和 P1/P2 边界保持。
