@@ -27,6 +27,7 @@ export function structuredFinancialPayload(raw:string) {
 // Match Go encoding/json escaping for hashes of these already-sealed records.
 export const goJSON=(v:unknown)=>JSON.stringify(v).replace(/[<>&\u2028\u2029]/g,c=>"\\u"+c.charCodeAt(0).toString(16).padStart(4,"0"));
 const hash=(v:string|Uint8Array)=>createHash("sha256").update(v).digest("hex");
+export const goTimestamp=(date:Date)=>date.toISOString().replace(/(\.[0-9]*?[1-9])0+Z$/,"$1Z").replace(/\.0+Z$/,"Z");
 
 async function main() {
  const [rootArg,originalArg,dirArg,binaryArg,promptArg]=process.argv.slice(2);
@@ -71,7 +72,7 @@ async function main() {
    await write(c.id+"-attempt.json",{at:new Date().toISOString(),input_hash:hash(c.input),seal_hash:hash(goJSON(seal))});
    const started=Date.now();const reply=await service.handle({v:2,id:"structured_"+c.id,op:"generate",provider:"google-antigravity",account_id:1,model:"gemini-3.8-flash",input:c.input},cancelled.signal);
    let generation:unknown=null;const code=reply.ok?"":reply.error?.code??"STRUCTURED_FAILED";
-   if(reply.ok) {const r=reply.result as any;if(injected!==1||r.prompt_hash!==seal.prompt_hash)throw Error("STRUCTURED_PROVENANCE");generation={provider:r.provider,account_id:r.account_id,model:r.model,prompt_hash:r.prompt_hash,text:r.text,completed_at:new Date().toISOString()};await write(c.id+"-generation.json",generation);completed++}
+   if(reply.ok) {const r=reply.result as any;if(injected!==1||r.prompt_hash!==seal.prompt_hash)throw Error("STRUCTURED_PROVENANCE");generation={provider:r.provider,account_id:r.account_id,model:r.model,prompt_hash:r.prompt_hash,text:r.text,completed_at:goTimestamp(new Date())};await write(c.id+"-generation.json",generation);completed++}
    // The baseline comparator is closed, so native injection is recorded separately.
    await write(c.id+"-native-metadata.json",{native_injected:injected,returned_usage:reply.ok?(reply.result as any).usage:null});
    await write(c.id+"-outcome.json",{elapsed_ms:Date.now()-started,code,at:new Date().toISOString(),generation_hash:generation?hash(goJSON(generation)):""});

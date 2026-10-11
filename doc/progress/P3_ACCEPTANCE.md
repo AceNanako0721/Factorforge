@@ -4,6 +4,8 @@
 
 已按先行设计加入原文页的可选未核验候选旁注；机制和实际页面验证见 [审阅记录](../engineering/P3_SEMANTIC_REVIEW.md)。用户选择继续无人值守抽取与独立评测、暂不启用生产；显示机制不关闭语义质量与完整性缺口。
 
+最新财务人工QA单问题抽取：八新上下文完整判据5/8、四空对照4/4；原生schema同题配对4/8并仍带围栏，方法停止，不能提升自动核验资格。时间戳哈希的独立审计保持原始记录，详见 [首轮](../engineering/P3_FINANCIAL_EXTRACTION_RESULTS.md) / [配对](../engineering/P3_STRUCTURED_JSON_RESULTS.md)。这些问答标签不覆盖完整事件或新闻来源质量。
+
 最新外部事件对照：八份FewFC原文/四空原文共12次真实Antigravity调用，11次严格格式有效，完整事件标签一致2/8、角色匹配6/21；数据全人工标注来源未确认且有标注边界歧义，不冒充人工盲标或整个模型准确率。候选仍需明确审阅，生产资产/标定/OD-01/OD-02均未关闭，见 [结果](../engineering/P3_EXTERNAL_EVENT_RESULTS.md)。暂停的本地模型保持停止。
 
 历史单位适用性的七个已使用开发对照已完成独立单题请求，观察区间分开，未设阈值或关闭关系/完整性缺口，见 [对照记录](../engineering/P3_UNIT_RELATION_CONTROLS.md)。排队/模型/outbox已统一冻结证据有效窗口，实际P2/原生PG/独立进程验证见 [有效期记录](../engineering/P3_EVIDENCE_DEADLINE.md)；它不替代独立语义抽取验收。
