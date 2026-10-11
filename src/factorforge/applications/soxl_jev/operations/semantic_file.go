@@ -61,9 +61,15 @@ func readSemanticInput(root, input string, max int) ([]byte, error) {
 	if err != nil || !strings.HasPrefix(rel, "runtime"+string(filepath.Separator)) || !filepath.IsLocal(rel) {
 		return nil, d.Fail("SEMANTIC_INPUT_INVALID", 422)
 	}
-	resolved, err := filepath.EvalSymlinks(path)
-	if err != nil || resolved != path {
-		return nil, d.Fail("SEMANTIC_INPUT_INVALID", 422)
+	// Include the root's ancestors without rejecting Windows short-name aliases.
+	for cursor := path; ; cursor = filepath.Dir(cursor) {
+		part, e := os.Lstat(cursor)
+		if e != nil || part.Mode()&os.ModeSymlink != 0 {
+			return nil, d.Fail("SEMANTIC_INPUT_INVALID", 422)
+		}
+		if cursor == filepath.Dir(cursor) {
+			break
+		}
 	}
 	r, err := os.OpenRoot(base)
 	if err != nil {

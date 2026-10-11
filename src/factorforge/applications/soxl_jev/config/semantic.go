@@ -38,10 +38,20 @@ func LoadSemantic(root, path string) (SemanticSettings, error) {
 	if err != nil || absolute != canonical {
 		return result, d.Fail("SEMANTIC_CONFIG_INVALID", 503)
 	}
-	resolved, err := filepath.EvalSymlinks(canonical)
 	info, statErr := os.Lstat(canonical)
-	if err != nil || resolved != canonical || statErr != nil || !info.Mode().IsRegular() || runtime.GOOS != "windows" && info.Mode().Perm()&0077 != 0 {
+	if statErr != nil || !info.Mode().IsRegular() || runtime.GOOS != "windows" && info.Mode().Perm()&0077 != 0 {
 		return result, d.Fail("SEMANTIC_CONFIG_INVALID", 503)
+	}
+	// Windows may expand an ordinary 8.3 path in EvalSymlinks. Inspect actual
+	// reparse/link components instead of treating spelling changes as links.
+	for cursor := canonical; ; cursor = filepath.Dir(cursor) {
+		part, e := os.Lstat(cursor)
+		if e != nil || part.Mode()&os.ModeSymlink != 0 {
+			return result, d.Fail("SEMANTIC_CONFIG_INVALID", 503)
+		}
+		if cursor == filepath.Dir(cursor) {
+			break
+		}
 	}
 	raw, err := privateFile(canonical, 16<<20)
 	if err != nil {
