@@ -2,6 +2,8 @@
 
 更新：2026-10-11；用户确认执行本次分流。Change-Type: code-only，当前文档基线保持 v2.5.2；旧版 HTML、式样、设计、生产参数与准入保持。
 
+主线交付：[PR #55](https://github.com/AceNanako0721/Factorforge/pull/55)。本地验证及归档已完成，最终合并与七项GitHub检查状态从该PR和main的Actions读取；原本地工作保留备份/恢复点后，主目录同步合并后的main，不再把实验提交叠在活动分支。
+
 ## 进入主线
 
 | 原遗留范围 | 处理 | 验证与限制 |
