@@ -60,3 +60,5 @@ v2.1.5 PR #21 首轮 [CI 37882006107](https://github.com/AceNanako0721/Factorfor
 合并该入口后，先查询 main 的真实运行；若已有覆盖同一提交的运行就等待该轮，不重复调度。确无运行时才执行 `gh workflow run contracts.yml --ref main`，确认 workflow_dispatch 的 headSha 等于要验收的 main，并等待全部五项成功后发布。手动运行是事件缺失时的恢复手段，不表示平台根因已修复，不替代 PR 分类或生产验收。使用仓库限定 SSH 推送工作流，不要求重新索取现有认证。
 
 2026-10-11，PR #51 首轮 CI `38111016178` 的 Ubuntu 模型检查失败：既有“OMP zero budget/window is unlimited, durable and bounded across reopen”连续260次持久写盘及重开约7048ms，超过Bun默认5000ms。测试超时后的夹具清理使仍在执行的重开出现路径ENOENT；不是真实配置、模型额度或交易故障。仅将该压力/持久性测试时限显式设为30000ms，保留260次写盘、256去重窗口、累计261次调用和全部断言；不改变生产请求时限或跳过检查。后续以修正提交的完整七项CI为准。
+
+PR #51 随后 CI `38111299068` 的Windows原生审阅CLI测试报“executable file not found in %PATH%”：测试将Go的Windows可执行文件输出命名为无扩展名 `instance-cli`，子进程查找按Windows规则无法执行。夹具在Windows显式加 `.exe`，仍使用绝对路径和缺失配置/无模型运行时环境验证，不跳过Windows测试；生产入口未改变。

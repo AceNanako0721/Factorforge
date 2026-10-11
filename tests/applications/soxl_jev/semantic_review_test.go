@@ -237,6 +237,9 @@ func TestSemanticReviewRejectsMismatchedOrModifiedArtifacts(t *testing.T) {
 func TestSemanticReviewNativeCLIWithoutConfigOrRuntime(t *testing.T) {
 	f := makeSemanticReviewFixture(t, false)
 	bin := filepath.Join(f.root, "instance-cli")
+	if runtime.GOOS == "windows" {
+		bin += ".exe"
+	}
 	build := exec.Command("go", "build", "-o", bin, "../../../src/factorforge/applications/soxl_jev/entrypoints/instance-cli")
 	if out, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build %v %s", err, out)
