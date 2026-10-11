@@ -200,6 +200,27 @@ test("budget reservations and duplicates survive restart; disabled input does no
   expect((await x.service.handle({ ...r, id: "next" })).error?.code).toBe("LOCAL_BUDGET_EXHAUSTED"); expect(requests).toBe(1);
   x.store.settings.enabled = false; expect((await x.service.handle({ ...r, id: "disabled" })).error?.code).toBe("MODULE_DISABLED"); expect(requests).toBe(1);
 });
+test("OMP zero budget/window is unlimited, durable and bounded across reopen",async()=>{
+  let calls=0;const x=await fixture({omp_max_requests:0,budget_window_seconds:0},async()=>{calls++;return completions()});const id=await x.key("deepseek");
+  const catalog=async()=>({models:[openAIModel()],source:"bundled",stale:false});x.access.catalog=catalog;
+  const r={v:2,id:"unlimited",op:"generate",provider:"deepseek",account_id:id,model:"gpt-4o-mini",input:"fixture"};
+  for(let i=0;i<260;i++)expect((await x.service.handle({...r,id:`unlimited-${i}`})).ok).toBe(true);
+  expect(x.store.state.omp!.budgets[`deepseek:${id}`].count).toBe(260);
+  expect(x.store.state.omp!.budgets[`deepseek:${id}`].ids.length).toBe(256);
+  await x.reopen();x.access.catalog=catalog;
+  expect(x.service.status().local_budget).toEqual({mode:"unlimited",limit:null,window_seconds:0});
+  expect((await x.service.handle({...r,id:"unlimited-259"})).error?.code).toBe("DUPLICATE_REQUEST");
+  expect((await x.service.handle({...r,id:"after-reopen"})).ok).toBe(true);expect(calls).toBe(261);
+});
+test("OMP opt-in cap needs a window and unlimited respects provider rate limits",async()=>{
+  let calls=0;const x=await fixture({omp_max_requests:1,budget_window_seconds:0},async()=>{calls++;return json({},429)});const id=await x.key("deepseek");
+  x.access.catalog=async()=>({models:[openAIModel()],source:"bundled",stale:false});
+  const r={v:2,id:"limited",op:"generate",provider:"deepseek",account_id:id,model:"gpt-4o-mini",input:"fixture"};
+  expect((await x.service.handle(r)).error?.code).toBe("BUDGET_WINDOW_REQUIRED");expect(calls).toBe(0);
+  x.store.settings.omp_max_requests=0;const service=x.service;
+  expect((await service.handle(r)).error?.code).toBe("RATE_LIMITED");
+  expect((await service.handle({...r,id:"next"})).error?.code).toBe("RATE_LIMITED");expect(calls).toBe(1);
+});
 test("browser cancellation/config validation does not launch another application", async () => {
   const x = await fixture(); const aborted = new AbortController(); aborted.abort();
   await expect(captureBrowserSession(x.store, { url: "https://fixture.invalid", cookieNames: ["fixture"] }, aborted.signal)).rejects.toBeInstanceOf(Error);

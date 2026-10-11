@@ -9,6 +9,7 @@ import {
 import type { ConfigStore } from "../config/store.js";
 import { OAuthAdapter } from "../adapters/oauth.js";
 import { ResponsesAdapter } from "../adapters/responses.js";
+import { budgetStatus, recentRequest, reserveBudget, validateBudget } from "./request-budget.js";
 export class ModelService {
   private paused = new Set<Channel>();
   readonly oauth: OAuthAdapter;
@@ -32,6 +33,7 @@ export class ModelService {
         s.oauth?.scopes.includes("chatgpt.tokens.use.direct") ?? false,
       chatgpt_expires_at: s.oauth?.expires_at ?? null,
       paused_channels: [...this.paused],
+      local_budget: { api: budgetStatus(m.api_max_requests, m.budget_window_seconds), chatgpt: budgetStatus(m.chatgpt_max_requests, m.budget_window_seconds) },
       budgets: Object.fromEntries(
         Object.entries(s.budgets).map(([c, b]) => [
           c,
@@ -49,11 +51,9 @@ export class ModelService {
       m.max_input_bytes,
       m.max_output_bytes,
       m.max_line_bytes,
-      m.budget_window_seconds,
     ])
       if (n <= 0) fail("LIMITS_REQUIRED");
-    if ((channel === "api" ? m.api_max_requests : m.chatgpt_max_requests) <= 0)
-      fail("CHANNEL_DISABLED");
+    validateBudget(channel === "api" ? m.api_max_requests : m.chatgpt_max_requests, m.budget_window_seconds);
     if (
       m.timeout_seconds * 1000 > 2147483647 ||
       m.login_timeout_seconds * 1000 > 2147483647 ||
@@ -62,22 +62,9 @@ export class ModelService {
       fail("LIMITS_INVALID");
   }
   private async reserve(channel: Channel, id: string) {
-    const now = Date.now(),
-      m = this.store.settings;
-    let b = this.store.state.budgets[channel];
-    if (b && now < b.last) fail("CLOCK_ROLLBACK");
-    if (!b || now - b.start >= m.budget_window_seconds * 1000)
-      b = { start: now, last: now, count: 0, ids: [] };
-    if (b.ids.includes(id)) fail("DUPLICATE_REQUEST");
-    if (
-      b.count >=
-      (channel === "api" ? m.api_max_requests : m.chatgpt_max_requests)
-    )
-      fail("LOCAL_BUDGET_EXHAUSTED");
-    b.count++;
-    b.last = now;
-    b.ids.push(id);
-    this.store.state.budgets[channel] = b;
+    const m = this.store.settings;
+    this.store.state.budgets[channel] = reserveBudget(this.store.state.budgets[channel], id,
+      channel === "api" ? m.api_max_requests : m.chatgpt_max_requests, m.budget_window_seconds);
     await this.store.save();
   }
   async handle(value: unknown): Promise<Reply> {
@@ -98,6 +85,7 @@ export class ModelService {
           ok: true,
           result: { models: await this.responses.models(channel!) },
         };
+      if (recentRequest(this.store.state.budgets[channel!], id, this.store.settings.budget_window_seconds)) fail("DUPLICATE_REQUEST");
       const prompt = await this.store.prompt();
       if (
         Buffer.byteLength(r.input!) + Buffer.byteLength(prompt) >

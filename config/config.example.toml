@@ -216,6 +216,8 @@ max_line_bytes = 0
 budget_window_seconds = 0
 api_max_requests = 0
 chatgpt_max_requests = 0
+# Local request budgets: 0 = unlimited, positive = opt-in windowed cap.
+# A positive cap requires a positive budget_window_seconds.
 claude_cli_path = ""
 antigravity_cli_path = ""
 omp_max_requests = 0

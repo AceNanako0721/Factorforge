@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="ff:version" content="2.5.0"><meta name="ff:kind" content="specification"><meta name="ff:pair" content="02_策略化框架层设计书.html"><title>02_策略化框架层式样书 · Factorforge v2.5.0</title><style>
+:root{--ink:#172d40;--muted:#587083;--accent:#006e82;--line:#cfdee5;--paper:#fff;--bg:#edf3f6}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.8 system-ui,'Microsoft YaHei',sans-serif}
+a{color:var(--accent);text-underline-offset:3px;overflow-wrap:anywhere}header{background:#15384a;color:white;padding:28px max(24px,calc((100vw - 1320px)/2));border-bottom:5px solid #2eb6ad}
+header p{margin:0}header strong{font-size:23px}header a{color:#a9eee9}.shell{display:grid;grid-template-columns:245px minmax(0,1fr);gap:26px;max-width:1320px;margin:28px auto;padding:0 24px}
+nav{position:sticky;top:16px;align-self:start;max-height:calc(100vh - 32px);overflow:auto;padding:18px;background:var(--paper);border:1px solid var(--line);border-radius:12px;font-size:14px}
+nav a{display:block;padding:6px 0;text-decoration:none}main{overflow-wrap:anywhere;min-width:0;background:var(--paper);padding:30px 38px;border:1px solid var(--line);border-radius:12px}
+h1{font-size:30px;line-height:1.35;margin:0 0 18px}h2{font-size:23px;border-bottom:2px solid var(--line);padding:10px 0;margin:34px 0 18px;scroll-margin-top:20px}h3{font-size:18px;margin:25px 0 10px;scroll-margin-top:20px}p{margin:12px 0}
+.meta,.note{background:#eef7f8;border-left:4px solid var(--accent);padding:12px 16px;margin:18px 0;color:#294c60}.warning{background:#fff7e9;border-color:#d09b39}.table-wrap{overflow:auto;margin:18px 0}
+table{width:100%;border-collapse:collapse;font-size:14px}th{background:#e8f1f4;text-align:left}th,td{padding:11px 13px;border:1px solid var(--line);vertical-align:top;overflow-wrap:anywhere}td code{white-space:normal;overflow-wrap:anywhere}
+pre{padding:16px;background:#102d3d;color:#d8f2ed;border-radius:8px;overflow:auto;font:13px/1.7 Consolas,monospace}code{overflow-wrap:anywhere;font-family:Consolas,monospace;font-size:.9em;background:#edf3f6;padding:1px 4px;border-radius:3px}pre code{background:none;color:inherit;padding:0}
+figure{margin:24px 0;border:1px solid var(--line);border-radius:10px;padding:16px;background:#f8fbfc;overflow:auto}figure svg{display:block;width:100%;height:auto;min-width:520px}figcaption{font-size:14px;color:var(--muted);margin-top:12px}details{margin:12px 0}footer{color:var(--muted);font-size:13px;margin-top:28px;border-top:1px solid var(--line);padding-top:15px}li{margin:5px 0}.badge{display:inline-block;background:#d6eee8;color:#15564b;border-radius:5px;padding:0 7px;font-size:13px}
+@media(max-width:900px){.shell{display:block;padding:0 12px;margin:16px auto}nav{position:static;max-height:220px;margin-bottom:16px}main{padding:22px 18px}h1{font-size:25px}}
+@media print{body{background:white;font-size:11pt}.shell{display:block;margin:0;padding:0;max-width:none}nav,header{display:none}main{padding:0;border:0}h2,h3{break-after:avoid}figure,tr{break-inside:avoid}figure svg{min-width:0}pre{white-space:pre-wrap;overflow-wrap:anywhere}a{color:inherit}table{font-size:9pt}}
+</style></head><body><header><strong>Factorforge / 文档基线</strong><p>v2.5.0 · 2026-10-10 · 三层架构 · HTML 正文</p></header><div class="shell"><nav aria-label="文档目录"><a href="index.html">版本索引</a><a href="#section-1">1 功能边界</a><a href="#section-2">2 对象、事件与评分</a><a href="#section-3">S2-001 观测对象与隔离</a><a href="#section-4">S2-002 创建与关联事件</a><a href="#section-5">S2-003 接收矢量评分</a><a href="#section-6">S2-004 去重与事实修订</a><a href="#section-7">S2-005 新颖度与提前计价</a><a href="#section-8">3 情绪与目标仓位</a><a href="#section-9">S2-006 情绪账本</a><a href="#section-10">S2-007 时间衰减</a><a href="#section-11">S2-008 价格兑现</a><a href="#section-12">S2-009 失效、缺数与守恒</a><a href="#section-13">S2-010 时基自动决策</a><a href="#section-14">S2-011 市场状态与辅助因子</a><a href="#section-15">S2-012 自动计算应持仓位</a><a href="#section-16">S2-013 目标与实际执行闭环</a><a href="#section-17">S2-014 波动止损与风险批次</a><a href="#section-18">S2-015 通用交易时段政策</a><a href="#section-19">4 案例、归因与负反馈</a><a href="#section-20">S2-016 完整案例与退出观察</a><a href="#section-21">S2-017 分层归因与未知</a><a href="#section-22">S2-018 多事件与反事实</a><a href="#section-23">S2-019 受限参数学习</a><a href="#section-24">S2-020 防错误学习</a><a href="#section-25">S2-021 自动生效、监测与回滚</a><a href="#section-26">S2-022 研究验证与分项评价</a><a href="#section-27">S2-023 资格、恢复与可解释性</a><a href="#section-28">5 验收效果</a><a href="#section-29">6 配置边界</a><a href="#section-30">7 v2.1.0 追加：通用只读追溯</a><a href="#section-31">S2-024 查询对象、事件、评分与学习链</a></nav><main><div class="meta">02_策略化框架层式样书 · <a href="02_策略化框架层设计书.html">对应设计书</a></div><div class="note">本页继承 v2.0.0 正文，除本版明确追加的条款外，业务规则保持。继承正文中的历史交付说明不代表当前实现状态；P1/P2 已实现，P3 和 Web 管理台尚未实现。以本版索引和进度记录为准。</div><article id="document-body"><div data-source-sha256="bdd71574cc92e1f44adb773de8bf5b820e127f438f3492485640b53538879f58" data-source-document="02_策略化框架层式样书.md"><h1>策略化框架层式样书</h1>
+<p>版本：2.5.0；日期：2026年10月11日。对应设计书：02_策略化框架层设计书。需求编号 S2；验收编号 T2。</p>
+<h2 id="section-1">1 功能边界</h2>
+<p>本层实现通用的事件情绪量化策略。依赖交易系统层提供市场、账户和执行能力，接收外部指定的观测对象、事件及有来源的评分，自动计算剩余情绪、应持仓位和交易后的受限反馈。</p>
+<p>观测哪个对象、怎样捕捉消息、由哪个模型或人工评分由使用者决定。本层不内置联网搜索、模型调用或具体交易对象。没有应用实例时，手工或固定夹具仍可驱动完整量化流程。评分服务暂时没有新输入时，旧事件的可靠衰减、持仓管理及风险处理继续运行。</p>
+<h2 id="section-2">2 对象、事件与评分</h2>
+<h3 id="section-3">S2-001 观测对象与隔离</h3>
+<p>能够创建、查询、暂停、归档多个观测对象，并绑定交易对象、模拟/实盘环境及参数。每个对象的情绪池、决策、案例及参数分别保存。相同交易对象的多个策略运行须有明确持仓归属；观测对象暂停后仍处理既有仓位、案例和保护，不能静默删除状态。</p>
+<h3 id="section-4">S2-002 创建与关联事件</h3>
+<p>能够创建新的经济事件，关联一个或多个观测对象，记录事实、证据、来源时间、类型和修订关系。创建事件只表示事实已登记，不自动形成情绪或订单。事件类型可扩展，每种类型具有独立的评分量表、生命周期和历史效果记录。</p>
+<h3 id="section-5">S2-003 接收矢量评分</h3>
+<p>使用者可以给新事件或已创建事件提交对特定观测对象的评分，至少包含方向和影响程度。完整可交易评分还包括可信度、相关程度、新颖度、未预期程度、影响期限、证据及版本。方向为正、负或中性；影响程度为非负值。未知、缺失、超界或矛盾评分要保留原因并隔离，不当作中性或零风险。</p>
+<h3 id="section-6">S2-004 去重与事实修订</h3>
+<p>同一经济事实的转载、翻译和多媒体报道只补充来源，不重复完整注入情绪。新事实、官方确认、金额修订和撤销分别记录。纯可信度修订只改变当前剩余影响，不能重置事件年龄或再次消费已兑现价格；真正新增事实可建立关联贡献。所有差额及拒收量可查。</p>
+<h3 id="section-7">S2-005 新颖度与提前计价</h3>
+<p>按新事实比例降低重复信息影响，并结合事前预期和评分可用前的价格反应评估尚未被市场计入的部分。相同证据不能被重复扣减。缺乏可靠预期或价格时保留不确定区间，用可信下界限制新增风险；无法建立下界时不凭该事件增仓。</p>
+<h2 id="section-8">3 情绪与目标仓位</h2>
+<h3 id="section-9">S2-006 情绪账本</h3>
+<p>每个事件对每个对象的贡献单独保存，汇总正向、负向和净情绪。基础影响经可信度、相关程度、新颖度、未预期程度、事件类型及市场状态修正后注入，并遵守事件、事件族和对象总量上限。反向消息通过负向贡献抵消净值，不删除原正向贡献。</p>
+<h3 id="section-10">S2-007 时间衰减</h3>
+<p>事件剩余影响按所登记半衰期随真实经过时间逐渐减小，包括没有交易和停机期间。不同类型可以有不同期限；不能因为重启、重复评分或更换参数让旧消息恢复年轻状态。衰减不能把正面事件翻成负面事件。</p>
+<h3 id="section-11">S2-008 价格兑现</h3>
+<p>价格向预测方向运动时，消耗尚未兑现的事件影响；回撤后再到旧高位不得重复消耗，反向运动不能自动补回。多个同向事件共享一次价格兑现预算，不能每条消息都把同一涨幅完整归为自己。空仓也计算兑现；实际持仓盈亏不作为兑现量。</p>
+<h3 id="section-12">S2-009 失效、缺数与守恒</h3>
+<p>被证伪、撤销、超过寿命或低于清理阈值的贡献按原因清除；止损本身不能让事件失效。每次变化可解释为注入、修订、衰减、兑现或失效，账差超出登记容差就冻结受影响增险。价格缺失时继续时间衰减，暂停兑现及依赖该价格的新风险，恢复后不回写历史决策。</p>
+<h3 id="section-13">S2-010 时基自动决策</h3>
+<p>按配置周期持续计算，消息可提前处理但不能到达就直接增险。每周期先接收实际成交与保护结果，再处理旧贡献和新评分，形成仓位建议。停机漏掉的周期保留记录而不追补过期订单；止损和执行异常及时处理，不等待主周期。</p>
+<h3 id="section-14">S2-011 市场状态与辅助因子</h3>
+<p>允许趋势、波动、风险偏好、行业强弱和极端异常等多个状态同时存在，切换有确认和滞回。只使用当时已可用数据；未知状态采取登记的保守政策。辅助因子声明用于可信度、仓位、状态还是提前计价，启用前要证明样本外增量效果，不能无限增加复杂度。</p>
+<h3 id="section-15">S2-012 自动计算应持仓位</h3>
+<p>根据剩余净情绪计算方向及有限仓位等级，受波动、流动性、证据质量、正负冲突和风险限制修正。进入某等级需要高于退出该等级的阈值，避免边界附近频繁往返。无充分信号可以保持空仓。方向反转时先确认旧方向已平，再评估新方向。</p>
+<h3 id="section-16">S2-013 目标与实际执行闭环</h3>
+<p>向交易层提交带版本、期限和原因的目标暴露，查询实际与未完成量后再作下一决策；理论目标不被记为成交。卖空、最小订单或资金能力不足时保留理论目标并说明实际为何不同。普通调整有最小变动与冷却，强制减险优先。最终交易层风险拒绝不能被框架绕过。</p>
+<h3 id="section-17">S2-014 波动止损与风险批次</h3>
+<p>用已完成K线估计正常噪声，在噪声之外计算保护距离，并按单笔风险预算降低数量或不交易。该计算独立于情绪强弱。存量风险批次不因亏损或学习扩大止损；新参数只用于以后新风险批次。止损后仍观察旧事件，不直接判定方向失败。</p>
+<h3 id="section-18">S2-015 通用交易时段政策</h3>
+<p>允许使用者定义某些时段的新增风险次数和净亏损案例次数限制，两者独立记录，达到任一则禁止该窗口增险。重试、拆单、部分成交不重复占额；未知受理结果继续占额。止损、减仓及保护不受次数限制。日历和窗口由使用者配置，框架不内置特定市场时段。</p>
+<h2 id="section-19">4 案例、归因与负反馈</h2>
+<h3 id="section-20">S2-016 完整案例与退出观察</h3>
+<p>以实际方向持仓周期建立案例，关联风险批次、事件、评分、情绪变化、目标、成交、成本、止损和退出原因。实际归零后进入入场时已冻结规则的观察期。缺数、未结束或仍持续影响的案例标为未成熟或删失，不能用零结果补齐。</p>
+<h3 id="section-21">S2-017 分层归因与未知</h3>
+<p>先检查数据和执行，再检查外部异常、去重和提前计价，之后评价方向、强度、生命周期、兑现、时机及止损。允许多原因和无法确定。外部提供的解释是候选，必须经客观证据与稳定性核验；模型自述置信度和单笔盈亏不能直接决定参数修正。</p>
+<h3 id="section-22">S2-018 多事件与反事实</h3>
+<p>共同驱动和重叠事件合并独立样本组，无法分离时只做簇级评价。支持不使用策略止损、延迟入场、调整退出和同预算更宽止损等单因素反事实；仍保留硬风险条件。反事实与实际账务分列，不能用事后最佳点制造盈利，也不能单独证明因果。</p>
+<h3 id="section-23">S2-019 受限参数学习</h3>
+<p>只对登记白名单内的类型权重、半衰期、兑现参数及止损偏差提出学习候选。成熟、质量合格的独立证据经置信度、遗忘、重复误差、有效样本量和稳定状态门控后，才可按该参数固定步长小幅调整。硬风险、权限、运行阶段、数据真实性及实例额度不能学习。</p>
+<h3 id="section-24">S2-020 防错误学习</h3>
+<p>单次极端行情、无法归因、执行污染、重复案例和盈利但判断错误的案例不能误导学习。同一证据不能独自重复推动更新；相关参数不能同时无条件修改。参数有上下限、漂移预算、冷却、新证据门槛及反向门槛，证据不足就保持现值。</p>
+<h3 id="section-25">S2-021 自动生效、监测与回滚</h3>
+<p>白名单候选通过独立验证、影子或受控试用及风险门后，在规定周期边界自动生效，不逐次等待人工。失败则拒绝或回滚并冻结。回滚只影响未来，不改历史评分、成交或已消费证据；周期合理性报告不阻塞合格发布。参数停止变化不等于已证明收敛。</p>
+<h3 id="section-26">S2-022 研究验证与分项评价</h3>
+<p>提供按真实可用时间重放、严格时间顺序样本外验证、事件组隔离、未来信息检查及冻结/自适应对照。分别评价事件方向、强度、生命周期、兑现、时机、止损、成本后交易风险和参数稳定性，报告未知比例、独立样本及不确定性。核心假设不支持时停止升级，不能靠增加模型复杂度掩盖失败。</p>
+<h3 id="section-27">S2-023 资格、恢复与可解释性</h3>
+<p>研究评分与可交易评分的资格分离，公共接口使用者不能自行获得实盘信号资格。不同实例及模拟/实盘隔离，合格提交者仍接受数据、参数、时效和风险校验。恢复情绪、决策、目标、观察及学习后先与交易层核验；不能因框架重启解除交易层锁定。每次交易、不交易、更新、不更新均能按当时输入重放原因。</p>
+<h2 id="section-28">5 验收效果</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>编号</th>
+<th>条件</th>
+<th>应达到的效果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>T2-01</td>
+<td>不安装应用层，手工创建两个对象及评分</td>
+<td>完成独立情绪、目标、模拟执行与案例闭环</td>
+</tr>
+<tr>
+<td>T2-02</td>
+<td>新事件未评分，或已有事件收到方向/影响评分</td>
+<td>前者不注入；后者校验后在下一有效周期处理</td>
+</tr>
+<tr>
+<td>T2-03</td>
+<td>转载、纯确认、新事实、撤销及重复请求</td>
+<td>不重复注入，修订不重置年龄，差额可查</td>
+</tr>
+<tr>
+<td>T2-04</td>
+<td>提前计价未知或同证据重复使用</td>
+<td>采用可靠下界或拒绝相关增险</td>
+</tr>
+<tr>
+<td>T2-05</td>
+<td>衰减、兑现、反向及失效叠加</td>
+<td>组成可查、守恒、非负，重复价格不再消耗</td>
+</tr>
+<tr>
+<td>T2-06</td>
+<td>停机、断价、补消息、相同输入重放</td>
+<td>实时衰减，无过期补单或历史回写，结果一致</td>
+</tr>
+<tr>
+<td>T2-07</td>
+<td>边界情绪、冲突、反向及能力不足</td>
+<td>正确滞回和降险，先平后反，目标/实际分开</td>
+</tr>
+<tr>
+<td>T2-08</td>
+<td>止损、学习及新风险批次</td>
+<td>旧保护不放宽，止损不清空事件或立即学习</td>
+</tr>
+<tr>
+<td>T2-09</td>
+<td>指定时段内重试、未知订单和迟到亏损案例</td>
+<td>两计数独立且持久，减险继续</td>
+</tr>
+<tr>
+<td>T2-10</td>
+<td>未成熟、删失、重叠及执行污染案例</td>
+<td>不提前学习，保存未知或簇级结论</td>
+</tr>
+<tr>
+<td>T2-11</td>
+<td>反事实更宽止损或修改退出</td>
+<td>同预算及当时信息，真实损益不混入</td>
+</tr>
+<tr>
+<td>T2-12</td>
+<td>固定步长、证据消费、漂移及相关参数</td>
+<td>门控失败不更新，合格仅改变可识别参数</td>
+</tr>
+<tr>
+<td>T2-13</td>
+<td>用户离线、候选合格或回滚</td>
+<td>自动边界生效，拒绝/回滚可查，历史不改</td>
+</tr>
+<tr>
+<td>T2-14</td>
+<td>泄漏样本、失败试验或误差不可识别</td>
+<td>正确隔离、记录全部尝试，不宣称通过</td>
+</tr>
+<tr>
+<td>T2-15</td>
+<td>公共调用伪造实盘资格、跨实例或异常恢复</td>
+<td>拒绝且留痕，不能解除底层风险锁</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="section-29">6 配置边界</h2>
+<p>类型量表、半衰期、兑现尺度、仓位等级、观察窗、标签、学习门槛和时效均从登记配置读取。缺少关键参数时可以研究记录，不能隐式进入真实交易。通用能力的数学定义和程序流程由对应设计书展开，具体交易对象、模型和实例数值仅由应用实例选择。</p>
+</div><h2 id="section-30">7 v2.1.0 追加：通用只读追溯</h2><h3 id="section-31">S2-024 查询对象、事件、评分与学习链</h3><p>向有query权限的公共身份提供对象目录、事件及事实版本、评分及准入结果、贡献账本、案例归因/反事实、参数激活与审计的只读查询。身份、实例、环境和对象范围继续按原规则核验；接口不创建事件、评分、贡献、决策或学习，不推进时钟，不授予signal资格。保留历史版本、原始时间、来源、真实/研究区别及未知状态。没有保存的记录明确缺失，不能由查询反算或补造。</p><p>长列表采用有界查询和稳定分页，游标与范围及读取快照绑定；授权变化或快照过期时不能继续越权读取。原文、真实Prompt、凭据和任意内部命令载荷不进入公开查询。已有实时pool接口只提供快照，不能宣称历史曲线已存在。</p><table><thead><tr><th>验收</th><th>效果</th></tr></thead><tbody><tr><td>T2-16</td><td>不安装应用，通过公共query身份查询上述追溯数据；修改或跨环境/实例请求拒绝；查前查后业务状态、时钟和outbox不变；游标失效可检测；缺记录不伪造。</td></tr></tbody></table></article><footer>HTML 是本版唯一发布正文。图表为内嵌 SVG，无需联网或运行脚本。文档通过不代表程序实现、交易运行或实盘准入通过。</footer></main></div></body></html>

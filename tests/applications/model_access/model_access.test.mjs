@@ -745,15 +745,48 @@ test("actual jose remote JWKS verifier rejects a signed token with the wrong key
     else await assert.rejects(call, /AUTH_ID_TOKEN_INVALID/);
   }
 });
-test("disabled unused API budget does not block a ChatGPT connection", async (t) => {
+test("zero API budget means unlimited and does not block ChatGPT", async (t) => {
   const f = await fixture(t, { api_max_requests: 0 });
   f.store.state.oauth = fixtureOAuth();
   const p = provider(),
     s = new ModelService(f.store, p.fetcher);
   assert.equal((await s.handle(request("chatgpt-only", "chatgpt"))).ok, true);
-  assert.equal(
-    (await s.handle(request("no-api", "api"))).error.code,
-    "CHANNEL_DISABLED",
-  );
-  assert.equal(p.inferences().length, 1);
+  assert.equal((await s.handle(request("api-unlimited", "api"))).ok, true);
+  assert.equal(p.inferences().length, 2);
+});
+
+test("API and ChatGPT zero budgets and zero window permit calls across restart", async t => {
+  const f = await fixture(t, { api_max_requests: 0, chatgpt_max_requests: 0, budget_window_seconds: 0 });
+  f.store.state.oauth = fixtureOAuth();
+  const p = provider(); let service = new ModelService(f.store, p.fetcher);
+  for (const channel of ["api", "chatgpt"]) {
+    for (let i=0;i<(channel === "api" ? 260 : 6);i++) assert.equal((await service.handle(request(`${channel}-${i}`,channel))).ok,true);
+  }
+  assert.equal(f.store.state.budgets.api.ids.length,256);
+  assert.equal(f.store.state.budgets.api.count,260);
+  service = new ModelService(await f.reopen(),p.fetcher);
+  assert.equal(service.status().local_budget.api.mode,"unlimited");
+  assert.equal(service.status().local_budget.chatgpt.limit,null);
+  assert.equal((await service.handle(request("api-259"))).error.code,"DUPLICATE_REQUEST");
+  assert.equal((await service.handle(request("after-restart"))).ok,true);
+  assert.equal(p.inferences().length,267);
+});
+
+test("opt-in cap requires a window, but unlimited still requires single-call boundaries", async t => {
+  const f = await fixture(t, { budget_window_seconds: 0 }); const p=provider();
+  assert.equal((await new ModelService(f.store,p.fetcher).handle(request())).error.code,"BUDGET_WINDOW_REQUIRED");
+  f.store.settings.api_max_requests=0; f.store.settings.max_input_bytes=0;
+  assert.equal((await new ModelService(f.store,p.fetcher).handle(request())).error.code,"LIMITS_REQUIRED");
+  f.store.settings.enabled=false;
+  assert.equal((await new ModelService(f.store,p.fetcher).handle(request())).error.code,"MODULE_DISABLED");
+  assert.equal(p.inferences().length,0);
+});
+
+test("omitted budget fields default to unlimited without changing private non-budget values", async t => {
+  const f=await fixture(t); await f.store.close();
+  let raw=await fs.readFile(f.file,"utf8");
+  raw=raw.replace(/^(api_max_requests|chatgpt_max_requests|omp_max_requests|budget_window_seconds) = .*\n/gm,"");
+  await fs.writeFile(f.file,raw);const store=await f.reopen();
+  for(const key of ["api_max_requests","chatgpt_max_requests","omp_max_requests","budget_window_seconds"])assert.equal(store.settings[key],0);
+  assert.equal(store.settings.api_key,"fixture-api-key");
 });
