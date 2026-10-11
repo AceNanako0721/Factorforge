@@ -3,10 +3,9 @@ package experiments_test
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"math/big"
-	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -83,29 +82,23 @@ func directNewsLab(t *testing.T) string {
 func TestAcquireDirectNewsSources(t *testing.T) {
 	lab := directNewsLab(t)
 	frozenRateWrite(t, lab, "acquisition-started.json", map[string]any{"at": time.Now().UTC(), "urls": directNewsURLs, "model_calls": 0})
-	// Fixed public HTTPS URLs only. This acquisition experiment may use the
-	// workstation's HTTPS proxy; production Fetcher and its SSRF policy stay intact.
-	client := &http.Client{Timeout: 20 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	// curl is optional for this opt-in acquisition experiment only. No redirects
+	// or retries; production Fetcher and its SSRF policy stay intact.
 	sources := []directNewsSource{}
 	for i, url := range directNewsURLs {
-		req, err := http.NewRequestWithContext(t.Context(), "GET", url, nil)
-		if err != nil {
-			t.Fatal("DIRECT_NEWS_FIXED_URL")
-		}
-		response, err := client.Do(req)
+		out, err := exec.CommandContext(t.Context(), "curl", "--silent", "--fail", "--proto", "=https", "--max-time", "20", "--max-filesize", "2097152", "--write-out", "\n%{http_code}", url).Output()
 		if err != nil {
 			frozenRateWrite(t, lab, "acquisition-failed.json", map[string]any{"index": i, "error": "SOURCE_UNAVAILABLE", "completed": sources})
 			t.Fatal("DIRECT_NEWS_SOURCE_UNAVAILABLE")
 		}
-		body, readErr := io.ReadAll(io.LimitReader(response.Body, (2<<20)+1))
-		response.Body.Close()
-		media := response.Header.Get("Content-Type")
-		if response.StatusCode != 200 || readErr != nil || len(body) > 2<<20 {
-			frozenRateWrite(t, lab, "acquisition-failed.json", map[string]any{"index": i, "http_status": response.StatusCode, "error": "SOURCE_RESPONSE_INVALID", "completed": sources})
+		cut := strings.LastIndexByte(string(out), '\n')
+		if cut < 0 || string(out[cut+1:]) != "200" || cut > 2<<20 {
+			frozenRateWrite(t, lab, "acquisition-failed.json", map[string]any{"index": i, "error": "SOURCE_RESPONSE_INVALID", "completed": sources})
 			t.Fatal("DIRECT_NEWS_SOURCE_RESPONSE")
 		}
+		body := out[:cut]
 		id := fmt.Sprintf("source-%02d", i+1)
-		if !strings.Contains(media, "html") || os.WriteFile(filepath.Join(lab, id+".html"), body, 0600) != nil {
+		if !strings.Contains(strings.ToLower(string(body)), "<html") || os.WriteFile(filepath.Join(lab, id+".html"), body, 0600) != nil {
 			t.Fatal("DIRECT_NEWS_SOURCE_WRITE")
 		}
 		doc, err := html.Parse(strings.NewReader(string(body)))
@@ -444,6 +437,43 @@ func TestEvaluateDirectNews(t *testing.T) {
 	}
 	frozenRateWrite(t, lab, "evaluation.json", map[string]any{"at": time.Now().UTC(), "seal_hash": d.ContentDigest(sealRaw), "cases": rows, "classification_counts": counts, "production_installed": false, "independent_blind_validation": false, "impact_accuracy": nil, "billed_cost": nil})
 	t.Logf("direct-news classification counts=%v; no production admission", string(mustNewsJSON(counts)))
+}
+
+// Check the frozen request set immediately before handing it to the existing
+// credentialed runner. Neither labels nor source manifests become model input.
+func TestRunSealedDirectNews(t *testing.T) {
+	lab := directNewsLab(t)
+	var seal struct {
+		Questions string            `json:"questions_hash"`
+		Labels    string            `json:"labels_hash"`
+		Plan      string            `json:"plan_hash"`
+		Code      string            `json:"code_hash"`
+		Runner    string            `json:"runner_hash"`
+		Protocol  string            `json:"protocol_hash"`
+		Requests  map[string]string `json:"requests"`
+	}
+	financialRead(t, lab, "sealed.json", &seal)
+	files := map[string]string{"questions.json": seal.Questions, "labels.json": seal.Labels, "plan.json": seal.Plan}
+	for name, hash := range seal.Requests {
+		files[name] = hash
+	}
+	for name, hash := range files {
+		raw, err := os.ReadFile(filepath.Join(lab, name))
+		if err != nil || d.ContentDigest(raw) != hash {
+			t.Fatal("DIRECT_NEWS_PREFLIGHT_CHANGED")
+		}
+	}
+	for name, hash := range map[string]string{"direct_news_test.go": seal.Code, "semantic_lab_test.go": seal.Runner, "../../../../doc/engineering/P3_DIRECT_NEWS_PROTOCOL.md": seal.Protocol} {
+		raw, err := os.ReadFile(name)
+		if err != nil || d.ContentDigest(raw) != hash {
+			t.Fatal("DIRECT_NEWS_PREFLIGHT_CODE_CHANGED")
+		}
+	}
+	if len(seal.Requests) != 16 {
+		t.Fatal("DIRECT_NEWS_PREFLIGHT_COUNT")
+	}
+	t.Setenv("FACTORFORGE_SEMANTIC_LAB", lab)
+	TestJevSemanticMethodProbe(t)
 }
 
 func TestDirectNewsComparatorAndArticleBoundaries(t *testing.T) {
