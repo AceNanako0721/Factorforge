@@ -29,7 +29,7 @@ export const goJSON=(v:unknown)=>JSON.stringify(v).replace(/[<>&\u2028\u2029]/g,
 const hash=(v:string|Uint8Array)=>createHash("sha256").update(v).digest("hex");
 export const goTimestamp=(date:Date)=>date.toISOString().replace(/(\.[0-9]*?[1-9])0+Z$/,"$1Z").replace(/\.0+Z$/,"Z");
 
-async function main() {
+export async function runFinancialPair(variant?:{model:string;prefix:string;protocol:string}) {
  const [rootArg,originalArg,dirArg,binaryArg,promptArg]=process.argv.slice(2);
  if(!rootArg||!originalArg||!dirArg||!binaryArg||!promptArg||process.argv.length!==7)throw Error("STRUCTURED_TRIAL_USAGE");
  const root=path.resolve(rootArg),original=path.resolve(originalArg),dir=path.resolve(dirArg),binary=path.resolve(binaryArg),prompt=path.resolve(promptArg);
@@ -40,7 +40,9 @@ async function main() {
  const sealRaw=await fs.readFile(path.join(original,"seal.json")),casesRaw=await fs.readFile(path.join(original,"cases.json"));
  const seal=JSON.parse(sealRaw.toString()),cases=JSON.parse(casesRaw.toString());
  if(seal.cases_hash!==hash(casesRaw)||cases.length!==12||seal.config_root!==root)throw Error("STRUCTURED_ORIGINAL_SEAL");
- await fs.writeFile(path.join(dir,"seal.json"),sealRaw,{flag:"wx",mode:0o600});await fs.writeFile(path.join(dir,"cases.json"),casesRaw,{flag:"wx",mode:0o600});
+ let preparedCases=casesRaw,preparedSeal=sealRaw;
+ if(variant){for(const c of cases)c.id=variant.prefix+c.id;seal.settings.Model=variant.model;seal.at=goTimestamp(new Date());preparedCases=Buffer.from(JSON.stringify(cases,null,2));seal.cases_hash=hash(preparedCases);preparedSeal=Buffer.from(JSON.stringify(seal,null,2));}
+ await fs.writeFile(path.join(dir,"seal.json"),preparedSeal,{flag:"wx",mode:0o600});await fs.writeFile(path.join(dir,"cases.json"),preparedCases,{flag:"wx",mode:0o600});
  const config=path.join(root,"config","config.toml"),trial={enabled:true,prompt_file:path.relative(root,prompt),timeout_seconds:120,max_input_bytes:65536,max_output_bytes:32768,max_line_bytes:1048576,omp_max_requests:0,budget_window_seconds:0};
  let store:ConfigStore|undefined,access:OMPAccess|undefined,changed=false,stage="config",completed=0;
  const saved:Record<string,unknown>={},cancelled=new AbortController();const stop=()=>cancelled.abort();process.on("SIGINT",stop);process.on("SIGTERM",stop);
@@ -51,12 +53,12 @@ async function main() {
   const priorPrompt=store.settings.prompt_file,priorInput=store.settings.max_input_bytes;
   let promptHash="";try{store.settings.prompt_file=trial.prompt_file;store.settings.max_input_bytes=trial.max_input_bytes;promptHash=hash(await store.prompt())}finally{store.settings.prompt_file=priorPrompt;store.settings.max_input_bytes=priorInput}
   if(promptHash!==seal.prompt_hash)throw Error("STRUCTURED_PROMPT_CHANGED");
-  await write("probe-seal.json",{at:new Date().toISOString(),protocol_hash:hash(await fs.readFile(path.join(checkout,"doc","engineering","P3_STRUCTURED_JSON_PROTOCOL.md"))),runner_hash:hash(await fs.readFile(import.meta.filename)),original_seal_hash:hash(sealRaw),cases_hash:hash(casesRaw),schema_hash:hash(goJSON(financialJSONSchema)),paired_development:true,planned_calls:12});
+  await write("probe-seal.json",{at:new Date().toISOString(),protocol_hash:hash(await fs.readFile(path.join(checkout,"doc","engineering",variant?.protocol??"P3_STRUCTURED_JSON_PROTOCOL.md"))),runner_hash:hash(await fs.readFile(import.meta.filename)),original_seal_hash:hash(sealRaw),original_cases_hash:hash(casesRaw),cases_hash:hash(preparedCases),schema_hash:variant?null:hash(goJSON(financialJSONSchema)),model:variant?.model??"gemini-3.8-flash",native_schema:!variant,paired_development:true,planned_calls:12});
   await write("restore-settings.json",saved);Object.assign(store.settings,trial);changed=true;store.saveSync();
   let injected=0;const nativeFetch=globalThis.fetch;
   const fetcher:typeof fetch=async(url,init)=>{
    const address=new URL(typeof url==="string"?url:url instanceof URL?url.href:url.url);
-   if(address.pathname.endsWith(":streamGenerateContent")) {
+   if(!variant&&address.pathname.endsWith(":streamGenerateContent")) {
     if(typeof init?.body!=="string"||++injected!==1)throw Error("STRUCTURED_NATIVE_SINGLE_SEND");
     return nativeFetch(url,{...init,body:structuredFinancialPayload(init.body)});
    }
@@ -64,15 +66,15 @@ async function main() {
   };
   access=new OMPAccess(store,fetcher);await access.ready();const service=new OMPService(store,access);
   stage="catalog";const cat=await service.handle({v:2,id:"structured_catalog",op:"models",provider:"google-antigravity",account_id:1},cancelled.signal);
-  if(!cat.ok||!(cat as any).result.models.some((m:any)=>m.id==="gemini-3.8-flash"))throw Error("STRUCTURED_MODEL_UNAVAILABLE");
-  await write("started.json",{at:new Date().toISOString(),automatic_retry:false,seal_hash:hash(goJSON(seal)),native_json_schema:true});
+  if(!cat.ok||!(cat as any).result.models.some((m:any)=>m.id===(variant?.model??"gemini-3.8-flash")))throw Error("STRUCTURED_MODEL_UNAVAILABLE");
+  await write("started.json",{at:new Date().toISOString(),automatic_retry:false,seal_hash:hash(goJSON(seal)),native_json_schema:!variant});
   stage="generate";
   for(const c of cases) {
    cancelled.signal.throwIfAborted();injected=0;
    await write(c.id+"-attempt.json",{at:new Date().toISOString(),input_hash:hash(c.input),seal_hash:hash(goJSON(seal))});
-   const started=Date.now();const reply=await service.handle({v:2,id:"structured_"+c.id,op:"generate",provider:"google-antigravity",account_id:1,model:"gemini-3.8-flash",input:c.input},cancelled.signal);
+   const started=Date.now();const reply=await service.handle({v:2,id:(variant?"paired_":"structured_")+c.id,op:"generate",provider:"google-antigravity",account_id:1,model:variant?.model??"gemini-3.8-flash",input:c.input},cancelled.signal);
    let generation:unknown=null;const code=reply.ok?"":reply.error?.code??"STRUCTURED_FAILED";
-   if(reply.ok) {const r=reply.result as any;if(injected!==1||r.prompt_hash!==seal.prompt_hash)throw Error("STRUCTURED_PROVENANCE");generation={provider:r.provider,account_id:r.account_id,model:r.model,prompt_hash:r.prompt_hash,text:r.text,completed_at:goTimestamp(new Date())};await write(c.id+"-generation.json",generation);completed++}
+   if(reply.ok) {const r=reply.result as any;if(injected!==(variant?0:1)||r.prompt_hash!==seal.prompt_hash)throw Error("STRUCTURED_PROVENANCE");generation={provider:r.provider,account_id:r.account_id,model:r.model,prompt_hash:r.prompt_hash,text:r.text,completed_at:goTimestamp(new Date())};await write(c.id+"-generation.json",generation);completed++}
    // The baseline comparator is closed, so native injection is recorded separately.
    await write(c.id+"-native-metadata.json",{native_injected:injected,returned_usage:reply.ok?(reply.result as any).usage:null});
    await write(c.id+"-outcome.json",{elapsed_ms:Date.now()-started,code,at:new Date().toISOString(),generation_hash:generation?hash(goJSON(generation)):""});
@@ -85,4 +87,4 @@ async function main() {
  stage="evaluate";
  const result=await new Promise<number>((resolve,reject)=>{const child=spawn(binary,["-test.run=^TestFinancialExtractionTrial$","-test.v"],{cwd:path.join(checkout,"tests/applications/soxl_jev/experiments"),stdio:"inherit",windowsHide:true,env:{...process.env,FACTORFORGE_FINANCIAL_EXTRACTION_MODE:"evaluate",FACTORFORGE_FINANCIAL_EXTRACTION_ROOT:checkout,FACTORFORGE_FINANCIAL_EXTRACTION_CONFIG_ROOT:root,FACTORFORGE_FINANCIAL_EXTRACTION_DIR:dir}});child.once("error",()=>reject(Error("STRUCTURED_EVALUATE_FAILED")));child.once("exit",code=>resolve(code??1))});if(result||completed!==12)process.exitCode=1;
 }
-if(import.meta.main)await main();
+if(import.meta.main)await runFinancialPair();
