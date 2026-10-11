@@ -40,6 +40,8 @@ export async function runLunaTransport() {
  let done!:()=>void;const finished=new Promise<void>(r=>done=r),unregister=postmortem.register("factorforge-luna-transport",async()=>{stop();await finished});
  const metadata:any[]=[],nativeErrors:any[]=[],guardErrors:any[]=[];const readers:Promise<void>[]=[];let generationSends=0;
  const originalFrame=(SSEGuard.prototype as any).frame;
+ const originalFeed=SSEGuard.prototype.feed;
+ SSEGuard.prototype.feed=function(value){try{return originalFeed.call(this,value)}catch(e:any){guardErrors.push({stage:"feed",code:typeof e?.code==="string"&&/^[A-Z_]+$/.test(e.code)?e.code:"UNKNOWN",chunk_bytes:value?.byteLength??0,frames:[...(typeof e?.stack==="string"?e.stack:"").matchAll(/applications\/model_access\/([a-zA-Z0-9_./-]+:\d+:\d+)/g)].map(m=>m[1]).slice(0,5)});throw e}};
  (SSEGuard.prototype as any).frame=function(){
   const raw=(this.data as string[]).join("\n");
   try{return originalFrame.call(this)}catch(e:any){let parsed:any;try{parsed=JSON.parse(raw)}catch{}
