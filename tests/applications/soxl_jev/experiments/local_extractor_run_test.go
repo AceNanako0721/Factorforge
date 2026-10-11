@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -111,6 +112,17 @@ type localCallReceipt struct {
 // service installation, global configuration, Python, external model API or
 // downstream framework write occurs in this experiment.
 func TestRunFrozenLocalExtractionBatch(t *testing.T) {
+	runFrozenLocalExtractionBatch(t, false)
+}
+
+func TestRunFrozenWindowsLocalExtractionBatch(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Windows Vulkan method comparison only")
+	}
+	runFrozenLocalExtractionBatch(t, true)
+}
+
+func runFrozenLocalExtractionBatch(t *testing.T, windowsGPU bool) {
 	lab := localExtractorLab(t)
 	var seal localRequestSeal
 	financialRead(t, lab, "requests-seal.json", &seal)
@@ -132,7 +144,24 @@ func TestRunFrozenLocalExtractionBatch(t *testing.T) {
 		}
 		requests[i] = raw
 	}
-	for _, asset := range []struct{ Name, Hash string }{{"model.gguf", "7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5"}, {"llama-cpu.tar.gz", "f6d25dde8f51133143d1453da4fd5f73b145127177612a283bf7995957af3392"}} {
+	bundleName, bundleHash := "llama-cpu.tar.gz", "f6d25dde8f51133143d1453da4fd5f73b145127177612a283bf7995957af3392"
+	variantHash, device := "", ""
+	if windowsGPU {
+		bundleName, bundleHash = "llama-vulkan.zip", "1bfe78ad9168b79fa02bf67f6af9f5e17a966d824d77238517f7bef12ac73b36"
+		raw, err := os.ReadFile(filepath.Join(lab, "runtime-variant.json"))
+		var variant struct {
+			Device              string `json:"device"`
+			ZipHash             string `json:"zip_hash"`
+			ParentProtocolHash  string `json:"parent_protocol_hash"`
+			ConsumedDevelopment bool   `json:"consumed_development"`
+			Backend             string `json:"backend"`
+		}
+		if err != nil || localStrictDecode(raw, &variant) != nil || variant.ZipHash != bundleHash || variant.ParentProtocolHash != seal.ProtocolHash || !variant.ConsumedDevelopment || variant.Backend != "Windows Vulkan RX6800XT" || variant.Device != "Vulkan0" {
+			t.Fatal("LOCAL_GPU_VARIANT_NOT_FROZEN")
+		}
+		variantHash, device = d.ContentDigest(raw), variant.Device
+	}
+	for _, asset := range []struct{ Name, Hash string }{{"model.gguf", "7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5"}, {bundleName, bundleHash}} {
 		f, err := os.Open(filepath.Join(lab, asset.Name))
 		if err != nil {
 			t.Fatal("LOCAL_RUNTIME_ASSET_REQUIRED")
@@ -148,7 +177,7 @@ func TestRunFrozenLocalExtractionBatch(t *testing.T) {
 	if err != nil || !json.Valid(evaluationSeal) {
 		t.Fatal("LOCAL_EVALUATION_SEAL_REQUIRED")
 	}
-	frozenRateWrite(t, lab, "local-calls-started.json", map[string]any{"at": time.Now().UTC(), "requests_sealed": true, "evaluation_seal_hash": d.ContentDigest(evaluationSeal), "maximum_calls": 4, "retry": false, "orders": 0})
+	frozenRateWrite(t, lab, "local-calls-started.json", map[string]any{"at": time.Now().UTC(), "requests_sealed": true, "evaluation_seal_hash": d.ContentDigest(evaluationSeal), "runtime_variant_hash": variantHash, "maximum_calls": 4, "retry": false, "orders": 0})
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal("LOCAL_PORT")
@@ -164,7 +193,15 @@ func TestRunFrozenLocalExtractionBatch(t *testing.T) {
 	defer log.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Minute)
 	defer cancel()
-	command := exec.CommandContext(ctx, "nice", "-n", "10", filepath.Join(lab, "llama-cpu", "llama-server"), "--model", filepath.Join(lab, "model.gguf"), "--host", "127.0.0.1", "--port", fmt.Sprint(port), "--alias", "qwen3-4b-q4km-lab", "--threads", "4", "--threads-batch", "6", "--parallel", "1", "--ctx-size", "16384", "--no-context-shift", "--no-webui", "--jinja")
+	args := []string{"--model", filepath.Join(lab, "model.gguf"), "--host", "127.0.0.1", "--port", fmt.Sprint(port), "--alias", "qwen3-4b-q4km-lab", "--threads", "4", "--threads-batch", "6", "--parallel", "1", "--ctx-size", "16384", "--no-context-shift", "--no-webui", "--jinja"}
+	var command *exec.Cmd
+	if windowsGPU {
+		args = append(args, "--gpu-layers", "99", "--device", device)
+		command = exec.CommandContext(ctx, filepath.Join(lab, "llama-vulkan", "llama-server.exe"), args...)
+	} else {
+		command = exec.CommandContext(ctx, "nice", append([]string{"-n", "10", filepath.Join(lab, "llama-cpu", "llama-server")}, args...)...)
+	}
+	configureLocalServerProcess(command)
 	command.Stdout = log
 	command.Stderr = log
 	if command.Start() != nil {

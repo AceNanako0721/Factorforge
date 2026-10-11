@@ -1,3 +1,5 @@
+> **归档分支（2026-10-11）**：仅保存已停止的 Qwen3-4B / llama.cpp 本地 CPU、Windows Vulkan 抽取试验。原始三笔先行提交和后续四文件扩展保留，不合并生产主线、不启动实验。当前进度及替代路线以 main 的 `doc/progress/P3.md` 和 `doc/engineering/P3_ROUTE_DISPOSITION.md` 为准。真实提示词、语料、响应和权重不在 Git 中。
+
 # Factorforge
 
 Factorforge 是分为交易系统、策略化框架、应用实例三层的事件情绪量化交易项目。当前开发基线为 **v2.5.2**（语义候选与私有原文审阅衔接），既有发布对照为 v2.1.0，代码与公开文档采用 [MIT](LICENSE) 许可证。
