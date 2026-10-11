@@ -297,7 +297,7 @@ func TestSECIndexAndLatest8KSelection(t *testing.T) {
 	if _, ok = secCIK([]byte(`{}`), "NVDA"); ok {
 		t.Fatal("missing ticker mapped")
 	}
-	atom := append([]byte("<?xml version=\"1.0\" encoding=\"ISO-8859-1\" ?>\n<feed xmlns=\"http://www.w3.org/2005/Atom\"><updated>2026-10-11T10:45:07-04:00</updated><entry><title>8-K - Soci\xe9t\xe9</title><updated>2026-10-10T17:30:00-04:00</updated></entry></feed>"))
+	atom := []byte("<?xml version=\"1.0\" encoding=\"ISO-8859-1\" ?>\n<feed xmlns=\"http://www.w3.org/2005/Atom\"><updated>2026-10-11T10:45:07-04:00</updated><entry><title>8-K - Soci\xe9t\xe9</title><updated>2026-10-10T17:30:00-04:00</updated></entry></feed>")
 	feed, ok := secAtom(atom)
 	if !ok || feed.Updated != "2026-10-11T10:45:07-04:00" || len(feed.Entries) != 1 || feed.Entries[0].Updated != "2026-10-10T17:30:00-04:00" {
 		t.Fatalf("ISO-8859-1 Atom not read: %+v", feed)
