@@ -138,6 +138,17 @@ func financialExtractionCases(t *testing.T, root string) ([]financialExtractionC
 			continue
 		}
 		for _, raw := range c.Questions {
+			// Arithmetic questions use scalar answers; exclude by task metadata
+			// before decoding the span-only answer array. Do not change eligibility.
+			var header struct {
+				AnswerType string `json:"answer_type"`
+			}
+			if json.Unmarshal(raw, &header) != nil {
+				t.Fatal("FINANCIAL_QUESTION_HEADER_INVALID")
+			}
+			if header.AnswerType != "span" {
+				continue
+			}
 			var q financialQuestion
 			if json.Unmarshal(raw, &q) != nil {
 				t.Fatal("FINANCIAL_QUESTION_INVALID")
