@@ -27,6 +27,17 @@ notification_token = ""
 [application]
 prompt_file = "prompts/prompts.local.json"
 
+[application.semantic_extraction]
+enabled = false
+bun_path = ""
+provider = ""
+account_id = 0
+model = ""
+timeout_seconds = 0
+cleanup_seconds = 0
+max_events = 0
+max_quote_bytes = 0
+
 [application.read_api]
 environment = ""
 instance_id = ""

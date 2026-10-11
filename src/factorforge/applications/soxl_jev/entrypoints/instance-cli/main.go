@@ -4,25 +4,47 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	modelaccess "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/adapters/modelaccess"
 	pg "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/adapters/postgres"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/config"
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/domain"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/entrypoints/assembly"
+	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/evidence"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/operations"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"sort"
+	"syscall"
 	"time"
 )
 
 func run() error {
-	action := flag.String("action", "", "init-storage, register-provider-budget, publish-projection, prepare-evidence, compile-evidence, prepare-review, render-review, compile-calendar or export-evidence (no trades)")
+	action := flag.String("action", "", "init-storage, register-provider-budget, publish-projection, prepare-evidence, extract-candidates, compile-evidence, prepare-review, render-review, compile-calendar or export-evidence (no trades)")
 	source := flag.String("config", "config/config.toml", "Canonical private config for this operator command only")
 	version := flag.Int64("expected-version", -1, "Existing read version; -1 only for initial publication")
 	proposalInput := flag.String("proposal-input", "", "Private closed JSON evidence and catalog request")
 	proposalOutput := flag.String("proposal-output", "", "New private JSON file under this repository runtime")
 	proposalBytes := flag.Int("max-proposal-bytes", 0, "Explicit input and output file byte budget")
 	flag.Parse()
+	if *action == "extract-candidates" {
+		root, err := os.Getwd()
+		if err != nil {
+			return d.Fail("SEMANTIC_CONFIG_INVALID", 503)
+		}
+		path, err := filepath.Abs(*source)
+		if err != nil {
+			return d.Fail("SEMANTIC_CONFIG_INVALID", 503)
+		}
+		settings, err := config.LoadSemantic(root, path)
+		if err != nil {
+			return err
+		}
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer cancel()
+		client := modelaccess.Client{Root: root, Config: path, Settings: settings}
+		return operations.ExtractSemanticFile(ctx, client, root, *proposalInput, *proposalOutput, *proposalBytes, evidence.SemanticLimits{MaxEvents: settings.MaxEvents, MaxQuoteBytes: settings.MaxQuoteBytes})
+	}
 	if d.Has([]string{"prepare-evidence", "compile-evidence", "prepare-review", "render-review", "compile-calendar"}, *action) {
 		root, err := os.Getwd()
 		if err != nil {

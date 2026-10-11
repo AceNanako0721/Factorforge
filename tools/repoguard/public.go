@@ -102,6 +102,13 @@ func TemplateIssue(name string, data []byte, historical bool) string {
 		}
 		if historical {
 			old := cloneMap(expected)
+			// Exact pre-v2.5.1 empty template; populated semantic blocks are never accepted.
+			legacyApplication := cloneMap(asMap(old["application"]))
+			delete(legacyApplication, "semantic_extraction")
+			old["application"] = legacyApplication
+			if equalJSON(actual, old) {
+				return ""
+			}
 			// Exact v2.3.0 empty model template, before the OMP adapter fields.
 			legacyModel := cloneMap(asMap(old["model_access"]))
 			delete(legacyModel, "omp_max_requests")
