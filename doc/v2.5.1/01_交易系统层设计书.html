@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="ff:version" content="2.5.1"><meta name="ff:kind" content="design"><meta name="ff:pair" content="01_交易系统层式样书.html"><title>01_交易系统层设计书 · Factorforge v2.5.1</title><style>
+:root{--ink:#172d40;--muted:#587083;--accent:#006e82;--line:#cfdee5;--paper:#fff;--bg:#edf3f6}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.8 system-ui,'Microsoft YaHei',sans-serif}
+a{color:var(--accent);text-underline-offset:3px;overflow-wrap:anywhere}header{background:#15384a;color:white;padding:28px max(24px,calc((100vw - 1320px)/2));border-bottom:5px solid #2eb6ad}
+header p{margin:0}header strong{font-size:23px}header a{color:#a9eee9}.shell{display:grid;grid-template-columns:245px minmax(0,1fr);gap:26px;max-width:1320px;margin:28px auto;padding:0 24px}
+nav{position:sticky;top:16px;align-self:start;max-height:calc(100vh - 32px);overflow:auto;padding:18px;background:var(--paper);border:1px solid var(--line);border-radius:12px;font-size:14px}
+nav a{display:block;padding:6px 0;text-decoration:none}main{overflow-wrap:anywhere;min-width:0;background:var(--paper);padding:30px 38px;border:1px solid var(--line);border-radius:12px}
+h1{font-size:30px;line-height:1.35;margin:0 0 18px}h2{font-size:23px;border-bottom:2px solid var(--line);padding:10px 0;margin:34px 0 18px;scroll-margin-top:20px}h3{font-size:18px;margin:25px 0 10px;scroll-margin-top:20px}p{margin:12px 0}
+.meta,.note{background:#eef7f8;border-left:4px solid var(--accent);padding:12px 16px;margin:18px 0;color:#294c60}.warning{background:#fff7e9;border-color:#d09b39}.table-wrap{overflow:auto;margin:18px 0}
+table{width:100%;border-collapse:collapse;font-size:14px}th{background:#e8f1f4;text-align:left}th,td{padding:11px 13px;border:1px solid var(--line);vertical-align:top;overflow-wrap:anywhere}td code{white-space:normal;overflow-wrap:anywhere}
+pre{padding:16px;background:#102d3d;color:#d8f2ed;border-radius:8px;overflow:auto;font:13px/1.7 Consolas,monospace}code{overflow-wrap:anywhere;font-family:Consolas,monospace;font-size:.9em;background:#edf3f6;padding:1px 4px;border-radius:3px}pre code{background:none;color:inherit;padding:0}
+figure{margin:24px 0;border:1px solid var(--line);border-radius:10px;padding:16px;background:#f8fbfc;overflow:auto}figure svg{display:block;width:100%;height:auto;min-width:520px}figcaption{font-size:14px;color:var(--muted);margin-top:12px}details{margin:12px 0}footer{color:var(--muted);font-size:13px;margin-top:28px;border-top:1px solid var(--line);padding-top:15px}li{margin:5px 0}.badge{display:inline-block;background:#d6eee8;color:#15564b;border-radius:5px;padding:0 7px;font-size:13px}
+@media(max-width:900px){.shell{display:block;padding:0 12px;margin:16px auto}nav{position:static;max-height:220px;margin-bottom:16px}main{padding:22px 18px}h1{font-size:25px}}
+@media print{body{background:white;font-size:11pt}.shell{display:block;margin:0;padding:0;max-width:none}nav,header{display:none}main{padding:0;border:0}h2,h3{break-after:avoid}figure,tr{break-inside:avoid}figure svg{min-width:0}pre{white-space:pre-wrap;overflow-wrap:anywhere}a{color:inherit}table{font-size:9pt}}
+</style></head><body><header><strong>Factorforge / 文档基线</strong><p>v2.5.1 · 2026-10-10 · 三层架构 · HTML 正文</p></header><div class="shell"><nav aria-label="文档目录"><a href="index.html">版本索引</a><a href="#section-1">1 代码生成范围与依赖</a><a href="#section-2">2 数据类型和字段约定</a><a href="#section-3">3 服务与接口</a><a href="#section-4">4 风险、目标差额与并发</a><a href="#section-5">5 订单状态、幂等与账务事务</a><a href="#section-6">6 保护、执行权与异常恢复</a><a href="#section-7">7 仿真与供应商适配</a><a href="#section-8">8 式样到代码与测试追踪</a><a href="#section-9">9 Go 包、数值与交易运行实现</a><a href="#section-10">10 P1 开源参考与本版落地状态</a><a href="#section-11">Go 迁移共同约束与切换门槛</a><a href="#binance-tradfi-mapping">12 Binance TradFi产品映射</a></nav><main><div class="meta">01_交易系统层设计书 · <a href="01_交易系统层式样书.html">对应仕様书</a></div><article id="document-body"><div class="note">v2.5.1 追加第三层独立模型接入模块（第五对仕様与设计）：API Key 与官方 ChatGPT 登录经显式选择提供候选文本。保留无 Python、三层接口及原四组业务式样；新模块不自动接入事件抽取、JEV 决策或交易。暂停的本地模型实验保持停止，账号验收与 P3/LIVE 准入分别记录。</div><div data-source-sha256="7910eb00b189ac449243b58504a92979ce9000add99c1cd6d467eb70bcf97751" data-source-document="01_交易系统层设计书.md"><h1>交易系统层设计书</h1>
+<p>版本：2.5.1；日期：2026年10月11日。唯一对应式样书：<a href="01_%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E5%B1%82%E5%BC%8F%E6%A0%B7%E4%B9%A6.html">交易系统层式样书</a>。本文规定实现 S1 的代码，不引入策略业务要求。</p>
+<h2 id="section-1">1 代码生成范围与依赖</h2>
+<p>实现包 src/factorforge/trading，独立入口 trading-api、execution-sim、execution-live。本层安装包不得导入 strategy 或 applications；验收时在未安装上两层的环境启动。API 只调用本层 application 服务，确定性 domain 不依赖网络/数据库；adapters 实现本层端口。Go、net/http 与 PostgreSQL 为本版目标技术栈，Go 依赖以 go.mod/go.sum 固定；迁移约束和落地状态见新增 Go 实现章节。</p>
+<p>建议子包为 domain/{market,order,protection,account,risk}、application/{commands,queries,reconcile}、ports/{market,broker,clock,secret,store}、adapters/{sim,binance,postgres}、api、workers。BrokerPort 对所有交易对象提供相同能力；新增渠道只扩充适配器和能力探针。数据库、日志、配置和时钟是本层设施，没有上层回调才能工作的必选路径。</p>
+<p>实例配置只通过通用接口传入。本层只认识 owner_id 和请求来源，不认识其策略类型。交易对象使用 InstrumentKey=(venue,product,instrument_id)，运行使用 RunKey=(environment,account_id,run_id)，environment 仅为 SIM/LIVE；历史回放和影子通过 SIM 的 execution_mode=REPLAY/SHADOW 区分，SHADOW不撮合。账号及所有外键带 environment，跨环境绑定拒绝。</p>
+<h2 id="section-2">2 数据类型和字段约定</h2>
+<p>此处类型是 v2.0 交易接口的设计真源，P1 据此生成 contracts/v2/trading 的机器契约、DTO 和校验；旧 contracts/openapi/v1.json 不参与生成。schema_version 固定为 trading-2.0，未知安全字段拒绝。金额、价格、数量为十进制字符串，内部有限十进制 Value；不得用二进制浮点核账。情绪等数学量不属于本层。时间用带 Z 的 UTC ISO8601，同时保留交易渠道业务日；ID 为不透明字符串。</p>
+<p>每个写请求公共字段：schema_version、request_id、idempotency_key、run_key、expected_version、reason、expires_at_utc；身份由已认证上下文取得，不能由正文中的 actor 或 environment 字符串授予权限。创建运行不要求 expected_version；其他命令以 aggregate_version 作乐观并发控制。响应公共字段：resource_id、aggregate_version、state、accepted_at_utc、correlation_id、reason_codes；accepted 表示本地命令持久化，不能表示成交。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>类型</th>
+<th>必需字段及语义</th>
+<th>约束</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>InstrumentSpec</td>
+<td>key, version, valid_from, price_tick, quantity_step, contract_multiplier, quote_currency, settlement_currency, min_notional, capabilities, price_roles</td>
+<td>乘数/步长正；交易能力枚举含LIMIT/MARKET/SHORT/CONDITIONAL_PROTECTION/REDUCE_ONLY等；不明用UNKNOWN</td>
+</tr>
+<tr>
+<td>MarketPoint</td>
+<td>instrument_key, source_id, kind, observed_at, received_at, available_at, value, currency, quality, spec_version</td>
+<td>kind区分BID/ASK/LAST/MARK/INDEX/REFERENCE/FX；quality为VALID/STALE/MISSING/CONFLICT</td>
+</tr>
+<tr>
+<td>Candle</td>
+<td>instrument_key, interval, open_at, close_at, available_at, open/high/low/close, volume, source_id, final, revision</td>
+<td>正价格；high不小于低价及开收；final=false不进入完成K线集合</td>
+</tr>
+<tr>
+<td>AccountPolicy</td>
+<td>version, valid_from, risk_day_zone, notional_limits, trade_loss_limit, margin_policy, daily_loss, drawdown, consecutive_loss, breach_action, recovery_policy</td>
+<td>三项账户亏损保护各含mode=OBSERVE/ENFORCE与阈值；缺关键值REQUIRED_UNSET</td>
+</tr>
+<tr>
+<td>OrderRequest</td>
+<td>owner_id, instrument_key, side, order_type, quantity, limit_price?, time_in_force?, reduce_only, position_side, spec_version, protection_plan?</td>
+<td>限价必需limit_price；新增实盘风险必需有效保护计划；未知模式拒绝</td>
+</tr>
+<tr>
+<td>ProtectionPlan</td>
+<td>lot_id?, trigger_kind, trigger_price, covered_quantity, exit_order_type, max_slippage_policy, spec_version</td>
+<td>触发价格角色支持后才接受；覆盖量按实际成交追踪；减仓语义必须证明</td>
+</tr>
+<tr>
+<td>TargetRequest</td>
+<td>owner_id, instrument_key, target_version, target_quantity, policy_version, spec_version, source_decision_id, protection_plan?, owner_epoch</td>
+<td>带符号数量；一对象一个活跃owner；所有潜在风险均计入</td>
+</tr>
+<tr>
+<td>OrderView</td>
+<td>order_id, external_order_id?, client_order_id, owner_id, instrument_key, side, requested_quantity, filled_quantity, remaining_quantity, average_fill_price?, state, reduce_only, spec_version</td>
+<td>未成交无均价，不填0；状态见第5章</td>
+</tr>
+<tr>
+<td>Fill</td>
+<td>venue, account_id, external_fill_id, external_order_id, instrument_key, side, quantity, price, fee, fee_currency, happened_at, received_at</td>
+<td>外部唯一键去重；账务只来源于实际或模拟成交事实</td>
+</tr>
+<tr>
+<td>PositionView</td>
+<td>instrument_key, owner_id?, quantity, average_entry?, unrealized_pnl?, currency, reconciliation_state, protection_state, observed_at</td>
+<td>归属不明进入UNALLOCATED，不随意分配</td>
+</tr>
+<tr>
+<td>AccountView</td>
+<td>equity?, available_margin?, currency, risk_day, realized_pnl, unrealized_pnl?, fees, funding, external_flows, risk_state, policy_version, observed_at</td>
+<td>净值不可靠时为null并携带质量；日损失不填0</td>
+</tr>
+</tbody>
+</table></div>
+<p>可选字段仅在业务不适用时省略；未知必需安全数值禁止执行。查询列表响应 items 为上述具体类型，另有 cursor 和 snapshot_version，不使用通用 Record。API 错误为 Problem={code,message,field?,correlation_id,retryable,current_version?}；401未认证、403越权、404当前身份范围不存在、409版本/幂等冲突、422域/能力/单位错误、423风险锁/恢复核验、429限流、503设施失效。未知订单结果用业务状态UNKNOWN，不能用可重试503诱发新订单。</p>
+<h2 id="section-3">3 服务与接口</h2>
+<p>BrokerPort 实现 submit_order、query_order、cancel_order、list_open_orders、list_fills、get_positions、submit_protection、query_protection、cancel_protection、get_account、get_income、get_capabilities。MarketPort 实现 candles、latest_points、subscribe_updates、instrument_specs。端口接收结构化 DTO，返回受理/事实/未知结果，不暴露交易密钥。适配器负责供应商字段、签名、限速、错误码和普通/条件单不同协议。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>HTTP/命令</th>
+<th>输入</th>
+<th>输出及副作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>POST /api/v2/trading/runs</td>
+<td>environment, account_binding, execution_mode, account_policy, initial_cash?</td>
+<td>RunView；SIM本金必填；LIVE不创建资金</td>
+</tr>
+<tr>
+<td>GET /instruments, /market/candles, /market/points</td>
+<td>InstrumentKey、区间、价格用途</td>
+<td>InstrumentSpec/Candle/MarketPoint列表；完整前缀同上</td>
+</tr>
+<tr>
+<td>POST /orders</td>
+<td>OrderRequest及公共字段</td>
+<td>OrderView；经风险、预占、outbox执行</td>
+</tr>
+<tr>
+<td>GET /orders, /orders/{id}, /positions, /account</td>
+<td>RunKey、查询游标</td>
+<td>OrderView/PositionView/AccountView；只在身份绑定范围查询</td>
+</tr>
+<tr>
+<td>POST /orders/{id}/cancel</td>
+<td>公共字段及order_id</td>
+<td>持久化撤单命令；订单仍未终态则继续计风险</td>
+</tr>
+<tr>
+<td>PUT /owners/{owner}/targets/{instrument}</td>
+<td>TargetRequest及公共字段</td>
+<td>TargetView={target_version,target_quantity,actual_quantity,pending_quantity,delta_quantity,state,reasons}</td>
+</tr>
+<tr>
+<td>POST /protections, GET /protections/{id}</td>
+<td>ProtectionPlan/标识及公共字段</td>
+<td>ProtectionView={plan,external_id?,covered_quantity,state,verified_at?,reasons}</td>
+</tr>
+<tr>
+<td>POST /protections/{id}/replace</td>
+<td>新计划、原版本及公共字段</td>
+<td>替换状态；按第6章无空档顺序执行</td>
+</tr>
+<tr>
+<td>POST /protections/{id}/cancel</td>
+<td>公共字段、指定计划</td>
+<td>仅已无对应敞口或有替代确认时允许</td>
+</tr>
+<tr>
+<td>POST /runs/{id}/reconcile, /stop, /resume</td>
+<td>模式、原因、版本及公共字段</td>
+<td>RunView；resume需核验结果和独立权限</td>
+</tr>
+</tbody>
+</table></div>
+<p>RunView={run_key,execution_mode,state,policy_version,reconciled_at?,executor_epoch,active_owners,reasons}。Target状态为PENDING/RECONCILING/ACTIVE/BLOCKED/SUPERSEDED；ACTIVE不代表已经达成。CLI是本层API客户端，提供sim-create、market-read、order-submit/cancel、protection-set、account-show、reconcile；CLI不绕过服务。直接订单入口受owner占用冲突检查，不能在框架占用的归属上偷偷发单。</p>
+<h2 id="section-4">4 风险、目标差额与并发</h2>
+<p>RiskEngine输入不可变的AccountSnapshot、InstrumentSpec、AccountPolicy、未终态订单和请求。检查顺序：身份/环境 → 故障及恢复状态 → 数据和规则 → 交易能力/时段 → 归属 → 最不利敞口/保证金 → 单笔及组合压力 → 账户ENFORCE门 → 审计可用。输出 RiskDecision={approved,reasons,worst_exposure,reservations,policy_version,input_hash}。策略来源与人工来源不能改变顺序。</p>
+<p>owner绑定表对(RunKey,InstrumentKey,position_side)作互斥所有权；初版同一账户同一产品不同时运行多个独立写者。不同交易对象/账户可以并行。将来需要同标的多策略共享时，以独立账户或经新增式样验证的分配器扩展，不靠净持仓猜归属。即使不同owner交易不同对象，其账户预算仍由单账户事务检查及预占。</p>
+<p>对目标数量 q_target 先按数量步长向零取整。delta = q_target - q_actual - q_pending_valid；q_pending_valid只包含同一目标下仍有效的订单预期量。新目标先撤销旧增险单，确认后才能替换；未知旧单继续按最不利同时成交风险计入。反向目标先平旧方向且查询归零，然后新方向重新风险检查。人工改仓、ADL或强平使owner_epoch增加、目标BLOCKED；上层读取新事实并显式恢复目标epoch才能继续，旧epoch请求拒绝。</p>
+<p>通用线性产品名义金额为 abs(q × price × multiplier)，损益为有符号q × multiplier × (exit-entry)，费用/资金费另记。非线性产品需另一个已验证AccountingPort，初版能力不支持就拒绝；不用线性公式硬套。每种价格用途来自InstrumentSpec，成交可行性用有效BID/ASK，保证金用批准MARK，策略价格代理由上层选择但本层返回真实质量。</p>
+<p>OBSERVE 的账户日损失/回撤/连亏只输出would_trigger记录，不向可用预算、目标缩减或锁状态注入间接约束。其他硬限照常。Π_day=equity_marked-equity_start-net_external_inflow，L_day=max(0,-Π_day)；金额或比例任一ENFORCE阈值达到则锁定。原风险日基准、外部资金流和锁持久化；浮盈恢复、转账及重启不自动解除。新风险日如何解除按recovery_policy，必须完成对账。</p>
+<p>风险配置必须有有效版本、依据和启用范围。ENFORCE缺breach_action或风险默认值证据未满足实例准入时拒绝LIVE启动。breach_action枚举KEEP_PROTECTION/ORDERLY_REDUCE/EXIT_WHEN_TRADABLE；不替用户选择。连续亏损接受经成交和净成本核验的完整仓位周期关闭事实，不接受上层任意写一个亏损次数；没有框架时本层PositionCycle也可形成该事实。</p>
+<h2 id="section-5">5 订单状态、幂等与账务事务</h2>
+<p>订单主状态：CREATED → RESERVED → DISPATCHING → ACKNOWLEDGED → PARTIALLY_FILLED → FILLED；旁路为REJECTED、CANCEL_PENDING、CANCELED、UNKNOWN。撤单和成交并发时，以累计成交事实确定filled/remaining，不能由较晚到的撤单响应覆盖成交。终态更正仅追加外部事实，不复用旧请求ID。</p>
+<p>幂等表唯一键为(environment,account_id,principal_id,idempotency_key)，保存规范请求哈希和已产生的resource_id。相同键相同正文返回原结果；不同正文409。client_order_id从本地order_id稳定生成，不因网络重试更换；实际供应商长度/字符限制由适配器测试冻结。</p>
+<p>同一数据库事务锁account及owner，校验expected_version，写order/target、risk_decision、资金/敞口reservation、audit和outbox；失败则无可投递订单。网络调用在事务外，没有数据库与交易所原子事务。outbox至少一次投递，执行前再检查期限、risk_policy、executor_epoch和最新风险；收到未知响应先查询稳定客户端ID，无法确认则UNKNOWN并锁增险。UNKNOWN预占不释放，只有确定未受理/撤销才释放剩余额度。</p>
+<p>存储表：trading_run、account_policy_version、instrument_spec、market_snapshot_ref、owner_binding、target_request、order、protection_order、fill、income_entry、position_lot、position_cycle、risk_day、risk_lock、risk_reservation、reconciliation_report、command_dedup、audit_event、outbox。所有运行事实带RunKey，fill和income按渠道外部业务ID唯一；本层数据库角色独占其表，上层无直写权限。</p>
+<p>SIM和LIVE用独立schema、数据库角色、执行进程和凭据目录；跨schema外键/查询禁止。账户净值是成交/收入账本投影，查询交易所结果形成核验事实；差异不能被投影静默覆盖。真实原文、模型会话不是本层表的内容。</p>
+<h2 id="section-6">6 保护、执行权与异常恢复</h2>
+<p>每次新增实际成交建立risk_lot并执行ProtectActualFill；未确认保护时 lot为UNPROTECTED，暂停增险并按预定政策保留/退出，持续告警。部分成交只保护已成交量，不以订单原总量假装全部有保护。保护状态为PENDING/ACTIVE_VERIFIED/TRIGGERED/EXIT_PARTIAL/CLOSED/UNKNOWN/FAILED。</p>
+<p>保护替换先创建并查询新保护，确认覆盖后撤旧；若供应商不允许重叠，必须通过能力验证可原子修改，否则禁止该替换路径或先安全降险。任何时候保护覆盖状态与实际仓位对账。触发只表示条件成立，继续追踪成交、残仓及费用。存量保护不放宽；减仓型保护不能因为side或仓位模式不符变成反向开仓。</p>
+<p>execution-live唯一持有签名凭据。每账户只有一个经确认的执行主，使用executor_epoch及数据库租约；租约丢失停止出站。数据库租约不能证明旧进程已经无法发单，切主还需确认旧进程/凭据出口已隔离；无法确认时不启动新主。双主故障注入验证不能只测一行租约SQL。</p>
+<p>运行状态INITIALIZING/NORMAL/DEGRADED/RISK_LOCKED/EMERGENCY/RECOVERY_CHECK/STOPPED。启动先查询普通单、条件单、成交、收入、仓位、保证金和规则，与本地订单ID及风险锁核对；对所有UNKNOWN查清或保持BLOCKED。恢复完成需要账差归零或签署差异解释、外部变更归属明确及保护可确认；独立resume命令才可回NORMAL。保护和强制减险工作池优先于普通发单及行情批量下载。</p>
+<p>API/数据库失效时不得靠本地旧缓存继续增险。残仓的最后处置为已准备的官方交易渠道人工runbook：确认账户 → 隔离旧自动执行 → 查实际仓位/普通及条件单 → 撤增险且保留必要保护 → 按预签触限政策减险 → 留存外部ID及前后事实 → 恢复后导入并对账。若独立复核职责无法落实，实盘准入保持未通过；不假定已有第二名操作人员。无有效预案时不提供未经验证的离线签名发单脚本。</p>
+<h2 id="section-7">7 仿真与供应商适配</h2>
+<p>SimBroker实现完整BrokerPort，使用固定种子及冻结成交规则；输入时钟来自ReplayClock，不读系统当前时间决定历史成交。市价按下一可用可成交报价加费用/滑点，限价须考虑排队/成交量；无逐笔时保存OHLC路径歧义，选择登记的保守规则或区间。模拟保证金、资金费、强平、部分成交、撤单不确定及停盘；资金不足不能自动注资。SHADOW只保存目标和意图。</p>
+<p>BinanceAdapter按能力探针映射普通/条件单，查询与撤销分别使用供应商适用接口。动态读取交易规则并保存版本；目标产品/账户/协议接受状态仍需实际核验。官方文档已于2026年10月4日核对普通交易及条件订单的入口分类，具体参数在适配器契约探针中冻结，不把公共文档当目标账户已授权证据。<a href="https://developers.binance.com/en/docs/catalog/core-trading-derivatives-trading-usd-s-m-futures/api/rest-api/trade">Binance交易接口</a></p>
+<p>不同venue适配器跑同一BrokerPort契约测试，合约特有收入与公司行动输出通用TypedIncome/InstrumentChange，由核账及恢复流程处理，不能在策略包写供应商私有API。</p>
+<h2 id="section-8">8 式样到代码与测试追踪</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>式样</th>
+<th>实现章节/主组件</th>
+<th>验收</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>S1-001</td>
+<td>1、3、7；独立包/API/CLI与BrokerPort</td>
+<td>T1-01</td>
+</tr>
+<tr>
+<td>S1-002</td>
+<td>1、5；RunKey、schema/角色/执行进程隔离</td>
+<td>T1-02</td>
+</tr>
+<tr>
+<td>S1-003</td>
+<td>2、3、7；MarketPort与数据质量</td>
+<td>T1-03</td>
+</tr>
+<tr>
+<td>S1-004</td>
+<td>2、4、7；InstrumentSpec、核算适配</td>
+<td>T1-03、T1-08</td>
+</tr>
+<tr>
+<td>S1-005</td>
+<td>3、5；订单命令和状态机</td>
+<td>T1-04</td>
+</tr>
+<tr>
+<td>S1-006</td>
+<td>3、4；OwnerBinding、TargetService</td>
+<td>T1-06</td>
+</tr>
+<tr>
+<td>S1-007</td>
+<td>6；ProtectActualFill、ProtectionService</td>
+<td>T1-05</td>
+</tr>
+<tr>
+<td>S1-008</td>
+<td>4、5；RiskEngine与原子预占</td>
+<td>T1-06、T1-12</td>
+</tr>
+<tr>
+<td>S1-009</td>
+<td>4；OBSERVE/ENFORCE政策分支</td>
+<td>T1-07</td>
+</tr>
+<tr>
+<td>S1-010</td>
+<td>4、5、7；账本、risk_day、收入</td>
+<td>T1-08</td>
+</tr>
+<tr>
+<td>S1-011</td>
+<td>5；幂等表、client ID、UNKNOWN</td>
+<td>T1-04</td>
+</tr>
+<tr>
+<td>S1-012</td>
+<td>4、6；Reconciler、owner_epoch</td>
+<td>T1-10</td>
+</tr>
+<tr>
+<td>S1-013</td>
+<td>6；Stop/Resume、人工预案</td>
+<td>T1-09、T1-10</td>
+</tr>
+<tr>
+<td>S1-014</td>
+<td>7；SimBroker、ReplayClock</td>
+<td>T1-11</td>
+</tr>
+<tr>
+<td>S1-015</td>
+<td>2、5、6；Auth、审计、健康门</td>
+<td>T1-12</td>
+</tr>
+</tbody>
+</table></div>
+<p>纯函数测试覆盖Decimal舍入、最不利敞口和OBSERVE不间接停机；集成测试注入提交成功但响应丢失、撤单竞态、保护失败、重复成交、双主和数据库不可用；真实能力探针与人工恢复演练单独留证。完成文档与契约检查只能证明设计一致，不能替代实盘执行证据。</p>
+</div><h2 id="section-9">9 Go 包、数值与交易运行实现</h2>
+<p>api/http.go 使用标准库 net/http.ServeMux 注册现有 /api/v2/trading 路由，Handler 只调用 application 服务。写正文先限制长度、校验 Content-Type，json.Decoder.DisallowUnknownFields、单文档 EOF 和显式字段/枚举/跨字段校验；不接受浮点金额。需要区分缺失与 null 的字段使用存在标记结构；必需布尔/整数不能仅由零值判断。保持 Pydantic 原 ID、时间因果、OHLC、规则、保护和账户政策约束，按现有 OpenAPI 比对错误状态与业务 Problem。</p>
+<p>domain/decimal/value.go 封装 cockroachdb/apd/v3 v3.2.3，不向调用者暴露可变系数或全局 Context。普通运算沿用原 Decimal 28 位、ROUND_HALF_EVEN 和逐操作顺序；舍入到数量步长仍为 ROUND_DOWN（趋零）。解析只接受有限十进制字符串，保留负零/指数/尾数语义；错误不打印输入。Math 属于一次计算，错误传到用例，在提交/出站前检查，不能把失败生成的零值写入状态。api/dto/decimal.go 只公开稳定值类型与算术接口，供 P2 依赖；这是 P1 通用数据能力，不是跨层业务 common。</p>
+<p>application/{commands,targets,reconcile,recovery,execution_facts,emergency}.go 与旧用例逐项对应。写事务取得运行/账户串行锁，再核验 aggregate_version、幂等请求指纹、所有权/epoch、硬风险和最不利未成交量；持久化命令及 outbox 成功后才返回受理。workers/{executor,protection,feedback,market}.go 独立运行，出站操作前/后记录状态。超时写结果使用 UNKNOWN 和原 client_order_id 查询；不能依赖通用 HTTP 重试重发写单。普通单和条件保护使用不同适配端口及查询事实。</p>
+<p>ports/store.go 定义 context.Context 贯穿的事务/查询端口，不暴露 pgx 类型。adapters/postgres/store.go 采用固定 pgx/v5 v5.11.0 与 pgxpool；加载原 migrations/001_trading.sql，并应用可选 002_snapshot_order.sql 保留接收顺序；保留 trading_sim/trading_live 模式、数据库角色、外键和追加账务。JSONB 解码不经 float64，数量/时间由显式 DTO 读取；原状态没有适配证据时不得自动升级数据库或重新赋予执行权。序列化后的金额仍是字符串。事务取消/提交结果未知时先读幂等结果。</p>
+<p>adapters/sim/broker.go 迁移可用时点、延迟、参与率、部分成交、手续费、资金、OHLC 保守路径和影子不撮合规则。adapters/binance/{transport,broker,market,probe,remote}.go 用 net/http 和明确 Transport 超时实现限流、签名、时间同步、原 ID 查询及状态映射；签名密钥只在执行入口读取 config/config.toml。API/行情进程不能装配签名执行凭据。</p>
+<p>domain/lease.go 保持租约不等于隔离：到期后替换仍需旧 epoch 隔离证据；续租、出站 epoch、停机恢复锁和 DONE outbox 不被新执行者改写。entrypoints/{trading-api,execution-sim,execution-live,market-collector,trading-cli,testnet-acceptance}/main.go 各自装配本层，P1 二进制不包含 strategy/applications。LIVE 默认未就绪，测试网能力/故障闭环须在另行授权的迁移验收中复测。</p><figure id="go-p1"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 500" role="img" aria-labelledby="go-p1-title go-p1-desc"><title id="go-p1-title">图 D1-Go：事务、执行权与结果未知</title><desc id="go-p1-desc">HTTP / CLI → Auth + typed DTO，固定 environment / account / run，拒绝未知字段；application → Store.Transaction，版本 / 幂等 / 所有权 / 风险 → 命令 + outbox；executor / protection → 有效 lease + 已核验隔离，按端口出站；签名秘密只在执行进程；回报 / 原 ID 查询 → execution_facts / accounting，去重记账 + 保护事实；UNKNOWN 禁止盲目重发；恢复 / SIM 故障验收通过后切换，上层未部署仍独立运行；LIVE 另行准入</desc><defs><marker id="go-p1-arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L9,3 L0,6" fill="#39768a"/></marker></defs><path d="M450.0,85 L450.0,100.0 L450.0,100.0 L450.0,115" fill="none" stroke="#39768a" stroke-width="2" marker-end="url(#go-p1-arrow)"/><path d="M450.0,185 L450.0,200.0 L450.0,200.0 L450.0,215" fill="none" stroke="#39768a" stroke-width="2" marker-end="url(#go-p1-arrow)"/><path d="M450.0,285 L450.0,300.0 L450.0,300.0 L450.0,315" fill="none" stroke="#39768a" stroke-width="2" marker-end="url(#go-p1-arrow)"/><path d="M450.0,385 L450.0,400.0 L450.0,400.0 L450.0,415" fill="none" stroke="#39768a" stroke-width="2" marker-end="url(#go-p1-arrow)"/><rect x="100" y="15" width="700" height="70" rx="9" fill="#e5f2f3" stroke="#72a4b2"/><text x="450.0" y="44.5" text-anchor="middle" font-size="15" fill="#17384a">HTTP / CLI → Auth + typed DTO</text><text x="450.0" y="65.5" text-anchor="middle" font-size="15" fill="#17384a">固定 environment / account / run，拒绝未知字段</text><rect x="100" y="115" width="700" height="70" rx="9" fill="#e5f2f3" stroke="#72a4b2"/><text x="450.0" y="144.5" text-anchor="middle" font-size="15" fill="#17384a">application → Store.Transaction</text><text x="450.0" y="165.5" text-anchor="middle" font-size="15" fill="#17384a">版本 / 幂等 / 所有权 / 风险 → 命令 + outbox</text><rect x="100" y="215" width="700" height="70" rx="9" fill="#e5f2f3" stroke="#72a4b2"/><text x="450.0" y="244.5" text-anchor="middle" font-size="15" fill="#17384a">executor / protection → 有效 lease + 已核验隔离</text><text x="450.0" y="265.5" text-anchor="middle" font-size="15" fill="#17384a">按端口出站；签名秘密只在执行进程</text><rect x="100" y="315" width="700" height="70" rx="9" fill="#e5f2f3" stroke="#72a4b2"/><text x="450.0" y="344.5" text-anchor="middle" font-size="15" fill="#17384a">回报 / 原 ID 查询 → execution_facts / accounting</text><text x="450.0" y="365.5" text-anchor="middle" font-size="15" fill="#17384a">去重记账 + 保护事实；UNKNOWN 禁止盲目重发</text><rect x="100" y="415" width="700" height="70" rx="9" fill="#e5f2f3" stroke="#72a4b2"/><text x="450.0" y="444.5" text-anchor="middle" font-size="15" fill="#17384a">恢复 / SIM 故障验收通过后切换</text><text x="450.0" y="465.5" text-anchor="middle" font-size="15" fill="#17384a">上层未部署仍独立运行；LIVE 另行准入</text></svg><figcaption>图 D1-Go：事务、执行权与结果未知</figcaption></figure><h2 id="section-10">10 P1 开源参考与本版落地状态</h2><div class="table-wrap"><table><thead><tr><th>部件</th><th>固定来源 / 部分</th><th>复用方式与验收</th></tr></thead><tbody><tr><td>十进制</td><td><a href="https://github.com/cockroachdb/apd/tree/6d9c587326e78bcfbea630bf52893ff45f6f9ed5">apd v3.2.3</a>；context.go、decimal.go、round.go</td><td>依赖锁定，不复制其源码；Apache-2.0，保留依赖许可证；固定 JSON 与算术对照</td></tr><tr><td>HTTP 服务</td><td><a href="https://go.dev/doc/go1.22">Go ServeMux 方法/路径路由</a>、net/http</td><td>标准库调用；认证/错误/重试/超时按 Factorforge 契约设计</td></tr><tr><td>PostgreSQL</td><td><a href="https://github.com/jackc/pgx">pgx/v5</a>；pgxpool、事务及类型映射</td><td>基础设施依赖 v5.11.0，MIT；pgxpool/pool.go、tx.go、pgconn；角色、账本及事务仍按本项目设计</td></tr><tr><td>Binance 网络参考</td><td>局域网 TradingAgent internal/exchange/{binance_client,binance_futures}.go；正式引用前核验其许可和固定提交</td><td>参考签名/时钟/原 ID 查询及错误分类；本版未复制其源码，不继承 float64 账务</td></tr><tr><td>本版已开始的源码</td><td>domain、application、ports、adapters、api、workers 与六个 entrypoints；tools/build-trading、export-trading-contract、init-private-config、prepare-trading-profiles</td><td>P1 完整 Go 实现和本地验收完成，真实 PostgreSQL/HTTP/故障/隔离/无 Python 路径进程验证通过；Go 测试网只读子集 12 项通过，完整现场交易复验不由旧报告代替</td></tr></tbody></table></div><p data-go-p1-status="complete">运行实现：application/commands.go、operations.go、targets.go、market.go、execution_facts.go、venue.go 调用 ports.Store 的 Create/Read/BoundRun/Transaction；api/http.go 先经 api/dto/decode.go 的冻结形状/默认值/显式空值检查再调用应用服务。workers/executor.go、protection.go、feedback.go 调用 ports.Broker 的提交/查询/撤单及成交/收入/账户方法；collector.go 经 ports.TradingAPI.Call 使用下层本层 HTTP，不拥有交易密钥。adapters/postgres/store.go 在账户行锁事务中写入完整状态、outbox 和追加审计；实际 session_user 身份/跨环境权限及 NOLOGIN 均为执行边界。金额与原 JSONB 业务字段保持，顺序快照与旧写入兼容。</p><p>私有文件由 adapters/configuration/config.go 使用 go-toml/v2 v2.4.3 的 decode.go、marshaler.go 加载；公开格式仅有空内容模板。adapters/isolation/{gateway,filesystem_linux}.go 使用固定 go-landlock v0.10.1 的严格路径限制，空网络 namespace 由原生 unshare 装配；Unix CONNECT 只允许登记目的地，撤权关闭已建立 TLS 并禁止重连。测试网验收入口运行独立 API/签名子进程和本轮 PostgreSQL，显式授权写操作，失败只输出稳定错误码；独立清理仅取消本轮已知保护且每次确认账户已平仓。实验政策不能复制进生产 Readiness。许可证与固定版本见 <a href="../../THIRD_PARTY_NOTICES.md">第三方声明</a>，证据及当前 Go 启动见 <a href="../progress/GO_MIGRATION.md">迁移进度</a>、<a href="../engineering/TRADING_GO.md">运行说明</a>。</p><h2 id="section-11">Go 迁移共同约束与切换门槛</h2>
+<p>语言选择按模块而非全项目统一：现有 P1/P2 与已实现上层 Go 模块继续采用 Go；上层可复用 TypeScript/JavaScript 等非 Python 模块，不要求为统一语言重写成熟接入代码。语言选择不改变三层依赖、公开契约、权限隔离或准入；Python 不得作为活跃源码、解释器、子进程、HTTP 服务或构建/测试/hooks/CI 的必需依赖。具体跨语言传输和模块引入仍须先验证再定稿设计。根 go.mod 是本仓库 Go 模块唯一真源，只约束 Go 源码，go.sum 固定其依赖校验；现有工具链 Go 1.27.1。Go 生产代码仍只放 src/factorforge 对应层，domain、application、ports、adapters、api、workers 六类职责保留；独立 main 放本层 entrypoints/入口名。P1 不导入上层，P2 仅引用 P1 api/dto 的公开值类型和 HTTP 客户端；不创建承载跨层业务的 common。Go 测试放 tests 对应层，数据库迁移仍归属本层 PostgreSQL 适配器。</p>
+<p>迁移以 v2.1.0 标签 e97c9e9a380d105a7e96933bdd325e1d9af06d93 的源码、冻结业务式样和 contracts/v2 契约为对照。HTTP 方法/路径、schema_version、十进制字符串、UTC/空值/未知语义、错误码、状态机和授权范围保持；OpenAPI 3.1.0 及历史 JSON Schema Draft 2020-12 不降级。接口不是因 Go 类型名变化自动升版。</p>
+<p>新实现不调用 Python 子进程、不嵌 Python 解释器，也不以 Python HTTP 服务作为最终 Go 后端。迁移期间旧源码与入口保留，用合成夹具捕获对照；不得双启动同一账户的执行者、双写同一运行，或因 Go 模块编译通过就替换运行服务。切换前记录当前版本、运行状态和库快照，停止旧执行者并取得隔离证据，由新进程恢复对账；回退也须停止并隔离新执行者，不能同时使用同一签名身份。</p>
+<p>替换全部活跃初始化、布局/版本/HTML/公开内容/历史契约检查、构建、hooks、CI 与运行工具；最终用没有 Python 的受控环境完成 Go 构建、单元/故障/真实 PostgreSQL/独立进程/SIM 验收。历史冻结文档中的 Python 文字或文件保留为历史，不要求运行其作者脚本；旧活跃作者工具在 Go 替代检查通过后退役。迁移夹具 JSON 自带源提交和 fixture_only，Go 测试读取固定结果，不依赖即时 Python oracle。真实配置及 Prompt 不迁移进夹具。</p>
+<p>发布记录逐模块区分本地机制、真实环境和生产准入证据。P1/P2 已完成 Go 运行迁移，G3 已退役活跃 Python 工具；原 Python 证据只作历史对照。P3 原生工作池、管理台 Go BFF/React 和日历/报告已完成本地集成，具体结果见进度记录。外部来源许可、抽取/模型评测、生产参数、DEC-06、独立复核和 LIVE 准入仍未关闭。本次不授权实际交易。</p><h2 id="binance-tradfi-mapping">12 Binance TradFi 永续产品映射（v2.1.9）</h2>
+<p>对应 S1-001/003/004/007 与 T1 产品能力验收；业务式样和通用 LINEAR_PERPETUAL 契约不变。先完成<a href="../engineering/P3_VENUE_VERIFICATION.md">两个官方环境的只读请求及真实返回重放</a>，再完成本章，随后修改生产适配器。P1 不依赖 P3 的 SOXL/JEV/日历逻辑。</p>
+<p>adapters/binance/market.go 的 InstrumentSpecs 只识别明确的 PERPETUAL 和 TRADIFI_PERPETUAL，其他交易所枚举继续不构建通用规则。保留显式 Multipliers[symbol] 且正数的要求，不默认1；TRADIFI_PERPETUAL 还必须有非空 baseAsset/underlyingType，quoteAsset 与 marginAsset 非空且相同，否则返回 INSTRUMENT_RULES_UNVERIFIED。symbol/status/filter/orderTypes 继续按既有转换与领域校验处理。</p>
+<p>识别的新类型映射到既有 InstrumentKey{Venue=BINANCE,Product=LINEAR_PERPETUAL,InstrumentID=交易所symbol}，数量/价格/最小名义保持十进制；不自动填交易能力、MarginTier、账户授权或特殊资金费。新类型摘要在原 filters/multiplier/status 外增加 contractType/baseAsset/quoteAsset/marginAsset/underlyingType，身份变化产生新版本。旧 PERPETUAL 摘要和有效起点保持原规则，未变化规则不抖动。缺乘数/未知类型不登记，异常不返回局部成功结果。</p>
+<figure><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 270" role="img"><title>交易所枚举到通用永续规则</title><desc>公共交易所返回先验证明确类型、显式乘数与线性结算身份，再经原规则转换、版本摘要及领域核验，读取规则不赋予签名执行资格。</desc><defs><marker id="tradfi-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#006e82"/></marker></defs><g fill="#eef7f8" stroke="#006e82"><rect x="20" y="35" width="220" height="85" rx="8"/><rect x="290" y="35" width="280" height="85" rx="8"/><rect x="620" y="35" width="260" height="85" rx="8"/></g><g fill="#17384a" font-family="sans-serif" font-size="16" text-anchor="middle"><text x="130" y="70">公开 exchangeInfo</text><text x="130" y="99">明确枚举 / 实际身份</text><text x="430" y="70">显式乘数 / 线性结算</text><text x="430" y="99">原过滤 / 十进制 / 版本校验</text><text x="750" y="70">通用 LINEAR_PERPETUAL</text><text x="750" y="99">P1 API / 原账务与保护</text><text x="450" y="199">识别类型不等于账户或保护准入；下层没有 SOXL/JEV 依赖</text></g><g fill="none" stroke="#006e82" stroke-width="2" marker-end="url(#tradfi-arrow)"><path d="M240 78H290"/><path d="M570 78H620"/></g></svg><figcaption>图 D1-TradFi：复用既有交易接口，新增交易所类型适配。</figcaption></figure>
+<p>实际下层/本层调用保持 Market.InstrumentSpecs → Collector.Collect → TradingAPI.Call 的 /api/v2/trading/instruments 登记，再由上层读取 P1 InstrumentSpec。没有新增签名、协议接受或订单操作；LIMIT/MARKET 的声明不能推导 CONDITIONAL_PROTECTION。复用原 Go 适配器和官方 exchangeInfo 文档，不复制上游SDK实现；没有新依赖。测试普通/新类型、未知类型、缺乘数/身份不一致/无效步长、规则变化及普通旧摘要保持；实际公共响应重放、P1 HTTP 采集及向上只读绑定，完整Go/vet/race/布局/契约与静态文档检查。实际账户能力及经济单位验证另行登记。</p>
+</article><footer>HTML 是本版唯一发布正文。图表为内嵌 SVG，无需联网或运行脚本。文档通过不代表程序实现、交易运行或实盘准入通过。</footer></main></div></body></html>
