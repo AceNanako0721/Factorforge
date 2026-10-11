@@ -102,6 +102,15 @@ func TemplateIssue(name string, data []byte, historical bool) string {
 		}
 		if historical {
 			old := cloneMap(expected)
+			// Exact pre-v2.5.3 empty template, before the SEC identity block.
+			secApplication := cloneMap(asMap(old["application"]))
+			secPipeline := cloneMap(asMap(secApplication["pipeline"]))
+			delete(secPipeline, "sec")
+			secApplication["pipeline"] = secPipeline
+			old["application"] = secApplication
+			if equalJSON(actual, old) {
+				return ""
+			}
 			// Exact pre-v2.5.1 empty template; populated semantic blocks are never accepted.
 			legacyApplication := cloneMap(asMap(old["application"]))
 			delete(legacyApplication, "semantic_extraction")

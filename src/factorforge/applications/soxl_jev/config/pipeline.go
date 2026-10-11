@@ -106,6 +106,7 @@ type WorkerProfile struct {
 	SearchToken      string           `toml:"search_token"`
 	ReportReadURL    string           `toml:"report_read_url"`
 	ReportReadToken  string           `toml:"report_read_token"`
+	SECUserAgent     string           `toml:"sec_user_agent"`
 }
 
 func (p WorkerProfile) Binding() d.Binding {
@@ -230,6 +231,20 @@ type RSSRegistration struct {
 	MaxItems                int      `json:"max_items"`
 	PublicationTimeVerified bool     `json:"publication_time_verified"`
 }
+
+// SECRegistration is a private asset entry for the v2.5.3 SEC 8-K source.
+// FixtureBase is accepted only in fixture mode; production uses EDGAR hosts.
+type SECRegistration struct {
+	SourceID         string                  `json:"source_id"`
+	LicenceRef       string                  `json:"licence_ref"`
+	Companies        []monitoring.SECCompany `json:"companies"`
+	Items            []string                `json:"items"`
+	LookbackSeconds  int64                   `json:"lookback_seconds"`
+	MaxFilings       int                     `json:"max_filings"`
+	MaxMetadataBytes int                     `json:"max_metadata_bytes"`
+	MinIntervalMS    int64                   `json:"min_interval_ms"`
+	FixtureBase      string                  `json:"fixture_base,omitempty"`
+}
 type PipelineAssets struct {
 	CalendarFile          string                            `json:"calendar_file,omitempty"`
 	ReviewedEvidenceFiles []string                          `json:"reviewed_evidence_files,omitempty"`
@@ -246,6 +261,7 @@ type PipelineAssets struct {
 	EventPlans            map[string]workers.EventPlan      `json:"event_plans"`
 	Annotations           map[string]evidence.Annotation    `json:"annotations"`
 	RSS                   []RSSRegistration                 `json:"rss"`
+	SECFilings            []SECRegistration                 `json:"sec_filings"`
 	Calibration           analysis.CalibrationMapping       `json:"calibration"`
 	SearchPlans           []monitoring.SearchPlan           `json:"search_plans"`
 	SearchRouting         *d.SearchRoutingPolicy            `json:"search_routing"`
@@ -367,6 +383,9 @@ func PrepareWorkerProfiles(canonical, root string) ([]string, error) {
 				Ingest         WorkerAccess     `toml:"ingest"`
 				Research       WorkerAccess     `toml:"research"`
 				Trading        WorkerAccess     `toml:"trading"`
+				SEC            struct {
+					UserAgent string `toml:"user_agent"`
+				} `toml:"sec"`
 			} `toml:"pipeline"`
 		} `toml:"application"`
 	}
@@ -405,6 +424,7 @@ func PrepareWorkerProfiles(canonical, root string) ([]string, error) {
 			p.SearchURL = c.Services.SearchAPIURL
 			p.SearchToken = c.Credentials.SearchAPIKey
 			p.SearchBackends = c.Application.Pipeline.SearchBackends
+			p.SECUserAgent = c.Application.Pipeline.SEC.UserAgent
 		}
 		if role != "INGEST" {
 			p.ProviderToken = c.Credentials.JevAPIKey

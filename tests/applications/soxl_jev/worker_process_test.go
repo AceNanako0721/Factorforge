@@ -165,7 +165,20 @@ func TestNativeInstanceWorkerProfilesAndProcessWithoutPythonNode(t *testing.T) {
 	var searchEndpoint string
 	var braveCalls, exaCalls atomic.Int64
 	searchServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		secFolder := "/Archives/edgar/data/1045810/000104581026000003/"
 		switch request.URL.Path {
+		case "/submissions/CIK0001045810.json":
+			if request.Header.Get("User-Agent") != "Factorforge fixture ops@example.com" {
+				t.Error("SEC identity not declared by native worker")
+			}
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprintf(w, `{"filings":{"recent":{"form":["8-K"],"accessionNumber":["0001045810-26-000003"],"acceptanceDateTime":["%s"],"items":["2.02,9.01"]}}}`, time.Now().UTC().Add(-time.Hour).Format(time.RFC3339))
+		case secFolder + "0001045810-26-000003-index.htm":
+			w.Header().Set("Content-Type", "text/html")
+			fmt.Fprintf(w, `<table><tr><td>1</td><td>PRESS RELEASE</td><td><a href="%spr.htm">pr.htm</a></td><td>EX-99.1</td><td>1</td></tr></table>`, secFolder)
+		case secFolder + "pr.htm":
+			w.Header().Set("Content-Type", "text/html")
+			fmt.Fprint(w, "<html><body><p>Fixture SEC press release.</p></body></html>")
 		case "/feed":
 			w.Header().Set("Content-Type", "application/rss+xml")
 			fmt.Fprintf(w, "<rss version=\"2.0\"><channel><item><link>%s/seed</link><pubDate>%s</pubDate></item></channel></rss>", searchEndpoint, now.Add(-time.Minute).Format(time.RFC1123Z))
@@ -194,9 +207,11 @@ func TestNativeInstanceWorkerProfilesAndProcessWithoutPythonNode(t *testing.T) {
 	defer searchServer.Close()
 	searchEndpoint = searchServer.URL
 	asset.Sources = map[string]d.SourceRegistration{"fixture-rss": {SourceID: "fixture-rss", Version: "fixture-source-version", LicenceRef: "fixture-licence", Enabled: true, LicenceVerified: true, AllowAnalysis: true, Environments: []string{"SIM"}, ValidFrom: now.Add(-time.Hour), ValidUntil: now.Add(time.Hour), MaxAge: time.Hour}}
+	asset.Sources["fixture-sec"] = d.SourceRegistration{SourceID: "fixture-sec", Version: "fixture-source-version", LicenceRef: "fixture-sec-licence", Enabled: true, LicenceVerified: true, AllowAnalysis: true, Environments: []string{"SIM"}, ValidFrom: now.Add(-time.Hour), ValidUntil: now.Add(time.Hour), MaxAge: time.Hour}
 	asset.RSS = []config.RSSRegistration{{FeedURL: searchEndpoint + "/feed", SourceID: "fixture-rss", LicenceRef: "fixture-licence", Hosts: []string{"127.0.0.1"}, MaxItems: 2}}
 	asset.SearchPlans = []monitoring.SearchPlan{{Version: "fixture-search-plan", SourceID: "fixture-rss", Query: "fixture approved topic", Count: 2}}
 	asset.SearchSourceHosts = map[string]string{"127.0.0.1": "fixture-rss"}
+	asset.SECFilings = []config.SECRegistration{{SourceID: "fixture-sec", LicenceRef: "fixture-sec-licence", Companies: []monitoring.SECCompany{{Ticker: "NVDA", CIK: 1045810}}, Items: []string{"2.02"}, LookbackSeconds: 172800, MaxFilings: 5, MaxMetadataBytes: 65536, MinIntervalMS: 100, FixtureBase: searchEndpoint}}
 	searchPolicy := searchPolicy(now.Truncate(time.Second), "BRAVE", "EXA")
 	searchPolicy.CacheTTLSeconds = 300
 	asset.SearchRouting = &searchPolicy
@@ -218,6 +233,7 @@ func TestNativeInstanceWorkerProfilesAndProcessWithoutPythonNode(t *testing.T) {
 	}
 	canonical := filepath.Join(private, "canonical.toml")
 	sections := map[string]any{"mode": "mock", "services": map[string]any{"jev_api_url": model.URL + "/v1/systemone", "framework_api_url": publicFramework.URL}, "credentials": map[string]any{"jev_api_key": "fixture-token", "framework_api_token": "fixture-report-read"}, "application": map[string]any{"prompt_file": prompt, "pipeline": map[string]any{"settings": settings, "ingest": config.WorkerAccess{DatabaseURL: dsns["INGEST"], FrameworkURL: framework.URL, FrameworkToken: "fixture-only-worker"}, "trading": config.WorkerAccess{DatabaseURL: dsns["TRADING"], FrameworkURL: framework.URL, FrameworkToken: "fixture-only-analysis-worker"}, "research": config.WorkerAccess{DatabaseURL: dsns["RESEARCH"], FrameworkURL: framework.URL, FrameworkToken: "fixture-only-research"}}}}
+	sections["application"].(map[string]any)["pipeline"].(map[string]any)["sec"] = map[string]any{"user_agent": "Factorforge fixture ops@example.com"}
 	sections["application"].(map[string]any)["pipeline"].(map[string]any)["search_backends"] = []config.SearchAccess{{ID: "brave", Kind: "BRAVE", Endpoint: searchEndpoint + "/brave", Token: "fixture-search-token"}, {ID: "exa", Kind: "EXA", Endpoint: searchEndpoint + "/exa"}}
 	data, err = toml.Marshal(sections)
 	if err != nil {
@@ -247,6 +263,9 @@ func TestNativeInstanceWorkerProfilesAndProcessWithoutPythonNode(t *testing.T) {
 		}
 		if profile.Role != "INGEST" && (len(profile.SearchBackends) != 0 || strings.Contains(string(bytes), "fixture-search-token")) {
 			t.Fatal("search credentials copied to analysis")
+		}
+		if (profile.Role == "INGEST") != (profile.SECUserAgent != "") || profile.Role != "INGEST" && strings.Contains(string(bytes), "ops@example.com") {
+			t.Fatal("SEC identity must reach only the ingest profile")
 		}
 	}
 	if _, err = config.LoadWorker(paths[1], "TRADING"); err == nil {
@@ -281,7 +300,7 @@ func TestNativeInstanceWorkerProfilesAndProcessWithoutPythonNode(t *testing.T) {
 		t.Fatal("native per-provider result lost")
 	}
 	var originalCount int
-	if err = admin.QueryRow(ctx, "SELECT count(*) FROM instance_pipeline_sim.raw_evidence_manifest WHERE instance_id=$1", r.Binding.InstanceID).Scan(&originalCount); err != nil || originalCount != 4 {
+	if err = admin.QueryRow(ctx, "SELECT count(*) FROM instance_pipeline_sim.raw_evidence_manifest WHERE instance_id=$1", r.Binding.InstanceID).Scan(&originalCount); err != nil || originalCount != 5 {
 		t.Fatal("native seed/supplement persistence", err, originalCount)
 	}
 	if reviewed, e := ingest.Evidence(ctx, reviewArtifact.Raw.EvidenceID); e != nil || reviewed == nil || !reviewed.Complete || reviewed.Raw.ReceivedAt != reviewArtifact.Raw.ReceivedAt {

@@ -87,3 +87,7 @@
 
 1. **独立标签流程**：先冻结协议，再从探针之后新提交的 8-K（2.02/7.01/8.01，含 EX-99）中按时间顺序取样；标注者须独立于开发判读，先标后投递 JEV 六问。标注者由谁担任需要用户安排。
 2. **生产接入顺序**：SEC 适配器涉及新来源类型、私有身份配置项和 items 过滤规则，属于设计变化；需先在设计书新增章节（必要时修订 S3 来源式样），发布新版本后再实现，不直接把本实验代码接入生产链路。
+
+## 生产适配器（v2.5.3）
+
+设计先行于实现：v2.5.3 设计基线新增 [实例设计第25章](../v2.5.3/03_SOXLUSDT_JEV应用实例设计书.html#sec-filing-source)（design 类，五组式样不变），之后实现 `monitoring/sec_filing.go`、`config/sec_source.go`、Fetcher 的 User-Agent 字段与公开模板的空 `[application.pipeline.sec]` 块。运行配置见 [链路运行说明](INSTANCE_PIPELINE.md#v253-sec-edgar-8-k-新闻稿来源)。探针中“最近一份 8-K 不等于新闻”的发现落实为按窗口和 items 过滤、无 EX-99 不产生证据；接收时刻只写 provider_published_at。实验 runner 仍只在 tests/applications/soxl_jev/experiments，不接入生产链路。

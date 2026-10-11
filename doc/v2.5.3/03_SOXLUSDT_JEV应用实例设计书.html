@@ -529,7 +529,7 @@ figure{margin:24px 0;border:1px solid var(--line);border-radius:10px;padding:16p
 </tr>
 <tr>
 <td>monitoring/sec_filing.go</td>
-<td>新增 SECFilingSource，实现既有 ports.MonitorSource.Poll(ctx, cutoff)。字段：Fetcher、SourceID、LicenceRef、Companies（ticker + CIK）、Items、Lookback、MaxFilings、MaxMetadataBytes、MinInterval、DataBase、ArchiveBase、Clock、Sleep。DataBase/ArchiveBase 生产固定为 https://data.sec.gov 与 https://www.sec.gov；仅夹具模式可替换为回环地址。进程内记住已成功返回的申报编号，避免每轮重复读取索引与附件；重启后依靠既有存储按 EvidenceID 去重。</td>
+<td>新增 SECFilingSource，实现既有 ports.MonitorSource.Poll(ctx, cutoff)。字段：Fetcher、SourceID、LicenceRef、Companies（ticker + CIK）、Items、Lookback、MaxFilings、MaxMetadataBytes、MaxExhibitBytes（取 MaxInputBytes）、MinInterval、DataBase、ArchiveBase、Clock、Wait（可取消的请求间隔）。DataBase/ArchiveBase 生产固定为 https://data.sec.gov 与 https://www.sec.gov；仅夹具模式可替换为回环地址。进程内记住已成功返回的申报编号，避免每轮重复读取索引与附件；重启后依靠既有存储按 EvidenceID 去重。</td>
 </tr>
 <tr>
 <td>config/pipeline.go</td>

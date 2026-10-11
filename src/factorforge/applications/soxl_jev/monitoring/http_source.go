@@ -15,6 +15,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 )
 
 type FetchPolicy struct {
@@ -22,6 +24,9 @@ type FetchPolicy struct {
 	Timeout     time.Duration
 	MaxBytes    int
 	FixtureOnly bool
+	// UserAgent identifies the operator to sources that require it (SEC EDGAR).
+	// Empty keeps the transport default used by RSS and search originals.
+	UserAgent string
 }
 type Fetcher struct {
 	policy FetchPolicy
@@ -36,6 +41,9 @@ func NewFetcher(p FetchPolicy) (*Fetcher, error) {
 		if host == "" || strings.ContainsAny(host, "/:@?# ") {
 			return nil, d.Fail("SOURCE_HOST_INVALID", 422)
 		}
+	}
+	if len(p.UserAgent) > 256 || !utf8.ValidString(p.UserAgent) || strings.IndexFunc(p.UserAgent, unicode.IsControl) >= 0 {
+		return nil, d.Fail("SOURCE_USER_AGENT_INVALID", 422)
 	}
 	transport := &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12}, DisableKeepAlives: true, ResponseHeaderTimeout: p.Timeout}
 	transport.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
@@ -88,6 +96,9 @@ func (f *Fetcher) Get(ctx context.Context, endpoint string) ([]byte, string, err
 	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
 	if err != nil {
 		return nil, "", d.Fail("SOURCE_URL_FORBIDDEN", 403)
+	}
+	if f.policy.UserAgent != "" {
+		req.Header.Set("User-Agent", f.policy.UserAgent)
 	}
 	response, err := f.client.Do(req)
 	if err != nil {
