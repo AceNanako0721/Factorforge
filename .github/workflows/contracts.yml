@@ -171,10 +171,10 @@ jobs:
           node tools/check-model-access.mjs
           npm --prefix src/factorforge/applications/model_access test
           npm --prefix src/factorforge/applications/model_access run test:omp
-          bun test tests/applications/model_access/experiments/structured-json-trial.test.ts
+          bun test tests/applications/model_access/experiments/structured-json-trial.test.ts tests/applications/model_access/experiments/luna-transport-trial.test.ts
       - name: Verify Go semantic candidates and public Bun protocol without accounts
         run: |
           go test ./tests/applications/soxl_jev -run Semantic -count=1
-          go test ./tests/applications/soxl_jev/experiments -run 'Test(FinancialExtractionMetricBoundaries|StructuredTimestampHashBoundary)$' -count=1
+          go test ./tests/applications/soxl_jev/experiments -run 'Test(FinancialExtraction(MetricBoundaries|AccountBinding)|StructuredTimestampHashBoundary)$' -count=1
         env:
           FACTORFORGE_REQUIRE_MODEL_PROTOCOL: ${{ runner.os == 'Linux' && '1' || '0' }}

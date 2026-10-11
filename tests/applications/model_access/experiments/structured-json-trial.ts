@@ -29,7 +29,7 @@ export const goJSON=(v:unknown)=>JSON.stringify(v).replace(/[<>&\u2028\u2029]/g,
 const hash=(v:string|Uint8Array)=>createHash("sha256").update(v).digest("hex");
 export const goTimestamp=(date:Date)=>date.toISOString().replace(/(\.[0-9]*?[1-9])0+Z$/,"$1Z").replace(/\.0+Z$/,"Z");
 
-export type FinancialPairVariant={model:string;prefix:string;protocol:string;provider?:string;accountId?:number};
+export type FinancialPairVariant={model:string;prefix:string;protocol:string;provider?:string;accountId?:number;task?:"external-event"};
 export function prepareFinancialPair(seal:any,cases:any[],variant:FinancialPairVariant,codeHash:string,now:Date) {
  const provider=variant.provider??"google-antigravity",accountId=variant.accountId??1;
  if(!/^[a-z0-9-]+$/.test(provider)||!Number.isSafeInteger(accountId)||accountId<1||!/^[a-z0-9_]+_$/.test(variant.prefix)||!variant.model)throw Error("PAIRED_SETTINGS_INVALID");
@@ -55,11 +55,16 @@ export async function runFinancialPair(variant?:FinancialPairVariant) {
  if(variant){
   const codeFiles:Record<string,string>={};
   for(const f of ["financial_extraction_trial_test.go","financial_gold_test.go","external_event_trial_test.go","semantic_candidate_trial_test.go"].sort())codeFiles[f]=hash(await fs.readFile(path.join(checkout,"tests/applications/soxl_jev/experiments",f)));
-  const derived=prepareFinancialPair(seal,cases,variant,hash(goJSON(codeFiles)),new Date());
+  const codeHash=variant.task==="external-event"?codeFiles["external_event_trial_test.go"]!:hash(goJSON(codeFiles));
+  const derived=prepareFinancialPair(seal,cases,variant,codeHash,new Date());
   seal=derived.seal;cases=derived.cases;preparedCases=derived.casesRaw;preparedSeal=derived.sealRaw;
  }
  const provider=variant?.provider??"google-antigravity",accountId=variant?.accountId??1;
  await fs.writeFile(path.join(dir,"seal.json"),preparedSeal,{flag:"wx",mode:0o600});await fs.writeFile(path.join(dir,"cases.json"),preparedCases,{flag:"wx",mode:0o600});
+ if(variant?.task==="external-event"){
+  const source=await fs.readFile(path.join(original,"source.json"));if(hash(source)!==seal.source_hash)throw Error("PAIRED_SOURCE_CHANGED");
+  await fs.writeFile(path.join(dir,"source.json"),source,{flag:"wx",mode:0o600});
+ }
  const config=path.join(root,"config","config.toml"),trial={enabled:true,prompt_file:path.relative(root,prompt),timeout_seconds:120,max_input_bytes:65536,max_output_bytes:32768,max_line_bytes:1048576,omp_max_requests:0,budget_window_seconds:0};
  let store:ConfigStore|undefined,access:OMPAccess|undefined,changed=false,stage="config",completed=0;
  const saved:Record<string,unknown>={},cancelled=new AbortController();const stop=()=>cancelled.abort();process.on("SIGINT",stop);process.on("SIGTERM",stop);
@@ -102,6 +107,7 @@ export async function runFinancialPair(variant?:FinancialPairVariant) {
   try{access?.close();if(store&&changed){for(const[k,v]of Object.entries(trial))if((store.settings as any)[k]!==v)throw Error("STRUCTURED_SETTINGS_RECONCILE");Object.assign(store.settings,saved);store.saveSync();console.log(JSON.stringify({settings_restored:true,completed,local_budget:"unlimited"}))}}finally{await store?.close();done();unregister();process.off("SIGINT",stop);process.off("SIGTERM",stop)}
  }
  stage="evaluate";
- const result=await new Promise<number>((resolve,reject)=>{const child=spawn(binary,["-test.run=^TestFinancialExtractionTrial$","-test.v"],{cwd:path.join(checkout,"tests/applications/soxl_jev/experiments"),stdio:"inherit",windowsHide:true,env:{...process.env,FACTORFORGE_FINANCIAL_EXTRACTION_MODE:"evaluate",FACTORFORGE_FINANCIAL_EXTRACTION_ROOT:checkout,FACTORFORGE_FINANCIAL_EXTRACTION_CONFIG_ROOT:root,FACTORFORGE_FINANCIAL_EXTRACTION_DIR:dir}});child.once("error",()=>reject(Error("STRUCTURED_EVALUATE_FAILED")));child.once("exit",code=>resolve(code??1))});if(result||completed!==12)process.exitCode=1;
+ const eventTask=variant?.task==="external-event",test=eventTask?"TestExternalEventTrial":"TestFinancialExtractionTrial",envPrefix=eventTask?"FACTORFORGE_EXTERNAL_EVENT":"FACTORFORGE_FINANCIAL_EXTRACTION";
+ const result=await new Promise<number>((resolve,reject)=>{const child=spawn(binary,["-test.run=^"+test+"$","-test.v"],{cwd:path.join(checkout,"tests/applications/soxl_jev/experiments"),stdio:"inherit",windowsHide:true,env:{...process.env,[envPrefix+"_MODE"]:"evaluate",[envPrefix+"_ROOT"]:checkout,[envPrefix+"_CONFIG_ROOT"]:root,[envPrefix+"_DIR"]:dir}});child.once("error",()=>reject(Error("STRUCTURED_EVALUATE_FAILED")));child.once("exit",code=>resolve(code??1))});if(result||completed!==12)process.exitCode=1;
 }
 if(import.meta.main)await runFinancialPair();
