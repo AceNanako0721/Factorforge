@@ -28,7 +28,8 @@ node runtime/model-access-build/entrypoints/cli.js menu --config config/config.t
 
 - timeout_seconds：目录/刷新/单次推理时限；login_timeout_seconds：整个登录流程时限。
 - max_input_bytes：输入与私有提示词总量；max_output_bytes：输出与思考文本总量；max_line_bytes：JSONL 行与供应商流总包络上限。
-- budget_window_seconds、omp_max_requests：每个所选账户在窗口内允许的生成次数；enabled：生成开关。容量由操作者在“设置推理边界”填写，公开模板全为零，不猜生产常数。
+- api_max_requests、chatgpt_max_requests、omp_max_requests：默认0，表示本地调用次数无限制；正数才启用可选次数预算。正数预算需填写正数 budget_window_seconds；不限次数时窗口0表示不重置统计。enabled 为独立生成开关，单次超时与字节边界仍需正数；菜单明确显示“无限制”。
+- 不限次数保留最近256个请求ID用于近期去重，并累计尝试次数，避免记录无限膨胀；历史业务幂等由调用者负责。该记录界限不是调用次数上限。供应商429/计划额度拒绝及未知送达不自动重试保持，本地统计不代表供应商剩余额度。
 - omp_browser_path：仅浏览器会话 Cookie 登录方式需要，填已安装 Chromium/Chrome 的绝对路径，并在有桌面的会话运行。常规 OAuth 网址/设备码不依赖此字段。
 - 原 api_*、chatgpt_max_requests 与官方 CLI 路径仍服务旧接口，不用于新的 OMP 账户。
 

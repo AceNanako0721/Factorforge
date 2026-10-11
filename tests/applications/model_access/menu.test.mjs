@@ -8,11 +8,19 @@ import path from "node:path";
 import { execFileSync, spawn } from "node:child_process";
 import { TerminalMenu, MenuExit, cleanText, clipText } from "../../../runtime/model-access-build/entrypoints/terminal-menu.js";
 import { runMenu } from "../../../runtime/model-access-build/entrypoints/menu.js";
+import { ModelService } from "../../../runtime/model-access-build/application/service.js";
 import { ConfigStore, emptySettings, block } from "../../../runtime/model-access-build/config/store.js";
 import { OAuthAdapter, ISSUER } from "../../../runtime/model-access-build/adapters/oauth.js";
 import { OfficialCLI, nativeEnvironment, nativeArguments, claudeStatus } from "../../../runtime/model-access-build/adapters/official-cli.js";
 const root = path.resolve(import.meta.dirname, "../../..");
 const tick = () => new Promise(resolve => setImmediate(resolve));
+test("budget menu displays zero as unlimited, distinct from vendor quota",async t=>{
+  const f=await config(t);const actions=["budget","exit"],notices=[];
+  const ui={exit:new AbortController(),open(){},close(){},async select(){return actions.shift()},async notice(title,lines){notices.push([title,...lines].join("\n"))}};
+  await runMenu(f.store,new ModelService(f.store),ui);
+  assert.match(notices[0],/API 上限: 无限制/);assert.match(notices[0],/ChatGPT 上限: 无限制/);
+  assert.match(notices[0],/供应商剩余额度未知/);assert.doesNotMatch(notices[0],/0 表示未配置/);
+});
 async function config(t, overrides = {}, legacy = false) {
   const temp = await fs.mkdtemp(path.join(os.tmpdir(), "ff-menu-"));
   await fs.mkdir(path.join(temp, "config"));

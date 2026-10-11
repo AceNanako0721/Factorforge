@@ -32,7 +32,7 @@ export function validateOMPState(s: OMPState) {
   for (const [key, b] of Object.entries(s.budgets)) {
     if (!/^[a-z0-9.-]+:[1-9][0-9]*$/.test(key) || !record(b) || !Number.isSafeInteger(b.start) ||
         !Number.isSafeInteger(b.last) || b.last < b.start || !Number.isSafeInteger(b.count) || b.count < 0 ||
-        !Array.isArray(b.ids) || b.count !== b.ids.length || new Set(b.ids).size !== b.ids.length ||
+        !Array.isArray(b.ids) || b.count < b.ids.length || new Set(b.ids).size !== b.ids.length ||
         b.ids.some(id => typeof id !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(id))) fail("MODEL_STATE_INVALID");
   }
 }

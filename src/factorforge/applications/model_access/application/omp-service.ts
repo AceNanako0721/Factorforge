@@ -3,6 +3,7 @@ import { decodeOMP } from "../api/omp-protocol.js";
 import { fail, ModelError, safeFailure } from "../api/protocol.js";
 import { OMPAccess } from "../adapters/omp-access.js";
 import { ConfigStore } from "../config/store.js";
+import { budgetStatus, recentRequest, reserveBudget, validateBudget } from "./request-budget.js";
 export class OMPService {
   private readonly paused = new Set<string>();
   constructor(readonly store: ConfigStore, readonly access: OMPAccess) {}
@@ -10,6 +11,7 @@ export class OMPService {
     this.store.assertUsable();
     return { enabled: this.store.settings.enabled, omp_max_requests: this.store.settings.omp_max_requests,
       budget_window_seconds: this.store.settings.budget_window_seconds,
+      local_budget: budgetStatus(this.store.settings.omp_max_requests, this.store.settings.budget_window_seconds),
       accounts: this.access.providers().filter(p => p.configured_accounts).map(p => ({ provider: p.credential_provider, count: p.configured_accounts })),
       budgets: Object.fromEntries(Object.entries(this.store.state.omp!.budgets).map(([key, b]) => [key, { start: b.start, count: b.count }])),
       paused_accounts: [...this.paused], account_validation: "ACCOUNT_VALIDATION_PENDING" };
@@ -24,19 +26,14 @@ export class OMPService {
     this.store.assertUsable();
     const m = this.store.settings;
     if (!m.enabled) fail("MODULE_DISABLED");
-    for (const n of [m.timeout_seconds, m.max_input_bytes, m.max_output_bytes, m.max_line_bytes, m.budget_window_seconds])
+    for (const n of [m.timeout_seconds, m.max_input_bytes, m.max_output_bytes, m.max_line_bytes])
       if (n <= 0) fail("LIMITS_REQUIRED");
-    if (m.omp_max_requests <= 0) fail("CHANNEL_DISABLED");
+    validateBudget(m.omp_max_requests, m.budget_window_seconds);
     if (m.timeout_seconds * 1000 > 2147483647 || m.budget_window_seconds * 1000 > Number.MAX_SAFE_INTEGER) fail("LIMITS_INVALID");
   }
   private reserve(key: string, id: string) {
-    const budgets = this.store.state.omp!.budgets, now = Date.now(), m = this.store.settings;
-    let b = budgets[key];
-    if (b && now < b.last) fail("CLOCK_ROLLBACK");
-    if (!b || now - b.start >= m.budget_window_seconds * 1000) b = { start: now, last: now, count: 0, ids: [] };
-    if (b.ids.includes(id)) fail("DUPLICATE_REQUEST");
-    if (b.count >= m.omp_max_requests) fail("LOCAL_BUDGET_EXHAUSTED");
-    b.count++; b.last = now; b.ids.push(id); budgets[key] = b;
+    const budgets = this.store.state.omp!.budgets, m = this.store.settings;
+    budgets[key] = reserveBudget(budgets[key], id, m.omp_max_requests, m.budget_window_seconds);
     this.store.saveSync();
   }
   async handle(value: unknown, parent?: AbortSignal) {
@@ -57,10 +54,7 @@ export class OMPService {
       budgetKey = `${provider}:${r.account_id}`;
       if (this.paused.has(budgetKey)) fail("RATE_LIMITED");
       // Reject a duplicate before OAuth refresh or discovery as well as send.
-      if (this.store.state.omp!.budgets[budgetKey]?.ids.includes(r.id)) {
-        const b = this.store.state.omp!.budgets[budgetKey]!;
-        if (Date.now() - b.start < this.store.settings.budget_window_seconds * 1000) fail("DUPLICATE_REQUEST");
-      }
+      if (recentRequest(this.store.state.omp!.budgets[budgetKey], r.id, this.store.settings.budget_window_seconds)) fail("DUPLICATE_REQUEST");
       const prompt = await this.store.prompt();
       if (Buffer.byteLength(r.input!) + Buffer.byteLength(prompt) > this.store.settings.max_input_bytes) fail("INPUT_LIMIT_EXCEEDED");
       const catalog = await this.access.catalog(provider, r.account_id!, signal);

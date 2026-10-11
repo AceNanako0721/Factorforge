@@ -5,11 +5,12 @@ import { OAuthSelectorComponent } from "@oh-my-pi/pi-tui/overlays/oauth-selector
 import { LoginDialogComponent } from "@oh-my-pi/pi-tui/overlays/login-dialog";
 import { ModelPickerComponent } from "@oh-my-pi/pi-tui/overlays/model-picker";
 import type { ModelBrowserSource } from "@oh-my-pi/pi-tui/overlays/model-browser";
-import { ConfigStore, type Settings } from "../config/store.js";
+import { ConfigStore } from "../config/store.js";
 import { OMPAccess, onAbort } from "../adapters/omp-access.js";
 import { captureBrowserSession } from "../adapters/browser-session.js";
 import { OMPService } from "../application/omp-service.js";
 import { fail, ModelError, safeFailure } from "../api/protocol.js";
+import { inferenceFields, parseInferenceValue, validateInferenceLimits, type InferenceLimits } from "../application/inference-limits.js";
 import type { Model } from "@oh-my-pi/pi-ai";
 
 // Original OMP model browser, with no coding-agent roles or agent execution.
@@ -25,9 +26,9 @@ function operatorFailure(error: unknown) {
     BROWSER_CONFIGURATION_REQUIRED: "在私有 config/config.toml 的 model_access.omp_browser_path 填入已安装 Chromium/Chrome 的绝对路径，然后重新选择登录。",
     BROWSER_DISPLAY_REQUIRED: "在 Ubuntu 桌面的终端打开菜单；浏览器会话登录需要可显示的桌面环境。",
     LOGIN_LIMIT_REQUIRED: "在私有配置填写正数 login_timeout_seconds 和 timeout_seconds，然后重新打开菜单。",
-    LIMITS_REQUIRED: "返回主菜单的“设置推理边界”，填写调用时限、字节上限和本地预算。",
+    LIMITS_REQUIRED: "返回主菜单的“设置推理边界”，填写调用时限和字节上限；本地次数默认不限。",
     MODULE_DISABLED: "返回主菜单的“设置推理边界”，填写并确认启用推理；登录无需启用。",
-    CHANNEL_DISABLED: "返回主菜单的“设置推理边界”，填写正数 omp_max_requests 后再显式测试。",
+    BUDGET_WINDOW_REQUIRED: "只有主动设置正数次数上限时才需要正数预算窗口；如不限制次数，将 omp_max_requests 设为0。",
   };
   return code + (help[code] ? "\n" + help[code] : "");
 }
@@ -143,7 +144,7 @@ export async function runOMPMenu(store: ConfigStore, access: OMPAccess, service:
             getError: () => undefined, getAvailable: () => catalog.models, getAll: () => catalog.models, refreshIfStale: async () => false,
           }, [], { onPick: m => done(m), onCancel: () => done() }));
           if (model) { chosen = { ...account, model: model.id, source: catalog.source }; note = `已选择 ${account.provider} / ${model.id}（${catalog.source}）；尚未调用。`; }
-        } else if (action === "status") await message(JSON.stringify(service.status(), null, 2));
+        } else if (action === "status") await message(`本地调用次数：${store.settings.omp_max_requests === 0 ? "无限制" : store.settings.omp_max_requests}；供应商剩余额度：未知\n` + JSON.stringify(service.status(), null, 2));
         else if (action === "logout") {
           const account = await selectAccount(); if (!account) continue;
           if (await confirm(`删除 ${account.provider} #${account.id} 的本地连接？其他连接保留。`)) {
@@ -158,16 +159,15 @@ export async function runOMPMenu(store: ConfigStore, access: OMPAccess, service:
           const reply = await service.testRequest(chosen.provider, chosen.id, chosen.model, text, ending.signal);
           await message(reply.ok ? String((reply.result as { text: string }).text) : `调用失败：${"error" in reply ? operatorFailure(new ModelError(reply.error!.code)) : "INTERNAL_FAILURE"}`);
         } else if (action === "limits") {
-          const fields = ["timeout_seconds", "max_input_bytes", "max_output_bytes", "max_line_bytes", "budget_window_seconds", "omp_max_requests"] as const;
-          const values: Partial<Settings> = {}; let cancelled = false;
-          for (const field of fields) {
-            const value = await input(`${field}：填写正整数（当前 ${store.settings[field]}）`);
+          const values = {} as InferenceLimits; let cancelled = false;
+          for (const field of inferenceFields) {
+            const meaning = field === "omp_max_requests" ? "0=无限制，正整数=本地次数上限" : field === "budget_window_seconds" ? "0=不重置统计；正数次数上限需要正数窗口" : "正整数";
+            const value = await input(`${field}：${meaning}，留空保持当前 ${store.settings[field]}`);
             if (value === undefined) { cancelled = true; break; }
-            if (!/^[1-9][0-9]*$/.test(value) || !Number.isSafeInteger(Number(value))) fail("LIMITS_INVALID");
-            values[field] = Number(value);
+            values[field] = parseInferenceValue(field, value, store.settings[field]);
           }
           if (cancelled) continue;
-          if (values.timeout_seconds! * 1000 > 2147483647 || values.budget_window_seconds! * 1000 > Number.MAX_SAFE_INTEGER) fail("LIMITS_INVALID");
+          validateInferenceLimits(values);
           if (await confirm("保存以上边界并启用模型推理？")) { Object.assign(store.settings, values, { enabled: true }); store.saveSync(); note = "推理边界已保存；没有发送请求。"; }
         }
       } catch (e) { note = "操作未完成：" + operatorFailure(e); await message(note); }

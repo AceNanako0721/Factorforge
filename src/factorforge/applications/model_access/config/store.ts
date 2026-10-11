@@ -109,7 +109,8 @@ function settings(raw: string): Settings {
   if (m && typeof m === "object") {
     if (!Object.hasOwn(m, "claude_cli_path")) m.claude_cli_path = "";
     if (!Object.hasOwn(m, "antigravity_cli_path")) m.antigravity_cli_path = "";
-    if (!Object.hasOwn(m, "omp_max_requests")) m.omp_max_requests = 0;
+    for (const key of ["api_max_requests", "chatgpt_max_requests", "omp_max_requests", "budget_window_seconds"] as const)
+      if (!Object.hasOwn(m, key)) m[key] = 0;
     if (!Object.hasOwn(m, "omp_browser_path")) m.omp_browser_path = "";
   }
   if (
@@ -168,7 +169,7 @@ function state(raw: string): State {
       !Number.isSafeInteger(b.count) ||
       b.count < 0 ||
       !Array.isArray(b.ids) ||
-      b.count !== b.ids.length ||
+      b.count < b.ids.length ||
       new Set(b.ids).size !== b.ids.length ||
       b.ids.some(
         (x) => typeof x !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(x),
