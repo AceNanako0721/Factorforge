@@ -7,6 +7,7 @@ import {pathToFileURL} from "node:url";
 import {ConfigStore} from "../../../../src/factorforge/applications/model_access/config/store.js";
 import {OMPAccess} from "../../../../src/factorforge/applications/model_access/adapters/omp-access.js";
 import {OMPService} from "../../../../src/factorforge/applications/model_access/application/omp-service.js";
+import {SSEGuard} from "../../../../src/factorforge/applications/model_access/adapters/omp-stream-guard.js";
 import {postmortem} from "../../../../src/factorforge/applications/model_access/node_modules/@oh-my-pi/pi-utils/src/index.ts";
 
 const hash=(s:string|Uint8Array)=>createHash("sha256").update(s).digest("hex");
@@ -37,7 +38,14 @@ export async function runLunaTransport() {
  const saved:Record<string,unknown>={},cancelled=new AbortController();let store:ConfigStore|undefined,access:OMPAccess|undefined,changed=false;
  const stop=()=>cancelled.abort();process.on("SIGINT",stop);process.on("SIGTERM",stop);
  let done!:()=>void;const finished=new Promise<void>(r=>done=r),unregister=postmortem.register("factorforge-luna-transport",async()=>{stop();await finished});
- const metadata:any[]=[],nativeErrors:any[]=[];const readers:Promise<void>[]=[];let generationSends=0;
+ const metadata:any[]=[],nativeErrors:any[]=[],guardErrors:any[]=[];const readers:Promise<void>[]=[];let generationSends=0;
+ const originalFrame=(SSEGuard.prototype as any).frame;
+ (SSEGuard.prototype as any).frame=function(){
+  const raw=(this.data as string[]).join("\n");
+  try{return originalFrame.call(this)}catch(e:any){let parsed:any;try{parsed=JSON.parse(raw)}catch{}
+   guardErrors.push({kind:e?.name==="TypeError"?"TypeError":"OTHER",code:typeof e?.code==="string"&&/^[A-Z_]+$/.test(e.code)?e.code:"UNKNOWN",frame_bytes:Buffer.byteLength(raw),json_valid:parsed!==undefined,frame_type:typeof parsed?.type==="string"&&/^[a-z_.]+$/.test(parsed.type)?parsed.type:null,top_keys:parsed&&typeof parsed==="object"?Object.keys(parsed).filter(k=>["type","response","error","delta","choices","candidates","usage","status"].includes(k)):[],output_is_array:Array.isArray(parsed?.response?.output),choices_type:typeof parsed?.choices,google_candidates_type:typeof(parsed?.response??parsed)?.candidates,terminal:this.terminal});throw e;
+  }
+ };
  // Experiment-only observation. The original formatter still owns the outcome.
  const {mock}=await import("bun:test");
  const moduleURL=pathToFileURL(path.join(checkout,"src/factorforge/applications/model_access/node_modules/@oh-my-pi/pi-ai/src/error/index.ts")).href;
@@ -66,11 +74,11 @@ export async function runLunaTransport() {
   };
   access=new OMPAccess(store,fetcher);await access.ready();const service=new OMPService(store,access);
   await write("attempt.json",{at:new Date().toISOString(),input_hash:hash(input)});
-  const start=Date.now(),reply=await service.handle({v:2,id:"luna_transport_synthetic_20261011_v2",op:"generate",provider:"openai-codex",account_id:2,model:"gpt-6-luna",input},cancelled.signal);
+  const start=Date.now(),reply=await service.handle({v:2,id:"luna_transport_synthetic_20261011_v3",op:"generate",provider:"openai-codex",account_id:2,model:"gpt-6-luna",input},cancelled.signal);
   await Promise.allSettled(readers);
-  await write("outcome.json",{at:new Date().toISOString(),ok:reply.ok,code:reply.ok?"":reply.error?.code,elapsed_ms:Date.now()-start,generation_sends:generationSends,metadata,native_errors:nativeErrors});
+  await write("outcome.json",{at:new Date().toISOString(),ok:reply.ok,code:reply.ok?"":reply.error?.code,elapsed_ms:Date.now()-start,generation_sends:generationSends,metadata,native_errors:nativeErrors,guard_errors:guardErrors});
   if(reply.ok)await write("generation.json",reply.result);
-  console.log(JSON.stringify({ok:reply.ok,code:reply.ok?"":reply.error?.code,generation_sends:generationSends,metadata,native_errors:nativeErrors}));
+  console.log(JSON.stringify({ok:reply.ok,code:reply.ok?"":reply.error?.code,generation_sends:generationSends,metadata,native_errors:nativeErrors,guard_errors:guardErrors}));
  }finally{try{access?.close();if(store&&changed){for(const[k,v]of Object.entries(trial))if((store.settings as any)[k]!==v)throw Error("TRANSPORT_SETTINGS_RECONCILE");Object.assign(store.settings,saved);store.saveSync()}}finally{await store?.close();done();unregister();process.off("SIGINT",stop);process.off("SIGTERM",stop)}}
 }
 if(import.meta.main)await runLunaTransport();
