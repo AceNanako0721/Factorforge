@@ -1,6 +1,6 @@
 # P3 采集、分析和提交运行说明
 
-更新：2026-10-11。当前设计基线 v2.5.2；继承 Go 链路、日历/报告、逐事实JEV绑定及后续证据窗口、模型接入和候选审阅设计。本页是持续实现/操作记录，不能代替冻结式样、设计或生产准入；下方版本章节为历史沿革。
+更新：2026-10-12。当前设计基线 v2.5.3；继承 Go 链路、日历/报告、逐事实JEV绑定及后续证据窗口、模型接入和候选审阅设计。本页是持续实现/操作记录，不能代替冻结式样、设计或生产准入；下方版本章节为历史沿革。
 
 当前分流：摄入/投递的两处时间顺序错误按既有设计修复，SOXL正式规格资料仅作研究证据；Qwen/llama.cpp本地抽取路线停止并公开归档。OMP接入、候选审阅与独立事实核验保留，JEV原文直评仍为实验，不接入生产worker。详情见 [处置记录](P3_ROUTE_DISPOSITION.md) 与 [P3验收](../progress/P3_ACCEPTANCE.md)。
 
@@ -225,3 +225,16 @@ Acquire失败没有HTTP；成功预占后仅一次HTTP，完整交付保存COMPL
 ## v2.1.13 评分提交的并发版本
 
 评分outbox及候选仍不可改。Dispatch先查原回执，无回执才读最新P2 Version并重查期限，发送时只在Command复制件刷新ExpectedVersion。明确的AGGREGATE_VERSION_CONFLICT保持原行到下轮，不在同轮重发；事实/幂等等其他冲突继续拒绝，未知投递继续先协调原回执。没有新配置/状态/数据库迁移，旧REJECTED终态不自动重开。验证及实际下层语义见[P3_SCORE_VERSION](P3_SCORE_VERSION.md)。
+
+## v2.5.3 SEC EDGAR 8-K 新闻稿来源
+
+按 [实例设计第25章](../v2.5.3/03_SOXLUSDT_JEV应用实例设计书.html#sec-filing-source) 实现。ingest-worker 在采集周期内按登记公司读取 EDGAR submissions，只取窗口内、items 命中的原始 8-K，读取索引页中同一申报目录内第一份 EX-99 附件并保存原始字节；接收时刻写入 provider_published_at，first_public_at 始终为空。没有已审阅标注的 SEC 原文按既有规则隔离，不进入交易评分。
+
+配置分两处，均为私有：
+
+- `config/config.toml` 的 `[application.pipeline.sec] user_agent`：SEC 要求的身份声明，形如“名称 联系邮箱”，以邮箱结尾。PrepareWorkerProfiles 只复制给 INGEST 档案。
+- 资产文件 `sec_filings[]`：`source_id`、`licence_ref`（须在 `sources` 中登记且 enabled/licence_verified/allow_analysis 为真）、`companies[{ticker,cik}]`、`items`（如 `["2.02","7.01","8.01"]`）、`lookback_seconds`、`max_filings`、`max_metadata_bytes`（submissions 约 160 KB）、`min_interval_ms`（不少于 100，即不超过 SEC 公布的 10 次/秒）。`fixture_base` 只在 mock 模式下接受回环地址。
+
+失败码：SEC_IDENTITY_REQUIRED（缺少带邮箱的身份）、SOURCE_LICENCE_REQUIRED、SOURCE_CONFIGURATION_REQUIRED、SOURCE_FILING_BUDGET_EXCEEDED（窗口内候选超过 max_filings，不截断）、SEC_SUBMISSIONS_INVALID、SEC_METADATA_FORMAT_INVALID、SEC_INDEX_INVALID（附件链接越出申报目录）、SOURCE_ORIGINAL_UNAVAILABLE（含 403/429，不自动重试）。整轮失败时不记已返回申报，下一次轮询重新判断；同一进程内已返回的申报不重复读取，重启后依靠 EvidenceID 去重。
+
+验证：回环夹具覆盖身份请求头、表单/窗口/items 过滤、无附件申报、越界链接、预算、媒体类型、请求间隔与取消、失败后恢复；原生 ingest-worker 在 PATH=/nonexistent 下经真实 PostgreSQL 两次启动只保存一份 SEC 原文。8-K/A 更正关系、6-K 境外发行人、首发时间与召回完整性不在本版范围。

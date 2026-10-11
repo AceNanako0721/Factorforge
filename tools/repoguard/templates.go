@@ -108,6 +108,9 @@ database_url = ""
 framework_url = ""
 framework_token = ""
 
+[application.pipeline.sec]
+user_agent = ""
+
 
 [trading]
 adapter = "mock"
