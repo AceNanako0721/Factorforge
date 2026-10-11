@@ -3,6 +3,7 @@ import "../../../../src/factorforge/applications/model_access/entrypoints/omp-en
 import fs from "node:fs/promises";
 import path from "node:path";
 import {createHash} from "node:crypto";
+import {pathToFileURL} from "node:url";
 import {ConfigStore} from "../../../../src/factorforge/applications/model_access/config/store.js";
 import {OMPAccess} from "../../../../src/factorforge/applications/model_access/adapters/omp-access.js";
 import {OMPService} from "../../../../src/factorforge/applications/model_access/application/omp-service.js";
@@ -36,7 +37,17 @@ export async function runLunaTransport() {
  const saved:Record<string,unknown>={},cancelled=new AbortController();let store:ConfigStore|undefined,access:OMPAccess|undefined,changed=false;
  const stop=()=>cancelled.abort();process.on("SIGINT",stop);process.on("SIGTERM",stop);
  let done!:()=>void;const finished=new Promise<void>(r=>done=r),unregister=postmortem.register("factorforge-luna-transport",async()=>{stop();await finished});
- const metadata:any[]=[];const readers:Promise<void>[]=[];let generationSends=0;
+ const metadata:any[]=[],nativeErrors:any[]=[];const readers:Promise<void>[]=[];let generationSends=0;
+ // Experiment-only observation. The original formatter still owns the outcome.
+ const {mock}=await import("bun:test");
+ const moduleURL=pathToFileURL(path.join(checkout,"src/factorforge/applications/model_access/node_modules/@oh-my-pi/pi-ai/src/error/index.ts")).href;
+ const originalError=await import(moduleURL),finalize=originalError.finalize;
+ mock.module(moduleURL,()=>({...originalError,finalize:async(e:any,...args:any[])=>{
+  const stack=typeof e?.stack==="string"?e.stack:"";
+  const frames=[...stack.matchAll(/\/node_modules\/@oh-my-pi\/pi-ai\/src\/([a-zA-Z0-9_./-]+:\d+:\d+)/g)].map(m=>m[1]).slice(0,5);
+  nativeErrors.push({kind:["Error","TypeError","AbortError","TimeoutError","SyntaxError"].includes(e?.name)?e.name:"OTHER",category:safeTransportError(e),frames});
+  return finalize(e,...args);
+ }}));
  const nativeFetch=globalThis.fetch;
  try {
   store=await ConfigStore.open(path.join(root,"config/config.toml"));for(const k of Object.keys(trial))saved[k]=(store.settings as any)[k];
@@ -55,11 +66,11 @@ export async function runLunaTransport() {
   };
   access=new OMPAccess(store,fetcher);await access.ready();const service=new OMPService(store,access);
   await write("attempt.json",{at:new Date().toISOString(),input_hash:hash(input)});
-  const start=Date.now(),reply=await service.handle({v:2,id:"luna_transport_synthetic_20261011",op:"generate",provider:"openai-codex",account_id:2,model:"gpt-6-luna",input},cancelled.signal);
+  const start=Date.now(),reply=await service.handle({v:2,id:"luna_transport_synthetic_20261011_v2",op:"generate",provider:"openai-codex",account_id:2,model:"gpt-6-luna",input},cancelled.signal);
   await Promise.allSettled(readers);
-  await write("outcome.json",{at:new Date().toISOString(),ok:reply.ok,code:reply.ok?"":reply.error?.code,elapsed_ms:Date.now()-start,generation_sends:generationSends,metadata});
+  await write("outcome.json",{at:new Date().toISOString(),ok:reply.ok,code:reply.ok?"":reply.error?.code,elapsed_ms:Date.now()-start,generation_sends:generationSends,metadata,native_errors:nativeErrors});
   if(reply.ok)await write("generation.json",reply.result);
-  console.log(JSON.stringify({ok:reply.ok,code:reply.ok?"":reply.error?.code,generation_sends:generationSends,metadata}));
+  console.log(JSON.stringify({ok:reply.ok,code:reply.ok?"":reply.error?.code,generation_sends:generationSends,metadata,native_errors:nativeErrors}));
  }finally{try{access?.close();if(store&&changed){for(const[k,v]of Object.entries(trial))if((store.settings as any)[k]!==v)throw Error("TRANSPORT_SETTINGS_RECONCILE");Object.assign(store.settings,saved);store.saveSync()}}finally{await store?.close();done();unregister();process.off("SIGINT",stop);process.off("SIGTERM",stop)}}
 }
 if(import.meta.main)await runLunaTransport();
