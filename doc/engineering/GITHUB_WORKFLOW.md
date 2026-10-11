@@ -58,3 +58,5 @@ v2.1.5 PR #21 首轮 [CI 37882006107](https://github.com/AceNanako0721/Factorfor
 旧 YAML 没有 workflow_dispatch，因此没有可用的手动启动入口。按 [GitHub 官方手动运行文档](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow) 增加该事件，保留原 push/PR 触发、五个 job、版本/历史/源码检查及 contents:read 权限。此变更归 code-only，不另建文档版本，不通过空提交或取消保护制造通过状态。
 
 合并该入口后，先查询 main 的真实运行；若已有覆盖同一提交的运行就等待该轮，不重复调度。确无运行时才执行 `gh workflow run contracts.yml --ref main`，确认 workflow_dispatch 的 headSha 等于要验收的 main，并等待全部五项成功后发布。手动运行是事件缺失时的恢复手段，不表示平台根因已修复，不替代 PR 分类或生产验收。使用仓库限定 SSH 推送工作流，不要求重新索取现有认证。
+
+2026-10-11，PR #51 首轮 CI `38111016178` 的 Ubuntu 模型检查失败：既有“OMP zero budget/window is unlimited, durable and bounded across reopen”连续260次持久写盘及重开约7048ms，超过Bun默认5000ms。测试超时后的夹具清理使仍在执行的重开出现路径ENOENT；不是真实配置、模型额度或交易故障。仅将该压力/持久性测试时限显式设为30000ms，保留260次写盘、256去重窗口、累计261次调用和全部断言；不改变生产请求时限或跳过检查。后续以修正提交的完整七项CI为准。

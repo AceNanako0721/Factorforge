@@ -224,7 +224,9 @@ test("OMP zero budget/window is unlimited, durable and bounded across reopen",as
   expect(x.service.status().local_budget).toEqual({mode:"unlimited",limit:null,window_seconds:0});
   expect((await x.service.handle({...r,id:"unlimited-259"})).error?.code).toBe("DUPLICATE_REQUEST");
   expect((await x.service.handle({...r,id:"after-reopen"})).ok).toBe(true);expect(calls).toBe(261);
-});
+// This deliberately fsyncs 260 reservations; shared CI disks can exceed Bun's
+// default five seconds. Keep every durable write and assertion in the test.
+},30000);
 test("OMP opt-in cap needs a window and unlimited respects provider rate limits",async()=>{
   let calls=0;const x=await fixture({omp_max_requests:1,budget_window_seconds:0},async()=>{calls++;return json({},429)});const id=await x.key("deepseek");
   x.access.catalog=async()=>({models:[openAIModel()],source:"bundled",stale:false});
