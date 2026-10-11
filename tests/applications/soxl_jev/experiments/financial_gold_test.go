@@ -87,6 +87,10 @@ func financialRead(t *testing.T, lab, name string, dst any) []byte {
 		t.Fatal("FINANCIAL_LAB_FILE")
 	}
 	raw, err := os.ReadFile(filepath.Join(lab, name))
+	if dst == nil {
+		var decoded any
+		dst = &decoded // Hash-only callers still require well-formed JSON.
+	}
 	if err != nil || json.Unmarshal(raw, dst) != nil {
 		t.Fatal("FINANCIAL_LAB_INPUT", name)
 	}
