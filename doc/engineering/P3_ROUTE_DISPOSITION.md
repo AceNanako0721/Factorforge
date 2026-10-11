@@ -2,7 +2,7 @@
 
 更新：2026-10-11；用户确认执行本次分流。Change-Type: code-only，当前文档基线保持 v2.5.2；旧版 HTML、式样、设计、生产参数与准入保持。
 
-主线交付：[PR #55](https://github.com/AceNanako0721/Factorforge/pull/55)。本地验证及归档已完成，最终合并与七项GitHub检查状态从该PR和main的Actions读取；原本地工作保留备份/恢复点后，主目录同步合并后的main，不再把实验提交叠在活动分支。
+主线交付：[PR #55](https://github.com/AceNanako0721/Factorforge/pull/55) 已合并为 main `7afc24da03590a6c6f0be1f4b7fa58f24a9ff927`。PR Actions `38128467269` 与 main Actions `38128623222` 各七项通过；主目录已同步且无未提交修改，原本地工作保留备份/恢复点，不再把实验提交叠在活动分支。
 
 ## 进入主线
 
@@ -39,3 +39,13 @@ OMP 登录与模型接入、已合并的候选审阅、独立事实核验继续�
 修复前后记录为隔离开发树 runtime/p3-cleanup-before.log 与 runtime/p3-cleanup-after.log；当前基线反例失败、恢复修复后通过。全仓Go测试、P3及实验race、全仓vet、布局/契约/版本/HTML/冻结历史检查和140条持续记录本地链接核对通过。资料不可覆盖离线回归纳入Linux/Windows CI；普通CI不抓取实际PDF或请求模型。公开暂存内容及推送可达历史仍按仓库检查执行。
 
 本轮私有日志及哈希清单另存主目录runtime/p3-cleanup-20261011，不上传原始运行产物。合并与 Actions 的最终状态以本次 PR 和 main 的检查为准，不把离线检查写成生产运行通过。
+
+## 合并后的本地仓库整理
+
+2026-10-11 已完成整理，版本保持 v2.5.2。远程实际只剩 main 与公开归档分支；本地共清除20个过时分支，并清理已删除远程分支的缓存引用。逐一核对合并PR与提交祖先关系；`backup/p3-before-v2.4.0` 的三笔旧提交与归档三笔提交补丁一致，`fix/p3-expired-receipts` 完整可达于归档。没有删除公开归档。
+
+6条stash先完整保存为忽略的私有Git bundle，独立恢复验证了22个原本地分支及全部stash的工作树、索引和未跟踪文件树，随后清空stash。恢复包、原引用清单和校验记录位于主目录 `runtime/repository-cleanup-20261011`；包可能包含历史私有资料，不能上传GitHub。原15文件逐项备份继续保留。
+
+旧 `runtime/p3-worktree` 没有未提交源码，其7份忽略运行文件先打包并逐项比较，再移除该worktree。`Factorforge-antigravity-extraction` 保留，同步至main提交并解除已合并分支绑定；由于main已由主目录占用，该开发目录使用分离HEAD。其10466份忽略文件逐项哈希未变，真实配置哈希也未变。
+
+再次确认两个窗口辅助文件已经存在于公开归档快照 `8fb9b19`，Git blob与原stash未跟踪文件完全一致，并非只存在于stash。以上仅清理本地工作引用与记录，不推进P3验收或恢复停止的实验。
