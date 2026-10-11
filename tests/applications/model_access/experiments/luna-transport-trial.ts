@@ -3,7 +3,6 @@ import "../../../../src/factorforge/applications/model_access/entrypoints/omp-en
 import fs from "node:fs/promises";
 import path from "node:path";
 import {createHash} from "node:crypto";
-import {pathToFileURL} from "node:url";
 import {ConfigStore} from "../../../../src/factorforge/applications/model_access/config/store.js";
 import {OMPAccess} from "../../../../src/factorforge/applications/model_access/adapters/omp-access.js";
 import {OMPService} from "../../../../src/factorforge/applications/model_access/application/omp-service.js";
@@ -50,13 +49,20 @@ export async function runLunaTransport() {
  };
  // Experiment-only observation. The original formatter still owns the outcome.
  const {mock}=await import("bun:test");
- const moduleURL=pathToFileURL(path.join(checkout,"src/factorforge/applications/model_access/node_modules/@oh-my-pi/pi-ai/src/error/index.ts")).href;
- const originalError=await import(moduleURL),finalize=originalError.finalize;
- mock.module(moduleURL,()=>({...originalError,finalize:async(e:any,...args:any[])=>{
+ const modulePath=path.join(checkout,"src/factorforge/applications/model_access/node_modules/@oh-my-pi/pi-ai/src/error/index.ts");
+ const originalError=await import(modulePath),finalize=originalError.finalize;
+ mock.module(modulePath,()=>({...originalError,finalize:async(e:any,...args:any[])=>{
   const stack=typeof e?.stack==="string"?e.stack:"";
   const frames=[...stack.matchAll(/\/node_modules\/@oh-my-pi\/pi-ai\/src\/([a-zA-Z0-9_./-]+:\d+:\d+)/g)].map(m=>m[1]).slice(0,5);
   nativeErrors.push({kind:["Error","TypeError","AbortError","TimeoutError","SyntaxError"].includes(e?.name)?e.name:"OTHER",category:safeTransportError(e),frames});
   return finalize(e,...args);
+ }}));
+ const outputErrors:any[]=[],streamEvents:any[]=[];
+ const checkOutput=(OMPAccess.prototype as any).checkOutput;
+ (OMPAccess.prototype as any).checkOutput=function(message:any){try{return checkOutput.call(this,message)}catch(e:any){outputErrors.push({kind:e?.name,content:message?.content?.map((c:any)=>({type:c.type,text_type:typeof c.text,thinking_type:typeof c.thinking}))});throw e}};
+ const aiPath=path.join(checkout,"src/factorforge/applications/model_access/node_modules/@oh-my-pi/pi-ai/src/index.ts"),ai=await import(aiPath),nativeStream=ai.stream;
+ mock.module(aiPath,()=>({...ai,stream:(...args:any[])=>{
+  const stream=nativeStream(...args);return {async *[Symbol.asyncIterator](){for await(const event of stream){if(["error","done"].includes(event.type))streamEvents.push({type:event.type,reason:event.reason,status:event.error?.errorStatus,category:safeTransportError({message:event.error?.errorMessage}),error_id:event.error?.errorId});yield event}}};
  }}));
  const nativeFetch=globalThis.fetch;
  try {
@@ -76,11 +82,11 @@ export async function runLunaTransport() {
   };
   access=new OMPAccess(store,fetcher);await access.ready();const service=new OMPService(store,access);
   await write("attempt.json",{at:new Date().toISOString(),input_hash:hash(input)});
-  const start=Date.now(),reply=await service.handle({v:2,id:"luna_transport_synthetic_20261011_v3",op:"generate",provider:"openai-codex",account_id:2,model:"gpt-6-luna",input},cancelled.signal);
+  const start=Date.now(),reply=await service.handle({v:2,id:"luna_transport_synthetic_20261011_v4",op:"generate",provider:"openai-codex",account_id:2,model:"gpt-6-luna",input},cancelled.signal);
   await Promise.allSettled(readers);
-  await write("outcome.json",{at:new Date().toISOString(),ok:reply.ok,code:reply.ok?"":reply.error?.code,elapsed_ms:Date.now()-start,generation_sends:generationSends,metadata,native_errors:nativeErrors,guard_errors:guardErrors});
+  await write("outcome.json",{at:new Date().toISOString(),ok:reply.ok,code:reply.ok?"":reply.error?.code,elapsed_ms:Date.now()-start,generation_sends:generationSends,metadata,native_errors:nativeErrors,guard_errors:guardErrors,output_errors:outputErrors,stream_events:streamEvents});
   if(reply.ok)await write("generation.json",reply.result);
-  console.log(JSON.stringify({ok:reply.ok,code:reply.ok?"":reply.error?.code,generation_sends:generationSends,metadata,native_errors:nativeErrors,guard_errors:guardErrors}));
+  console.log(JSON.stringify({ok:reply.ok,code:reply.ok?"":reply.error?.code,generation_sends:generationSends,metadata,native_errors:nativeErrors,guard_errors:guardErrors,output_errors:outputErrors,stream_events:streamEvents}));
  }finally{try{access?.close();if(store&&changed){for(const[k,v]of Object.entries(trial))if((store.settings as any)[k]!==v)throw Error("TRANSPORT_SETTINGS_RECONCILE");Object.assign(store.settings,saved);store.saveSync()}}finally{await store?.close();done();unregister();process.off("SIGINT",stop);process.off("SIGTERM",stop)}}
 }
 if(import.meta.main)await runLunaTransport();
