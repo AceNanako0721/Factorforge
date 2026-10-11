@@ -259,6 +259,31 @@ test("store-as alias normalizes credential writes and row lookup", async () => {
   const x = await fixture(); await x.access.auth.credentials.upsert("zai-coding-plan", { type: "api_key", key: "fixture-key" });
   await x.reopen(); expect(x.access.accounts("zai").length).toBe(1); expect(x.access.accounts("zai-coding-plan").length).toBe(1);
 });
+for (const complete of [false, true]) test(`Codex socket close ${complete ? "after" : "before"} terminal completion preserves the protocol boundary`, async () => {
+  let requests = 0;
+  const item = { id: "msg_fixture", type: "message", role: "assistant", status: "completed", content: [{ type: "output_text", text: "fixture result", annotations: [] }] };
+  const events = [
+    { type: "response.created", response: { id: "resp_fixture", status: "in_progress", output: [] } },
+    { type: "response.output_item.added", output_index: 0, item: { ...item, status: "in_progress", content: [] } },
+    { type: "response.content_part.added", item_id: item.id, output_index: 0, content_index: 0, part: { type: "output_text", text: "", annotations: [] } },
+    { type: "response.output_text.delta", item_id: item.id, output_index: 0, content_index: 0, delta: "fixture result" },
+    { type: "response.output_item.done", output_index: 0, item },
+    { type: "response.completed", response: { id: "resp_fixture", status: "completed", output: [item], usage: { input_tokens: 2, output_tokens: 2, total_tokens: 4 } } },
+  ];
+  if (!complete) events.pop();
+  const bytes = new TextEncoder().encode(events.map(e => `data: ${JSON.stringify(e)}\n\n`).join(""));
+  const x = await fixture({}, async () => {
+    requests++; let reads = 0;
+    return new Response(new ReadableStream({pull(out) { if (reads++) out.error(new Error("fixture socket close after terminal")); else out.enqueue(bytes); }}), { headers: { "content-type": "text/event-stream" } });
+  });
+  const id = await x.key("openai-codex", true);
+  const model = getBundledModels("openai-codex").find((m: any) => m.id === "gpt-6-luna");
+  const result = x.access.generate("openai-codex", id, model, "fixture input", "", AbortSignal.timeout(2000));
+  if (complete) expect((await result).text).toBe("fixture result");
+  else await expect(result).rejects.toMatchObject({code:"DELIVERY_UNKNOWN"});
+  expect(requests).toBe(1);
+});
+
 for (const provider of ["anthropic", "openai-codex", "google-antigravity"]) test(`${provider} HTTP 429 sends only once`, async () => {
   let calls = 0; const x = await fixture({}, async () => { calls++; return json({ error: { message: "fixture-sensitive" } }, 429); });
   const id = await x.key(provider, provider !== "anthropic");

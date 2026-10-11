@@ -168,7 +168,15 @@ export class OMPAccess {
           try {
             const item = await reader.read();
             if (observe) guard.feed(item.done ? undefined : item.value);
-            if (item.done) out.close(); else out.enqueue(item.value);
+            if (item.done) out.close(); else {
+              out.enqueue(item.value);
+              // Codex completion is the protocol boundary. Do not let a
+              // speculative read after it abort the queued complete response.
+              if (model.api === "openai-codex-responses" && guard.terminal) {
+                out.close();
+                void reader.cancel().catch(() => {});
+              }
+            }
           } catch (e) {
             transportFailure ??= e instanceof ModelError ? e : new ModelError("DELIVERY_UNKNOWN", true);
             controller.abort(); out.error(transportFailure);
