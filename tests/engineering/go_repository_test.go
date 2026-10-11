@@ -138,7 +138,7 @@ func TestPublicGuardTemplateShapesAndDocumentContainers(t *testing.T) {
 			t.Fatal("accepted nonempty template")
 		}
 	}
-	legacy := strings.Split(string(config), "# P2 scoped API access only.")[0]
+	legacy := strings.Split(preSemanticTemplate(string(config)), "# P2 scoped API access only.")[0]
 	// The historical fixture predates both the P2 section and P3 read API.
 	start, end := strings.Index(legacy, "[application.read_api]"), strings.Index(legacy, "[trading]")
 	if start >= 0 && end > start {
@@ -189,7 +189,7 @@ func TestPublicGuardHistoricalSearchTemplateIsExactAndHistoryOnly(t *testing.T) 
 	if e != nil {
 		t.Fatal(e)
 	}
-	body := strings.ReplaceAll(string(config), "\r\n", "\n")
+	body := preSemanticTemplate(strings.ReplaceAll(string(config), "\r\n", "\n"))
 	body = strings.Split(body, "# BEGIN FACTORFORGE MODEL ACCESS")[0]
 	block := "[[application.pipeline.search_backends]]\nid = \"\"\nkind = \"\"\nendpoint = \"\"\ntoken = \"\"\n\n"
 	legacy := strings.Replace(body, block, "", 1)

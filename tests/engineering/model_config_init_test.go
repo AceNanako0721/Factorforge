@@ -90,7 +90,7 @@ func TestHistoricalModelTemplatePathsAreExactAndHistoryOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	legacy := strings.ReplaceAll(strings.ReplaceAll(string(config), "claude_cli_path = \"\"\n", ""), "antigravity_cli_path = \"\"\n", "")
+	legacy := strings.ReplaceAll(strings.ReplaceAll(preSemanticTemplate(string(config)), "claude_cli_path = \"\"\n", ""), "antigravity_cli_path = \"\"\n", "")
 	legacy = strings.ReplaceAll(strings.ReplaceAll(legacy, "omp_max_requests = 0\n", ""), "omp_browser_path = \"\"\n", "")
 	if guard.TemplateIssue("config/config.example.toml", []byte(legacy), true) != "" || guard.TemplateIssue("config/config.example.toml", []byte(legacy), false) == "" {
 		t.Fatal("v2.2 template history boundary")
@@ -99,7 +99,7 @@ func TestHistoricalModelTemplatePathsAreExactAndHistoryOnly(t *testing.T) {
 	if guard.TemplateIssue("config/config.example.toml", []byte(bad), true) == "" {
 		t.Fatal("historical private state accepted")
 	}
-	v23 := strings.ReplaceAll(strings.ReplaceAll(string(config), "omp_max_requests = 0\n", ""), "omp_browser_path = \"\"\n", "")
+	v23 := strings.ReplaceAll(strings.ReplaceAll(preSemanticTemplate(string(config)), "omp_max_requests = 0\n", ""), "omp_browser_path = \"\"\n", "")
 	if guard.TemplateIssue("config/config.example.toml", []byte(v23), true) != "" || guard.TemplateIssue("config/config.example.toml", []byte(v23), false) == "" {
 		t.Fatal("v2.3 template history boundary")
 	}

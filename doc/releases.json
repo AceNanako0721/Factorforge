@@ -291,6 +291,21 @@
         "04_Web管理台",
         "05_模型接入模块"
       ]
+    },
+    {
+      "version": "2.5.1",
+      "directory": "doc/v2.5.1",
+      "change_kind": "design",
+      "date": "2026-10-11",
+      "reason": "Antigravity候选抽取经先行验证后落实公开JSONL适配、原文跨度核验与明确审阅路径；业务规格及默认无限预算保持。",
+      "format": "html",
+      "document_pairs": [
+        "01_交易系统层",
+        "02_策略化框架层",
+        "03_SOXLUSDT_JEV应用实例",
+        "04_Web管理台",
+        "05_模型接入模块"
+      ]
     }
   ]
 }

@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { decodeOMP } from "../api/omp-protocol.js";
 import { fail, ModelError, safeFailure } from "../api/protocol.js";
 import { OMPAccess } from "../adapters/omp-access.js";
@@ -62,7 +62,7 @@ export class OMPService {
       if (!model) fail("MODEL_NOT_AVAILABLE");
       signal.throwIfAborted(); this.reserve(budgetKey, id);
       const result = await this.access.generate(provider, r.account_id!, model, r.input!, prompt, signal);
-      const reply = { v: 2, id, ok: true, result };
+      const reply = { v: 2, id, ok: true, result: { ...result, prompt_hash: createHash("sha256").update(prompt, "utf8").digest("hex") } };
       if (Buffer.byteLength(JSON.stringify(reply)) > this.store.settings.max_line_bytes) fail("OUTPUT_LIMIT_EXCEEDED", true);
       return reply;
     } catch (error) {

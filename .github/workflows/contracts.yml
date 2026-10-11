@@ -171,3 +171,7 @@ jobs:
           node tools/check-model-access.mjs
           npm --prefix src/factorforge/applications/model_access test
           npm --prefix src/factorforge/applications/model_access run test:omp
+      - name: Verify Go semantic candidates and public Bun protocol without accounts
+        run: go test ./tests/applications/soxl_jev -run Semantic -count=1
+        env:
+          FACTORFORGE_REQUIRE_MODEL_PROTOCOL: ${{ runner.os == 'Linux' && '1' || '0' }}

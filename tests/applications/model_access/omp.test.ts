@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import { ConfigStore, emptySettings, block } from "../../../runtime/model-access-build/config/store.js";
 import { OMPAccess } from "../../../runtime/model-access-build/adapters/omp-access.js";
 import { OMPService } from "../../../runtime/model-access-build/application/omp-service.js";
@@ -199,6 +200,18 @@ test("budget reservations and duplicates survive restart; disabled input does no
   await x.reopen(); x.access.catalog = async () => ({ models: [openAIModel()], source: "bundled", stale: false });
   expect((await x.service.handle({ ...r, id: "next" })).error?.code).toBe("LOCAL_BUDGET_EXHAUSTED"); expect(requests).toBe(1);
   x.store.settings.enabled = false; expect((await x.service.handle({ ...r, id: "disabled" })).error?.code).toBe("MODULE_DISABLED"); expect(requests).toBe(1);
+});
+test("public generation binds the actually loaded private instructions by hash", async () => {
+  const x = await fixture({ prompt_file: "prompts/fixture.json" }, async () => completions());
+  await fs.mkdir(path.join(x.temp, "prompts"));
+  const instructions = "SYNTHETIC test instructions 甲";
+  await fs.writeFile(path.join(x.temp, "prompts/fixture.json"), JSON.stringify({ instructions }), { mode: 0o600 });
+  const id = await x.key("deepseek");
+  x.access.catalog = async () => ({ models: [openAIModel()], source: "bundled", stale: false });
+  const reply = await x.service.handle({ v: 2, id: "prompt-hash", op: "generate", provider: "deepseek", account_id: id, model: "gpt-4o-mini", input: "fixture" });
+  expect(reply.ok).toBe(true);
+  expect(reply.result?.prompt_hash).toBe(createHash("sha256").update(instructions, "utf8").digest("hex"));
+  expect(JSON.stringify(reply)).not.toContain(instructions);
 });
 test("OMP zero budget/window is unlimited, durable and bounded across reopen",async()=>{
   let calls=0;const x=await fixture({omp_max_requests:0,budget_window_seconds:0},async()=>{calls++;return completions()});const id=await x.key("deepseek");

@@ -65,3 +65,5 @@ node tools/check-model-access.mjs
 ```
 
 夹具不登录真实账户，不发真实模型或交易请求。已验证机制与现场边界记录在 [OMP_ACCESS_VALIDATION.md](../../../../doc/engineering/OMP_ACCESS_VALIDATION.md)。用户登录后的真实账号与模型调用单独记录，不据此声称 P3 完成。
+
+实例语义候选从Go操作者经公开JSONL v2接入，generate成功result含本次实际私有instructions的prompt_hash（SHA-256）。公开响应schema见 contracts/v2/model-access/omp-generate-response.json；运行与审阅边界见 doc/engineering/P3_SEMANTIC_CANDIDATES.md。0/缺省本地次数预算继续不限。
