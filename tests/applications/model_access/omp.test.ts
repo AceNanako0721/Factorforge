@@ -148,6 +148,9 @@ test("original provider transport produces complete text through program adapter
 for (const provider of ["anthropic", "openai-codex", "google-antigravity"]) test(`${provider} original inference parser returns program text and selected credentials`, async () => {
   let requests = 0, sent: Headers | undefined;
   const x = await fixture({}, async (_url, init) => {
+    // Client-version discovery is a separate controlled request, not a generation.
+    // Answer it explicitly so the parser test does not need another test's cache.
+    if (provider === "google-antigravity" && String(_url).endsWith("/manifest/latest-arm64-mac.yml")) return new Response("version: 2.19.1\n");
     requests++; sent = new Headers(init?.headers);
     if (provider === "anthropic") return sse([
       { type: "message_start", message: { id: "fixture", type: "message", role: "assistant", content: [], model: "fixture", stop_reason: null, stop_sequence: null, usage: { input_tokens: 2, output_tokens: 0 } } },
