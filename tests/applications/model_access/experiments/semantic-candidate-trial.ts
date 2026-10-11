@@ -7,6 +7,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { ConfigStore } from "../../../../src/factorforge/applications/model_access/config/store.js";
 import { OMPAccess } from "../../../../src/factorforge/applications/model_access/adapters/omp-access.js";
 import { OMPService } from "../../../../src/factorforge/applications/model_access/application/omp-service.js";
+import { ModelError } from "../../../../src/factorforge/applications/model_access/api/protocol.js";
 import { postmortem } from "../../../../src/factorforge/applications/model_access/node_modules/@oh-my-pi/pi-utils/src/index.ts";
 
 const [rootArg, labName, binaryArg, promptArg] = process.argv.slice(2);
@@ -22,9 +23,11 @@ let child: ChildProcess | undefined, store: ConfigStore | undefined, access: OMP
 let changed = false, stopped = false;
 let saved: Record<string,unknown> = {};
 let promptHash = "";
+let stage = "config";
+const cancelled = new AbortController();
 let done!:()=>void;
 const finished = new Promise<void>(resolve=>done=resolve);
-const stop = () => {stopped=true;child?.kill("SIGTERM")};
+const stop = () => {stopped=true;cancelled.abort();child?.kill("SIGTERM")};
 const unregister = postmortem.register("factorforge-semantic-candidate-trial",async()=>{stop();await finished});
 process.on("SIGINT",stop);process.on("SIGTERM",stop);
 async function run(mode: string) {
@@ -38,27 +41,32 @@ async function run(mode: string) {
 try {
   store=await ConfigStore.open(config);
   for(const key of Object.keys(trial)) saved[key]=(store.settings as any)[key];
-  const originalPrompt=store.settings.prompt_file;
+  const originalPrompt=store.settings.prompt_file, originalInputLimit=store.settings.max_input_bytes;
+  stage="prompt";
   // prompt() only loads the private file; no OAuth/catalog may persist this edit.
-  try {store.settings.prompt_file=trial.prompt_file;promptHash=hash(await store.prompt())}
-  finally {store.settings.prompt_file=originalPrompt}
+  try {store.settings.prompt_file=trial.prompt_file;store.settings.max_input_bytes=trial.max_input_bytes;promptHash=hash(await store.prompt())}
+  finally {store.settings.prompt_file=originalPrompt;store.settings.max_input_bytes=originalInputLimit}
+  stage="prepare";
   if(await run("prepare")!==0) throw Error("TRIAL_PREPARE_FAILED");
   // Only non-secret settings are backed up; credentials/state are never copied.
   await fs.writeFile(path.join(dir,"restore-settings.json"),JSON.stringify(saved,null,2),{flag:"wx",mode:0o600});
   await fs.writeFile(path.join(dir,"runner-seal.json"),JSON.stringify({at:new Date().toISOString(),runner_hash:hash(await fs.readFile(import.meta.filename)),binary_hash:hash(await fs.readFile(binary)),local_budget:"unlimited",planned_calls:6,prompt_hash:promptHash},null,2),{flag:"wx",mode:0o600});
   if(stopped) throw Error("TRIAL_CANCELLED");
   changed=true;Object.assign(store.settings,trial);store.saveSync();
+  stage="catalog";
   access=new OMPAccess(store);await access.ready();
-  const catalog=await new OMPService(store,access).handle({v:2,id:"semantic_trial_catalog",op:"models",provider:"google-antigravity",account_id:1});
+  const catalog=await new OMPService(store,access).handle({v:2,id:"semantic_trial_catalog",op:"models",provider:"google-antigravity",account_id:1},cancelled.signal);
   if(!catalog.ok || !(catalog as any).result.models.some((m:any)=>m.id==="gemini-3.8-flash")) throw Error("TRIAL_MODEL_UNAVAILABLE");
   access.close();access=undefined;await store.close();store=undefined;
+  stage="generate";
   const status=await run("run");
+  stage="evaluate";
   const evaluation=await run("evaluate");
   if(status!==0||evaluation!==0) throw Error("TRIAL_INCOMPLETE_SEE_PRIVATE_OUTCOMES");
-} catch {
+} catch(error) {
   // No raw provider errors, responses or private instructions in terminal logs.
   process.exitCode=1;
-  console.error("TRIAL_FAILED_OR_INCOMPLETE");
+  console.error(JSON.stringify({code:error instanceof ModelError?error.code:"TRIAL_FAILED_OR_INCOMPLETE",stage}));
 } finally {
   try {
     access?.close();access=undefined;
