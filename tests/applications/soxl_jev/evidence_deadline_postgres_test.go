@@ -169,4 +169,58 @@ func TestEvidenceWindowPostgresReopenExpiryAndLegacyIsolation(t *testing.T) {
 	if err = admin.QueryRow(ctx, "SELECT count(*) FROM instance_pipeline_sim.trading_submission_outbox WHERE job_id=$1", late.JobID).Scan(&outboxes); err != nil || outboxes != 0 {
 		t.Fatal("late response produced outbox", err)
 	}
+	// A score accepted before expiry remains a genuine result after the app
+	// loses its response and reopens its durable outbox beyond the deadline.
+	accepted := original
+	accepted.JobID, accepted.Request.RequestID = "fixture-accepted-window-job", "fixture-accepted-window-job"
+	clock.at, worker.Provider = now, provider
+	if err = ingest.Enqueue(ctx, accepted, "fixture-budget"); err != nil {
+		t.Fatal(err)
+	}
+	if processed, err := worker.ProcessOne(ctx); err != nil || !processed || provider.calls != 2 {
+		t.Fatal("prepare durable accepted score", err)
+	}
+	rows, err := store.Outboxes(ctx, 10)
+	if err != nil || len(rows) != 1 {
+		t.Fatal("durable pending outbox", err)
+	}
+	durable := rows[0]
+	observer.submitOverride = func(ctx context.Context, command dto.ScoreCommand) (dto.AdmissionReceipt, error) {
+		if _, err := observer.FrameworkClient.Submit(ctx, command); err != nil {
+			return dto.AdmissionReceipt{}, err
+		}
+		return dto.AdmissionReceipt{}, d.Fail("FRAMEWORK_DELIVERY_UNKNOWN", 503)
+	}
+	if err = worker.Dispatch(ctx); err != nil {
+		t.Fatal(err)
+	}
+	rows, err = store.Outboxes(ctx, 10)
+	if err != nil || len(rows) != 1 || rows[0].DeliveryState != "DELIVERY_UNKNOWN" || len(observer.sent) != 1 {
+		t.Fatal("durable response loss", err)
+	}
+	store.Close()
+	store = openWorker()
+	worker.Store, clock.at = store, durable.ExpiresAt
+	observer.versions, observer.receipts = 0, 0
+	observer.versionErr = d.Fail("FRAMEWORK_UNAVAILABLE", 503)
+	if err = worker.Dispatch(ctx); err != nil || observer.receipts != 1 || observer.versions != 0 || len(observer.sent) != 1 || provider.calls != 2 {
+		t.Fatal("expired reopen did not reconcile existing receipt", err)
+	}
+	if err = admin.QueryRow(ctx, "SELECT state,payload FROM instance_pipeline_sim.trading_submission_outbox WHERE outbox_id=$1", durable.OutboxID).Scan(&state, &raw); err != nil || state != "ACK" {
+		t.Fatal("accepted receipt not durable", err, state)
+	}
+	var reconciled d.SubmissionOutbox
+	if json.Unmarshal(raw, &reconciled) != nil || reconciled.Receipt == nil || reconciled.Receipt.SubmissionID != durable.OutboxID || reconciled.CandidateHash != durable.CandidateHash || d.Digest(reconciled.Command) != d.Digest(durable.Command) {
+		t.Fatal("reconciliation changed immutable score")
+	}
+	if err = admin.QueryRow(ctx, "SELECT payload FROM instance_pipeline_sim.app_trading_analysis_job WHERE job_id=$1", accepted.JobID).Scan(&raw); err != nil {
+		t.Fatal(err)
+	}
+	var completed d.PipelineJob
+	if json.Unmarshal(raw, &completed) != nil || completed.ReceiptRef == nil || *completed.ReceiptRef != durable.OutboxID || d.Digest(completed.Request) != d.Digest(accepted.Request) {
+		t.Fatal("durable receipt lost job binding")
+	}
+	if err = worker.Dispatch(ctx); err != nil || observer.receipts != 1 || len(observer.sent) != 1 || provider.calls != 2 {
+		t.Fatal("terminal accepted row reopened", err)
+	}
 }

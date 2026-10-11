@@ -164,20 +164,21 @@ func (w AnalysisWorker) Dispatch(ctx context.Context) error {
 			}
 			continue
 		}
-		if !w.Clock.Now().UTC().Before(row.ExpiresAt) {
-			if err = w.Store.SetDelivery(ctx, row, "EXPIRED", nil); err != nil {
-				return err
-			}
-			continue
-		}
 		// A missing response is reconciled against recorded framework receipts before
-		// repeating the same score/key. No new model call or score ID is created.
+		// repeating the same score/key. Expiry blocks new submission, not confirmation
+		// of an already accepted result. No new model call or score ID is created.
 		receipt, e := w.Framework.Receipt(ctx, row.Command.Score.EventID, row.Command.Score.ObjectID, row.OutboxID)
 		if e != nil {
 			return e
 		}
 		if receipt != nil {
 			if err = w.Store.SetDelivery(ctx, row, "ACK", receipt); err != nil {
+				return err
+			}
+			continue
+		}
+		if !w.Clock.Now().UTC().Before(row.ExpiresAt) {
+			if err = w.Store.SetDelivery(ctx, row, "EXPIRED", nil); err != nil {
 				return err
 			}
 			continue

@@ -27,3 +27,19 @@
 普通CI的真实原生PostgreSQL研究链路在outbox冻结后推进P2聚合版本，再关闭/重开队列和共享控制连接；成功ACK且持久Command/CandidateHash完全保持，预算与模型调用都一次。已有真实JEV单调用原证据保持，不重复调用供应商。
 
 完整Go测试/vet、P3/实验/工程race及新增真实并发/封闭错误/PG重开定向race通过；原生实例构建、布局/契约/版本分类/历史冻结/四组式样保持通过。11HTML共22次1440/390检查通过，新流程及窄屏截图已查看。GitHub结果随交付记录；这些是提交机制验证，不提高业务评分、交易或LIVE资格。
+
+## 2026-10-10：丢回执后跨有效期的确认顺序修复
+
+基线v2.1.14/main `e4a8a1f`。实际本地Go P2已经接收评分，测试传输仅丢弃成功响应，应用保留DELIVERY_UNKNOWN；把注入时钟推进到ExpiresAt后，再调Dispatch。修复前直接SetDelivery(EXPIRED)，没有读取真实已存在回执；查询故障的反例也被过早终结。原失败日志保留 `runtime/accepted-expired-score-before.log`。
+
+现行HTML设计第19章已明确每轮从Receipt开始、确认既有结果不重发；第20章保留此顺序。因此归code-only，不另建文档版本或改旧基线。只把有效窗口行的到期终结移到Receipt查无结果之后；仍在Version/Submit之前检查截止，Version网络返回后再检查一次。窗口不一致的旧行仍走原仅查询/拒绝规则，已终态的旧行不重开。
+
+实际P2反例修复后ACK，查询失败时保持DELIVERY_UNKNOWN并返回错误；恢复后只读既有回执ACK。版本读取0次、原评分发送始终1次、Mock始终1次、候选/命令摘要不变。没有提高过期评分准入或增加重问/发送循环。无回执的过期行、读取Version途中到期及旧窗口拒绝反例继续通过。
+
+原生PostgreSQL补充：生产INGEST/分析身份完成一项有窗口任务，实际P2接受后丢响应；关闭/重开PipelineStore并推进到截止，Dispatch仅查一次真实回执。数据库outbox持久ACK、原完成job.ReceiptRef正确绑定，Command/CandidateHash/Request摘要保持；再次dispatch零新增查询/发送/模型调用。测试只使用合成事实、Mock模型和本地P2，无交易所或外部模型调用。定向结果保留 `runtime/accepted-expired-score-after.log` 与 `runtime/accepted-expired-score-postgres.log`，全量与GitHub结果随本次PR另记。
+
+## 2026-10-11：当前主线复现与交付
+
+main `172c435` 的生产代码在实际P2接受但丢响应、随后到期时，仍复现将真实已接收评分错误SetDelivery(EXPIRED)；查询故障反例也被提前终结。恢复修复后两反例通过，实际P2与原生PostgreSQL重开/独立进程回归同时通过。修复前后日志与时钟修复共存于隔离树runtime/p3-cleanup-before.log、p3-cleanup-after.log；没有重发或重问。
+
+按现行设计的未知送达先确认原回执、过期禁新提交规则交付；不重开历史终态、不改变P2准入。与已停止并归档的本地模型实验分开，见 [分流记录](P3_ROUTE_DISPOSITION.md)。

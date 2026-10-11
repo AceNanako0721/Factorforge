@@ -60,9 +60,13 @@ func (w IngestWorker) Process(ctx context.Context, raw d.RawEvidence) (d.Routing
 		if err != nil {
 			// Save the private original and failed extraction fact. Unknown facts never
 			// enter a provider queue. A later reviewed correction needs a new manifest.
-			extracted = d.ExtractedEvidence{Raw: raw, ExtractorID: "unavailable", ExtractorVersion: "unavailable", CompletedAt: now, Claims: []dto.Claim{}, Spans: []d.Span{}, Complete: false}
+			extracted = d.ExtractedEvidence{Raw: raw, ExtractorID: "unavailable", ExtractorVersion: "unavailable", CompletedAt: w.Clock.Now().UTC(), Claims: []dto.Claim{}, Spans: []d.Span{}, Complete: false}
 		}
 	}
+	// Loading and extraction consume real time. Evaluate their completed result
+	// against the current clock, while retaining all persisted original/review
+	// times and rejecting completion timestamps that are still in the future.
+	now = w.Clock.Now().UTC()
 	plan, planned := w.Plans[raw.ContentHash]
 	if reviewed, scoped := w.ReviewedEvents[raw.EvidenceID]; scoped {
 		plan, planned = reviewed.EventPlan, true

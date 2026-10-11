@@ -27,3 +27,21 @@ P2 `domain/records_support.go` 要求 EvidenceRef.AvailableAt 不早于 FirstPub
 实际P2 HTTP完整测试政策中，生产映射现在使有效事件VERIFIED；立即评分、模型延迟2分钟、网络延迟3分钟三组，EligibleFrom均不早于真实评分完成、框架接收及抽取完成。评分标定未登记，三个回执继续QUARANTINED。重复poll的新收取时间被原持久事实替代，始终一次入队。历史已登记旧payload以新映射重做返回FRAMEWORK_CONFLICT、不入队，不改EventID/FactVersion迎合结果。延迟数值都是测试夹具，不是生产设置。
 
 原生PG双事件重开测试进一步逐项核对P2 EvidenceRef.AvailableAt等于原收取时间；任务/预算不重复。原生进程、独立身份评分交接、拒绝事实、丢响应后的幂等重复等定向回归通过。全库Go测试、P3/实验/工程竞态、全库vet、布局/契约/基线检查及原生实例构建通过；GitHub检查另随交付核对；事件与评分、交易/LIVE门保持分列。
+
+## 2026-10-10：实际流逝时间下的摄入核验修复
+
+基线v2.1.14/main `e4a8a1f`。生产装配给IngestWorker及AnnotatedExtractor都注入系统时钟，但Process在数据库读取/抽取之前只读一次now，随后用该旧时间核验新的CompletedAt。使用真实AnnotatedExtractor、仅让注入时钟在抽取前流逝1微秒，并连接实际本地P2，首个合格抽取被错误QUARANTINE/EXTRACTION_NOT_VERIFIED。旧固定时钟测试没有触发这个条件。两个原失败记录保留 `runtime/ingest-elapsed-clock-before[-detail].log`。
+
+现行HTML第18章已规定真实抽取完成和路由可用的先后关系，因此是按既有设计修复代码。Process在读取/抽取完成后重新读取当前now，失败抽取也记录实际完成时点；不改原ReceivedAt、FirstPublicAt、VerifiedAt、CompletedAt或已保存路由。未来完成时间继续隔离；抽取过程中到期的来源在正确时点拒绝，到期映射只保留研究；不将历史错误QUARANTINE自动升级。
+
+实际P2定向验证：流逝后的合格抽取创建事件/入队一次，原文和审阅时钟保持；重复poll的任务、证据、路由和有效窗口摘要保持。来源到期、映射到期、未来CompletedAt及历史QUARANTINE不可改反例通过，后记录 `runtime/ingest-elapsed-clock-after.log`。
+
+原生进程补充此前缺少的正向摄入：`PATH=/nonexistent` 下真实系统时钟→生产AnnotatedExtractor→原生PostgreSQL→实际Go P2，合成17USD原文创建独立事件并持久进入RESEARCH。两次原生运行只保存一个任务/扣额，抽取完成晚于原收取、路由不早于完成，冻结窗口有效；没有启动研究分析器或新增模型调用。已有分析夹具的一次模型调用和ACK保持。初版新增夹具复用了既有12USD经济事实，被P2以FRAMEWORK_CONFLICT拒绝；保留 `runtime/ingest-elapsed-clock-native.log`，换成独立17USD合成原文后通过，结果为 `runtime/ingest-elapsed-clock-native-after.log`。没有更改生产去重或换键绕过真实拒绝。
+
+本次归code-only、不增版本，旧基线冻结；全量及GitHub结果随本次PR登记。这些均为本地合成事实/许可/参数的机制验证，不证明自动语义抽取、生产标定或真实交易准入。
+
+## 2026-10-11：在当前主线重新验收并分流
+
+以main `172c435` 的生产代码和待合并回归复现：elapsed-valid再次得到QUARANTINE/EXTRACTION_NOT_VERIFIED，来源/映射到期及未来完成的时点检查同时暴露旧now。恢复同一修复后定向测试通过；实际P2、原生PostgreSQL及独立进程回归通过。新的修复前后日志为隔离树runtime/p3-cleanup-before.log、p3-cleanup-after.log，保留前序证据。
+
+该修复不依赖任何本地模型，随本次主线交付；Qwen/llama.cpp试验单独公开归档，见 [分流记录](P3_ROUTE_DISPOSITION.md)。本次没有新模型/交易所请求、没有启动实际业务实例，不因机制通过关闭独立抽取或生产门。

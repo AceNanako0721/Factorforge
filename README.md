@@ -12,7 +12,7 @@ P2 已实现通用对象、事件与评分资格、逐贡献情绪账本、持�
 
 ## 语言与模块边界
 
-**禁止 Python，不要求统一 Go。**现有 P1/P2 Go 核心保留；上层可按模块需要使用 TypeScript/JavaScript 等非 Python 语言，范围包括后端、认证/模型接入和辅助模块。模块通过公开接口/契约协作，语言与运行时不改变三层依赖方向，下层不依赖上层运行时。具体引入仍须先验证、再设计、再实现；OMP 模型接入采用固定上游组件；已接入受限语义候选；独立质量与生产选择仍待验证，本地模型实验保持暂停。见 [需求与工程规则](doc/engineering/LANGUAGE_AND_MODULE_BOUNDARIES.md) 和 [文件树规范](doc/engineering/REPOSITORY_LAYOUT.md)。
+**禁止 Python，不要求统一 Go。**现有 P1/P2 Go 核心保留；上层可按模块需要使用 TypeScript/JavaScript 等非 Python 语言，范围包括后端、认证/模型接入和辅助模块。模块通过公开接口/契约协作，语言与运行时不改变三层依赖方向，下层不依赖上层运行时。具体引入仍须先验证、再设计、再实现；OMP 模型接入、受限语义候选和独立审阅保留。Qwen/llama.cpp 本地抽取路线已停止并公开归档；JEV新闻全文直评继续作为研究方向，独立质量与生产选择仍待验证。见 [工作分流记录](doc/engineering/P3_ROUTE_DISPOSITION.md)、[需求与工程规则](doc/engineering/LANGUAGE_AND_MODULE_BOUNDARIES.md) 和 [文件树规范](doc/engineering/REPOSITORY_LAYOUT.md)。
 
 ## 文档与依赖
 
