@@ -175,6 +175,6 @@ jobs:
       - name: Verify Go semantic candidates and public Bun protocol without accounts
         run: |
           go test ./tests/applications/soxl_jev -run Semantic -count=1
-          go test ./tests/applications/soxl_jev/experiments -run 'Test(FinancialExtraction(MetricBoundaries|AccountBinding)|StructuredTimestampHashBoundary|DirectNews(ComparatorAndArticleBoundaries|OfflineArtifactEvaluation))$' -count=1
+          go test ./tests/applications/soxl_jev/experiments -run 'Test(FinancialExtraction(MetricBoundaries|AccountBinding)|StructuredTimestampHashBoundary|DirectNews(ComparatorAndArticleBoundaries|OfflineArtifactEvaluation)|VenueReferenceArtifactIsPrivateAndImmutable)$' -count=1
         env:
           FACTORFORGE_REQUIRE_MODEL_PROTOCOL: ${{ runner.os == 'Linux' && '1' || '0' }}

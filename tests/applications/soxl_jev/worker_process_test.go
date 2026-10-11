@@ -8,6 +8,7 @@ import (
 	a "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/analysis"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/config"
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/domain"
+	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/evidence"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/monitoring"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/operations"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/reports"
@@ -308,6 +309,62 @@ func TestNativeInstanceWorkerProfilesAndProcessWithoutPythonNode(t *testing.T) {
 	var delivery string
 	if err = admin.QueryRow(ctx, "SELECT state FROM instance_pipeline_sim.trading_submission_outbox").Scan(&delivery); err != nil || delivery != "ACK" {
 		t.Fatal("framework receipt not durable", delivery, err)
+	}
+	// Unlike the seeded analysis job above, this original goes through the
+	// executable's actual system clock, AnnotatedExtractor and PostgreSQL lookup.
+	// The fixture is deliberately research-only; it cannot borrow signal scope.
+	encoded, _ := json.Marshal(r.Evidence)
+	var fresh d.ExtractedEvidence
+	if json.Unmarshal(encoded, &fresh) != nil {
+		t.Fatal("native original clone")
+	}
+	fresh.Raw.EvidenceID = "fixture-native-elapsed-original"
+	fresh.Raw.Content = strings.ReplaceAll(fresh.Raw.Content, "12 USD", "17 USD")
+	fresh.Raw.ContentHash = d.ContentDigest([]byte(fresh.Raw.Content))
+	fresh.Claims[0].ClaimID = "fixture-native-elapsed-claim"
+	fresh.Claims[0].NormalizedFact = fresh.Raw.Content
+	fresh.Claims[0].NumbersWithUnits = map[string]string{"USD": "17"}
+	fresh.Claims[0].EvidenceRefs = []string{fresh.Raw.EvidenceID}
+	fresh.Spans = []d.Span{{SpanID: "fixture-native-elapsed-span", StartOffset: 0, EndOffset: len(fresh.Raw.Content), TextHash: fresh.Raw.ContentHash, LicenceRef: fresh.Raw.LicenceRef}}
+	asset.Sources[fresh.Raw.SourceID] = d.SourceRegistration{SourceID: fresh.Raw.SourceID, Version: "fixture-native-source", LicenceRef: fresh.Raw.LicenceRef, Enabled: true, LicenceVerified: true, AllowAnalysis: true, AllowProvider: true, Environments: []string{"SIM"}, ValidFrom: now.Add(-time.Hour), ValidUntil: now.Add(time.Hour), MaxAge: time.Hour}
+	asset.Annotations = map[string]evidence.Annotation{fresh.Raw.ContentHash: handoffAnnotation(fresh)}
+	asset.EventPlans = map[string]d.EventPlan{fresh.Raw.ContentHash: {EventID: "fixture-native-elapsed-event", FamilyID: "fixture-native-elapsed-family", EventType: r.Event.EventType, Relation: "NEW", FactVersion: 1, OccurredAt: r.Event.OccurredAt, Novelty: number("1"), ScoreVersion: 1, RevisionKind: "INITIAL"}}
+	if err = pg.ConfigureQueueBudget(ctx, server.AdminDSN, pg.QueueBudget{Binding: r.Binding, Kind: "RESEARCH", Bucket: "fixture-budget", PolicyRef: "fixture-native-research", MaxJobs: 1, MaxConcurrent: 1, ValidFrom: now.Add(-time.Hour), ValidUntil: now.Add(time.Hour)}); err != nil {
+		t.Fatal(err)
+	}
+	data, _ = json.Marshal(asset)
+	if err = os.WriteFile(settings.AssetsFile, data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	data, _ = json.Marshal(map[string]any{"fixture_only": true, "evidence": []d.RawEvidence{fresh.Raw}})
+	if err = os.WriteFile(settings.FixtureInputFile, data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	for attempt := 0; attempt < 2; attempt++ {
+		command := exec.Command(ingestBinary, "--config", paths[0], "--once")
+		command.Dir = root
+		command.Env = []string{"PATH=/nonexistent", "TZ=UTC"}
+		if output, e := command.CombinedOutput(); e != nil {
+			t.Fatal("native elapsed extraction", e, string(output))
+		}
+	}
+	var researchRaw []byte
+	if err = admin.QueryRow(ctx, "SELECT payload FROM instance_pipeline_sim.app_research_analysis_job WHERE instance_id=$1", r.Binding.InstanceID).Scan(&researchRaw); err != nil {
+		t.Fatal("native positive original never reached research queue", err)
+	}
+	var researchJob d.PipelineJob
+	if json.Unmarshal(researchRaw, &researchJob) != nil || researchJob.Request.Event.EventID != "fixture-native-elapsed-event" || researchJob.State != "QUEUED" || researchJob.QueueKind != "RESEARCH" || !researchJob.Request.Evidence.CompletedAt.After(fresh.Raw.ReceivedAt) || researchJob.Request.Routing.EvaluatedAt.Before(researchJob.Request.Evidence.CompletedAt) || researchJob.Request.VerifyEligibilityWindow() != nil {
+		t.Fatal("native extraction/routing clocks invalid")
+	}
+	if exists, e := client.EventExists(ctx, "fixture-native-elapsed-event", r.ObjectID, 1); e != nil || !exists {
+		t.Fatal("native positive event missing from actual P2", e)
+	}
+	var researchJobs, researchDebits int
+	if err = admin.QueryRow(ctx, "SELECT count(*) FROM instance_pipeline_sim.app_research_analysis_job").Scan(&researchJobs); err != nil {
+		t.Fatal(err)
+	}
+	if err = admin.QueryRow(ctx, "SELECT used_jobs FROM instance_pipeline_sim.budget WHERE queue_kind='RESEARCH'").Scan(&researchDebits); err != nil || researchJobs != 1 || researchDebits != 1 || providerCalls.Load() != 1 {
+		t.Fatal("native restart duplicated research task, debit or model", err)
 	}
 	// A real-mode native worker must fail on missing shared-account registration
 	// before attempting its configured provider. All assets here remain synthetic.

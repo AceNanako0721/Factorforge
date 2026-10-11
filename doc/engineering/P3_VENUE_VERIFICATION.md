@@ -50,3 +50,24 @@ Go P3→实际Go P2 HTTP覆盖编译产物和旧inline，验证同版本重启�
 报告仅存 runtime/p3-account-lab-20261009/report.json，目录0700/文件0600，SHA256 a3b7eb0a7d1c8379bf755c4d02b08061d812dc7ec3987f4148098f141d8ca564；公开日志仅路径、状态、耗时和布尔结论，不记录请求查询串/签名/Key。普通离线测试验证 POST/DELETE、订单路径、正式域名、其他symbol及超预算在底层传输前拒绝。真实配置/Prompt/生产资产不变。
 
 T3-01/T3-07 的账户只读能力已取得这份有限证据。目标产品协议/经济单位、费率政策有效期与实际结算、参考价适用、保护/执行联合验收仍未关闭；正式账户或生产业务实例不从测试网证据继承准入。
+
+## 2026-10-10：正式合约规格与经济单位依据
+
+沿官方 [Equity Securities Futures 目录](https://www.binance.com/en/about-legal/contract-specifications-equities-securities) → [SOXL 合约规格](https://www.binance.com/en/about-legal/contractspecs-usdmperpetualsoxl)，以及 [Clearing Procedures](https://www.binance.com/en/about-legal/clearing-procedures) 的 iframe，取得两份原始 PDF。`venue_terms_lab_test.go` 先写不可覆盖标记，最多两个匿名 GET、20秒/4MB、不重试；2026-10-10T01:27:04Z 均200，分别392/374ms。没有读取 Key、签名请求、接受协议、写入配置或订单。
+
+| 文档 | 字节 | SHA256 |
+| --- | ---: | --- |
+| SOXL 合约规格（2026-05-15发布） | 152877 | `dfa33f2039fd1a8b73058c328bce625e8d178d5005a05083233be5d1de10d5eb` |
+| 清算程序（此时官网链接的版本） | 666270 | `a86691f40d8155992c622715ce727d608d7f972ebb93ce90fa0106830e8a0a36` |
+
+SOXL规格§7/9/10.1/13/16分别约定：标的是一份 Direxion SOXL ETF（ISIN US25459W4583）在NYSE Arca报价的价格；报价/结算USDT；最小数量单位为SOXL；Contract Size转引清算程序；指数参考该ETF报价。清算程序§4.13(a)、§85.1、§86.1把USDS的Contract Size定义为标的数量，以数量×标记价计算仓位金额，并以带方向的数量×价差计算未实现损益。COIN-M的Contract Multiplier在§4.12另有定义，不应混入本产品。
+
+这些是一手**经济单位文档依据**；结合已有exchangeInfo的baseAsset=SOXL，可支持进一步验证“API数量按SOXL份额、线性换算系数1”的解释。后一句仍是跨文档/API映射推断，并非本账户成交账单证明；不将其直接写入生产乘数、费用政策或Readiness。ETF自身每日三倍目标不再乘入合约价差。文档还转引动态参数及公司行动，需保留版本/调整边界，不能把发行日数值当永久规则。
+
+没有目标SOXL实际成交、费用/资金费结算、产品协议接受状态、保护触发/应急减仓或独立价格代理联合证据。通用TradFi FAQ与检索到的Pre-IPO SPCX规格不能替代SOXL专属文件；FAQ也不能覆盖合约/清算正式条款。当前真实配置、生产代码及设计基线保持，后续若采用新的登记/校验方法仍须先完成配对HTML设计。
+
+原PDF、离线pdftotext阅读副本及report仅在0700的 `runtime/venue-terms-lab-20261010`，文件0600；报告SHA256 `640b3503d4e708544dbca63e5f8dca9143b3f9bbf4b7f2fe14dc1a8c7ccec768`。公开仅有限转述和出处，不上传PDF全文。
+
+## 2026-10-11：保留资料核验，解除实验依赖
+
+本次保留上述产品依据及显式启用的venue_terms_lab_test.go到主线，不再依赖已归档本地模型运行器的localWriteRaw。资料保存函数只在本实验内使用，离线测试验证0600文件、不可覆盖与原始字节保持；Windows保留不可覆盖/字节验证，权限以平台机制为准。本次未重抓PDF、未读密钥、未填生产乘数/费率或改变Readiness；目标账户成交/结算/保护联合证据仍缺，见 [分流及归档](P3_ROUTE_DISPOSITION.md)。

@@ -186,6 +186,41 @@ func TestScoreLostResponseUsesRecordedReceiptBeforeVersionOrResubmit(t *testing.
 	}
 }
 
+func TestAcceptedScoreLostResponseReconcilesAcrossExpiry(t *testing.T) {
+	for _, lookupFailure := range []bool{false, true} {
+		t.Run(fmt.Sprint(lookupFailure), func(t *testing.T) {
+			ctx := context.Background()
+			worker, store, provider, _, observer, _ := preparedScoreDispatch(t)
+			commandHash, candidateHash := d.Digest(store.outbox.Command), store.outbox.CandidateHash
+			observer.submitOverride = func(ctx context.Context, command dto.ScoreCommand) (dto.AdmissionReceipt, error) {
+				if _, err := observer.FrameworkClient.Submit(ctx, command); err != nil {
+					return dto.AdmissionReceipt{}, err
+				}
+				return dto.AdmissionReceipt{}, d.Fail("FRAMEWORK_DELIVERY_UNKNOWN", 503)
+			}
+			if err := worker.Dispatch(ctx); err != nil || store.outbox.DeliveryState != "DELIVERY_UNKNOWN" {
+				t.Fatal("actual P2 accepted score did not lose its response", err)
+			}
+			worker.Clock.(*pipelineClock).at = store.outbox.ExpiresAt
+			observer.versionErr = d.Fail("FRAMEWORK_REQUEST_REJECTED", 503)
+			observer.versions, observer.receipts = 0, 0
+			if lookupFailure {
+				observer.receiptErr = d.Fail("FRAMEWORK_UNAVAILABLE", 503)
+				if err := worker.Dispatch(ctx); err == nil || store.outbox.DeliveryState != "DELIVERY_UNKNOWN" {
+					t.Fatal("failed receipt read made an accepted score irreconcilable", err, store.outbox.DeliveryState)
+				}
+				observer.receiptErr = nil
+			}
+			if err := worker.Dispatch(ctx); err != nil || store.outbox.DeliveryState != "ACK" || store.outbox.Receipt == nil {
+				t.Fatal("expiry hid the genuine accepted P2 receipt", err, store.outbox.DeliveryState)
+			}
+			if observer.versions != 0 || len(observer.sent) != 1 || provider.calls != 1 || d.Digest(store.outbox.Command) != commandHash || store.outbox.CandidateHash != candidateHash {
+				t.Fatal("late reconciliation changed facts, reread CAS, resent or reanalyzed")
+			}
+		})
+	}
+}
+
 func TestScoreReadFailureAndLateExpiryNeverSubmit(t *testing.T) {
 	for _, mode := range []string{"receipt", "version", "expiry-after-version"} {
 		t.Run(mode, func(t *testing.T) {
