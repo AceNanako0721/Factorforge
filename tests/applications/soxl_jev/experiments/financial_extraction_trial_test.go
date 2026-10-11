@@ -303,7 +303,7 @@ func TestFinancialExtractionTrial(t *testing.T) {
 		raw, err := os.ReadFile(filepath.Join(dir, c.ID+"-generation.json"))
 		if err == nil {
 			var g d.SemanticGeneration
-			if d.DecodePrivate(raw, &g) != nil || g.PromptHash != seal.PromptHash || g.Provider != seal.Settings.Provider || g.Model != seal.Settings.Model || g.AccountID != 1 {
+			if d.DecodePrivate(raw, &g) != nil || !financialGenerationMatchesSeal(g, seal) {
 				t.Fatal("FINANCIAL_GENERATION_INVALID")
 			}
 			var attempt struct {
@@ -352,6 +352,34 @@ func TestFinancialExtractionTrial(t *testing.T) {
 	semanticTrialWrite(t, dir, "evaluation.json", map[string]any{"at": time.Now().UTC(), "seal_hash": d.Digest(seal), "external_human_qa_labels": true, "production_admission": false, "cost": "UNKNOWN", "usage": "UNKNOWN", "cases": rows})
 	for _, row := range rows {
 		t.Logf("%v", row)
+	}
+}
+
+func financialGenerationMatchesSeal(g d.SemanticGeneration, seal financialExtractionSeal) bool {
+	return seal.Settings.AccountID > 0 && g.PromptHash == seal.PromptHash && g.Provider == seal.Settings.Provider && g.Model == seal.Settings.Model && g.AccountID == seal.Settings.AccountID
+}
+
+func TestFinancialExtractionAccountBinding(t *testing.T) {
+	seal := financialExtractionSeal{externalSeal: externalSeal{PromptHash: strings.Repeat("a", 64), Settings: config.SemanticSettings{Provider: "openai-codex", AccountID: 2, Model: "gpt-6-luna"}}}
+	g := d.SemanticGeneration{Provider: seal.Settings.Provider, AccountID: 2, Model: seal.Settings.Model, PromptHash: seal.PromptHash}
+	if !financialGenerationMatchesSeal(g, seal) {
+		t.Fatal("explicit second account rejected")
+	}
+	for _, field := range []string{"account", "provider", "model", "prompt"} {
+		bad := g
+		switch field {
+		case "account":
+			bad.AccountID = 1
+		case "provider":
+			bad.Provider = "google-antigravity"
+		case "model":
+			bad.Model = "gemini-3.8-flash"
+		case "prompt":
+			bad.PromptHash = strings.Repeat("b", 64)
+		}
+		if financialGenerationMatchesSeal(bad, seal) {
+			t.Fatalf("mismatched %s accepted", field)
+		}
 	}
 }
 
