@@ -1,6 +1,7 @@
 package experiments_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
@@ -101,6 +102,39 @@ func secFirstPressExhibit(items []secExhibit) (secExhibit, bool) {
 	return secExhibit{}, false
 }
 
+type secFeed struct {
+	Updated string `xml:"updated"`
+	Entries []struct {
+		Updated string `xml:"updated"`
+	} `xml:"entry"`
+}
+
+// EDGAR's Atom output declares ISO-8859-1, which encoding/xml rejects without
+// a charset reader. Each Latin-1 byte is the identical Unicode code point.
+func secAtom(raw []byte) (secFeed, bool) {
+	var feed secFeed
+	decoder := xml.NewDecoder(bytes.NewReader(raw))
+	decoder.CharsetReader = func(label string, input io.Reader) (io.Reader, error) {
+		switch strings.ToLower(label) {
+		case "iso-8859-1", "latin1":
+			latin, err := io.ReadAll(input)
+			if err != nil {
+				return nil, err
+			}
+			runes := make([]rune, len(latin))
+			for i, b := range latin {
+				runes[i] = rune(b)
+			}
+			return strings.NewReader(string(runes)), nil
+		}
+		return nil, fmt.Errorf("unsupported charset %q", label)
+	}
+	if decoder.Decode(&feed) != nil || len(feed.Entries) == 0 {
+		return secFeed{}, false
+	}
+	return feed, true
+}
+
 func secCIK(raw []byte, ticker string) (int64, bool) {
 	var table map[string]struct {
 		CIK    int64  `json:"cik_str"`
@@ -191,13 +225,8 @@ func TestCaptureSECFilingSource(t *testing.T) {
 
 	tickers := lab.get("company_tickers.json", "https://www.sec.gov/files/company_tickers.json")
 	atom := lab.get("current-8k.atom", "https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=8-K&company=&dateb=&owner=include&start=0&count=40&output=atom")
-	var feed struct {
-		Updated string `xml:"updated"`
-		Entries []struct {
-			Updated string `xml:"updated"`
-		} `xml:"entry"`
-	}
-	if xml.Unmarshal(atom, &feed) != nil || len(feed.Entries) == 0 {
+	feed, ok := secAtom(atom)
+	if !ok {
 		lab.stop("SEC_LAB_ATOM_UNREADABLE", nil)
 	}
 	for _, ticker := range secTickers {
@@ -267,5 +296,16 @@ func TestSECIndexAndLatest8KSelection(t *testing.T) {
 	}
 	if _, ok = secCIK([]byte(`{}`), "NVDA"); ok {
 		t.Fatal("missing ticker mapped")
+	}
+	atom := append([]byte("<?xml version=\"1.0\" encoding=\"ISO-8859-1\" ?>\n<feed xmlns=\"http://www.w3.org/2005/Atom\"><updated>2026-10-11T10:45:07-04:00</updated><entry><title>8-K - Soci\xe9t\xe9</title><updated>2026-10-10T17:30:00-04:00</updated></entry></feed>"))
+	feed, ok := secAtom(atom)
+	if !ok || feed.Updated != "2026-10-11T10:45:07-04:00" || len(feed.Entries) != 1 || feed.Entries[0].Updated != "2026-10-10T17:30:00-04:00" {
+		t.Fatalf("ISO-8859-1 Atom not read: %+v", feed)
+	}
+	if _, ok = secAtom([]byte(`<?xml version="1.0" encoding="Shift_JIS"?><feed><entry/></feed>`)); ok {
+		t.Fatal("undeclared charset guessed")
+	}
+	if _, ok = secAtom([]byte(`<feed xmlns="http://www.w3.org/2005/Atom"></feed>`)); ok {
+		t.Fatal("empty feed accepted")
 	}
 }
