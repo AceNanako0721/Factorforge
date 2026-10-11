@@ -40,6 +40,7 @@ type directNewsSource struct {
 type directNewsSelector struct{ Tag, Attr, Value string }
 type directNewsCase struct {
 	ID, Group, SourceID, Body, Previous, RepeatOf string
+	DeliveryIndex                                 int
 	Expected                                      map[string][]string
 }
 type directNewsRequest struct {
@@ -192,14 +193,27 @@ func directNewsExtract(raw []byte, selector directNewsSelector) (string, error) 
 func TestPrepareDirectNewsEvaluation(t *testing.T) {
 	lab := directNewsLab(t)
 	var sources []directNewsSource
-	financialRead(t, lab, "sources.json", &sources)
+	if _, err := os.Stat(filepath.Join(lab, "sources.json")); os.IsNotExist(err) {
+		var partial struct {
+			Completed []directNewsSource `json:"completed"`
+			Index     int                `json:"index"`
+			Error     string             `json:"error"`
+		}
+		financialRead(t, lab, "acquisition-failed.json", &partial)
+		if partial.Index != 3 || len(partial.Completed) != 3 {
+			t.Fatal("DIRECT_NEWS_PARTIAL_SOURCE")
+		}
+		sources = partial.Completed
+	} else {
+		financialRead(t, lab, "sources.json", &sources)
+	}
 	var selectors map[string][]directNewsSelector
 	selectorRaw := financialRead(t, lab, "selectors.json", &selectors)
 	var questions map[string]a.Question
 	qRaw := financialRead(t, lab, "questions.json", &questions)
 	var cases []directNewsCase
 	caseRaw := financialRead(t, lab, "case-seeds.json", &cases)
-	if len(sources) != 4 || len(cases) != 16 || len(questions) != 6 {
+	if (len(sources) != 3 && len(sources) != 4) || len(cases) != 16 || len(questions) != 6 {
 		t.Fatal("DIRECT_NEWS_PLAN_SHAPE")
 	}
 	for key, opts := range directNewsOptions {
@@ -248,7 +262,11 @@ func TestPrepareDirectNewsEvaluation(t *testing.T) {
 			var ok bool
 			c.Body, ok = bodies[c.SourceID]
 			if !ok {
-				t.Fatal("DIRECT_NEWS_CASE_SOURCE")
+				if c.SourceID != "source-04" || len(sources) != 3 {
+					t.Fatal("DIRECT_NEWS_CASE_SOURCE")
+				}
+				cases[i] = c
+				continue
 			}
 		}
 		var r directNewsRequest
@@ -278,6 +296,7 @@ func TestPrepareDirectNewsEvaluation(t *testing.T) {
 		frozenRateWrite(t, lab, name, r)
 		saved, _ := os.ReadFile(filepath.Join(lab, name))
 		requests, hashes[name], seen[c.ID] = append(requests, name), d.ContentDigest(saved), r
+		c.DeliveryIndex = len(requests)
 		cases[i] = c
 	}
 	frozenRateWrite(t, lab, "labels.json", cases)
@@ -292,7 +311,7 @@ func TestPrepareDirectNewsEvaluation(t *testing.T) {
 	labelRaw, _ := os.ReadFile(filepath.Join(lab, "labels.json"))
 	planRaw, _ := os.ReadFile(filepath.Join(lab, "plan.json"))
 	frozenRateWrite(t, lab, "sealed.json", map[string]any{"at": time.Now().UTC(), "questions_hash": d.ContentDigest(qRaw), "seed_hash": d.ContentDigest(caseRaw), "selectors_hash": d.ContentDigest(selectorRaw), "labels_hash": d.ContentDigest(labelRaw), "plan_hash": d.ContentDigest(planRaw), "code_hash": d.ContentDigest(code), "runner_hash": d.ContentDigest(runner), "protocol_hash": d.ContentDigest(protocol), "requests": hashes, "independent_blind_validation": false, "production_installed": false})
-	t.Log("16 raw-news requests sealed; labels not in requests; no calls")
+	t.Logf("planned=16; requests=%d; unavailable=%d; no calls", len(requests), 16-len(requests))
 }
 
 func mustNewsJSON(v any) []byte {
@@ -382,17 +401,23 @@ func TestEvaluateDirectNews(t *testing.T) {
 	if started.At.Before(seal.At) || started.Retries != 0 {
 		t.Fatal("DIRECT_NEWS_START_INVALID")
 	}
-	type metric struct{ Scored, Matched int }
+	type metric struct{ Expected, Valid, Matched, NotRun int }
 	counts := map[string]map[string]*metric{}
 	rows, seen := []map[string]any{}, map[string]directNewsReply{}
 	for i, c := range cases {
 		name := fmt.Sprintf("request-%02d.json", i+1)
-		reqRaw := financialRead(t, lab, name, nil)
-		if seal.Requests[name] != d.ContentDigest(reqRaw) {
-			t.Fatal("DIRECT_NEWS_REQUEST_CHANGED")
-		}
 		row := map[string]any{"id": c.ID, "group": c.Group, "status": "NOT_RUN", "expected": c.Expected}
-		raw, err := os.ReadFile(filepath.Join(lab, fmt.Sprintf("case-%03d-response.json", i+1)))
+		var raw []byte
+		err := os.ErrNotExist
+		if c.DeliveryIndex > 0 {
+			reqRaw := financialRead(t, lab, name, nil)
+			if seal.Requests[name] != d.ContentDigest(reqRaw) {
+				t.Fatal("DIRECT_NEWS_REQUEST_CHANGED")
+			}
+			raw, err = os.ReadFile(filepath.Join(lab, fmt.Sprintf("case-%03d-response.json", c.DeliveryIndex)))
+		} else {
+			row["reason"] = "SOURCE_UNAVAILABLE"
+		}
 		if err == nil {
 			var r directNewsReply
 			row["status"] = "INVALID"
@@ -428,7 +453,13 @@ func TestEvaluateDirectNews(t *testing.T) {
 				counts[c.Group][key] = &metric{}
 			}
 			m := counts[c.Group][key]
-			m.Scored++
+			m.Expected++
+			if row["status"] == "NOT_RUN" {
+				m.NotRun++
+			}
+			if row["status"] == "VALID" {
+				m.Valid++
+			}
 			if matches, ok := row["matches"].(map[string]bool); ok && matches[key] {
 				m.Matched++
 			}
@@ -469,7 +500,7 @@ func TestRunSealedDirectNews(t *testing.T) {
 			t.Fatal("DIRECT_NEWS_PREFLIGHT_CODE_CHANGED")
 		}
 	}
-	if len(seal.Requests) != 16 {
+	if len(seal.Requests) != 15 && len(seal.Requests) != 16 {
 		t.Fatal("DIRECT_NEWS_PREFLIGHT_COUNT")
 	}
 	t.Setenv("FACTORFORGE_SEMANTIC_LAB", lab)
