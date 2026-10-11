@@ -26,7 +26,17 @@ func run() error {
 	proposalInput := flag.String("proposal-input", "", "Private closed JSON evidence and catalog request")
 	proposalOutput := flag.String("proposal-output", "", "New private JSON file under this repository runtime")
 	proposalBytes := flag.Int("max-proposal-bytes", 0, "Explicit input and output file byte budget")
+	semanticInput := flag.String("semantic-input", "", "Optional private semantic artifact for render-review only")
 	flag.Parse()
+	semanticProvided := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "semantic-input" {
+			semanticProvided = true
+		}
+	})
+	if semanticProvided && (*action != "render-review" || *semanticInput == "") {
+		return d.Fail("SEMANTIC_REVIEW_INVALID", 422)
+	}
 	if *action == "extract-candidates" {
 		root, err := os.Getwd()
 		if err != nil {
@@ -60,6 +70,9 @@ func run() error {
 			return operations.PrepareReviewBundleFile(root, *proposalInput, *proposalOutput, *proposalBytes)
 		}
 		if *action == "render-review" {
+			if semanticProvided {
+				return operations.RenderReviewBundleWithSemanticFile(root, *proposalInput, *semanticInput, *proposalOutput, *proposalBytes)
+			}
 			return operations.RenderReviewBundleFile(root, *proposalInput, *proposalOutput, *proposalBytes)
 		}
 		return operations.PrepareEvidenceFile(root, *proposalInput, *proposalOutput, *proposalBytes)

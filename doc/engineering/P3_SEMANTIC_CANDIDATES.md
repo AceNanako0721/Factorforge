@@ -1,6 +1,8 @@
 # 语义候选接入与审阅
 
-设计基线：[v2.5.1 实例设计第23章](../v2.5.1/03_SOXLUSDT_JEV应用实例设计书.html#semantic-candidates)，对应原有 S3-003/004/006/009/015/016。先行机制证据见 [Antigravity 试验](P3_ANTIGRAVITY_EXTRACTION_LAB.md)。旧本地模型实验保持停止。
+设计基线：[v2.5.2 实例设计第23章](../v2.5.2/03_SOXLUSDT_JEV应用实例设计书.html#semantic-candidates)，对应原有 S3-003/004/006/009/015/016。先行机制证据见 [Antigravity 试验](P3_ANTIGRAVITY_EXTRACTION_LAB.md)。旧本地模型实验保持停止。
+
+既有 `render-review` 现可选 `--semantic-input`，在完整原文页显示经一致性检查的未核验候选；详见 [第24章](../v2.5.2/03_SOXLUSDT_JEV应用实例设计书.html#semantic-review-annotations) 和 [实现记录](P3_SEMANTIC_REVIEW.md)。显示机制不关闭 [外部事件评测](P3_EXTERNAL_EVENT_RESULTS.md) 暴露的语义与完整性缺口。
 
 ## 调用与配置
 
