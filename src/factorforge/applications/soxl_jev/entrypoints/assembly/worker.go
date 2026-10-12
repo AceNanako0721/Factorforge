@@ -107,7 +107,10 @@ func RunWorker(role string) error {
 			if sources[registration.SourceID] != nil {
 				return d.Fail("SOURCE_REGISTRATION_DUPLICATE", 422)
 			}
-			sources[registration.SourceID] = monitoring.RSSSource{Fetcher: fetcher, FeedURL: registration.FeedURL, SourceID: registration.SourceID, LicenceRef: registration.LicenceRef, MaxItems: registration.MaxItems, PublicationTimeVerified: registration.PublicationTimeVerified, Clock: clock{}.Now}
+			if registration.LookbackSeconds <= 0 || registration.LookbackSeconds > 7*24*3600 {
+				return d.Fail("SOURCE_CONFIGURATION_REQUIRED", 503)
+			}
+			sources[registration.SourceID] = &monitoring.RSSSource{Fetcher: fetcher, FeedURL: registration.FeedURL, SourceID: registration.SourceID, LicenceRef: registration.LicenceRef, MaxItems: registration.MaxItems, Lookback: time.Duration(registration.LookbackSeconds) * time.Second, PublicationTimeVerified: registration.PublicationTimeVerified, Clock: clock{}.Now}
 		}
 		for _, registration := range assets.SECFilings {
 			source, err := config.NewSECSource(registration, assets.Sources, p.SECUserAgent, timeout, p.Settings.MaxInputBytes, p.Mode == "mock", clock{}.Now)

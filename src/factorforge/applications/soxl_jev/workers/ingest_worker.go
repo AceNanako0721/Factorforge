@@ -51,10 +51,13 @@ func (w IngestWorker) Process(ctx context.Context, raw d.RawEvidence) (d.Routing
 	}
 	var extracted d.ExtractedEvidence
 	if saved != nil {
-		if saved.Raw.ContentHash != raw.ContentHash || saved.Raw.SourceID != raw.SourceID || saved.Raw.LicenceRef != raw.LicenceRef {
+		// Identity is decided by the source (v2.5.6). A later fetch of the same
+		// identity with different bytes never replaces the first durable capture.
+		if saved.Raw.SourceID != raw.SourceID || saved.Raw.LicenceRef != raw.LicenceRef {
 			return empty, d.Fail("EVIDENCE_ID_CONFLICT", 409)
 		}
 		extracted = *saved
+		raw = saved.Raw
 	} else {
 		extracted, err = w.Extractor.Extract(ctx, raw)
 		if err != nil {

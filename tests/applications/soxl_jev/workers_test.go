@@ -179,6 +179,19 @@ func TestIngestWorkerAndAnalysisResponseLossDoNotReanalyzeOrDuplicate(t *testing
 	if _, err := ingest.Process(context.Background(), later); err != nil || store.enqueues != 1 {
 		t.Fatal("duplicate ingestion", err, store.enqueues)
 	}
+	// v2.5.6: a refetch of the same identity with changed bytes keeps the first
+	// capture; another source or licence under the same identity still conflicts.
+	refetched := later
+	refetched.Content = e.Raw.Content + " <!-- rotating token -->"
+	refetched.ContentHash = d.ContentDigest([]byte(refetched.Content))
+	if receipt, err := ingest.Process(context.Background(), refetched); err != nil || store.enqueues != 1 || store.evidence.Raw.ContentHash != e.Raw.ContentHash || receipt.Route == "QUARANTINE" {
+		t.Fatal("refetched bytes replaced the first capture", err, store.enqueues)
+	}
+	foreign := later
+	foreign.SourceID = "fixture-other-source"
+	if _, err := ingest.Process(context.Background(), foreign); err == nil || err.Error() != "EVIDENCE_ID_CONFLICT" {
+		t.Fatal("identity reused across sources", err)
+	}
 	provider := &fixtureJev{candidate: c}
 	worker := workers.AnalysisWorker{Store: store, Framework: framework, Provider: provider, Clock: clock, WorkerID: "fixture-worker", Lease: time.Minute, AllowMock: true, MaxOutboxes: 10}
 	if processed, err := worker.ProcessOne(context.Background()); err != nil || !processed {

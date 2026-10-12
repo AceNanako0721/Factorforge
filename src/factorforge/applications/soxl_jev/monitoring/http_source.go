@@ -14,6 +14,7 @@ import (
 	"net/netip"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 	"unicode/utf8"
@@ -119,17 +120,30 @@ func (f *Fetcher) Get(ctx context.Context, endpoint string) ([]byte, string, err
 	return raw, media, nil
 }
 
+// RSSSource reads only items published inside [cutoff-Lookback, cutoff] and
+// fetches each item link once per process. The evidence identity is the
+// source and item link (v2.5.6): pages behind bot protection change bytes on
+// every fetch, so the first durable capture of a link is the original.
 type RSSSource struct {
 	Fetcher                       *Fetcher
 	FeedURL, SourceID, LicenceRef string
 	MaxItems                      int
+	Lookback                      time.Duration
 	PublicationTimeVerified       bool
 	Clock                         func() time.Time
+
+	mu       sync.Mutex
+	returned map[string]bool
 }
 
-func (s RSSSource) Poll(ctx context.Context, cutoff time.Time) ([]d.RawEvidence, error) {
-	if s.Fetcher == nil || s.Clock == nil || s.MaxItems <= 0 || !d.UTC(cutoff) || !d.ValidID(s.SourceID) || !d.ValidID(s.LicenceRef) {
+func (s *RSSSource) Poll(ctx context.Context, cutoff time.Time) ([]d.RawEvidence, error) {
+	if s.Fetcher == nil || s.Clock == nil || s.MaxItems <= 0 || s.Lookback <= 0 || !d.UTC(cutoff) || !d.ValidID(s.SourceID) || !d.ValidID(s.LicenceRef) {
 		return nil, d.Fail("SOURCE_CONFIGURATION_REQUIRED", 503)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.returned == nil {
+		s.returned = map[string]bool{}
 	}
 	raw, media, err := s.Fetcher.Get(ctx, s.FeedURL)
 	if err != nil {
@@ -150,10 +164,10 @@ func (s RSSSource) Poll(ctx context.Context, cutoff time.Time) ([]d.RawEvidence,
 	if xml.Unmarshal(raw, &feed) != nil || len(feed.Channel.Items) > s.MaxItems {
 		return nil, d.Fail("SOURCE_FEED_BUDGET_OR_FORMAT_INVALID", 422)
 	}
-	result := []d.RawEvidence{}
+	result, links := []d.RawEvidence{}, []string{}
 	for _, item := range feed.Channel.Items {
 		published, known := ParseRSSPublished(item.Published)
-		if !known || published.After(cutoff) {
+		if !known || published.After(cutoff) || published.Before(cutoff.Add(-s.Lookback)) || s.returned[item.Link] {
 			continue
 		}
 		published = published.UTC()
@@ -169,11 +183,16 @@ func (s RSSSource) Poll(ctx context.Context, cutoff time.Time) ([]d.RawEvidence,
 		content := string(body)
 		hash := d.ContentDigest(body)
 		received := s.Clock().UTC()
-		evidence := d.RawEvidence{EvidenceID: "evidence-" + d.Digest([]string{s.SourceID, item.Link, hash}), SourceID: s.SourceID, URL: item.Link, ContentHash: hash, Content: content, PublishedAt: &published, ReceivedAt: received, LicenceRef: s.LicenceRef}
+		evidence := d.RawEvidence{EvidenceID: "evidence-" + d.Digest([]string{s.SourceID, item.Link}), SourceID: s.SourceID, URL: item.Link, ContentHash: hash, Content: content, PublishedAt: &published, ReceivedAt: received, LicenceRef: s.LicenceRef}
 		if s.PublicationTimeVerified {
 			evidence.FirstPublicAt = &published
 		}
-		result = append(result, evidence)
+		result, links = append(result, evidence), append(links, item.Link)
+	}
+	// Only a fully successful poll is remembered; a failed poll is reconsidered
+	// at the next scheduled cycle instead of being retried immediately.
+	for _, link := range links {
+		s.returned[link] = true
 	}
 	return result, nil
 }

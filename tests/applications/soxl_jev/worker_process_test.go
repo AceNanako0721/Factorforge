@@ -208,7 +208,7 @@ func TestNativeInstanceWorkerProfilesAndProcessWithoutPythonNode(t *testing.T) {
 	searchEndpoint = searchServer.URL
 	asset.Sources = map[string]d.SourceRegistration{"fixture-rss": {SourceID: "fixture-rss", Version: "fixture-source-version", LicenceRef: "fixture-licence", Enabled: true, LicenceVerified: true, AllowAnalysis: true, Environments: []string{"SIM"}, ValidFrom: now.Add(-time.Hour), ValidUntil: now.Add(time.Hour), MaxAge: time.Hour}}
 	asset.Sources["fixture-sec"] = d.SourceRegistration{SourceID: "fixture-sec", Version: "fixture-source-version", LicenceRef: "fixture-sec-licence", Enabled: true, LicenceVerified: true, AllowAnalysis: true, Environments: []string{"SIM"}, ValidFrom: now.Add(-time.Hour), ValidUntil: now.Add(time.Hour), MaxAge: time.Hour}
-	asset.RSS = []config.RSSRegistration{{FeedURL: searchEndpoint + "/feed", SourceID: "fixture-rss", LicenceRef: "fixture-licence", Hosts: []string{"127.0.0.1"}, MaxItems: 2}}
+	asset.RSS = []config.RSSRegistration{{FeedURL: searchEndpoint + "/feed", SourceID: "fixture-rss", LicenceRef: "fixture-licence", Hosts: []string{"127.0.0.1"}, MaxItems: 2, LookbackSeconds: 86400}}
 	asset.SearchPlans = []monitoring.SearchPlan{{Version: "fixture-search-plan", SourceID: "fixture-rss", Query: "fixture approved topic", Count: 2}}
 	asset.SearchSourceHosts = map[string]string{"127.0.0.1": "fixture-rss"}
 	asset.SECFilings = []config.SECRegistration{{SourceID: "fixture-sec", LicenceRef: "fixture-sec-licence", Companies: []monitoring.SECCompany{{Ticker: "NVDA", CIK: 1045810}}, Items: []string{"2.02"}, LookbackSeconds: 172800, MaxFilings: 5, MaxMetadataBytes: 65536, MinIntervalMS: 100, FixtureBase: searchEndpoint}}
