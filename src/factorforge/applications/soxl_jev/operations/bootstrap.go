@@ -38,11 +38,13 @@ func (b Bootstrap) Run(ctx context.Context) (dto.ObservedObject, error) {
 	if !b.FixtureOnly && (object.InstrumentKey.Venue != "BINANCE" || object.InstrumentKey.Product != "LINEAR_PERPETUAL" || object.InstrumentKey.InstrumentID != "SOXLUSDT") {
 		return empty, d.Fail("INSTANCE_PRODUCT_BINDING_INVALID", 403)
 	}
+	// P1 SIM runs are REPLAY (simulated fills) or SHADOW (no matching); LIVE is
+	// never admitted here, and "SIM" is an environment, not an execution mode.
 	snapshot, err := b.Trading.BindingSnapshot(ctx)
 	if err != nil {
 		return empty, err
 	}
-	if snapshot.Run.Environment != object.TradingRunKey.Environment || snapshot.Run.AccountID != object.TradingRunKey.AccountID || snapshot.Run.RunID != object.TradingRunKey.RunID || snapshot.PolicyVersion != b.PolicyVersion || snapshot.ExecutionMode != "SIM" {
+	if snapshot.Run.Environment != object.TradingRunKey.Environment || snapshot.Run.AccountID != object.TradingRunKey.AccountID || snapshot.Run.RunID != object.TradingRunKey.RunID || snapshot.PolicyVersion != b.PolicyVersion || !d.Has([]string{"REPLAY", "SHADOW"}, snapshot.ExecutionMode) {
 		return empty, d.Fail("INSTANCE_TRADING_BINDING_MISMATCH", 403)
 	}
 	matched := false

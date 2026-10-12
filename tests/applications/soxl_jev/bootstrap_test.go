@@ -37,7 +37,7 @@ func TestBootstrapReadOnlyTradingBindingCreationRestoreAndStageLimits(t *testing
 	instrument := request.Object.InstrumentKey
 	key := dto.InstrumentKey{Venue: instrument.Venue, Product: instrument.Product, InstrumentID: instrument.InstrumentID}
 	calls := 0
-	environment := "SIM"
+	environment, mode := "SIM", "REPLAY"
 	p1 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		calls++
 		if req.Method != "GET" || req.Header.Get("Authorization") != "Bearer fixture-only-read" {
@@ -50,7 +50,7 @@ func TestBootstrapReadOnlyTradingBindingCreationRestoreAndStageLimits(t *testing
 			if req.URL.Query().Get("account_id") != r.AccountID || req.URL.Query().Get("run_id") != r.RunID {
 				t.Error("binding scope")
 			}
-			json.NewEncoder(w).Encode(map[string]any{"run_key": run, "aggregate_version": 3, "execution_mode": "SIM", "state": "RECOVERY_CHECK", "policy_version": "fixture-account-policy"})
+			json.NewEncoder(w).Encode(map[string]any{"run_key": run, "aggregate_version": 3, "execution_mode": mode, "state": "RECOVERY_CHECK", "policy_version": "fixture-account-policy"})
 		case "/api/v2/trading/instruments":
 			json.NewEncoder(w).Encode(map[string]any{"items": []dto.InstrumentSpec{{Key: key, Version: "fixture-spec", ValidFrom: clock.Now(), PriceTick: number("0.01"), QuantityStep: number("1"), ContractMultiplier: number("1")}}, "cursor": nil, "snapshot_version": 3})
 		default:
@@ -87,6 +87,18 @@ func TestBootstrapReadOnlyTradingBindingCreationRestoreAndStageLimits(t *testing
 		t.Fatal("LIVE stage granted by flag")
 	}
 	b.Stage = "R2"
+	// P1 reports SIM runs as REPLAY or SHADOW; any other execution mode is refused.
+	mode = "SHADOW"
+	if _, err = b.Run(context.Background()); err != nil {
+		t.Fatal("SHADOW SIM run rejected", err)
+	}
+	for _, other := range []string{"LIVE", "SIM", ""} {
+		mode = other
+		if _, err = b.Run(context.Background()); err == nil {
+			t.Fatal("execution mode accepted", other)
+		}
+	}
+	mode = "REPLAY"
 	environment = "LIVE"
 	if _, err = b.Run(context.Background()); err == nil {
 		t.Fatal("wrong trading environment accepted")
