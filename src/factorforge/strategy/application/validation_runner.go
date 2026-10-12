@@ -79,7 +79,7 @@ func (s Service) ValidateResearch(ctx context.Context, identity d.Identity, mani
 		row := state.ValidationRuns.Value(d.Text(manifest["run_id"]))
 		row["result"] = outcome
 		row["state"] = status
-		state.Audit = append(state.Audit, map[string]any{"action": "VALIDATION_FINISHED", "run_id": manifest["run_id"], "state": status, "at": d.ISO(s.Clock.Now())})
+		state.AppendAudit(map[string]any{"action": "VALIDATION_FINISHED", "run_id": manifest["run_id"], "state": status, "at": d.ISO(s.Clock.Now())})
 		state.Version++
 		return nil
 	})

@@ -11,12 +11,19 @@ import (
 type MemoryStore struct {
 	mu          sync.Mutex
 	states      map[string]*d.StrategyState
+	audits      map[string][]d.AuditRecord
 	environment string
 	FailCommit  bool
 }
 
 func NewMemory(state *d.StrategyState) *MemoryStore {
-	return &MemoryStore{states: map[string]*d.StrategyState{state.InstanceID: d.Clone(state)}, environment: state.Environment}
+	copy := d.CloneState(state)
+	rows := []d.AuditRecord{}
+	for i, row := range copy.Audit {
+		rows = append(rows, d.AuditRecord{Sequence: i + 1, Payload: row})
+	}
+	copy.AuditCount, copy.Audit = len(rows), nil
+	return &MemoryStore{states: map[string]*d.StrategyState{state.InstanceID: copy}, audits: map[string][]d.AuditRecord{state.InstanceID: rows}, environment: state.Environment}
 }
 func (s *MemoryStore) Environment() string { return s.environment }
 func (s *MemoryStore) Read(ctx context.Context, id string) (*d.StrategyState, error) {
@@ -29,7 +36,32 @@ func (s *MemoryStore) Read(ctx context.Context, id string) (*d.StrategyState, er
 	if !ok {
 		return nil, &d.Error{Code: "INSTANCE_NOT_FOUND", Status: 404}
 	}
-	return d.Clone(v), nil
+	return d.CloneState(v), nil
+}
+
+func (s *MemoryStore) ReadAudit(ctx context.Context, id string, after, through, limit int, actions []string) ([]d.AuditRecord, int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return nil, 0, err
+	}
+	if s.states[id] == nil {
+		return nil, 0, &d.Error{Code: "INSTANCE_NOT_FOUND", Status: 404}
+	}
+	if after < 0 || through < after || through > len(s.audits[id]) || limit < 1 {
+		return nil, 0, &d.Error{Code: "STORE_STATE_INVALID", Status: 503}
+	}
+	rows, total := []d.AuditRecord{}, 0
+	for _, row := range s.audits[id][:through] {
+		if len(actions) > 0 && !d.Has(actions, d.Text(row.Payload["action"])) {
+			continue
+		}
+		total++
+		if row.Sequence > after && len(rows) < limit {
+			rows = append(rows, d.Clone(row))
+		}
+	}
+	return rows, total, nil
 }
 func (s *MemoryStore) Transaction(ctx context.Context, id string, fn func(*d.StrategyState) error) error {
 	s.mu.Lock()
@@ -41,7 +73,7 @@ func (s *MemoryStore) Transaction(ctx context.Context, id string, fn func(*d.Str
 	if !ok {
 		return &d.Error{Code: "INSTANCE_NOT_FOUND", Status: 404}
 	}
-	work := d.Clone(old)
+	work := d.CloneState(old)
 	if err := d.Guard(func() error { return fn(work) }); err != nil {
 		return err
 	}
@@ -51,6 +83,14 @@ func (s *MemoryStore) Transaction(ctx context.Context, id string, fn func(*d.Str
 	if err := d.PreserveWindowPlans(old, work); err != nil {
 		return err
 	}
+	if err := d.CheckAuditAppend(old, work); err != nil {
+		return err
+	}
+	for i, row := range work.Audit {
+		s.audits[id] = append(s.audits[id], d.AuditRecord{Sequence: old.AuditCount + i + 1, Payload: d.Clone(row)})
+	}
+	work.AuditCount += len(work.Audit)
+	work.Audit = nil
 	s.states[id] = work
 	return nil
 }

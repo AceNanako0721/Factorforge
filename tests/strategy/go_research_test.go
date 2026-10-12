@@ -3,6 +3,7 @@ package strategy_test
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/strategy/adapters"
 	api "github.com/AceNanako0721/Factorforge/src/factorforge/strategy/api"
@@ -88,8 +89,38 @@ func TestNativeP2FrozenHTTPContracts(t *testing.T) {
 			t.Fatal(err)
 		}
 		expected, err := os.ReadFile("../../contracts/v2/strategy/" + name)
-		if err != nil || !bytes.Equal(expected, actual) {
+		if err != nil || !bytes.Equal(expected, frozenPolicyContract(t, actual)) {
 			t.Fatal("frozen HTTP contract changed")
+		}
+	}
+}
+
+// frozenPolicyContract checks the v2.5.8 optional policy field; the exported
+// contract under contracts/v2 already contains it, so raw is returned as-is.
+func frozenPolicyContract(t *testing.T, raw []byte) []byte {
+	t.Helper()
+	var doc map[string]any
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatal(err)
+	}
+	policy := sd.Object(sd.Object(sd.Object(doc["components"])["schemas"])["Policy"])
+	properties := sd.Object(policy["properties"])
+	window := sd.Object(properties["trend_window_seconds"])
+	if window["type"] != "integer" || sd.Number(window["minimum"]) != 1 || sd.Number(window["maximum"]) != 604800 || sd.Has(sd.Strings(policy["required"]), "trend_window_seconds") {
+		t.Fatal("optional trend schema missing or invalid", window)
+	}
+	return raw
+}
+
+func TestP2TrendWindowOpenAPIPreservesFrozenSurface(t *testing.T) {
+	for _, internal := range []bool{false, true} {
+		name := "openapi.json"
+		if internal {
+			name = "workload.openapi.json"
+		}
+		expected, err := os.ReadFile("../../contracts/v2/strategy/" + name)
+		if err != nil || !bytes.Equal(expected, frozenPolicyContract(t, api.OpenAPI(internal))) {
+			t.Fatal("unexpected change outside optional trend window", name, err)
 		}
 	}
 }

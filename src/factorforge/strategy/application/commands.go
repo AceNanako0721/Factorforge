@@ -71,7 +71,7 @@ func (s Service) Command(ctx context.Context, identity d.Identity, command d.Com
 		result = d.JSONValue(value)
 		state.Version++
 		state.Dedup.Set(command.IdempotencyKey, map[string]any{"hash": hash, "result": result})
-		state.Audit = append(state.Audit, map[string]any{"sequence": len(state.Audit) + 1, "action": d.ScopeName(scope), "request_id": command.RequestID, "identity": identity.Payload(), "at": d.ISO(s.Clock.Now()), "reason": command.Reason})
+		state.AppendAudit(map[string]any{"action": d.ScopeName(scope), "request_id": command.RequestID, "identity": identity.Payload(), "at": d.ISO(s.Clock.Now()), "reason": command.Reason})
 		return nil
 	})
 	return result, err

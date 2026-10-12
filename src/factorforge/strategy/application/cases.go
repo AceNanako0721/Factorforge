@@ -164,7 +164,7 @@ func CorrectActualRisk(state *d.StrategyState, obj *d.ObservedObject, snap *d.Tr
 			}
 		}
 		state.Decisions.Set(id, decision)
-		state.Outbox.Set(id, &d.TargetOutbox{Decision: *decision, TargetVersion: version + 1, ExpiresAt: at.Add(time.Duration(p.TargetTTLSeconds) * time.Second), State: "PENDING", OwnerEpoch: obj.OwnerEpoch})
+		state.Outbox.Set(id, &d.TargetOutbox{Decision: d.TargetDecision(decision), TargetVersion: version + 1, ExpiresAt: at.Add(time.Duration(p.TargetTTLSeconds) * time.Second), State: "PENDING", OwnerEpoch: obj.OwnerEpoch})
 		return nil
 	})
 	return decision, err

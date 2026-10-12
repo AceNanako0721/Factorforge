@@ -58,7 +58,7 @@ func New(options Options) (http.Handler, error) {
 				if code != "INVALID_REQUEST" {
 					row["actor"] = identity.Payload()
 				}
-				s.Audit = append(s.Audit, row)
+				s.AppendAudit(row)
 				s.Version++
 				return nil
 			})

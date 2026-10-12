@@ -11,6 +11,9 @@ type Clock interface{ Now() time.Time }
 type Store interface {
 	Environment() string
 	Read(context.Context, string) (*d.StrategyState, error)
+	// ReadAudit returns sequence-ordered rows in (after, through], plus the
+	// matching action count through that loaded snapshot's high-water mark.
+	ReadAudit(context.Context, string, int, int, int, []string) ([]d.AuditRecord, int, error)
 	Transaction(context.Context, string, func(*d.StrategyState) error) error
 	CheckWorkload(context.Context, d.WorkloadIdentity, string) error
 }

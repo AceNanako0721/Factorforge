@@ -7,7 +7,14 @@ import (
 
 // DecisionRetention is how long a superseded, settled decision stays in the
 // aggregate before it moves to the append-only archive (v2.5.7).
-const DecisionRetention = 24 * time.Hour
+const DecisionRetention = 6 * time.Hour
+
+// TargetDecision retains delivery inputs without duplicating the audit snapshot.
+func TargetDecision(decision *DecisionView) DecisionView {
+	copy := *decision
+	copy.InputSnapshot = nil
+	return copy
+}
 
 // CompactDecisionInput replaces snapshot.bars with per-object references. The
 // caller hashes the complete inputs first; P1 keeps the bars themselves.

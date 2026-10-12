@@ -407,6 +407,9 @@ func walkValidate(v reflect.Value) error {
 			return invalid()
 		}
 	case Policy:
+		if x.TrendWindowSeconds != nil && (*x.TrendWindowSeconds < x.CycleSeconds || *x.TrendWindowSeconds > 604800) {
+			return invalid()
+		}
 		if x.RegimeExit.Cmp(x.RegimeEnter) >= 0 || x.ObservationMinSeconds > x.ObservationMaxSeconds || x.HalfLifeBounds[0].Sign() <= 0 || x.HalfLifeBounds[0].Cmp(x.HalfLifeBounds[1]) > 0 {
 			return invalid()
 		}

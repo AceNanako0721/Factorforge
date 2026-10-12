@@ -2503,6 +2503,12 @@
             "title": "Target Ttl Seconds",
             "type": "integer"
           },
+          "trend_window_seconds": {
+            "description": "Optional calibrated trend window; must be at least cycle_seconds.",
+            "maximum": 604800,
+            "minimum": 1,
+            "type": "integer"
+          },
           "unknown_regime_multiplier": {
             "ge": 0,
             "le": 1,

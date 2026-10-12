@@ -19,6 +19,7 @@ func OpenAPI(internal bool) []byte {
 	paths := document["paths"].(map[string]any)
 	components := document["components"].(map[string]any)
 	schemas := components["schemas"].(map[string]any)
+	schemas["Policy"].(map[string]any)["properties"].(map[string]any)["trend_window_seconds"] = map[string]any{"type": "integer", "minimum": 1, "maximum": 604800, "description": "Optional calibrated trend window; must be at least cycle_seconds."}
 	components["securitySchemes"] = map[string]any{"bearerAuth": map[string]any{"type": "http", "scheme": "bearer"}}
 	stringField := func() map[string]any { return map[string]any{"type": "string"} }
 	nullableTime := map[string]any{"anyOf": []any{map[string]any{"type": "string", "format": "date-time"}, map[string]any{"type": "null"}}}

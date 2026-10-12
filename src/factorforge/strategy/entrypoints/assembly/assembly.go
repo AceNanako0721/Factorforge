@@ -174,11 +174,13 @@ func Worker(ctx context.Context, c config.Config, feedback bool) error {
 		if ctx.Err() != nil {
 			return nil
 		}
-		if feedback {
-			err = listener.Tick(ctx)
-		} else {
-			_, err = scheduler.Tick(ctx)
-		}
+		err = RetryTick(ctx, func(ctx context.Context) error {
+			if feedback {
+				return listener.Tick(ctx)
+			}
+			_, err := scheduler.Tick(ctx)
+			return err
+		}, os.Stderr, retryWait)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, Code(err))
 		}

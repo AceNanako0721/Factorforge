@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS __SCHEMA__.workload_capability_grant (
 CREATE TABLE IF NOT EXISTS __SCHEMA__.audit_event (
   instance_id text NOT NULL, sequence bigint NOT NULL, payload jsonb NOT NULL,
   PRIMARY KEY(instance_id,sequence));
+CREATE INDEX IF NOT EXISTS audit_event_action_sequence ON __SCHEMA__.audit_event
+  (instance_id,(payload->>'action'),sequence);
 CREATE TABLE IF NOT EXISTS __SCHEMA__.sentiment_entry (
   instance_id text NOT NULL, sequence bigint NOT NULL, payload jsonb NOT NULL,
   PRIMARY KEY(instance_id,sequence));
