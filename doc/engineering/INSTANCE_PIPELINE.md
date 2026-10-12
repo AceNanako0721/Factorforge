@@ -232,7 +232,7 @@ Acquire失败没有HTTP；成功预占后仅一次HTTP，完整交付保存COMPL
 
 配置分两处，均为私有：
 
-- `config/config.toml` 的 `[application.pipeline.sec] user_agent`：SEC 要求的身份声明，形如“名称 联系邮箱”，以邮箱结尾。PrepareWorkerProfiles 只复制给 INGEST 档案。
+- `config/config.toml` 的 `[application.pipeline.sec] user_agent`：SEC 要求的身份声明，形如“名称 联系邮箱”，以邮箱结尾。PrepareWorkerProfiles 只复制给 INGEST 档案。该段必须放在 `# BEGIN FACTORFORGE MODEL ACCESS` 标记之前：模型接入模块要求其标记块位于文件末尾，块内出现其他段会使其拒绝写回（MODEL_CONFIG_BLOCK_MUST_BE_LAST / CONFIG_PERSIST_FAILED）。
 - 资产文件 `sec_filings[]`：`source_id`、`licence_ref`（须在 `sources` 中登记且 enabled/licence_verified/allow_analysis 为真）、`companies[{ticker,cik}]`、`items`（如 `["2.02","7.01","8.01"]`）、`lookback_seconds`、`max_filings`、`max_metadata_bytes`（submissions 约 160 KB）、`min_interval_ms`（不少于 100，即不超过 SEC 公布的 10 次/秒）。`fixture_base` 只在 mock 模式下接受回环地址。
 
 失败码：SEC_IDENTITY_REQUIRED（缺少带邮箱的身份）、SOURCE_LICENCE_REQUIRED、SOURCE_CONFIGURATION_REQUIRED、SOURCE_FILING_BUDGET_EXCEEDED（窗口内候选超过 max_filings，不截断）、SEC_SUBMISSIONS_INVALID、SEC_METADATA_FORMAT_INVALID、SEC_INDEX_INVALID（附件链接越出申报目录）、SOURCE_ORIGINAL_UNAVAILABLE（含 403/429，不自动重试）。整轮失败时不记已返回申报，下一次轮询重新判断；同一进程内已返回的申报不重复读取，重启后依靠 EvidenceID 去重。
