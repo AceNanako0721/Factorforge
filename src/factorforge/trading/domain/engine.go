@@ -86,7 +86,26 @@ func (run *Aggregate) Clone() (*Aggregate, error) {
 	if err = decoder.Decode(&copy); err != nil {
 		return nil, err
 	}
+	copy.AuditCount = run.AuditCount
+	copy.CandleWrites = append([]Candle(nil), run.CandleWrites...)
+	data, err = json.Marshal(run.Audit)
+	if err != nil {
+		return nil, err
+	}
+	if err = json.Unmarshal(data, &copy.Audit); err != nil {
+		return nil, err
+	}
 	return &copy, nil
+}
+
+// Legacy snapshots can still decode audit, but newly persisted aggregates keep
+// it only in the store's append-only history.
+func (run Aggregate) MarshalJSON() ([]byte, error) {
+	type snapshot Aggregate
+	return json.Marshal(struct {
+		*snapshot
+		Audit []Object `json:"audit,omitempty"`
+	}{snapshot: (*snapshot)(&run)})
 }
 func Mutate(run *Aggregate, action func(*Engine)) error {
 	if err := Validate(run); err != nil {

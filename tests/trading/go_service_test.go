@@ -9,8 +9,10 @@ import (
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/adapters/sim"
 	a "github.com/AceNanako0721/Factorforge/src/factorforge/trading/application"
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/trading/domain"
+	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/ports"
 	"os"
 	"testing"
+	"time"
 )
 
 type fixedHealth []string
@@ -192,7 +194,43 @@ func TestGoServiceFrozenOracle(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			executionEqual(t, row.Final, actual)
+			expectedFinal := row.Final
+			// The old oracle kept all dedup entries even when a frame advanced by
+			// months. Project only legacy entries expired by the new 24-hour rule.
+			if string(row.Initial) != "null" {
+				var initial d.Aggregate
+				decodeExecution(t, row.Initial, &initial)
+				if actual.Clock.After(initial.Clock.Add(24 * time.Hour)) {
+					var final d.Aggregate
+					decodeExecution(t, row.Final, &final)
+					for _, identity := range initial.Dedup.Keys() {
+						var response map[string]json.RawMessage
+						_ = json.Unmarshal(initial.Dedup.Value(identity)["response"], &response)
+						if response["run_key"] == nil || response["correlation_id"] != nil {
+							final.Dedup.Delete(identity)
+						}
+					}
+					expectedFinal, _ = json.Marshal(final)
+				}
+			}
+			executionEqual(t, expectedFinal, actual)
+			var expected struct{ Audit json.RawMessage }
+			if json.Unmarshal(row.Final, &expected) != nil {
+				t.Fatal("invalid final fixture")
+			}
+			if err := store.View(ctx, key, func(run *d.Aggregate, history ports.History) error {
+				events, err := history.Audit(0, 0)
+				if err != nil {
+					return err
+				}
+				executionEqual(t, expected.Audit, events)
+				if run.AuditCount != int64(len(events)) || len(run.Audit) != 0 {
+					t.Fatal("audit not externalized")
+				}
+				return nil
+			}); err != nil {
+				t.Fatal(err)
+			}
 		})
 	}
 }

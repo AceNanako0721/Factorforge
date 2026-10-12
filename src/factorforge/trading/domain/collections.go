@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+const CandleRetention = 7 * 24 * time.Hour
+
 // Initialize default list factories when assembling a new run. Optional
 // InstrumentSpec.sessions remains nil, representing an unrestricted session.
 func InitCollections(run *Aggregate) {

@@ -149,7 +149,10 @@ func TestNativePostgresAtomicityAndIsolation(t *testing.T) {
 		t.Fatal(err)
 	}
 	executionEqual(t, before, after)
-	assertCode(store.Transaction(ctx, run.RunKey, func(r *d.Aggregate) error { r.Audit[0]["action"] = json.RawMessage(`"tampered"`); return nil }), "AUDIT_MUTATION_FORBIDDEN")
+	assertCode(store.Transaction(ctx, run.RunKey, func(r *d.Aggregate) error {
+		r.Audit = append(r.Audit, d.Object{"sequence": json.RawMessage(`1`), "action": json.RawMessage(`"tampered"`)})
+		return nil
+	}), "AUDIT_MUTATION_FORBIDDEN")
 	after, _ = store.Read(ctx, run.RunKey)
 	executionEqual(t, before, after)
 	runtimeConnection, err := pgx.Connect(ctx, server.SIMDSN)

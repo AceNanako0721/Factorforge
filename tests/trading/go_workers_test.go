@@ -246,6 +246,23 @@ func TestWorkersFrozenOracle(t *testing.T) {
 				t.Fatal(err)
 			}
 			executionEqual(t, row.Final, actual)
+			var expected struct{ Audit json.RawMessage }
+			if json.Unmarshal(row.Final, &expected) != nil {
+				t.Fatal("invalid final fixture")
+			}
+			if err := store.View(ctx, initial.RunKey, func(run *d.Aggregate, history ports.History) error {
+				events, err := history.Audit(0, 0)
+				if err != nil {
+					return err
+				}
+				executionEqual(t, expected.Audit, events)
+				if run.AuditCount != int64(len(events)) || len(run.Audit) != 0 {
+					t.Fatal("audit not externalized")
+				}
+				return nil
+			}); err != nil {
+				t.Fatal(err)
+			}
 		})
 	}
 }

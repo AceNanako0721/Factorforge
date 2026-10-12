@@ -18,6 +18,37 @@ import (
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/ports"
 )
 
+const CommandDedupRetention = 24 * time.Hour
+
+// retainDedup drops command dedup records whose retain_until has passed.
+// Records written before v2.5.8 have no retain_until; they are stamped with
+// legacyBase + CommandDedupRetention, where legacyBase is the clock the
+// command transaction started from.
+func retainDedup(run *d.Aggregate, legacyBase time.Time) {
+	var retained d.Ordered[d.Object]
+	for _, key := range run.Dedup.Keys() {
+		record := run.Dedup.Value(key)
+		var response map[string]json.RawMessage
+		_ = json.Unmarshal(record["response"], &response)
+		if string(record["create_run"]) == "true" || (response["run_key"] != nil && response["correlation_id"] == nil) {
+			retained.Set(key, record)
+			continue
+		}
+		var until time.Time
+		if raw, ok := record["retain_until"]; !ok {
+			until = legacyBase.Add(CommandDedupRetention)
+			record["retain_until"], _ = json.Marshal(until)
+		} else if json.Unmarshal(raw, &until) != nil {
+			retained.Set(key, record)
+			continue
+		}
+		if !until.Before(run.Clock) {
+			retained.Set(key, record)
+		}
+	}
+	run.Dedup = retained
+}
+
 type CommandInput interface{ Metadata() d.Command }
 type Response map[string]any
 type Service struct {
@@ -112,7 +143,7 @@ func ResourceID(run *d.Aggregate, prefix, identity string) string {
 	return prefix + "-" + RequestHash(Response{"run": run.RunKey, "version": run.Version, "clock": run.Clock, "seed": run.SimConfig.Seed, "identity": identity})[:28]
 }
 func Audit(run *d.Aggregate, action string, principal d.Principal, requestID string, detail any) {
-	event := Response{"sequence": len(run.Audit) + 1, "action": action, "principal_id": principal.PrincipalID, "request_id": requestID, "at": run.Clock, "detail": Wire(detail)}
+	event := Response{"sequence": run.AuditCount + int64(len(run.Audit)) + 1, "action": action, "principal_id": principal.PrincipalID, "request_id": requestID, "at": run.Clock, "detail": Wire(detail)}
 	data, _ := json.Marshal(Wire(event))
 	var object d.Object
 	json.Unmarshal(data, &object)
@@ -181,7 +212,7 @@ func (s *Service) CreateRun(ctx context.Context, principal d.Principal, body d.C
 	run := &d.Aggregate{RunKey: body.RunKey, ExecutionMode: body.ExecutionMode, State: "NORMAL", Policy: body.AccountPolicy, SimConfig: body.SimConfig, InitialCash: body.InitialCash, Currency: body.Currency, Cash: body.InitialCash, Clock: body.Clock, RiskDay: day, DayStartEquity: body.InitialCash, PeakEquity: body.InitialCash, ExecutorEpoch: 1}
 	d.InitCollections(run)
 	response := RunView(run)
-	saved, _ := json.Marshal(Response{"hash": fingerprint, "response": response})
+	saved, _ := json.Marshal(Response{"hash": fingerprint, "response": response, "create_run": true})
 	var object d.Object
 	json.Unmarshal(saved, &object)
 	run.Dedup.Set(identity, object)
@@ -201,6 +232,7 @@ func (s *Service) Command(ctx context.Context, principal d.Principal, commandInp
 	}
 	var response Response
 	err := s.Store.Transaction(ctx, command.RunKey, func(run *d.Aggregate) error {
+		started := run.Clock
 		identity := principal.PrincipalID + ":" + command.IdempotencyKey
 		fingerprint := RequestHash(Response{"action": action, "command": commandInput, "payload": payload})
 		if saved, ok := run.Dedup.Get(identity); ok {
@@ -234,6 +266,7 @@ func (s *Service) Command(ctx context.Context, principal d.Principal, commandInp
 		if err := engine.Err(); err != nil {
 			return err
 		}
+		retainDedup(run, started)
 		run.Version++
 		response["aggregate_version"] = run.Version
 		response["correlation_id"] = command.RequestID
@@ -241,7 +274,7 @@ func (s *Service) Command(ctx context.Context, principal d.Principal, commandInp
 		response["reason_codes"] = []string{}
 		Audit(run, action, principal, command.RequestID, response)
 		response = Wire(response).(map[string]any)
-		saved, _ := json.Marshal(Response{"hash": fingerprint, "response": response})
+		saved, _ := json.Marshal(Response{"hash": fingerprint, "response": response, "retain_until": command.ExpiresAtUTC.Add(CommandDedupRetention)})
 		var object d.Object
 		json.Unmarshal(saved, &object)
 		run.Dedup.Set(identity, object)
@@ -308,7 +341,7 @@ func (s *Service) RecordRejection(ctx context.Context, p d.Principal, code, acti
 		var object d.Object
 		json.Unmarshal(data, &object)
 		run.RejectedRequests = append(run.RejectedRequests, object)
-		Audit(run, "REQUEST_REJECTED", p, "rejection-"+formatInt(int64(len(run.Audit))), detail)
+		Audit(run, "REQUEST_REJECTED", p, "rejection-"+formatInt(run.AuditCount+int64(len(run.Audit))), detail)
 		return nil
 	})
 }

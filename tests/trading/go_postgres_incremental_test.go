@@ -2,7 +2,7 @@ package trading_test
 
 import (
 	"context"
-	"encoding/json"
+	a "github.com/AceNanako0721/Factorforge/src/factorforge/trading/application"
 	"strings"
 	"testing"
 	"time"
@@ -72,7 +72,7 @@ func TestNativePostgresIncrementalProjection(t *testing.T) {
 	if err = store.Transaction(ctx, run.RunKey, func(r *d.Aggregate) error {
 		r.HealthIssues = []string{"FIXTURE_HEALTH"}
 		r.HealthCheckedAt = &checked
-		r.Audit = append(r.Audit, d.Object{"action": json.RawMessage(`"FIXTURE_APPEND"`)})
+		a.Audit(r, "FIXTURE_APPEND", d.Principal{}, "fixture", nil)
 		return nil
 	}); err != nil {
 		t.Fatal(err)
@@ -93,7 +93,7 @@ func TestNativePostgresIncrementalProjection(t *testing.T) {
 		t.Fatal("audit append not projected", len(after), len(before), auditCount())
 	}
 	// Removing an audit event is still forbidden on the incremental path.
-	err = store.Transaction(ctx, run.RunKey, func(r *d.Aggregate) error { r.Audit = r.Audit[:len(r.Audit)-1]; return nil })
+	err = store.Transaction(ctx, run.RunKey, func(r *d.Aggregate) error { r.AuditCount--; return nil })
 	if failure, ok := err.(*d.Error); !ok || failure.Code != "AUDIT_MUTATION_FORBIDDEN" {
 		t.Fatal("audit truncation accepted", err)
 	}

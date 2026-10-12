@@ -327,6 +327,8 @@ type Aggregate struct {
 	Outbox                 []OutboxItem             `json:"outbox"`
 	Dedup                  Ordered[Object]          `json:"dedup"`
 	Audit                  []Object                 `json:"audit"`
+	AuditCount             int64                    `json:"-"`
+	CandleWrites           []Candle                 `json:"-"`
 	ExternalFacts          Ordered[*ExternalFact]   `json:"external_facts"`
 	FXRates                Ordered[*FxRate]         `json:"fx_rates"`
 	ConvertedFees          Ordered[decimal.Value]   `json:"converted_fees"`

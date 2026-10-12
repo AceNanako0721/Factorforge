@@ -12,8 +12,10 @@ import (
 // hour, at most MarketTradeLimit per instrument. Older trades stay only in the
 // append-only market_trade projection.
 const (
-	MarketTradeRetention = time.Hour
-	MarketTradeLimit     = 1000
+	MarketTradeRetention   = time.Hour
+	MarketTradeLimit       = 1000
+	CandleCorrectionWindow = time.Hour
+	CandleRetention        = d.CandleRetention
 )
 
 func retainTrades(run *d.Aggregate) {
@@ -48,6 +50,46 @@ func retainTrades(run *d.Aggregate) {
 		}
 	}
 	run.MarketTrades = retained
+}
+
+func retainCandles(run *d.Aggregate) {
+	cutoff := run.Clock.Add(-CandleRetention)
+	kept := make([]d.Candle, 0, len(run.Candles))
+	for _, candle := range run.Candles {
+		if candle.CloseAt.After(cutoff) {
+			kept = append(kept, candle)
+		}
+	}
+	run.Candles = kept
+}
+
+func candleChanges(old, candle d.Candle) []string {
+	changed := []string{}
+	if !old.CloseAt.Equal(candle.CloseAt) {
+		changed = append(changed, "close_at")
+	}
+	if old.Open.Cmp(candle.Open) != 0 {
+		changed = append(changed, "open")
+	}
+	if old.High.Cmp(candle.High) != 0 {
+		changed = append(changed, "high")
+	}
+	if old.Low.Cmp(candle.Low) != 0 {
+		changed = append(changed, "low")
+	}
+	if old.Close.Cmp(candle.Close) != 0 {
+		changed = append(changed, "close")
+	}
+	if old.Volume.Cmp(candle.Volume) != 0 {
+		changed = append(changed, "volume")
+	}
+	if old.Final != candle.Final {
+		changed = append(changed, "final")
+	}
+	if old.SourceID != candle.SourceID {
+		changed = append(changed, "source_id")
+	}
+	return changed
 }
 
 func checkQuotes(run *d.Aggregate) {
@@ -134,9 +176,11 @@ func (s *Service) AdvanceReplay(ctx context.Context, p d.Principal, command Comm
 						run.Candles = append(run.Candles[:index], run.Candles[index+1:]...)
 					}
 					run.Candles = append(run.Candles, candle)
+					run.CandleWrites = append(run.CandleWrites, candle)
 				}
 			}
 		}
+		retainCandles(run)
 		checkQuotes(run)
 		e.AssessLossGates()
 		if e.Err() != nil {
@@ -175,6 +219,7 @@ func (s *Service) IngestSnapshot(ctx context.Context, p d.Principal, body d.Mark
 			copy := point
 			run.Points.Set(code+":"+point.Kind, &copy)
 		}
+		revised := []Response{}
 		for _, candle := range body.Candles {
 			if run.Specs.Value(candle.InstrumentKey.Code()) == nil {
 				return problem("CANDLE_RULES_UNVERIFIED", 423)
@@ -189,16 +234,30 @@ func (s *Service) IngestSnapshot(ctx context.Context, p d.Principal, body d.Mark
 					break
 				}
 			}
-			if index >= 0 && !d.EqualModel(run.Candles[index], candle) && run.Candles[index].Revision >= candle.Revision {
-				return problem("CANDLE_REVISION_CONFLICT", 409)
-			}
-			if index < 0 || !d.EqualModel(run.Candles[index], candle) {
-				if index >= 0 {
-					run.Candles = append(run.Candles[:index], run.Candles[index+1:]...)
+			if index >= 0 {
+				old := run.Candles[index]
+				changed := candleChanges(old, candle)
+				if len(changed) == 0 {
+					continue
 				}
-				run.Candles = append(run.Candles, candle)
+				if candle.Revision <= old.Revision {
+					if candle.Revision != 0 || candle.SourceID != old.SourceID || body.At.Sub(old.CloseAt) > CandleCorrectionWindow {
+						return problem("CANDLE_REVISION_CONFLICT", 409)
+					}
+					if old.Revision == int64(^uint64(0)>>1) {
+						return problem("CANDLE_REVISION_CONFLICT", 409)
+					}
+					candle.Revision = old.Revision + 1
+					candle.AvailableAt = body.At
+				}
+				revised = append(revised, Response{"instrument_key": candle.InstrumentKey, "interval": candle.Interval, "open_at": candle.OpenAt, "revision": candle.Revision, "changed": changed})
+				run.Candles = append(run.Candles[:index], run.Candles[index+1:]...)
 			}
+			run.Candles = append(run.Candles, candle)
+			run.CandleWrites = append(run.CandleWrites, candle)
 		}
+		r["revised_candles"] = revised
+		retainCandles(run)
 		for _, trade := range body.Trades {
 			code := trade.InstrumentKey.Code()
 			spec := run.Specs.Value(code)
