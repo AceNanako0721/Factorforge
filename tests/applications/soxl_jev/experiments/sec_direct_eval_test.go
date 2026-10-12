@@ -36,6 +36,31 @@ var (
 	secEvalDeadline = time.Date(2026, 11, 30, 23, 59, 0, 0, time.UTC)
 )
 
+// secEvalWindow selects the frozen final sample or the pre-registered pilot on
+// earlier filings. Pilot results are development evidence only; filings already
+// read during the source probe are excluded.
+type secEvalWindowSpec struct {
+	Mode     string
+	From, To time.Time
+	Exclude  []string
+}
+
+var secEvalPilotExclude = []string{"0001730168-26-000076", "0000723125-26-000018", "0001193125-26-346806", "0000950103-26-014118", "0001628280-26-059257", "0001193125-26-338242"}
+
+func secEvalWindow(mode string, now time.Time) (secEvalWindowSpec, bool) {
+	switch mode {
+	case "", "final":
+		to := now
+		if to.After(secEvalDeadline) {
+			to = secEvalDeadline
+		}
+		return secEvalWindowSpec{"final", secEvalFrom, to, nil}, true
+	case "pilot":
+		return secEvalWindowSpec{"pilot", time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC), secEvalFrom, secEvalPilotExclude}, true
+	}
+	return secEvalWindowSpec{}, false
+}
+
 const (
 	secEvalMaxSamples = 30
 	secEvalMaxText    = 64 << 10
@@ -62,19 +87,21 @@ type secEvalCandidate struct {
 
 // secEvalSelect orders all qualifying filings by acceptance time; the first
 // filings with an EX-99 exhibit up to the cap become the sample.
-func secEvalSelect(submissions map[string][]byte, to time.Time) ([]secEvalCandidate, error) {
+func secEvalSelect(submissions map[string][]byte, w secEvalWindowSpec) ([]secEvalCandidate, error) {
 	out := []secEvalCandidate{}
 	for _, c := range secEvalCompanies {
 		raw, ok := submissions[c.Ticker]
 		if !ok {
 			return nil, fmt.Errorf("SEC_EVAL_SUBMISSIONS_MISSING %s", c.Ticker)
 		}
-		filings, err := monitoring.SECRecent8K(raw, secEvalItems, secEvalFrom, to)
+		filings, err := monitoring.SECRecent8K(raw, secEvalItems, w.From, w.To)
 		if err != nil {
 			return nil, err
 		}
 		for _, f := range filings {
-			out = append(out, secEvalCandidate{c, f})
+			if !d.Has(w.Exclude, f.Accession) {
+				out = append(out, secEvalCandidate{c, f})
+			}
 		}
 	}
 	sort.SliceStable(out, func(i, j int) bool {
@@ -144,20 +171,20 @@ func (p *secEvalPacer) get(t *testing.T, f *monitoring.Fetcher, url string) ([]b
 func TestSECDirectEvalAcquire(t *testing.T) {
 	lab := secEvalDir(t, "FACTORFORGE_SEC_EVAL_LAB")
 	now := time.Now().UTC()
-	to := now
-	if to.After(secEvalDeadline) {
-		to = secEvalDeadline
+	window, ok := secEvalWindow(os.Getenv("FACTORFORGE_SEC_EVAL_MODE"), now)
+	if !ok {
+		t.Fatal("SEC_EVAL_MODE")
 	}
 	if os.Mkdir(lab, 0700) != nil {
 		t.Fatal("SEC_EVAL_LAB_EXISTS")
 	}
-	frozenRateWrite(t, lab, "acquisition-started.json", map[string]any{"at": now, "from": secEvalFrom, "to": to, "protocol": "doc/engineering/P3_SEC_DIRECT_EVAL_PROTOCOL.md", "retries": 0})
+	frozenRateWrite(t, lab, "acquisition-started.json", map[string]any{"at": now, "mode": window.Mode, "from": window.From, "to": window.To, "excluded": window.Exclude, "protocol": "doc/engineering/P3_SEC_DIRECT_EVAL_PROTOCOL.md", "retries": 0})
 	fetcher, pace := secEvalFetcher(t), &secEvalPacer{}
 	submissions := map[string][]byte{}
 	for _, c := range secEvalCompanies {
 		submissions[c.Ticker], _ = pace.get(t, fetcher, fmt.Sprintf("https://data.sec.gov/submissions/CIK%010d.json", c.CIK))
 	}
-	candidates, err := secEvalSelect(submissions, to)
+	candidates, err := secEvalSelect(submissions, window)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -195,8 +222,8 @@ func TestSECDirectEvalAcquire(t *testing.T) {
 		}
 		samples = append(samples, s)
 	}
-	complete := len(samples) == secEvalMaxSamples || !now.Before(secEvalDeadline)
-	frozenRateWrite(t, lab, "samples.json", map[string]any{"complete": complete, "to": to, "samples": samples, "skipped": skipped, "candidates": len(candidates)})
+	complete := len(samples) == secEvalMaxSamples || !now.Before(secEvalDeadline) || window.Mode == "pilot"
+	frozenRateWrite(t, lab, "samples.json", map[string]any{"complete": complete, "mode": window.Mode, "to": window.To, "samples": samples, "skipped": skipped, "candidates": len(candidates)})
 	t.Logf("SEC evaluation acquisition: samples=%d complete=%v skipped=%d", len(samples), complete, len(skipped))
 }
 
@@ -703,14 +730,28 @@ func TestSECDirectEvalOfflineBoundaries(t *testing.T) {
 	}
 	submissions["MU"] = sub([4]string{"8-K", "0000723125-26-000020", "2026-10-20T20:05:00Z", "2.02,9.01"}, [4]string{"8-K", "0000723125-26-000010", "2026-10-11T14:00:00Z", "2.02"})
 	submissions["NVDA"] = sub([4]string{"8-K", "0001045810-26-000030", "2026-10-15T20:05:00Z", "5.02"}, [4]string{"8-K/A", "0001045810-26-000031", "2026-10-16T20:05:00Z", "2.02"}, [4]string{"8-K", "0001045810-26-000032", "2026-10-14T12:00:00Z", "8.01"})
-	got, err := secEvalSelect(submissions, now)
+	final, _ := secEvalWindow("final", now)
+	got, err := secEvalSelect(submissions, final)
 	// Before the probe, amendments and non-qualifying items are excluded; order is by acceptance.
 	if err != nil || len(got) != 2 || got[0].Company.Ticker != "NVDA" || got[1].Filing.Accession != "0000723125-26-000020" {
 		t.Fatal("sample selection", err, got)
 	}
 	delete(submissions, "TER")
-	if _, err = secEvalSelect(submissions, now); err == nil {
+	if _, err = secEvalSelect(submissions, final); err == nil {
 		t.Fatal("missing company accepted")
+	}
+	submissions["TER"] = sub([4]string{"8-K", "0001730168-26-000076", "2026-09-02T20:26:04Z", "2.02"}, [4]string{"8-K", "0000097210-26-000001", "2026-07-20T20:00:00Z", "2.02"}, [4]string{"8-K", "0000097210-26-000002", "2026-06-30T23:59:59Z", "2.02"})
+	pilot, ok := secEvalWindow("pilot", now)
+	got, err = secEvalSelect(submissions, pilot)
+	// The pilot covers [2026-07-01, probe) and excludes filings read during the probe.
+	if !ok || err != nil || len(got) != 2 || got[0].Filing.Accession != "0000097210-26-000001" || got[1].Filing.Accession != "0000723125-26-000010" {
+		t.Fatal("pilot selection", err, got)
+	}
+	if late, _ := secEvalWindow("final", secEvalDeadline.Add(time.Hour)); !late.To.Equal(secEvalDeadline) {
+		t.Fatal("final window must end at the deadline")
+	}
+	if _, ok = secEvalWindow("other", now); ok {
+		t.Fatal("unknown mode accepted")
 	}
 	text, err := secEvalText([]byte(`<html><body><p>Revenue rose&#160;10%</p><table><tr><td>Q3</td><td>$1.0</td></tr></table><script>x()</script></body></html>`))
 	if err != nil || text != "Revenue rose 10%\nQ3 | $1.0 |" {
