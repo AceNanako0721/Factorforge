@@ -156,7 +156,7 @@ func CorrectActualRisk(state *d.StrategyState, obj *d.ObservedObject, snap *d.Tr
 		}
 		id := "decision-" + d.Digest([]any{state.InstanceID, state.Environment, obj.ObjectID, "fill-risk", snap.Version})[:24]
 		inputs := map[string]any{"pool": d.Map(view), "snapshot": d.Map(snap), "policy": p.Version, "parameter_version": obj.ParameterVersion}
-		decision = &d.DecisionView{DecisionID: id, ObjectID: obj.ObjectID, CycleID: "fill-risk:" + fmt.Sprint(snap.Version), AvailableCutoff: at, PoolPlus: view.Plus, PoolMinus: view.Minus, PoolNet: view.Net, PreviousLevel: obj.Level, NewLevel: obj.Level, TargetQuantity: *target, ActualQuantity: snap.Actual[obj.ObjectID], PendingQuantity: snap.Pending[obj.ObjectID], ParameterVersion: obj.ParameterVersion, InputHash: d.Digest(inputs), InputSnapshot: inputs, ReasonCodes: []string{"ACTUAL_FILL_STOP_BUDGET_REDUCTION"}, SourceEventVersions: map[string]int{}}
+		decision = &d.DecisionView{DecisionID: id, ObjectID: obj.ObjectID, CycleID: "fill-risk:" + fmt.Sprint(snap.Version), AvailableCutoff: at, PoolPlus: view.Plus, PoolMinus: view.Minus, PoolNet: view.Net, PreviousLevel: obj.Level, NewLevel: obj.Level, TargetQuantity: *target, ActualQuantity: snap.Actual[obj.ObjectID], PendingQuantity: snap.Pending[obj.ObjectID], ParameterVersion: obj.ParameterVersion, InputHash: d.Digest(inputs), InputSnapshot: d.CompactDecisionInput(inputs), ReasonCodes: []string{"ACTUAL_FILL_STOP_BUDGET_REDUCTION"}, SourceEventVersions: map[string]int{}}
 		version := snap.TargetVersions[obj.ObjectID]
 		for _, item := range state.Outbox.Values() {
 			if item.Decision.ObjectID == obj.ObjectID && item.TargetVersion > version {

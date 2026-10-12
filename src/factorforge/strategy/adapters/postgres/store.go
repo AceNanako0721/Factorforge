@@ -99,7 +99,7 @@ func Initialize(ctx context.Context, dsn, environment string) error {
 		}
 		statements := []string{"GRANT USAGE ON SCHEMA " + name + " TO " + role, "GRANT SELECT ON ALL TABLES IN SCHEMA " + name + " TO " + role, "GRANT INSERT,UPDATE ON " + name + ".public_state TO " + role, "GRANT INSERT ON " + name + ".audit_event TO " + role, "GRANT INSERT ON " + name + ".object_owner_binding TO " + role}
 		if kind == "worker" {
-			statements = append(statements, "GRANT INSERT,UPDATE ON "+name+".internal_state TO "+role, "GRANT INSERT ON "+name+".sentiment_entry TO "+role)
+			statements = append(statements, "GRANT INSERT,UPDATE ON "+name+".internal_state TO "+role, "GRANT INSERT ON "+name+".sentiment_entry TO "+role, "GRANT INSERT ON "+name+".decision_archive TO "+role)
 		} else {
 			statements = append(statements, "REVOKE ALL ON "+name+".workload_capability_grant FROM "+role)
 		}
@@ -348,6 +348,37 @@ func (s *Store) appendRows(ctx context.Context, tx pgx.Tx, id string, oldAudit, 
 	}
 	return nil
 }
+
+// archiveDecisions moves every decision the transaction removed, with its
+// target, to the append-only archive (v2.5.7). An archived identity cannot
+// re-enter the aggregate.
+func (s *Store) archiveDecisions(ctx context.Context, tx pgx.Tx, id string, before, after *d.StrategyState) error {
+	for _, key := range before.Decisions.Keys() {
+		if _, kept := after.Decisions.Get(key); kept {
+			continue
+		}
+		raw, err := d.Marshal(map[string]any{"decision": before.Decisions.Value(key), "outbox": before.Outbox.Value(key)})
+		if err != nil {
+			return dbError(err)
+		}
+		if _, err = tx.Exec(ctx, "INSERT INTO "+s.table("decision_archive")+" VALUES($1,$2,now(),$3)", id, key, raw); err != nil {
+			return dbError(err)
+		}
+	}
+	for _, key := range after.Decisions.Keys() {
+		if _, existed := before.Decisions.Get(key); existed {
+			continue
+		}
+		var archived bool
+		if err := tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM "+s.table("decision_archive")+" WHERE instance_id=$1 AND decision_id=$2)", id, key).Scan(&archived); err != nil {
+			return dbError(err)
+		}
+		if archived {
+			return failure("STORE_STATE_INVALID", 503)
+		}
+	}
+	return nil
+}
 func (s *Store) Transaction(ctx context.Context, id string, fn func(*d.StrategyState) error) error {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -378,6 +409,9 @@ func (s *Store) Transaction(ctx context.Context, id string, fn func(*d.StrategyS
 			return failure("PUBLIC_INTERNAL_STATE_FORBIDDEN", 403)
 		}
 	} else {
+		if err = s.archiveDecisions(ctx, tx, id, before, state); err != nil {
+			return err
+		}
 		if _, err = tx.Exec(ctx, "UPDATE "+s.table("internal_state")+" SET payload=$1 WHERE instance_id=$2", internal, id); err != nil {
 			return dbError(err)
 		}

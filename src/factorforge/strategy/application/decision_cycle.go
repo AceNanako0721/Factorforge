@@ -553,7 +553,7 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 				if len(reasons) == 0 {
 					reasons = []string{"TARGET_COMPUTED"}
 				}
-				decision := &d.DecisionView{DecisionID: item.id, ObjectID: obj.ObjectID, CycleID: obj.ObjectID + ":" + d.ISO(item.scheduled), AvailableCutoff: at, PoolPlus: item.view.Plus, PoolMinus: item.view.Minus, PoolNet: item.view.Net, PreviousLevel: obj.Level, NewLevel: item.level, RawExposure: item.raw, ProjectedExposure: projected, TargetQuantity: item.target, ActualQuantity: actual, PendingQuantity: pending, StopPlan: item.stop, ParameterVersion: obj.ParameterVersion, InputHash: d.Digest(inputs), InputSnapshot: inputs, ReasonCodes: reasons, SourceEventVersions: sourceVersions}
+				decision := &d.DecisionView{DecisionID: item.id, ObjectID: obj.ObjectID, CycleID: obj.ObjectID + ":" + d.ISO(item.scheduled), AvailableCutoff: at, PoolPlus: item.view.Plus, PoolMinus: item.view.Minus, PoolNet: item.view.Net, PreviousLevel: obj.Level, NewLevel: item.level, RawExposure: item.raw, ProjectedExposure: projected, TargetQuantity: item.target, ActualQuantity: actual, PendingQuantity: pending, StopPlan: item.stop, ParameterVersion: obj.ParameterVersion, InputHash: d.Digest(inputs), InputSnapshot: d.CompactDecisionInput(inputs), ReasonCodes: reasons, SourceEventVersions: sourceVersions}
 				state.Decisions.Set(item.id, decision)
 				canReduce := m.Mul(item.target, actual).Sign() >= 0 && item.target.Abs().Cmp(actual.Abs()) <= 0 && obj.OwnerEpoch == snap.OwnerEpochs[obj.ObjectID]
 				unknown := unknownDelivery(state, obj.ObjectID)
@@ -588,7 +588,17 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 		for _, v := range outputs {
 			ids = append(ids, v.DecisionID)
 		}
-		state.Audit = append(state.Audit, map[string]any{"action": "CYCLE_COMMITTED", "at": d.ISO(at), "decisions": ids, "snapshot_version": before.Version})
+		audit := map[string]any{"action": "CYCLE_COMMITTED", "at": d.ISO(at), "decisions": ids, "snapshot_version": before.Version}
+		// The store writes removed decisions to the append-only archive in this
+		// transaction (v2.5.7); the aggregate keeps only what the runtime reads.
+		if archived := d.ArchivableDecisions(state, at); len(archived) > 0 {
+			for _, id := range archived {
+				state.Decisions.Delete(id)
+				state.Outbox.Delete(id)
+			}
+			audit["archived_decisions"] = archived
+		}
+		state.Audit = append(state.Audit, audit)
 		return nil
 	})
 	return outputs, err
