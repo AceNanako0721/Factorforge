@@ -378,17 +378,22 @@ func validateAnswer(q Question, a jevAnswer) error {
 		v, _ := dec.ParseDecimal(string(n))
 		sum = math.Add(sum, v)
 	}
-	if math.Err() != nil || sum.Cmp(one) != 0 {
+	// v2.5.4: the provider rounds published probabilities, so the exact decimal
+	// sum may differ from 1 by one unit of the second decimal place.
+	if math.Err() != nil || math.Sub(sum, one).Abs().Cmp(distributionTolerance) > 0 {
 		return fmt.Errorf("distribution")
 	}
 	return nil
 }
+
+var distributionTolerance, _ = dec.ParseDecimal("0.01")
+
 func mapScore(a jevAnswer, levels []dec.Decimal) (dec.Decimal, error) {
 	if a.Type != "score" || len(a.Probabilities) != len(levels) {
 		return dec.Decimal{}, d.Fail("JEV_RUBRIC_MISMATCH", 503)
 	}
 	math := dec.NewMath(28)
-	value := dec.Decimal{}
+	value, total := dec.Decimal{}, dec.Decimal{}
 	for index, level := range levels {
 		raw, ok := a.Probabilities[strconv.Itoa(index)]
 		if !ok {
@@ -399,7 +404,13 @@ func mapScore(a jevAnswer, levels []dec.Decimal) (dec.Decimal, error) {
 			return value, d.Fail("JEV_RESPONSE_INVALID", 503)
 		}
 		value = math.Add(value, math.Mul(weight, level))
+		total = math.Add(total, weight)
 	}
+	if math.Err() != nil || total.Sign() <= 0 {
+		return value, d.Fail("JEV_MAPPING_UNAVAILABLE", 503)
+	}
+	// Normalise by the validated sum; an exact distribution is unchanged.
+	value = math.Div(value, total)
 	if math.Err() != nil {
 		return value, d.Fail("JEV_MAPPING_UNAVAILABLE", 503)
 	}

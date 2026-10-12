@@ -590,6 +590,6 @@ figure{margin:24px 0;border:1px solid var(--line);border-radius:10px;padding:16p
 <h3>26.1 规则与实现位置</h3>
 <p>修改 analysis/jev_http.go 的分布校验：键集合与每项 [0,1] 检查保持；以既有 28 位十进制 dec.Math 精确求和 s，要求 |s − 1| ≤ 0.01，否则仍为分布错误、整份响应 JEV_RESPONSE_INVALID。容差取 0.01 而非按选项数放大：已观测的最大偏差为 0.01，多选项题（最多 57 个选项）按 n×0.005 放大会接受明显失真的分布。mapScore 的期望值改为 Σ wᵢ·bᵢ / s，s 恰为 1 时结果与原实现相同；s 为零在前一步已被拒绝。原始概率、confidence 与 score 按原样保存，不改写为归一化值。</p>
 <h3>26.2 接口、参考与验证</h3>
-<p>JevDecisionProvider、FrameworkClient 与 P2/P1 调用清单不变；评分提交仍使用映射后的十进制值和既有标定/路由门。参考<a href="https://docs.typesafe.ai/api">官方 System One 协议</a>对概率字段的描述，不引入 SDK。测试覆盖：和为 0.99、1.01、浮点表示误差时接受；0.98、1.02 及键缺失、越界、负值时拒绝；Score 期望按 s 归一化且 s=1 时与原值一致；实际已保存的两份先导响应可通过校验。已冻结的实验比较器保持原精确规则，不追溯改写既有实验结论。</p>
+<p>JevDecisionProvider、FrameworkClient 与 P2/P1 调用清单不变；评分提交仍使用映射后的十进制值和既有标定/路由门。参考<a href="https://docs.typesafe.ai/api">官方 System One 协议</a>对概率字段的描述，不引入 SDK。测试覆盖：和为 0.99、1.01、浮点表示误差时接受；0.98、1.02 及键缺失、越界、负值时拒绝；Score 期望按 s 归一化且 s=1 时与原值一致；夹具采用与真实响应相同的数值形态（两位小数和为 0.99、浮点表示误差）。已冻结的实验比较器保持原精确规则，不追溯改写既有实验结论。</p>
 </section>
 </article><footer>HTML 是本版唯一发布正文。图表为内嵌 SVG，无需联网或运行脚本。文档通过不代表程序实现、交易运行或实盘准入通过。</footer></main></div></body></html>

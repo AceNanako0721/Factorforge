@@ -1,6 +1,6 @@
 # P3 采集、分析和提交运行说明
 
-更新：2026-10-12。当前设计基线 v2.5.3；继承 Go 链路、日历/报告、逐事实JEV绑定及后续证据窗口、模型接入和候选审阅设计。本页是持续实现/操作记录，不能代替冻结式样、设计或生产准入；下方版本章节为历史沿革。
+更新：2026-10-12。当前设计基线 v2.5.4；继承 Go 链路、日历/报告、逐事实JEV绑定及后续证据窗口、模型接入和候选审阅设计。本页是持续实现/操作记录，不能代替冻结式样、设计或生产准入；下方版本章节为历史沿革。
 
 当前分流：摄入/投递的两处时间顺序错误按既有设计修复，SOXL正式规格资料仅作研究证据；Qwen/llama.cpp本地抽取路线停止并公开归档。OMP接入、候选审阅与独立事实核验保留，JEV原文直评仍为实验，不接入生产worker。详情见 [处置记录](P3_ROUTE_DISPOSITION.md) 与 [P3验收](../progress/P3_ACCEPTANCE.md)。
 
@@ -238,3 +238,7 @@ Acquire失败没有HTTP；成功预占后仅一次HTTP，完整交付保存COMPL
 失败码：SEC_IDENTITY_REQUIRED（缺少带邮箱的身份）、SOURCE_LICENCE_REQUIRED、SOURCE_CONFIGURATION_REQUIRED、SOURCE_FILING_BUDGET_EXCEEDED（窗口内候选超过 max_filings，不截断）、SEC_SUBMISSIONS_INVALID、SEC_METADATA_FORMAT_INVALID、SEC_INDEX_INVALID（附件链接越出申报目录）、SOURCE_ORIGINAL_UNAVAILABLE（含 403/429，不自动重试）。整轮失败时不记已返回申报，下一次轮询重新判断；同一进程内已返回的申报不重复读取，重启后依靠 EvidenceID 去重。
 
 验证：回环夹具覆盖身份请求头、表单/窗口/items 过滤、无附件申报、越界链接、预算、媒体类型、请求间隔与取消、失败后恢复；原生 ingest-worker 在 PATH=/nonexistent 下经真实 PostgreSQL 两次启动只保存一份 SEC 原文。8-K/A 更正关系、6-K 境外发行人、首发时间与召回完整性不在本版范围。
+
+## v2.5.4 JEV 概率舍入容差
+
+按 [实例设计第26章](../v2.5.4/03_SOXLUSDT_JEV应用实例设计书.html#jev-rounding-tolerance) 修改 JEV 响应校验：Choice/Score 概率的十进制和与 1 偏差不超过 0.01 即接受，Score 期望按该和归一化，原始分布照存。依据是项目内 94 份真实响应中 17 份概率和因舍入不等于 1（最大偏差 0.01），原精确规则会拒绝约五分之一的真实评分。键缺失、越界、负值或偏差超过 0.01 仍为 JEV_RESPONSE_INVALID，控制流不变。
