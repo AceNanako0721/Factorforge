@@ -8,10 +8,12 @@ import (
 	"embed"
 	"encoding/json"
 	"errors"
+	"fmt"
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/strategy/domain"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"os"
 	"strings"
 )
 
@@ -247,7 +249,15 @@ func (s *Store) load(ctx context.Context, tx pgx.Tx, id string, lock bool) (*d.S
 	if err = s.binding(ctx, tx, state, false); err != nil {
 		return nil, err
 	}
-	for _, name := range []string{"audit_event", "sentiment_entry"} {
+	var auditMax int
+	if err = tx.QueryRow(ctx, "SELECT coalesce(max(sequence),0),count(*) FROM "+s.table("audit_event")+" WHERE instance_id=$1", id).Scan(&auditMax, &state.AuditCount); err != nil {
+		return nil, err
+	}
+	if auditMax != state.AuditCount {
+		return nil, failure("STORE_STATE_INVALID", 503)
+	}
+	state.Audit = nil
+	for _, name := range []string{"sentiment_entry"} {
 		rows, err := tx.Query(ctx, "SELECT payload FROM "+s.table(name)+" WHERE instance_id=$1 ORDER BY sequence", id)
 		if err != nil {
 			return nil, err
@@ -258,21 +268,12 @@ func (s *Store) load(ctx context.Context, tx pgx.Tx, id string, lock bool) (*d.S
 				rows.Close()
 				return nil, err
 			}
-			if name == "audit_event" {
-				var v map[string]any
-				if d.RawDecode(bytes.NewReader(raw), &v) != nil {
-					rows.Close()
-					return nil, failure("STORE_STATE_INVALID", 503)
-				}
-				state.Audit = append(state.Audit, v)
-			} else {
-				var v d.LedgerEntry
-				if d.DecodeJSON(raw, &v) != nil {
-					rows.Close()
-					return nil, failure("STORE_STATE_INVALID", 503)
-				}
-				state.Ledger = append(state.Ledger, v)
+			var v d.LedgerEntry
+			if d.DecodeJSON(raw, &v) != nil {
+				rows.Close()
+				return nil, failure("STORE_STATE_INVALID", 503)
 			}
+			state.Ledger = append(state.Ledger, v)
 		}
 		err = rows.Err()
 		rows.Close()
@@ -304,7 +305,10 @@ func (s *Store) Create(ctx context.Context, state *d.StrategyState) error {
 	if err = s.binding(ctx, tx, state, true); err != nil {
 		return dbError(err)
 	}
-	if err = s.appendRows(ctx, tx, state.InstanceID, nil, state.Audit, nil, state.Ledger); err != nil {
+	if state.AuditCount != 0 {
+		return failure("APPEND_ONLY_MUTATION_FORBIDDEN", 503)
+	}
+	if err = s.appendRows(ctx, tx, state.InstanceID, d.NewState(state.InstanceID, state.Environment), state); err != nil {
 		return dbError(err)
 	}
 	return dbError(tx.Commit(ctx))
@@ -324,16 +328,74 @@ func (s *Store) Read(ctx context.Context, id string) (*d.StrategyState, error) {
 	}
 	return state, nil
 }
-func (s *Store) appendRows(ctx context.Context, tx pgx.Tx, id string, oldAudit, newAudit []map[string]any, oldLedger, newLedger []d.LedgerEntry) error {
-	if len(newAudit) < len(oldAudit) || len(newLedger) < len(oldLedger) || d.Digest(newAudit[:len(oldAudit)]) != d.Digest(oldAudit) || d.Digest(newLedger[:len(oldLedger)]) != d.Digest(oldLedger) {
+
+// ReadAudit pages over immutable sequences up to the caller's loaded high-water
+// mark. Later appends cannot leak into that snapshot.
+func (s *Store) ReadAudit(ctx context.Context, id string, after, through, limit int, actions []string) ([]d.AuditRecord, int, error) {
+	if after < 0 || through < after || limit < 1 {
+		return nil, 0, failure("STORE_STATE_INVALID", 503)
+	}
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
+	if err != nil {
+		return nil, 0, dbError(err)
+	}
+	defer tx.Rollback(ctx)
+	where := " WHERE instance_id=$1 AND sequence<=$2"
+	if len(actions) > 0 {
+		where += " AND payload->>'action'=ANY($3::text[])"
+	}
+	args := []any{id, through}
+	if len(actions) > 0 {
+		args = append(args, actions)
+	}
+	var total int
+	if err = tx.QueryRow(ctx, "SELECT count(*) FROM "+s.table("audit_event")+where, args...).Scan(&total); err != nil {
+		return nil, 0, dbError(err)
+	}
+	query := "SELECT sequence,payload FROM " + s.table("audit_event") + where + fmt.Sprintf(" AND sequence>$%d ORDER BY sequence LIMIT $%d", len(args)+1, len(args)+2)
+	args = append(args, after, limit)
+	rows, err := tx.Query(ctx, query, args...)
+	if err != nil {
+		return nil, 0, dbError(err)
+	}
+	result := []d.AuditRecord{}
+	for rows.Next() {
+		var row d.AuditRecord
+		var raw []byte
+		if err = rows.Scan(&row.Sequence, &raw); err != nil {
+			rows.Close()
+			return nil, 0, dbError(err)
+		}
+		if d.RawDecode(bytes.NewReader(raw), &row.Payload) != nil {
+			rows.Close()
+			return nil, 0, failure("STORE_STATE_INVALID", 503)
+		}
+		result = append(result, row)
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return nil, 0, dbError(err)
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return nil, 0, dbError(err)
+	}
+	return result, total, nil
+}
+func (s *Store) appendRows(ctx context.Context, tx pgx.Tx, id string, before, after *d.StrategyState) error {
+	if err := d.CheckAuditAppend(before, after); err != nil {
+		return err
+	}
+	oldLedger, newLedger := before.Ledger, after.Ledger
+	if len(newLedger) < len(oldLedger) || d.Digest(newLedger[:len(oldLedger)]) != d.Digest(oldLedger) {
 		return failure("APPEND_ONLY_MUTATION_FORBIDDEN", 503)
 	}
-	for index, row := range newAudit[len(oldAudit):] {
+	for index, row := range after.Audit {
 		raw, err := d.Marshal(row)
 		if err != nil {
 			return err
 		}
-		if _, err = tx.Exec(ctx, "INSERT INTO "+s.table("audit_event")+" VALUES($1,$2,$3)", id, len(oldAudit)+index+1, raw); err != nil {
+		if _, err = tx.Exec(ctx, "INSERT INTO "+s.table("audit_event")+" VALUES($1,$2,$3)", id, before.AuditCount+index+1, raw); err != nil {
 			return err
 		}
 	}
@@ -389,7 +451,7 @@ func (s *Store) Transaction(ctx context.Context, id string, fn func(*d.StrategyS
 	if err != nil {
 		return dbError(err)
 	}
-	before := d.Clone(state)
+	before := d.CloneState(state)
 	if err = d.Guard(func() error { return fn(state) }); err != nil {
 		return err
 	}
@@ -409,6 +471,9 @@ func (s *Store) Transaction(ctx context.Context, id string, fn func(*d.StrategyS
 			return failure("PUBLIC_INTERNAL_STATE_FORBIDDEN", 403)
 		}
 	} else {
+		if len(internal) > 2<<20 {
+			fmt.Fprintln(os.Stderr, "STATE_SIZE_HIGH", len(internal))
+		}
 		if err = s.archiveDecisions(ctx, tx, id, before, state); err != nil {
 			return err
 		}
@@ -422,7 +487,7 @@ func (s *Store) Transaction(ctx context.Context, id string, fn func(*d.StrategyS
 	if err = d.PreserveWindowPlans(before, state); err != nil {
 		return err
 	}
-	if err = s.appendRows(ctx, tx, id, before.Audit, state.Audit, before.Ledger, state.Ledger); err != nil {
+	if err = s.appendRows(ctx, tx, id, before, state); err != nil {
 		return dbError(err)
 	}
 	return dbError(tx.Commit(ctx))

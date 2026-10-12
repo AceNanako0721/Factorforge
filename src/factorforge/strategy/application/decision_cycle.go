@@ -183,6 +183,7 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 						state.Samples.Set(obj.ObjectID, append(samples, *sample))
 					}
 				}
+				d.RetainSamples(state, obj.ObjectID, at, p)
 				required := true
 				for _, name := range []string{"w", "g", "h", "eta", "kappa", "k_stop"} {
 					if _, ok := params.Values[name]; !ok {
@@ -568,7 +569,7 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 					if reservation != nil {
 						reservationID = d.Ptr(reservation.ReservationID)
 					}
-					state.Outbox.Set(item.id, &d.TargetOutbox{Decision: *decision, TargetVersion: version + 1, ExpiresAt: at.Add(time.Duration(p.TargetTTLSeconds) * time.Second), ReservationID: reservationID, State: "PENDING", OwnerEpoch: obj.OwnerEpoch})
+					state.Outbox.Set(item.id, &d.TargetOutbox{Decision: d.TargetDecision(decision), TargetVersion: version + 1, ExpiresAt: at.Add(time.Duration(p.TargetTTLSeconds) * time.Second), ReservationID: reservationID, State: "PENDING", OwnerEpoch: obj.OwnerEpoch})
 				}
 				obj.LastCycle = d.Ptr(item.scheduled)
 				obj.LastCutoff = d.Ptr(at)
@@ -598,7 +599,7 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 			}
 			audit["archived_decisions"] = archived
 		}
-		state.Audit = append(state.Audit, audit)
+		state.AppendAudit(audit)
 		return nil
 	})
 	return outputs, err
@@ -722,7 +723,7 @@ func (c DecisionCycle) Dispatch(ctx context.Context, identity d.Identity) error 
 					r.State = "RELEASED"
 				}
 			}
-			state.Audit = append(state.Audit, map[string]any{"action": "TARGET_DELIVERY", "decision_id": key, "state": status, "reason": reason, "at": d.ISO(now)})
+			state.AppendAudit(map[string]any{"action": "TARGET_DELIVERY", "decision_id": key, "state": status, "reason": reason, "at": d.ISO(now)})
 			state.Version++
 			return nil
 		})

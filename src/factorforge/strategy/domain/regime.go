@@ -20,11 +20,18 @@ func UpdateRegime(previous map[string]any, samples []MarketSample, at time.Time,
 				unknown("FACTOR_UNVALIDATED")
 				continue
 			}
+			if dimension == "trend" && p.TrendWindowSeconds == nil {
+				unknown("TREND_WINDOW_UNDEFINED")
+				continue
+			}
 			values := []MarketSample{}
 			for _, v := range samples {
 				if !v.AvailableAt.After(at) && v.Quality == "VALID" {
 					values = append(values, v)
 				}
+			}
+			if dimension == "trend" {
+				sort.SliceStable(values, func(i, j int) bool { return values[i].AvailableAt.Before(values[j].AvailableAt) })
 			}
 			if len(values) < 2 || values[len(values)-1].Sigma == nil {
 				unknown("FACTOR_MISSING")
@@ -34,7 +41,12 @@ func UpdateRegime(previous map[string]any, samples []MarketSample, at time.Time,
 			metric := Zero()
 			switch dimension {
 			case "trend":
-				metric = m.Div(m.Ln(m.Div(last.Price, values[0].Price)), *last.Sigma)
+				base := PriceAt(values, at.Add(-time.Duration(*p.TrendWindowSeconds)*time.Second))
+				if base == nil {
+					unknown("FACTOR_MISSING")
+					continue
+				}
+				metric = m.Div(m.Ln(m.Div(last.Price, base.Price)), *last.Sigma)
 			case "volatility":
 				metric = m.Sub(m.Div(*last.Sigma, p.SigmaRef), One())
 			default:

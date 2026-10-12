@@ -42,7 +42,7 @@ func addDecision(s *sd.StrategyState, template *sd.DecisionView, outbox *sd.Targ
 	s.Decisions.Set(id, decision)
 	if outbox != nil {
 		target := sd.Clone(outbox)
-		target.Decision, target.ExpiresAt, target.State, target.ReservationID = *decision, cutoff.Add(time.Minute), targetState, nil
+		target.Decision, target.ExpiresAt, target.State, target.ReservationID = sd.TargetDecision(decision), cutoff.Add(time.Minute), targetState, nil
 		s.Outbox.Set(id, target)
 	}
 }
@@ -100,7 +100,7 @@ func TestArchivableDecisionsRequiresEveryCondition(t *testing.T) {
 			s.Outbox.Delete("decision-new")
 			return at
 		},
-		"cutoff inside retention": func(s *sd.StrategyState) time.Time { return t0.Add(23 * time.Hour) },
+		"cutoff inside retention": func(s *sd.StrategyState) time.Time { return t0.Add(5 * time.Hour) },
 		"target expiry inside retention": func(s *sd.StrategyState) time.Time {
 			s.Outbox.Value("decision-old").ExpiresAt = at.Add(-time.Hour)
 			return at
@@ -161,7 +161,7 @@ func TestDecisionRetentionBoundsSerializedState(t *testing.T) {
 		}
 	}
 	raw, _ := json.Marshal(sd.JSONValue(s))
-	if s.Decisions.Len() > 24*60/7+2 || len(raw) > 1500000 {
+	if s.Decisions.Len() > 6*60/7+2 || len(raw) > 1500000 {
 		t.Fatal("retained decisions unbounded", s.Decisions.Len(), len(raw))
 	}
 	if s.Decisions.Value("decision-0299") == nil || s.Decisions.Value("decision-0000") != nil {

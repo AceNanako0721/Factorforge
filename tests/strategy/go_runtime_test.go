@@ -156,7 +156,7 @@ func TestNativeP2PostgresAtomicityRolesAndRestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if after.Version != state.Version+1 || after.Objects.Len() != 1 || len(after.Audit) != 1 {
+	if after.Version != state.Version+1 || after.Objects.Len() != 1 || after.AuditCount != 1 || len(after.Audit) != 0 {
 		t.Fatal("duplicate aggregate mutation")
 	}
 	plan := sd.TimeWindowPlan{PlanID: "fixture-utc-plan", ObjectID: request.Object.ObjectID, PolicyVersion: request.Policy.Version, SourceVersion: "fixture-utc-source", Windows: []sd.PolicyWindow{{WindowID: "fixture-continuous-window", Start: clock.Now(), End: clock.Now().Add(72 * time.Hour), EnforceLimits: true}}}
@@ -216,7 +216,11 @@ func TestNativeP2PostgresAtomicityRolesAndRestart(t *testing.T) {
 	}
 	before := sd.Clone(after)
 	assertStrategyCode(t, public.Transaction(ctx, state.InstanceID, func(s *sd.StrategyState) error { s.ConsumedEvidence = append(s.ConsumedEvidence, "forged"); return nil }), "PUBLIC_INTERNAL_STATE_FORBIDDEN")
-	assertStrategyCode(t, worker.Transaction(ctx, state.InstanceID, func(s *sd.StrategyState) error { s.Audit[0]["action"] = "tampered"; return nil }), "APPEND_ONLY_MUTATION_FORBIDDEN")
+	assertStrategyCode(t, worker.Transaction(ctx, state.InstanceID, func(s *sd.StrategyState) error { s.AuditCount--; return nil }), "APPEND_ONLY_MUTATION_FORBIDDEN")
+	assertStrategyCode(t, worker.Transaction(ctx, state.InstanceID, func(s *sd.StrategyState) error {
+		s.Audit = append(s.Audit, map[string]any{"sequence": 1, "action": "tampered"})
+		return nil
+	}), "APPEND_ONLY_MUTATION_FORBIDDEN")
 	assertStrategyCode(t, worker.Transaction(ctx, state.InstanceID, func(s *sd.StrategyState) error {
 		s.Version += 100
 		return &sd.Error{Code: "FIXTURE_ROLLBACK", Status: 503}
@@ -353,7 +357,7 @@ func TestNativeP2StrictAdmissionAndPublicListener(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if after.Objects.Len() != 0 || len(after.Audit) != 3 {
+	if after.Objects.Len() != 0 || after.AuditCount != 3 || len(after.Audit) != 0 {
 		t.Fatal("invalid requests mutated trading state or were not audited")
 	}
 }

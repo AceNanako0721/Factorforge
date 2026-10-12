@@ -190,8 +190,9 @@ func TestP2TraceReadOnlyPaginationPrivacyAndMissingFacts(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	_, err = query.Trace(context.Background(), public, "audit", "", app.ReadFilter{})
-	assertStrategyCode(t, err, "QUERY_RESOURCE_LIMIT")
+	if _, err = query.Trace(context.Background(), public, "audit", "", app.ReadFilter{}); err != nil {
+		t.Fatal("audit history must not consume the aggregate record budget", err)
+	}
 }
 
 // These persisted facts include a hidden free dictionary and a shared event.

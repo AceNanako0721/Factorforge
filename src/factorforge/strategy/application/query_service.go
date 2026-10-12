@@ -158,14 +158,60 @@ func (q QueryService) Trace(ctx context.Context, identity d.Identity, resource, 
 			}
 		}
 	}
-	counts := map[string]int{"objects": state.Objects.Len(), "events": state.EventVersions.Len(), "event": state.EventVersions.Len(), "scores": state.Scores.Len(), "ledger": len(state.Ledger), "attributions": state.Attributions.Len(), "counterfactuals": state.Counterfactuals.Len(), "parameter-activations": state.Candidates.Len() + len(state.Audit), "audit": len(state.Audit)}
+	bound := filter
+	bound.Cursor = ""
+	bound.Limit = limit
+	binding := d.Digest([]any{identity.Payload(), resource, id, bound})
+	position := 0
+	issued := q.Clock.Now()
+	if filter.Cursor != "" {
+		cursor, e := q.cursor(filter.Cursor)
+		if e != nil {
+			return empty, e
+		}
+		if cursor.Binding != binding || cursor.Version != state.Version || issued.Before(cursor.Issued) || issued.Sub(cursor.Issued) > q.Policy.CursorAge {
+			return empty, readError("QUERY_CURSOR_STALE", 409)
+		}
+		position = cursor.Offset
+		issued = cursor.Issued
+	}
+	if resource == "audit" {
+		return q.auditPage(ctx, identity, state, filter, allowed, position, limit, binding, issued)
+	}
+	counts := map[string]int{"objects": state.Objects.Len(), "events": state.EventVersions.Len(), "event": state.EventVersions.Len(), "scores": state.Scores.Len(), "ledger": len(state.Ledger), "attributions": state.Attributions.Len(), "counterfactuals": state.Counterfactuals.Len()}
+	var audits []d.AuditRecord
+	if resource == "parameter-activations" {
+		var total int
+		audits, total, err = q.Store.ReadAudit(ctx, state.InstanceID, 0, state.AuditCount, q.Policy.MaxRecords+1, []string{"PARAMETER_ACTIVATED", "PARAMETER_ROLLED_BACK", "PARAMETER_FROZEN"})
+		if err != nil {
+			return empty, err
+		}
+		counts[resource] = state.Candidates.Len() + total
+	}
 	if counts[resource] > q.Policy.MaxRecords {
 		return empty, readError("QUERY_RESOURCE_LIMIT", 503)
 	}
-	rows, err := traceRows(state, resource, id, filter)
+	rows, err := traceRows(state, resource, id, filter, audits)
 	if err != nil {
 		return empty, err
 	}
+	visible := visibleRows(rows, identity, filter, allowed)
+	sort.Slice(visible, func(i, j int) bool { return visible[i].key < visible[j].key })
+	if position > len(visible) {
+		return empty, readError("QUERY_CURSOR_INVALID", 409)
+	}
+	end := position + limit
+	if end < position || end > len(visible) {
+		end = len(visible)
+	}
+	page := readPage(state.Version, visible[position:end])
+	if end < len(visible) {
+		page.Cursor = d.Ptr(q.sign(readCursor{binding, state.Version, end, issued}))
+	}
+	return page, nil
+}
+
+func visibleRows(rows []readRow, identity d.Identity, filter ReadFilter, allowed map[string]bool) []readRow {
 	visible := []readRow{}
 	for _, row := range rows {
 		matches := len(row.objectIDs) == 0 && filter.ObjectID == "" && identity.Worker() == nil
@@ -192,40 +238,49 @@ func (q QueryService) Trace(ctx context.Context, identity d.Identity, resource, 
 		}
 		visible = append(visible, row)
 	}
-	sort.Slice(visible, func(i, j int) bool { return visible[i].key < visible[j].key })
-	bound := filter
-	bound.Cursor = ""
-	bound.Limit = limit
-	binding := d.Digest([]any{identity.Payload(), resource, id, bound})
-	position := 0
-	issued := q.Clock.Now()
-	if filter.Cursor != "" {
-		cursor, e := q.cursor(filter.Cursor)
-		if e != nil {
-			return empty, e
-		}
-		if cursor.Binding != binding || cursor.Version != state.Version || issued.Before(cursor.Issued) || issued.Sub(cursor.Issued) > q.Policy.CursorAge {
-			return empty, readError("QUERY_CURSOR_STALE", 409)
-		}
-		position = cursor.Offset
-		issued = cursor.Issued
-	}
-	if position > len(visible) {
-		return empty, readError("QUERY_CURSOR_INVALID", 409)
-	}
-	end := position + limit
-	if end < position || end > len(visible) {
-		end = len(visible)
-	}
-	page := ReadPage{Items: []map[string]any{}, SnapshotVersion: state.Version}
-	for _, row := range visible[position:end] {
+	return visible
+}
+
+func readPage(version int, rows []readRow) ReadPage {
+	page := ReadPage{Items: []map[string]any{}, SnapshotVersion: version}
+	for _, row := range rows {
 		page.Items = append(page.Items, row.value)
 		if row.at != nil && (page.ObservedAt == nil || row.at.After(*page.ObservedAt)) {
 			page.ObservedAt = row.at
 		}
 	}
+	return page
+}
+
+func (q QueryService) auditPage(ctx context.Context, identity d.Identity, state *d.StrategyState, filter ReadFilter, allowed map[string]bool, position, limit int, binding string, issued time.Time) (ReadPage, error) {
+	empty := ReadPage{Items: []map[string]any{}}
+	if position > state.AuditCount {
+		return empty, readError("QUERY_CURSOR_INVALID", 409)
+	}
+	visible := []readRow{}
+	for position < state.AuditCount && len(visible) <= limit {
+		audits, _, err := q.Store.ReadAudit(ctx, state.InstanceID, position, state.AuditCount, limit+1, nil)
+		if err != nil {
+			return empty, err
+		}
+		if len(audits) == 0 {
+			return empty, readError("STORE_STATE_INVALID", 503)
+		}
+		rows, err := traceRows(state, "audit", "", filter, audits)
+		if err != nil {
+			return empty, err
+		}
+		visible = append(visible, visibleRows(rows, identity, filter, allowed)...)
+		position = audits[len(audits)-1].Sequence
+	}
+	end := len(visible)
+	if end > limit {
+		end = limit
+	}
+	page := readPage(state.Version, visible[:end])
 	if end < len(visible) {
-		page.Cursor = d.Ptr(q.sign(readCursor{binding, state.Version, end, issued}))
+		sequence, _ := strconv.Atoi(visible[end-1].key)
+		page.Cursor = d.Ptr(q.sign(readCursor{binding, state.Version, sequence + 1, issued}))
 	}
 	return page, nil
 }
@@ -272,7 +327,7 @@ func eventView(event *d.Event) map[string]any {
 	}
 	return map[string]any{"event_id": event.EventID, "family_id": event.FamilyID, "fact_version": event.FactVersion, "parent_event_id": event.ParentEventID, "relation": event.Relation, "subject_id": event.SubjectID, "event_type": event.EventType, "occurred_at": event.OccurredAt, "first_public_at": event.FirstPublicAt, "evidence_refs": evidence, "claims": claims, "object_ids": event.ObjectIDs, "state": event.State, "novelty": event.Novelty}
 }
-func traceRows(s *d.StrategyState, resource, id string, f ReadFilter) ([]readRow, error) {
+func traceRows(s *d.StrategyState, resource, id string, f ReadFilter, audits []d.AuditRecord) ([]readRow, error) {
 	rows := []readRow{}
 	add := func(key string, at *time.Time, value map[string]any, ids ...string) {
 		rows = append(rows, readRow{key, at, value, ids})
@@ -374,7 +429,8 @@ func traceRows(s *d.StrategyState, resource, id string, f ReadFilter) ([]readRow
 				continue
 			}
 			found := false
-			for index, audit := range s.Audit {
+			for _, record := range audits {
+				index, audit := record.Sequence-1, record.Payload
 				if d.Text(audit["candidate_id"]) != key {
 					continue
 				}
@@ -414,7 +470,8 @@ func traceRows(s *d.StrategyState, resource, id string, f ReadFilter) ([]readRow
 			}
 		}
 	case "audit":
-		for index, audit := range s.Audit {
+		for _, record := range audits {
+			index, audit := record.Sequence-1, record.Payload
 			view := scalarFields(audit, "action", "code", "request_id", "decision_id", "candidate_id", "version", "state")
 			view["source_record_id"] = "audit:" + strconv.Itoa(index)
 			view["recorded_at"] = storedTime(audit["at"])

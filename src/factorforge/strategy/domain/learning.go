@@ -235,7 +235,7 @@ func Activate(s *StrategyState, obj *ObservedObject, at time.Time) error {
 			c["history"] = append(Strings(c["history"]), "ACTIVE", "MONITORING")
 			c["activated_version"] = next.Version
 			c["activated_at"] = ISO(at)
-			s.Audit = append(s.Audit, map[string]any{"action": "PARAMETER_ACTIVATED", "at": ISO(at), "candidate_id": c["candidate_id"], "version": next.Version})
+			s.AppendAudit(map[string]any{"action": "PARAMETER_ACTIVATED", "at": ISO(at), "candidate_id": c["candidate_id"], "version": next.Version})
 		}
 		return nil
 	})
@@ -249,7 +249,7 @@ func Rollback(s *StrategyState, id, reason string, at time.Time) error {
 	obj.ParameterVersion = Text(c["parent_version"])
 	c["state"] = "FROZEN"
 	c["history"] = append(Strings(c["history"]), "ROLLED_BACK", "FROZEN")
-	s.Audit = append(s.Audit, map[string]any{"action": "PARAMETER_ROLLED_BACK", "at": ISO(at), "reason": reason, "candidate_id": id})
+	s.AppendAudit(map[string]any{"action": "PARAMETER_ROLLED_BACK", "at": ISO(at), "reason": reason, "candidate_id": id})
 	return nil
 }
 func Monitor(s *StrategyState, obj *ObservedObject, at time.Time) error {

@@ -43,6 +43,7 @@ type Policy struct {
 	VerificationManifests       []string           `json:"verification_manifests"`
 	Levels                      []Level            `json:"levels"`
 	CycleSeconds                int                `json:"cycle_seconds"`
+	TrendWindowSeconds          *int               `json:"trend_window_seconds,omitempty"`
 	MaxPriceAgeSeconds          int                `json:"max_price_age_seconds"`
 	TargetTTLSeconds            int                `json:"target_ttl_seconds"`
 	EventCap                    Decimal            `json:"event_cap"`
@@ -311,6 +312,7 @@ type StrategyState struct {
 	FactorManifests       Ordered[map[string]any]     `json:"factor_manifests"`
 	SkippedCycles         []map[string]any            `json:"skipped_cycles"`
 	Audit                 []map[string]any            `json:"audit"`
+	AuditCount            int                         `json:"-"`
 	Dedup                 Ordered[map[string]any]     `json:"dedup"`
 }
 type CreateObject struct {

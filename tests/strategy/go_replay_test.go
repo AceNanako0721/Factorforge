@@ -94,9 +94,17 @@ func compactFrozenDecisions(v any) any {
 		out := map[string]any{}
 		for k, item := range x {
 			out[k] = compactFrozenDecisions(item)
+			if k == "audit" {
+				for _, row := range sd.Rows(out[k]) {
+					delete(row, "sequence")
+				}
+			}
 		}
 		if snapshot, ok := x["input_snapshot"].(map[string]any); ok && x["input_hash"] != nil {
 			out["input_snapshot"] = sd.CompactDecisionInput(snapshot)
+		}
+		if decision, ok := out["decision"].(map[string]any); ok && x["target_version"] != nil {
+			decision["input_snapshot"] = map[string]any{}
 		}
 		return out
 	case []any:
@@ -311,13 +319,23 @@ func TestFrozenP2StateTransitions(t *testing.T) {
 					t.Fatal(e)
 				}
 			}
-			if sd.Has([]string{"create", "set_state", "event", "score", "tick", "dispatch"}, kind) {
+			stored := sd.Has([]string{"create", "set_state", "event", "score", "tick", "dispatch"}, kind)
+			if stored {
 				state, err = store.Read(ctx, before.InstanceID)
 				if err != nil {
 					t.Fatal(err)
 				}
+				// Reconstruct the old comparison shape from immutable audit pages;
+				// runtime reads deliberately do not load this history.
+				rows, _, e := store.ReadAudit(ctx, state.InstanceID, 0, state.AuditCount, state.AuditCount+1, nil)
+				if e != nil {
+					t.Fatal(e)
+				}
+				for _, row := range rows {
+					state.Audit = append(state.Audit, row.Payload)
+				}
 			}
-			if e := firstDifference(compactFrozenDecisions(states[sd.Text(item["after"])]), sd.JSONValue(state), "state"); e != nil {
+			if e := firstDifference(compactFrozenDecisions(states[sd.Text(item["after"])]), compactFrozenDecisions(sd.JSONValue(state)), "state"); e != nil {
 				t.Fatal(e)
 			}
 			if trading.cursor != len(trading.calls) {
