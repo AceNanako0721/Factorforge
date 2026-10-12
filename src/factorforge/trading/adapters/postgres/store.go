@@ -10,10 +10,12 @@ import (
 	"errors"
 	"fmt"
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/trading/domain"
+	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/ports"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"strings"
+	"sync"
 )
 
 //go:embed migrations/*.sql
@@ -23,6 +25,8 @@ var Relations = []string{"account_policy_version", "instrument_spec", "market_sn
 type Store struct {
 	pool                *pgxpool.Pool
 	environment, schema string
+	candleMu            sync.Mutex
+	candleBackfilled    map[string]bool
 }
 
 func failure(code string, status int) error { return &d.Error{Code: code, Status: status} }
@@ -41,7 +45,7 @@ func Open(ctx context.Context, dsn, environment string) (*Store, error) {
 	if err != nil {
 		return nil, failure("STORE_UNAVAILABLE", 503)
 	}
-	return &Store{pool, environment, schema}, nil
+	return &Store{pool: pool, environment: environment, schema: schema, candleBackfilled: map[string]bool{}}, nil
 }
 func (s *Store) Close()              { s.pool.Close() }
 func (s *Store) Environment() string { return s.environment }
@@ -77,7 +81,7 @@ func Initialize(ctx context.Context, dsn, environment string) error {
 		return sqlError(err)
 	}
 	defer tx.Rollback(ctx)
-	for _, name := range []string{"001_trading.sql", "002_snapshot_order.sql"} {
+	for _, name := range []string{"001_trading.sql", "002_snapshot_order.sql", "003_market_candle.sql"} {
 		script, err := migrations.ReadFile("migrations/" + name)
 		if err != nil {
 			return failure("MIGRATION_UNAVAILABLE", 503)
@@ -103,7 +107,7 @@ func Initialize(ctx context.Context, dsn, environment string) error {
 			return sqlError(err)
 		}
 	}
-	for _, query := range []string{"REVOKE ALL ON ALL TABLES IN SCHEMA " + schema + " FROM PUBLIC", "GRANT USAGE ON SCHEMA " + schema + " TO " + role, "GRANT SELECT,INSERT,UPDATE ON ALL TABLES IN SCHEMA " + schema + " TO " + role, "REVOKE UPDATE,DELETE ON " + schema + ".audit_event FROM " + role} {
+	for _, query := range []string{"REVOKE ALL ON ALL TABLES IN SCHEMA " + schema + " FROM PUBLIC", "GRANT USAGE ON SCHEMA " + schema + " TO " + role, "GRANT SELECT,INSERT,UPDATE ON ALL TABLES IN SCHEMA " + schema + " TO " + role, "REVOKE UPDATE,DELETE ON " + schema + ".audit_event," + schema + ".market_candle FROM " + role, "REVOKE DELETE ON " + schema + ".command_dedup," + schema + ".market_trade FROM " + role} {
 		if _, err = tx.Exec(ctx, query); err != nil {
 			return sqlError(err)
 		}
@@ -171,10 +175,37 @@ func (s *Store) load(ctx context.Context, connection reader, key d.RunKey, lock 
 	if json.Unmarshal(data, &run) != nil || d.Validate(run) != nil {
 		return nil, false, failure("STORE_SNAPSHOT_INVALID", 503)
 	}
+	var count, last int64
+	if err := connection.QueryRow(ctx, "SELECT count(*),COALESCE(max(sequence),0) FROM "+s.table("audit_event")+" WHERE account_id=$1", key.AccountID).Scan(&count, &last); err != nil {
+		return nil, false, sqlError(err)
+	}
+	if count != last {
+		return nil, false, failure("AUDIT_MUTATION_FORBIDDEN", 503)
+	}
+	// Only pre-upgrade payloads carry an audit prefix. Verify it before dropping
+	// it; normal reads never load historical audit payloads.
+	if run.Audit != nil {
+		if int64(len(run.Audit)) != count {
+			return nil, false, failure("AUDIT_MUTATION_FORBIDDEN", 503)
+		}
+		for i, event := range run.Audit {
+			var data []byte
+			if err := connection.QueryRow(ctx, "SELECT payload FROM "+s.table("audit_event")+" WHERE account_id=$1 AND sequence=$2", key.AccountID, i+1).Scan(&data); err != nil {
+				return nil, false, sqlError(err)
+			}
+			var stored d.Object
+			if json.Unmarshal(data, &stored) != nil || !equalJSON(stored, event) {
+				return nil, false, failure("AUDIT_MUTATION_FORBIDDEN", 503)
+			}
+		}
+	}
+	run.Audit = []d.Object{}
+	run.AuditCount = count
 	return &run, ordered, nil
 }
 func (s *Store) Read(ctx context.Context, key d.RunKey) (*d.Aggregate, error) {
-	run, _, err := s.load(ctx, s.pool, key, false)
+	var run *d.Aggregate
+	err := s.View(ctx, key, func(value *d.Aggregate, _ ports.History) error { run = value; return nil })
 	return run, err
 }
 func (s *Store) BoundRun(ctx context.Context, account string) (*d.RunKey, error) {
@@ -217,10 +248,14 @@ func (s *Store) Create(ctx context.Context, run *d.Aggregate) error {
 	if err != nil {
 		return sqlError(err)
 	}
-	if err = s.persist(ctx, tx, run, nil); err != nil {
+	if err = s.persist(ctx, tx, run, nil, 0, run.Candles); err != nil {
 		return err
 	}
-	return sqlError(tx.Commit(ctx))
+	if err = tx.Commit(ctx); err != nil {
+		return sqlError(err)
+	}
+	s.markCandlesBackfilled(run.RunKey.AccountID)
+	return nil
 }
 func (s *Store) Transaction(ctx context.Context, key d.RunKey, apply func(*d.Aggregate) error) error {
 	if err := s.key(key); err != nil {
@@ -237,6 +272,11 @@ func (s *Store) Transaction(ctx context.Context, key d.RunKey, apply func(*d.Agg
 	}
 	// Projections are rewritten only where this transaction changed them. A
 	// payload changed outside the ordered snapshot falls back to a full rewrite.
+	auditCount := run.AuditCount
+	var candles []d.Candle
+	if !ordered || s.needsCandleBackfill(key.AccountID) {
+		candles = append(candles, run.Candles...)
+	}
 	var prior *state
 	if ordered {
 		prior = capture(run)
@@ -251,15 +291,34 @@ func (s *Store) Transaction(ctx context.Context, key d.RunKey, apply func(*d.Agg
 	if err != nil {
 		return failure("STORE_SNAPSHOT_INVALID", 503)
 	}
-	if err = s.persist(ctx, tx, run, prior); err != nil {
+	if err = s.persist(ctx, tx, run, prior, auditCount, candles); err != nil {
 		return err
 	}
 	_, err = tx.Exec(ctx, "UPDATE "+s.table("trading_run")+" SET version=$1,payload=$2::jsonb,snapshot_text=$3 WHERE account_id=$4", run.Version, data, string(data), key.AccountID)
 	if err != nil {
 		return sqlError(err)
 	}
-	return sqlError(tx.Commit(ctx))
+	if err = tx.Commit(ctx); err != nil {
+		return sqlError(err)
+	}
+	s.markCandlesBackfilled(key.AccountID)
+	return nil
 }
+
+// Every Store instance backfills once. The archive is immutable, so normal
+// transactions need only accepted CandleWrites. External payload rewrites
+// always backfill again, regardless of this process-local optimization.
+func (s *Store) needsCandleBackfill(account string) bool {
+	s.candleMu.Lock()
+	defer s.candleMu.Unlock()
+	return !s.candleBackfilled[account]
+}
+func (s *Store) markCandlesBackfilled(account string) {
+	s.candleMu.Lock()
+	defer s.candleMu.Unlock()
+	s.candleBackfilled[account] = true
+}
+
 func raw(value any) json.RawMessage { data, _ := json.Marshal(value); return data }
 
 // state is the projection of one aggregate: relation rows and audit events.
@@ -326,29 +385,11 @@ func capture(run *d.Aggregate) *state {
 // persist writes the projections of run. With prior (the state loaded in the
 // same locked transaction) only changed rows are upserted and only new audit
 // events are verified against storage and appended; without it every row is
-// written and every stored audit event is compared.
-func (s *Store) persist(ctx context.Context, tx pgx.Tx, run *d.Aggregate, prior *state) error {
+// rewritten; audit verification still uses the loaded count and new events.
+func (s *Store) persist(ctx context.Context, tx pgx.Tx, run *d.Aggregate, prior *state, auditCount int64, candles []d.Candle) error {
 	current := capture(run)
-	if prior == nil {
-		if err := s.verifyAudit(ctx, tx, run); err != nil {
-			return err
-		}
-	} else {
-		if len(current.audit) < len(prior.audit) {
-			return failure("AUDIT_MUTATION_FORBIDDEN", 503)
-		}
-		for i := range prior.audit {
-			if !bytes.Equal(prior.audit[i], current.audit[i]) {
-				return failure("AUDIT_MUTATION_FORBIDDEN", 503)
-			}
-		}
-		var count, last int
-		if err := tx.QueryRow(ctx, "SELECT count(*),COALESCE(max(sequence),0) FROM "+s.table("audit_event")+" WHERE account_id=$1", run.RunKey.AccountID).Scan(&count, &last); err != nil {
-			return sqlError(err)
-		}
-		if count != len(prior.audit) || last != len(prior.audit) {
-			return failure("AUDIT_MUTATION_FORBIDDEN", 503)
-		}
+	if err := s.verifyAudit(ctx, tx, run, auditCount); err != nil {
+		return err
 	}
 	for table, values := range current.records {
 		for identity, value := range values {
@@ -357,45 +398,46 @@ func (s *Store) persist(ctx context.Context, tx pgx.Tx, run *d.Aggregate, prior 
 					continue
 				}
 			}
-			if _, err := tx.Exec(ctx, "INSERT INTO "+s.table(table)+"(account_id,resource_id,payload) VALUES($1,$2,$3::jsonb) ON CONFLICT(account_id,resource_id) DO UPDATE SET payload=excluded.payload", run.RunKey.AccountID, identity, []byte(value)); err != nil {
+			if _, err := tx.Exec(ctx, "INSERT INTO "+s.table(table)+"(account_id,resource_id,payload) VALUES($1,$2,$3::jsonb) "+conflict(table), run.RunKey.AccountID, identity, []byte(value)); err != nil {
 				return sqlError(err)
 			}
 		}
 	}
-	first := 0
-	if prior != nil {
-		first = len(prior.audit)
+	for i, event := range current.audit {
+		if _, err := tx.Exec(ctx, "INSERT INTO "+s.table("audit_event")+"(account_id,sequence,payload) VALUES($1,$2,$3::jsonb)", run.RunKey.AccountID, auditCount+int64(i)+1, []byte(event)); err != nil {
+			return sqlError(err)
+		}
 	}
-	for i := first; i < len(current.audit); i++ {
-		if _, err := tx.Exec(ctx, "INSERT INTO "+s.table("audit_event")+"(account_id,sequence,payload) VALUES($1,$2,$3::jsonb) ON CONFLICT DO NOTHING", run.RunKey.AccountID, i+1, []byte(current.audit[i])); err != nil {
+	candles = append(candles, run.CandleWrites...)
+	if len(candles) > 0 {
+		query := "INSERT INTO " + s.table("market_candle") + "(account_id,instrument_key,interval,open_at,revision,payload) SELECT $1,(value->'instrument_key'->>'venue')||':'||(value->'instrument_key'->>'product')||':'||(value->'instrument_key'->>'instrument_id'),value->>'interval',(value->>'open_at')::timestamptz,(value->>'revision')::bigint,value FROM jsonb_array_elements($2::jsonb) ON CONFLICT DO NOTHING"
+		if _, err := tx.Exec(ctx, query, run.RunKey.AccountID, []byte(raw(candles))); err != nil {
 			return sqlError(err)
 		}
 	}
 	return nil
 }
 
-func (s *Store) verifyAudit(ctx context.Context, tx pgx.Tx, run *d.Aggregate) error {
-	rows, err := tx.Query(ctx, "SELECT sequence,payload FROM "+s.table("audit_event")+" WHERE account_id=$1 ORDER BY sequence", run.RunKey.AccountID)
-	if err != nil {
+func conflict(table string) string {
+	if table == "command_dedup" || table == "market_trade" {
+		return "ON CONFLICT(account_id,resource_id) DO NOTHING"
+	}
+	return "ON CONFLICT(account_id,resource_id) DO UPDATE SET payload=excluded.payload"
+}
+
+func (s *Store) verifyAudit(ctx context.Context, tx pgx.Tx, run *d.Aggregate, auditCount int64) error {
+	var count, last int64
+	if err := tx.QueryRow(ctx, "SELECT count(*),COALESCE(max(sequence),0) FROM "+s.table("audit_event")+" WHERE account_id=$1", run.RunKey.AccountID).Scan(&count, &last); err != nil {
 		return sqlError(err)
 	}
-	for rows.Next() {
-		var sequence int
-		var data []byte
-		if err = rows.Scan(&sequence, &data); err != nil {
-			rows.Close()
-			return sqlError(err)
-		}
-		var prior d.Object
-		if json.Unmarshal(data, &prior) != nil || sequence > len(run.Audit) || !equalJSON(prior, run.Audit[sequence-1]) {
-			rows.Close()
+	if run.AuditCount != auditCount || count != auditCount || last != auditCount {
+		return failure("AUDIT_MUTATION_FORBIDDEN", 503)
+	}
+	for i, event := range run.Audit {
+		var sequence int64
+		if json.Unmarshal(event["sequence"], &sequence) != nil || sequence != auditCount+int64(i)+1 {
 			return failure("AUDIT_MUTATION_FORBIDDEN", 503)
 		}
-	}
-	err = rows.Err()
-	rows.Close()
-	if err != nil {
-		return sqlError(err)
 	}
 	return nil
 }

@@ -43,7 +43,7 @@ func (p *Probe) Check(ctx context.Context, run *d.Aggregate) ([]string, error) {
 	} else if offset.Abs().Cmp(policy.MaxClockSkewSeconds) > 0 {
 		issues = append(issues, "CLOCK_UNVERIFIED_OR_DRIFTED")
 	}
-	if int64(len(run.Audit)) >= policy.MaxAuditRecords {
+	if run.AuditCount+int64(len(run.Audit)) >= policy.MaxAuditRecords {
 		issues = append(issues, "AUDIT_RETENTION_CAPACITY")
 	}
 	pending := int64(0)

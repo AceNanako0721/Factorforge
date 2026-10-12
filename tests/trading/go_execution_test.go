@@ -28,6 +28,14 @@ func executionEqual(t *testing.T, expected json.RawMessage, actual any) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Pure domain traces still carry pending audit in memory. Verify those
+	// events separately because Aggregate.MarshalJSON omits their storage field.
+	if run, ok := actual.(*d.Aggregate); ok && run.AuditCount == 0 {
+		var fields map[string]json.RawMessage
+		if json.Unmarshal(expected, &fields) == nil && fields["audit"] != nil {
+			executionEqual(t, fields["audit"], run.Audit)
+		}
+	}
 	var left, right any
 	a := json.NewDecoder(bytes.NewReader(expected))
 	a.UseNumber()
@@ -39,6 +47,35 @@ func executionEqual(t *testing.T, expected json.RawMessage, actual any) {
 	if err = b.Decode(&right); err != nil {
 		t.Fatal(err)
 	}
+	// v2.5.8 stores audit externally and adds retention metadata. Frozen
+	// fixtures stay unchanged; history is checked separately by store/service tests.
+	var project func(any)
+	project = func(value any) {
+		switch v := value.(type) {
+		case map[string]any:
+			if _, ok := v["sim_config"]; ok {
+				delete(v, "audit")
+			}
+			if _, ok := v["hash"]; ok {
+				if _, ok := v["response"]; ok {
+					delete(v, "retain_until")
+					delete(v, "create_run")
+				}
+			}
+			if changes, ok := v["revised_candles"].([]any); ok && len(changes) == 0 {
+				delete(v, "revised_candles")
+			}
+			for _, child := range v {
+				project(child)
+			}
+		case []any:
+			for _, child := range v {
+				project(child)
+			}
+		}
+	}
+	project(left)
+	project(right)
 	var compare func(any, any, string)
 	compare = func(a, b any, path string) {
 		switch x := a.(type) {

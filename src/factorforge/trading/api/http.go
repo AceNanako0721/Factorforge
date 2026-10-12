@@ -9,8 +9,10 @@ import (
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/api/dto"
 	a "github.com/AceNanako0721/Factorforge/src/factorforge/trading/application"
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/trading/domain"
+	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/ports"
 	"mime"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -273,10 +275,21 @@ func (h *Handler) query(r *http.Request, p d.Principal) (any, error) {
 	if d.Validate(key) != nil {
 		return nil, fail("INVALID_REQUEST", 422)
 	}
-	run, err := h.Service.Read(r.Context(), p, key)
-	if err != nil {
+	if err := a.Require(p, key, "read"); err != nil {
 		return nil, err
 	}
+	var value any
+	err := h.Service.Store.View(r.Context(), key, func(run *d.Aggregate, history ports.History) error {
+		var err error
+		value, err = h.queryRun(r, run, history)
+		return err
+	})
+	return value, err
+}
+
+func (h *Handler) queryRun(r *http.Request, run *d.Aggregate, history ports.History) (any, error) {
+	parts := path(r)
+	q := r.URL.Query()
 	items := []any{}
 	page := func() any { return a.Response{"items": items, "cursor": nil, "snapshot_version": run.Version} }
 	switch parts[0] {
@@ -365,12 +378,24 @@ func (h *Handler) query(r *http.Request, p d.Principal) (any, error) {
 				if e1 != nil || e2 != nil || q.Get("interval") == "" {
 					return nil, fail("INVALID_REQUEST", 422)
 				}
-				for _, x := range run.Candles {
-					if x.InstrumentKey == key && x.Interval == q.Get("interval") && x.Final && !x.AvailableAt.After(run.Clock) && !x.OpenAt.Before(start) && !x.CloseAt.After(end) {
-						items = append(items, x)
-					}
+				offset, limit, err := pagination(r)
+				if err != nil {
+					return nil, err
 				}
-				return page(), nil
+				fetch := limit
+				if fetch > 0 {
+					fetch++
+				}
+				candles, err := history.Candles(ports.CandleQuery{Instrument: key, Interval: q.Get("interval"), Start: start, End: end, Offset: offset, Limit: fetch})
+				if err != nil {
+					return nil, err
+				}
+				var cursor any
+				if limit > 0 && len(candles) > limit {
+					candles = candles[:limit]
+					cursor = strconv.Itoa(offset + limit)
+				}
+				return a.Response{"items": candles, "cursor": cursor, "snapshot_version": run.Version}, nil
 			}
 		}
 	case "fills":
@@ -405,12 +430,45 @@ func (h *Handler) query(r *http.Request, p d.Principal) (any, error) {
 		}
 		return page(), nil
 	case "audit":
-		for _, x := range run.Audit {
-			items = append(items, x)
+		offset, limit, err := pagination(r)
+		if err != nil {
+			return nil, err
 		}
-		return page(), nil
+		fetch := limit
+		if fetch > 0 {
+			fetch++
+		}
+		events, err := history.Audit(int64(offset), fetch)
+		if err != nil {
+			return nil, err
+		}
+		var cursor any
+		if limit > 0 && len(events) > limit {
+			events = events[:limit]
+			cursor = strconv.Itoa(offset + limit)
+		}
+		return a.Response{"items": events, "cursor": cursor, "snapshot_version": run.Version}, nil
 	case "operational-health":
 		return a.Response{"issues": run.HealthIssues, "checked_at": run.HealthCheckedAt, "executor_epoch": run.ExecutorEpoch, "lease_epoch": run.LeaseEpoch, "lease_until": run.LeaseUntil}, nil
 	}
 	return nil, fail("NOT_FOUND", 404)
+}
+
+func pagination(r *http.Request) (int, int, error) {
+	q := r.URL.Query()
+	offset, limit := 0, 0
+	var err error
+	if q.Has("cursor") {
+		offset, err = strconv.Atoi(q.Get("cursor"))
+		if err != nil || offset < 0 {
+			return 0, 0, fail("INVALID_REQUEST", 422)
+		}
+	}
+	if q.Has("limit") {
+		limit, err = strconv.Atoi(q.Get("limit"))
+		if err != nil || limit <= 0 || limit >= int(^uint(0)>>1) || offset > int(^uint(0)>>1)-limit {
+			return 0, 0, fail("INVALID_REQUEST", 422)
+		}
+	}
+	return offset, limit, nil
 }

@@ -70,6 +70,7 @@ func (c *Collector) Collect(ctx context.Context, instrument, interval string, st
 	if json.Unmarshal(raw, &page) != nil {
 		return 0, 0, fail("COLLECTOR_API_REJECTED", 503)
 	}
+	registered := false
 	for _, prior := range page.Items {
 		if prior.Key == spec.Key && prior.Version == spec.Version {
 			left, right := *prior, *spec
@@ -79,6 +80,7 @@ func (c *Collector) Collect(ctx context.Context, instrument, interval string, st
 			if !d.EqualModel(left, right) {
 				return 0, 0, fail("COLLECTOR_RULES_CONFLICT", 409)
 			}
+			registered = true
 			spec = prior
 			if remember, ok := c.Market.(interface{ Remember(*d.InstrumentSpec) }); ok {
 				remember.Remember(spec)
@@ -87,12 +89,14 @@ func (c *Collector) Collect(ctx context.Context, instrument, interval string, st
 		}
 	}
 	at := c.now()
-	command, err := c.command(ctx, observationID("rules-", spec.Version, at), at)
-	if err != nil {
-		return 0, 0, err
-	}
-	if _, err = c.Client.Call(ctx, "POST", "/api/v2/trading/instruments", nil, d.RegisterSpec{Command: command, Spec: *spec}); err != nil {
-		return 0, 0, err
+	if !registered {
+		command, err := c.command(ctx, observationID("rules-", spec.Version, at), at)
+		if err != nil {
+			return 0, 0, err
+		}
+		if _, err = c.Client.Call(ctx, "POST", "/api/v2/trading/instruments", nil, d.RegisterSpec{Command: command, Spec: *spec}); err != nil {
+			return 0, 0, err
+		}
 	}
 	points, err := c.Market.LatestPoints(ctx, spec.Key)
 	if err != nil {
