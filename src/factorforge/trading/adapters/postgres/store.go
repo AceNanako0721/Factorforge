@@ -148,32 +148,34 @@ func loginAllowed(ctx context.Context, connection reader) error {
 	return nil
 }
 
-func (s *Store) load(ctx context.Context, connection reader, key d.RunKey, lock bool) (*d.Aggregate, error) {
+func (s *Store) load(ctx context.Context, connection reader, key d.RunKey, lock bool) (*d.Aggregate, bool, error) {
 	if err := s.key(key); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	if err := loginAllowed(ctx, connection); err != nil {
-		return nil, err
+		return nil, false, err
 	}
-	query := "SELECT CASE WHEN snapshot_text IS NOT NULL AND snapshot_text::jsonb=payload THEN snapshot_text ELSE payload::text END FROM " + s.table("trading_run") + " WHERE account_id=$1 AND run_id=$2"
+	query := "SELECT snapshot_text IS NOT NULL AND snapshot_text::jsonb=payload, CASE WHEN snapshot_text IS NOT NULL AND snapshot_text::jsonb=payload THEN snapshot_text ELSE payload::text END FROM " + s.table("trading_run") + " WHERE account_id=$1 AND run_id=$2"
 	if lock {
 		query += " FOR UPDATE"
 	}
+	var ordered bool
 	var data []byte
-	if err := connection.QueryRow(ctx, query, key.AccountID, key.RunID).Scan(&data); err != nil {
+	if err := connection.QueryRow(ctx, query, key.AccountID, key.RunID).Scan(&ordered, &data); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, failure("RUN_NOT_FOUND", 404)
+			return nil, false, failure("RUN_NOT_FOUND", 404)
 		}
-		return nil, sqlError(err)
+		return nil, false, sqlError(err)
 	}
 	var run d.Aggregate
 	if json.Unmarshal(data, &run) != nil || d.Validate(run) != nil {
-		return nil, failure("STORE_SNAPSHOT_INVALID", 503)
+		return nil, false, failure("STORE_SNAPSHOT_INVALID", 503)
 	}
-	return &run, nil
+	return &run, ordered, nil
 }
 func (s *Store) Read(ctx context.Context, key d.RunKey) (*d.Aggregate, error) {
-	return s.load(ctx, s.pool, key, false)
+	run, _, err := s.load(ctx, s.pool, key, false)
+	return run, err
 }
 func (s *Store) BoundRun(ctx context.Context, account string) (*d.RunKey, error) {
 	if err := loginAllowed(ctx, s.pool); err != nil {
@@ -215,7 +217,7 @@ func (s *Store) Create(ctx context.Context, run *d.Aggregate) error {
 	if err != nil {
 		return sqlError(err)
 	}
-	if err = s.persist(ctx, tx, run); err != nil {
+	if err = s.persist(ctx, tx, run, nil); err != nil {
 		return err
 	}
 	return sqlError(tx.Commit(ctx))
@@ -229,9 +231,15 @@ func (s *Store) Transaction(ctx context.Context, key d.RunKey, apply func(*d.Agg
 		return sqlError(err)
 	}
 	defer tx.Rollback(ctx)
-	run, err := s.load(ctx, tx, key, true)
+	run, ordered, err := s.load(ctx, tx, key, true)
 	if err != nil {
 		return err
+	}
+	// Projections are rewritten only where this transaction changed them. A
+	// payload changed outside the ordered snapshot falls back to a full rewrite.
+	var prior *state
+	if ordered {
+		prior = capture(run)
 	}
 	if err = apply(run); err != nil {
 		return err
@@ -243,7 +251,7 @@ func (s *Store) Transaction(ctx context.Context, key d.RunKey, apply func(*d.Agg
 	if err != nil {
 		return failure("STORE_SNAPSHOT_INVALID", 503)
 	}
-	if err = s.persist(ctx, tx, run); err != nil {
+	if err = s.persist(ctx, tx, run, prior); err != nil {
 		return err
 	}
 	_, err = tx.Exec(ctx, "UPDATE "+s.table("trading_run")+" SET version=$1,payload=$2::jsonb,snapshot_text=$3 WHERE account_id=$4", run.Version, data, string(data), key.AccountID)
@@ -253,29 +261,14 @@ func (s *Store) Transaction(ctx context.Context, key d.RunKey, apply func(*d.Agg
 	return sqlError(tx.Commit(ctx))
 }
 func raw(value any) json.RawMessage { data, _ := json.Marshal(value); return data }
-func (s *Store) persist(ctx context.Context, tx pgx.Tx, run *d.Aggregate) error {
-	rows, err := tx.Query(ctx, "SELECT sequence,payload FROM "+s.table("audit_event")+" WHERE account_id=$1 ORDER BY sequence", run.RunKey.AccountID)
-	if err != nil {
-		return sqlError(err)
-	}
-	for rows.Next() {
-		var sequence int
-		var data []byte
-		if err = rows.Scan(&sequence, &data); err != nil {
-			rows.Close()
-			return sqlError(err)
-		}
-		var prior d.Object
-		if json.Unmarshal(data, &prior) != nil || sequence > len(run.Audit) || !equalJSON(prior, run.Audit[sequence-1]) {
-			rows.Close()
-			return failure("AUDIT_MUTATION_FORBIDDEN", 503)
-		}
-	}
-	err = rows.Err()
-	rows.Close()
-	if err != nil {
-		return sqlError(err)
-	}
+
+// state is the projection of one aggregate: relation rows and audit events.
+type state struct {
+	records map[string]map[string]json.RawMessage
+	audit   []json.RawMessage
+}
+
+func capture(run *d.Aggregate) *state {
 	data := map[string]json.RawMessage{}
 	encoded, _ := json.Marshal(run)
 	json.Unmarshal(encoded, &data)
@@ -323,17 +316,86 @@ func (s *Store) persist(ctx context.Context, tx pgx.Tx, run *d.Aggregate) error 
 	}
 	records["executor_lease"] = map[string]json.RawMessage{"account": raw(lease)}
 	records["runtime_health"] = map[string]json.RawMessage{"current": raw(map[string]any{"issues": run.HealthIssues, "checked_at": run.HealthCheckedAt})}
-	for table, values := range records {
+	audit := make([]json.RawMessage, len(run.Audit))
+	for i, event := range run.Audit {
+		audit[i] = raw(event)
+	}
+	return &state{records, audit}
+}
+
+// persist writes the projections of run. With prior (the state loaded in the
+// same locked transaction) only changed rows are upserted and only new audit
+// events are verified against storage and appended; without it every row is
+// written and every stored audit event is compared.
+func (s *Store) persist(ctx context.Context, tx pgx.Tx, run *d.Aggregate, prior *state) error {
+	current := capture(run)
+	if prior == nil {
+		if err := s.verifyAudit(ctx, tx, run); err != nil {
+			return err
+		}
+	} else {
+		if len(current.audit) < len(prior.audit) {
+			return failure("AUDIT_MUTATION_FORBIDDEN", 503)
+		}
+		for i := range prior.audit {
+			if !bytes.Equal(prior.audit[i], current.audit[i]) {
+				return failure("AUDIT_MUTATION_FORBIDDEN", 503)
+			}
+		}
+		var count, last int
+		if err := tx.QueryRow(ctx, "SELECT count(*),COALESCE(max(sequence),0) FROM "+s.table("audit_event")+" WHERE account_id=$1", run.RunKey.AccountID).Scan(&count, &last); err != nil {
+			return sqlError(err)
+		}
+		if count != len(prior.audit) || last != len(prior.audit) {
+			return failure("AUDIT_MUTATION_FORBIDDEN", 503)
+		}
+	}
+	for table, values := range current.records {
 		for identity, value := range values {
-			if _, err = tx.Exec(ctx, "INSERT INTO "+s.table(table)+"(account_id,resource_id,payload) VALUES($1,$2,$3::jsonb) ON CONFLICT(account_id,resource_id) DO UPDATE SET payload=excluded.payload", run.RunKey.AccountID, identity, []byte(value)); err != nil {
+			if prior != nil {
+				if old, ok := prior.records[table][identity]; ok && bytes.Equal(old, value) {
+					continue
+				}
+			}
+			if _, err := tx.Exec(ctx, "INSERT INTO "+s.table(table)+"(account_id,resource_id,payload) VALUES($1,$2,$3::jsonb) ON CONFLICT(account_id,resource_id) DO UPDATE SET payload=excluded.payload", run.RunKey.AccountID, identity, []byte(value)); err != nil {
 				return sqlError(err)
 			}
 		}
 	}
-	for i, event := range run.Audit {
-		if _, err = tx.Exec(ctx, "INSERT INTO "+s.table("audit_event")+"(account_id,sequence,payload) VALUES($1,$2,$3::jsonb) ON CONFLICT DO NOTHING", run.RunKey.AccountID, i+1, []byte(raw(event))); err != nil {
+	first := 0
+	if prior != nil {
+		first = len(prior.audit)
+	}
+	for i := first; i < len(current.audit); i++ {
+		if _, err := tx.Exec(ctx, "INSERT INTO "+s.table("audit_event")+"(account_id,sequence,payload) VALUES($1,$2,$3::jsonb) ON CONFLICT DO NOTHING", run.RunKey.AccountID, i+1, []byte(current.audit[i])); err != nil {
 			return sqlError(err)
 		}
+	}
+	return nil
+}
+
+func (s *Store) verifyAudit(ctx context.Context, tx pgx.Tx, run *d.Aggregate) error {
+	rows, err := tx.Query(ctx, "SELECT sequence,payload FROM "+s.table("audit_event")+" WHERE account_id=$1 ORDER BY sequence", run.RunKey.AccountID)
+	if err != nil {
+		return sqlError(err)
+	}
+	for rows.Next() {
+		var sequence int
+		var data []byte
+		if err = rows.Scan(&sequence, &data); err != nil {
+			rows.Close()
+			return sqlError(err)
+		}
+		var prior d.Object
+		if json.Unmarshal(data, &prior) != nil || sequence > len(run.Audit) || !equalJSON(prior, run.Audit[sequence-1]) {
+			rows.Close()
+			return failure("AUDIT_MUTATION_FORBIDDEN", 503)
+		}
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return sqlError(err)
 	}
 	return nil
 }

@@ -8,6 +8,44 @@ import (
 	"time"
 )
 
+// v2.5.5 design chapter 13: the run snapshot keeps public trades of the last
+// hour, at most MarketTradeLimit per instrument. Older trades stay only in the
+// append-only market_trade projection.
+const (
+	MarketTradeRetention = time.Hour
+	MarketTradeLimit     = 1000
+)
+
+func retainTrades(run *d.Aggregate) {
+	cutoff := run.Clock.Add(-MarketTradeRetention)
+	groups := map[string][]*d.MarketTrade{}
+	keys := map[*d.MarketTrade]string{}
+	for _, key := range run.MarketTrades.Keys() {
+		trade := run.MarketTrades.Value(key)
+		if !trade.ObservedAt.After(cutoff) {
+			run.MarketTrades.Delete(key)
+			continue
+		}
+		code := trade.InstrumentKey.Code()
+		groups[code] = append(groups[code], trade)
+		keys[trade] = key
+	}
+	for _, trades := range groups {
+		if len(trades) <= MarketTradeLimit {
+			continue
+		}
+		sort.Slice(trades, func(i, j int) bool {
+			if !trades[i].ObservedAt.Equal(trades[j].ObservedAt) {
+				return trades[i].ObservedAt.After(trades[j].ObservedAt)
+			}
+			return trades[i].ExternalID > trades[j].ExternalID
+		})
+		for _, trade := range trades[MarketTradeLimit:] {
+			run.MarketTrades.Delete(keys[trade])
+		}
+	}
+}
+
 func checkQuotes(run *d.Aggregate) {
 	for _, code := range run.Specs.Keys() {
 		bid, ask := run.Points.Value(code+":BID"), run.Points.Value(code+":ASK")
@@ -163,6 +201,9 @@ func (s *Service) IngestSnapshot(ctx context.Context, p d.Principal, body d.Mark
 			if spec == nil || trade.SpecVersion != spec.Version || trade.AvailableAt.After(run.Clock) {
 				return problem("TRADE_RULE_OR_TIME_MISMATCH", 423)
 			}
+			if !trade.ObservedAt.After(run.Clock.Add(-MarketTradeRetention)) {
+				continue
+			}
 			identity := code + ":" + trade.ExternalID
 			old := run.MarketTrades.Value(identity)
 			if old != nil && (old.InstrumentKey != trade.InstrumentKey || old.SourceID != trade.SourceID || !old.ObservedAt.Equal(trade.ObservedAt) || old.Price.Cmp(trade.Price) != 0 || old.Quantity.Cmp(trade.Quantity) != 0) {
@@ -173,6 +214,7 @@ func (s *Service) IngestSnapshot(ctx context.Context, p d.Principal, body d.Mark
 				run.MarketTrades.Set(identity, &copy)
 			}
 		}
+		retainTrades(run)
 		groups := map[string]map[string]bool{}
 		for _, candle := range body.Candles {
 			code := candle.InstrumentKey.Code()
