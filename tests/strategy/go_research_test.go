@@ -95,8 +95,8 @@ func TestNativeP2FrozenHTTPContracts(t *testing.T) {
 	}
 }
 
-// The v2.5.8 optional policy field is the only allowed contract addition; the
-// checked-in frozen contract and all remaining bytes stay unchanged.
+// frozenPolicyContract checks the v2.5.8 optional policy field; the exported
+// contract under contracts/v2 already contains it, so raw is returned as-is.
 func frozenPolicyContract(t *testing.T, raw []byte) []byte {
 	t.Helper()
 	var doc map[string]any
@@ -109,12 +109,7 @@ func frozenPolicyContract(t *testing.T, raw []byte) []byte {
 	if window["type"] != "integer" || sd.Number(window["minimum"]) != 1 || sd.Number(window["maximum"]) != 604800 || sd.Has(sd.Strings(policy["required"]), "trend_window_seconds") {
 		t.Fatal("optional trend schema missing or invalid", window)
 	}
-	delete(properties, "trend_window_seconds")
-	projected, err := json.MarshalIndent(doc, "", "  ")
-	if err != nil {
-		t.Fatal(err)
-	}
-	return append(projected, '\n')
+	return raw
 }
 
 func TestP2TrendWindowOpenAPIPreservesFrozenSurface(t *testing.T) {
