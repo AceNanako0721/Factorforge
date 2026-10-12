@@ -27,6 +27,9 @@ CREATE TABLE IF NOT EXISTS __SCHEMA__.audit_event (
 CREATE TABLE IF NOT EXISTS __SCHEMA__.sentiment_entry (
   instance_id text NOT NULL, sequence bigint NOT NULL, payload jsonb NOT NULL,
   PRIMARY KEY(instance_id,sequence));
+CREATE TABLE IF NOT EXISTS __SCHEMA__.decision_archive (
+  instance_id text NOT NULL, decision_id text NOT NULL, archived_at timestamptz NOT NULL, payload jsonb NOT NULL,
+  PRIMARY KEY(instance_id,decision_id));
 REVOKE ALL ON ALL TABLES IN SCHEMA __SCHEMA__ FROM PUBLIC;
 CREATE OR REPLACE FUNCTION __SCHEMA__.reject_mutation() RETURNS trigger
 LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'immutable strategy record'; END; $$;
@@ -35,4 +38,7 @@ CREATE TRIGGER immutable_audit BEFORE UPDATE OR DELETE ON __SCHEMA__.audit_event
 FOR EACH ROW EXECUTE FUNCTION __SCHEMA__.reject_mutation();
 DROP TRIGGER IF EXISTS immutable_ledger ON __SCHEMA__.sentiment_entry;
 CREATE TRIGGER immutable_ledger BEFORE UPDATE OR DELETE ON __SCHEMA__.sentiment_entry
+FOR EACH ROW EXECUTE FUNCTION __SCHEMA__.reject_mutation();
+DROP TRIGGER IF EXISTS immutable_decision_archive ON __SCHEMA__.decision_archive;
+CREATE TRIGGER immutable_decision_archive BEFORE UPDATE OR DELETE ON __SCHEMA__.decision_archive
 FOR EACH ROW EXECUTE FUNCTION __SCHEMA__.reject_mutation();

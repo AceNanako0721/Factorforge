@@ -85,6 +85,29 @@ func replayIdentity(t *testing.T, value any) sd.Identity {
 	decodeRecord(t, value, &p)
 	return p
 }
+
+// compactFrozenDecisions projects frozen pre-v2.5.7 decisions through the
+// documented bar compaction. input_hash is untouched and still compared.
+func compactFrozenDecisions(v any) any {
+	switch x := v.(type) {
+	case map[string]any:
+		out := map[string]any{}
+		for k, item := range x {
+			out[k] = compactFrozenDecisions(item)
+		}
+		if snapshot, ok := x["input_snapshot"].(map[string]any); ok && x["input_hash"] != nil {
+			out["input_snapshot"] = sd.CompactDecisionInput(snapshot)
+		}
+		return out
+	case []any:
+		out := make([]any, len(x))
+		for i, item := range x {
+			out[i] = compactFrozenDecisions(item)
+		}
+		return out
+	}
+	return v
+}
 func firstDifference(expected, actual any, path string) error {
 	if expected == nil && actual == nil {
 		return nil
@@ -160,7 +183,7 @@ func (r *replayTrading) call(method string, args any) (map[string]any, error) {
 	if sd.Text(item["method"]) != method {
 		r.t.Fatalf("expected P1 %s, got %s", item["method"], method)
 	}
-	if err := firstDifference(item["arguments"], sd.JSONValue(args), "P1.arguments"); err != nil {
+	if err := firstDifference(compactFrozenDecisions(item["arguments"]), sd.JSONValue(args), "P1.arguments"); err != nil {
 		r.t.Fatal(err)
 	}
 	if e := sd.Object(item["error"]); len(e) > 0 {
@@ -194,7 +217,7 @@ func TestFrozenP2StateTransitions(t *testing.T) {
 		kind := sd.Text(item["kind"])
 		t.Run(fmt.Sprintf("%03d-%s", index, kind), func(t *testing.T) {
 			var before sd.StrategyState
-			decodeRecord(t, states[sd.Text(item["before"])], &before)
+			decodeRecord(t, compactFrozenDecisions(states[sd.Text(item["before"])]), &before)
 			orders := sd.Object(sd.Object(states["$orders"])[sd.Text(item["before"])])
 			fields := reflect.ValueOf(&before).Elem()
 			for i := 0; i < fields.NumField(); i++ {
@@ -284,7 +307,7 @@ func TestFrozenP2StateTransitions(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if e := firstDifference(item["result"], sd.JSONValue(result), "result"); e != nil {
+				if e := firstDifference(compactFrozenDecisions(item["result"]), sd.JSONValue(result), "result"); e != nil {
 					t.Fatal(e)
 				}
 			}
@@ -294,7 +317,7 @@ func TestFrozenP2StateTransitions(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			if e := firstDifference(states[sd.Text(item["after"])], sd.JSONValue(state), "state"); e != nil {
+			if e := firstDifference(compactFrozenDecisions(states[sd.Text(item["after"])]), sd.JSONValue(state), "state"); e != nil {
 				t.Fatal(e)
 			}
 			if trading.cursor != len(trading.calls) {
