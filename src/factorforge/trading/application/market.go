@@ -19,31 +19,35 @@ const (
 func retainTrades(run *d.Aggregate) {
 	cutoff := run.Clock.Add(-MarketTradeRetention)
 	groups := map[string][]*d.MarketTrade{}
-	keys := map[*d.MarketTrade]string{}
-	for _, key := range run.MarketTrades.Keys() {
-		trade := run.MarketTrades.Value(key)
-		if !trade.ObservedAt.After(cutoff) {
-			run.MarketTrades.Delete(key)
-			continue
+	for _, trade := range run.MarketTrades.Values() {
+		if trade.ObservedAt.After(cutoff) {
+			code := trade.InstrumentKey.Code()
+			groups[code] = append(groups[code], trade)
 		}
-		code := trade.InstrumentKey.Code()
-		groups[code] = append(groups[code], trade)
-		keys[trade] = key
 	}
+	keep := map[*d.MarketTrade]bool{}
 	for _, trades := range groups {
-		if len(trades) <= MarketTradeLimit {
-			continue
-		}
 		sort.Slice(trades, func(i, j int) bool {
 			if !trades[i].ObservedAt.Equal(trades[j].ObservedAt) {
 				return trades[i].ObservedAt.After(trades[j].ObservedAt)
 			}
 			return trades[i].ExternalID > trades[j].ExternalID
 		})
-		for _, trade := range trades[MarketTradeLimit:] {
-			run.MarketTrades.Delete(keys[trade])
+		for _, trade := range trades[:min(len(trades), MarketTradeLimit)] {
+			keep[trade] = true
 		}
 	}
+	if len(keep) == run.MarketTrades.Len() {
+		return
+	}
+	// Rebuild in one pass, preserving receipt order; per-key Delete is linear.
+	var retained d.Ordered[*d.MarketTrade]
+	for _, key := range run.MarketTrades.Keys() {
+		if trade := run.MarketTrades.Value(key); keep[trade] {
+			retained.Set(key, trade)
+		}
+	}
+	run.MarketTrades = retained
 }
 
 func checkQuotes(run *d.Aggregate) {
