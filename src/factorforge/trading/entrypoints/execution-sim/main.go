@@ -52,6 +52,14 @@ func run() error {
 		}
 	}
 	worker := &workers.Executor{Store: store, Broker: &sim.Adapter{}, ExecutorID: *holder, LeaseEpoch: epoch, Now: time.Now, Health: service.Health}
+	// Poll every 250 ms while commands are moving; idle ticks back off to 2 s
+	// (at most a quarter of the lease) so an empty outbox does not rewrite the
+	// run snapshot four times a second.
+	idle := 2 * time.Second
+	if epoch > 0 && time.Duration(snapshot.Policy.Operational.LeaseSeconds)*time.Second/4 < idle {
+		idle = time.Duration(snapshot.Policy.Operational.LeaseSeconds) * time.Second / 4
+	}
+	pause := 250 * time.Millisecond
 	for {
 		if epoch > 0 {
 			if err = store.Transaction(ctx, key, func(run *d.Aggregate) error {
@@ -61,10 +69,16 @@ func run() error {
 				return err
 			}
 		}
-		if _, err = worker.Tick(ctx, key); err != nil {
+		worked, err := worker.Tick(ctx, key)
+		if err != nil {
 			return err
 		}
-		if *once || !r.Pause(ctx, 250*time.Millisecond) {
+		if worked {
+			pause = 250 * time.Millisecond
+		} else if pause < idle {
+			pause = min(2*pause, idle)
+		}
+		if *once || !r.Pause(ctx, pause) {
 			return nil
 		}
 	}
