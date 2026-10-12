@@ -119,7 +119,7 @@ func TestCapturedRegisterMetadataAndTransportReplay(t *testing.T) {
 		t.Fatal(e)
 	}
 	now := time.Date(2026, 10, 9, 8, 0, 0, 0, time.UTC)
-	source := monitoring.RSSSource{Fetcher: fetcher, FeedURL: endpoint + "/whole", SourceID: "fixture-register", LicenceRef: "fixture-only", MaxItems: 3, Clock: func() time.Time { return now }}
+	source := &monitoring.RSSSource{Fetcher: fetcher, FeedURL: endpoint + "/whole", SourceID: "fixture-register", LicenceRef: "fixture-only", MaxItems: 3, Lookback: 24 * time.Hour, Clock: func() time.Time { return now }}
 	rows, e := source.Poll(context.Background(), now)
 	if e == nil || e.Error() != "SOURCE_FEED_BUDGET_OR_FORMAT_INVALID" || len(rows) != 0 || originalGets.Load() != 0 {
 		t.Fatal("REGISTER_WHOLE_FEED_BUDGET_NOT_ENFORCED", e)

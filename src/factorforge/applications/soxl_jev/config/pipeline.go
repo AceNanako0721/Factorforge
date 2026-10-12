@@ -229,6 +229,7 @@ type RSSRegistration struct {
 	LicenceRef              string   `json:"licence_ref"`
 	Hosts                   []string `json:"hosts"`
 	MaxItems                int      `json:"max_items"`
+	LookbackSeconds         int64    `json:"lookback_seconds"`
 	PublicationTimeVerified bool     `json:"publication_time_verified"`
 }
 

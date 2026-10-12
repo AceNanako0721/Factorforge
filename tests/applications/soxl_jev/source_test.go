@@ -36,12 +36,15 @@ func TestSourceOriginalOnlyTransportDNSAndRedirectBoundary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	source := monitoring.RSSSource{Fetcher: fetcher, FeedURL: base + "/feed", SourceID: "fixture-source", LicenceRef: "fixture-licence", MaxItems: 2, Clock: func() time.Time { return now }}
+	source := &monitoring.RSSSource{Fetcher: fetcher, FeedURL: base + "/feed", SourceID: "fixture-source", LicenceRef: "fixture-licence", MaxItems: 2, Lookback: time.Hour, Clock: func() time.Time { return now }}
 	items, err := source.Poll(context.Background(), now)
 	if err != nil || len(items) != 1 || items[0].Content != "fixture licensed original" || items[0].FirstPublicAt != nil {
 		t.Fatal("clue or publication time fabricated", err)
 	}
-	source.PublicationTimeVerified = true
+	if items, err = source.Poll(context.Background(), now); err != nil || len(items) != 0 {
+		t.Fatal("returned link fetched again", err)
+	}
+	source = &monitoring.RSSSource{Fetcher: fetcher, FeedURL: base + "/feed", SourceID: "fixture-source", LicenceRef: "fixture-licence", MaxItems: 2, Lookback: time.Hour, PublicationTimeVerified: true, Clock: func() time.Time { return now }}
 	items, err = source.Poll(context.Background(), now)
 	if err != nil || items[0].FirstPublicAt == nil {
 		t.Fatal(err)

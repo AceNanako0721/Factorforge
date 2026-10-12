@@ -51,7 +51,7 @@ func TestRSSSourceAcquiresActualOfficialDayFormatWithoutFirstPublicClaim(t *test
 		t.Fatal(err)
 	}
 	now := time.Date(2026, 10, 9, 0, 0, 0, 0, time.UTC)
-	source := monitoring.RSSSource{Fetcher: f, FeedURL: endpoint + "/feed", SourceID: "fixture-rss", LicenceRef: "fixture-licence", MaxItems: 1, Clock: func() time.Time { return now }}
+	source := &monitoring.RSSSource{Fetcher: f, FeedURL: endpoint + "/feed", SourceID: "fixture-rss", LicenceRef: "fixture-licence", MaxItems: 1, Lookback: 72 * time.Hour, Clock: func() time.Time { return now }}
 	rows, err := source.Poll(context.Background(), now)
 	if err != nil || len(rows) != 1 || rows[0].FirstPublicAt != nil || rows[0].PublishedAt == nil || rows[0].PublishedAt.Format(time.RFC3339) != "2026-10-07T18:00:00Z" {
 		t.Fatal("single-digit item skipped or assigned first-public", err, rows)
@@ -59,5 +59,49 @@ func TestRSSSourceAcquiresActualOfficialDayFormatWithoutFirstPublicClaim(t *test
 	rows, err = source.Poll(context.Background(), now.Add(-3*24*time.Hour))
 	if err != nil || len(rows) != 0 {
 		t.Fatal("future source entered cutoff", err)
+	}
+}
+func TestRSSSourceLookbackWindowAndLinkIdentity(t *testing.T) {
+	var endpoint string
+	var originals int
+	now := time.Date(2026, 10, 12, 12, 0, 0, 0, time.UTC)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/feed" {
+			w.Header().Set("Content-Type", "application/rss+xml")
+			fmt.Fprintf(w, `<rss><channel><item><link>%s/recent</link><pubDate>%s</pubDate></item><item><link>%s/old</link><pubDate>%s</pubDate></item></channel></rss>`,
+				endpoint, now.Add(-time.Hour).Format(time.RFC1123Z), endpoint, now.Add(-49*time.Hour).Format(time.RFC1123Z))
+			return
+		}
+		originals++
+		// Bot protection rotates tokens in every response body.
+		w.Header().Set("Content-Type", "text/html")
+		fmt.Fprintf(w, "<p>fixture original %s</p><!-- token %d -->", r.URL.Path, originals)
+	}))
+	defer server.Close()
+	endpoint = server.URL
+	u, _ := url.Parse(endpoint)
+	f, err := monitoring.NewFetcher(monitoring.FetchPolicy{Hosts: []string{u.Hostname()}, Timeout: time.Second, MaxBytes: 10000, FixtureOnly: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	newSource := func(lookback time.Duration) *monitoring.RSSSource {
+		return &monitoring.RSSSource{Fetcher: f, FeedURL: endpoint + "/feed", SourceID: "fixture-rss", LicenceRef: "fixture-licence", MaxItems: 2, Lookback: lookback, Clock: func() time.Time { return now }}
+	}
+	if _, err = newSource(0).Poll(context.Background(), now); err == nil || err.Error() != "SOURCE_CONFIGURATION_REQUIRED" {
+		t.Fatal("unbounded feed window accepted", err)
+	}
+	source := newSource(48 * time.Hour)
+	first, err := source.Poll(context.Background(), now)
+	if err != nil || len(first) != 1 || first[0].URL != endpoint+"/recent" || originals != 1 {
+		t.Fatal("lookback window not applied", err, first, originals)
+	}
+	if again, err := source.Poll(context.Background(), now.Add(15*time.Minute)); err != nil || len(again) != 0 || originals != 1 {
+		t.Fatal("returned link fetched again", err, again, originals)
+	}
+	// A restarted process fetches the link once more; the bytes differ but the
+	// evidence identity does not, so the store keeps one original.
+	restarted, err := newSource(48*time.Hour).Poll(context.Background(), now.Add(15*time.Minute))
+	if err != nil || len(restarted) != 1 || restarted[0].ContentHash == first[0].ContentHash || restarted[0].EvidenceID != first[0].EvidenceID {
+		t.Fatal("identity depends on rotating bytes", err, restarted)
 	}
 }
