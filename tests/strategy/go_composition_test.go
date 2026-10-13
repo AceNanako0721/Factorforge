@@ -570,3 +570,34 @@ func TestCompositionExplicitWindowTimes(t *testing.T) {
 		t.Fatal("open window moved")
 	}
 }
+
+// A window that closed before any price sample exists becomes a CENSORED case
+// with direction 0; the stored state must still decode (shadow 2026-10-13).
+func TestCompositionCensoredScheduledCaseRoundTrips(t *testing.T) {
+	s, o, p, _, at := compositionBase(t)
+	s.Templates.Set("earnings/post", templateFixture())
+	req := sd.ScheduledEventCommand{ScheduleID: "past", ObjectID: o.ObjectID, EventType: "earnings", ExpectedAt: at.Add(-72 * time.Hour), Certainty: "CONFIRMED", SourceRef: "fixture-calendar", Revision: 1, Status: "SCHEDULED"}
+	if _, err := sd.UpsertSchedule(s, req); err != nil {
+		t.Fatal(err)
+	}
+	if err := sd.AdvanceScheduled(s, o, at, p); err != nil {
+		t.Fatal(err)
+	}
+	var censored *sd.CaseRecord
+	for _, c := range s.Cases.Values() {
+		if c.Kind == "SCHEDULED_WINDOW" {
+			censored = c
+		}
+	}
+	if censored == nil || censored.Status != "CENSORED" || censored.Direction != 0 {
+		t.Fatal("expected a censored scheduled case", censored)
+	}
+	raw, err := sd.Marshal(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var back sd.StrategyState
+	if err = sd.DecodeJSON(raw, &back); err != nil {
+		t.Fatal("state with censored scheduled case does not decode", err)
+	}
+}
