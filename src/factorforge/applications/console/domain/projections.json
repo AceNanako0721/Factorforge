@@ -5503,6 +5503,12 @@
               ],
               "type": "string"
             },
+            "window_times": {
+              "additionalProperties": {
+                "$ref": "#/components/schemas/ScheduledWindowTimes"
+              },
+              "type": "object"
+            },
             "windows": {
               "additionalProperties": {
                 "$ref": "#/components/schemas/ScheduledWindow"
@@ -5608,6 +5614,12 @@
                 "CANCELLED"
               ],
               "type": "string"
+            },
+            "windows": {
+              "additionalProperties": {
+                "$ref": "#/components/schemas/ScheduledWindowTimes"
+              },
+              "type": "object"
             }
           },
           "required": [
@@ -5671,6 +5683,12 @@
                 "CANCELLED"
               ],
               "type": "string"
+            },
+            "window_times": {
+              "additionalProperties": {
+                "$ref": "#/components/schemas/ScheduledWindowTimes"
+              },
+              "type": "object"
             },
             "windows_state": {
               "additionalProperties": {
@@ -5810,6 +5828,24 @@
             "start",
             "start_price",
             "template"
+          ],
+          "type": "object"
+        },
+        "ScheduledWindowTimes": {
+          "additionalProperties": false,
+          "properties": {
+            "end_at": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "start_at": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          "required": [
+            "end_at",
+            "start_at"
           ],
           "type": "object"
         },

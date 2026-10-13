@@ -13,7 +13,23 @@ type ScheduledEvent struct {
 	Status       string                      `json:"status"`
 	WindowsState map[string]string           `json:"windows_state"`
 	Windows      map[string]*ScheduledWindow `json:"windows,omitempty"`
+	// WindowTimes are application-computed spans (v2.6.1), e.g. trading-day
+	// windows that fixed template offsets cannot express.
+	WindowTimes map[string]ScheduledWindowTimes `json:"window_times,omitempty"`
 }
+type ScheduledWindowTimes struct {
+	StartAt time.Time `json:"start_at"`
+	EndAt   time.Time `json:"end_at"`
+}
+
+// Span prefers the submitted window times over the template offsets.
+func (e *ScheduledEvent) Span(id string, t *ScheduledTemplate) (time.Time, time.Time) {
+	if w, ok := e.WindowTimes[id]; ok {
+		return w.StartAt, w.EndAt
+	}
+	return e.ExpectedAt.Add(time.Duration(t.StartOffsetSeconds) * time.Second), e.ExpectedAt.Add(time.Duration(t.EndOffsetSeconds) * time.Second)
+}
+
 type ScheduledWindow struct {
 	Start      time.Time          `json:"start"`
 	End        time.Time          `json:"end"`
@@ -23,14 +39,15 @@ type ScheduledWindow struct {
 }
 type ScheduledEventCommand struct {
 	Command
-	ScheduleID string    `json:"schedule_id"`
-	ObjectID   string    `json:"object_id"`
-	EventType  string    `json:"event_type"`
-	ExpectedAt time.Time `json:"expected_at"`
-	Certainty  string    `json:"certainty"`
-	SourceRef  string    `json:"source_ref"`
-	Revision   int       `json:"revision"`
-	Status     string    `json:"status"`
+	ScheduleID string                          `json:"schedule_id"`
+	ObjectID   string                          `json:"object_id"`
+	EventType  string                          `json:"event_type"`
+	ExpectedAt time.Time                       `json:"expected_at"`
+	Certainty  string                          `json:"certainty"`
+	SourceRef  string                          `json:"source_ref"`
+	Revision   int                             `json:"revision"`
+	Status     string                          `json:"status"`
+	Windows    map[string]ScheduledWindowTimes `json:"windows,omitempty"`
 }
 type TemplatePrior struct {
 	Mean        Decimal `json:"mean"`
@@ -128,6 +145,14 @@ func UpsertSchedule(s *StrategyState, request ScheduledEventCommand) (*Scheduled
 	if old != nil && (request.Revision <= old.Revision || request.ObjectID != old.ObjectID || request.EventType != old.EventType || old.Status == "CANCELLED" && request.Status != "CANCELLED") {
 		return nil, &Error{"SCHEDULED_REVISION_CONFLICT", 409}
 	}
+	for id, w := range request.Windows {
+		if !Has(ids, id) {
+			return nil, &Error{"SCHEDULED_WINDOW_UNKNOWN", 422}
+		}
+		if !w.StartAt.Before(w.EndAt) {
+			return nil, invalid()
+		}
+	}
 	next := &ScheduledEvent{ScheduleID: request.ScheduleID, ObjectID: request.ObjectID, EventType: request.EventType, ExpectedAt: request.ExpectedAt, Certainty: request.Certainty, SourceRef: request.SourceRef, Revision: request.Revision, Status: request.Status, WindowsState: map[string]string{}, Windows: map[string]*ScheduledWindow{}}
 	if old != nil {
 		next.WindowsState = Clone(old.WindowsState)
@@ -142,6 +167,12 @@ func UpsertSchedule(s *StrategyState, request ScheduledEventCommand) (*Scheduled
 		}
 		if request.Status == "CANCELLED" && Has([]string{"OPEN", "PENDING"}, next.WindowsState[id]) {
 			next.WindowsState[id] = "VOID"
+		}
+	}
+	if len(request.Windows) > 0 {
+		next.WindowTimes = map[string]ScheduledWindowTimes{}
+		for id, w := range request.Windows {
+			next.WindowTimes[id] = ScheduledWindowTimes{w.StartAt.UTC(), w.EndAt.UTC()}
 		}
 	}
 	s.ScheduledEvents.Set(next.ScheduleID, next)
@@ -175,8 +206,7 @@ func AdvanceScheduled(s *StrategyState, obj *ObservedObject, at time.Time, p *Po
 			}
 			w := event.Windows[id]
 			if status == "PENDING" {
-				start := event.ExpectedAt.Add(time.Duration(t.StartOffsetSeconds) * time.Second)
-				end := event.ExpectedAt.Add(time.Duration(t.EndOffsetSeconds) * time.Second)
+				start, end := event.Span(id, t)
 				if at.Before(start) {
 					continue
 				}

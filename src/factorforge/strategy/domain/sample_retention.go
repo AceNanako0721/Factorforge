@@ -46,7 +46,7 @@ func RetainSamples(s *StrategyState, objectID string, at time.Time, p *Policy) {
 			}
 			if status == "PENDING" {
 				if template := s.Templates.Value(event.EventType + "/" + windowID); template != nil {
-					start := event.ExpectedAt.Add(time.Duration(template.StartOffsetSeconds) * time.Second)
+					start, _ := event.Span(windowID, template)
 					if !start.After(at) {
 						keepFrom(start)
 					}

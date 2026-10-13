@@ -339,7 +339,7 @@ func Compose(s *StrategyState, obj *ObservedObject, at time.Time, view PoolView,
 		layer string
 		value Decimal
 	}{}
-	stale := false
+	stale, missing := false, false
 	read := func(id string, age int, purpose string) *FactorObservation {
 		series := s.FactorSeries.Value(id)
 		if series == nil || series.Definition.Purpose != purpose {
@@ -372,7 +372,18 @@ func Compose(s *StrategyState, obj *ObservedObject, at time.Time, view PoolView,
 		if o := read(f.FactorID, f.MaxAgeSeconds, "BASELINE"); o != nil {
 			value = m.Mul(f.Weight, o.Value)
 		} else if f.State == "ENABLED" {
-			stale = true
+			// v2.6.1: HOLD_REDUCE_ONLY keeps the last value for one more
+			// max_age, reduce-only; afterwards the factor counts as zero.
+			if c.MissingPolicy == "HOLD_REDUCE_ONLY" {
+				if o := read(f.FactorID, 2*f.MaxAgeSeconds, "BASELINE"); o != nil {
+					value = m.Mul(f.Weight, o.Value)
+					stale = true
+				} else {
+					missing = true
+				}
+			} else {
+				missing = true
+			}
 		}
 		if f.State == "ENABLED" {
 			out.Baseline = m.Add(out.Baseline, value)
@@ -384,10 +395,12 @@ func Compose(s *StrategyState, obj *ObservedObject, at time.Time, view PoolView,
 			}{"BASELINE", value}
 		}
 	}
-	if stale && c.MissingPolicy == "HOLD_REDUCE_ONLY" {
-		out.Baseline = Zero()
+	if stale {
 		result.Force = true
 		result.Reasons = append(result.Reasons, "BASELINE_STALE")
+	}
+	if missing {
+		result.Reasons = append(result.Reasons, "BASELINE_MISSING")
 	}
 	if !c.AllowShortBaseline {
 		out.Baseline = Max(Zero(), out.Baseline)

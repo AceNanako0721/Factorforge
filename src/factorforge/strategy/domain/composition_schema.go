@@ -84,8 +84,11 @@ func CompositionSchemas() map[string]any {
 	}
 	event["windows_state"] = dict(enum("PENDING", "OPEN", "CLOSED", "VOID"))
 	event["windows"] = dict(ref("ScheduledWindow"))
-	model("ScheduledEvent", event, "windows")
-	model("ScheduledEventCommand", cmd)
+	model("ScheduledWindowTimes", map[string]any{"start_at": at, "end_at": at})
+	event["window_times"] = dict(ref("ScheduledWindowTimes"))
+	cmd["windows"] = dict(ref("ScheduledWindowTimes"))
+	model("ScheduledEvent", event, "windows", "window_times")
+	model("ScheduledEventCommand", cmd, "windows")
 	model("LayerEntry", map[string]any{"exposure_seconds": decimal, "pnl": decimal, "cost_fee": decimal, "cost_funding": decimal, "hypothetical": boolField})
 	model("LayerDay", map[string]any{"object_id": str, "date": str, "sealed": boolField, "entries": dict(ref("LayerEntry")), "pnl": decimal, "cost_fee": decimal, "cost_funding": decimal})
 	model("LayerSettlement", map[string]any{"at": at, "price": positive, "quantity": decimal, "equity": positive, "components": nullable(ref("DecisionComponents")), "seen_fills": dict(at), "seen_incomes": dict(at), "shadow_exposure": dict(decimal)})

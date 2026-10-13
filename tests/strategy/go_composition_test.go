@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -84,7 +85,12 @@ func TestCompositionBoundaries(t *testing.T) {
 			p.Composition.MissingPolicy = "HOLD_REDUCE_ONLY"
 			s.FactorSeries.Value("daily").Observations[0].AvailableAt = a.Add(-2 * time.Second)
 			p.Composition.Adjustment.EventOnlyCap = sd.One()
-		}, "1", "0.2", "0.2", "0", "0.999999999000000000999999999", true},
+		}, "1", "0.2", "0.2", "0.5", "1", true},
+		{"stale-hold-expired", func(s *sd.StrategyState, o *sd.ObservedObject, p *sd.Policy, m *sd.MarketSample, a time.Time) {
+			p.Composition.Baseline[0].MaxAgeSeconds = 1
+			p.Composition.MissingPolicy = "HOLD_REDUCE_ONLY"
+			s.FactorSeries.Value("daily").Observations[0].AvailableAt = a.Add(-3 * time.Second)
+		}, "1", "0.5", "0", "0", "0", false},
 		{"shadow-baseline", func(s *sd.StrategyState, o *sd.ObservedObject, p *sd.Policy, m *sd.MarketSample, a time.Time) {
 			p.Composition.Baseline[0].State = "SHADOW"
 		}, "0", "0", "0", "0", "0", false},
@@ -110,6 +116,9 @@ func TestCompositionBoundaries(t *testing.T) {
 			assertAmount(t, r.Components.Combined, test.combined)
 			if r.Force != test.force {
 				t.Fatal("force", r.Force)
+			}
+			if test.name == "stale-reduce-only" && !sd.Has(r.Reasons, "BASELINE_STALE") || test.name == "stale-hold-expired" && !sd.Has(r.Reasons, "BASELINE_MISSING") {
+				t.Fatal("missing baseline reason", r.Reasons)
 			}
 			if test.name == "shadow-baseline" {
 				assertAmount(t, r.Components.Shadow["factor:daily"].Exposure, "0.5")
@@ -519,4 +528,45 @@ func TestCompositionFirstCoreAgainstExistingPositionConfirms(t *testing.T) {
 	}
 	r = compose(t, s, o, p, m, at.Add(300*time.Second), "0", "0")
 	assertAmount(t, r.Raw, "-0.5")
+}
+
+// v2.6.1: explicit per-event window times override template offsets.
+func TestCompositionExplicitWindowTimes(t *testing.T) {
+	s, o, p, m, at := compositionBase(t)
+	s.Templates.Set("earnings/post", templateFixture())
+	s.Samples.Set(o.ObjectID, []sd.MarketSample{*m})
+	req := sd.ScheduledEventCommand{ScheduleID: "explicit", ObjectID: o.ObjectID, EventType: "earnings", ExpectedAt: at, Certainty: "CONFIRMED", SourceRef: "fixture-calendar", Revision: 1, Status: "SCHEDULED", Windows: map[string]sd.ScheduledWindowTimes{"unknown": {StartAt: at, EndAt: at.Add(time.Hour)}}}
+	if _, err := sd.UpsertSchedule(s, req); err == nil || err.Error() != "SCHEDULED_WINDOW_UNKNOWN" && !strings.Contains(err.Error(), "SCHEDULED_WINDOW_UNKNOWN") {
+		t.Fatal("unknown window accepted", err)
+	}
+	req.Windows = map[string]sd.ScheduledWindowTimes{"post": {StartAt: at.Add(time.Hour), EndAt: at}}
+	if _, err := sd.UpsertSchedule(s, req); err == nil {
+		t.Fatal("inverted window accepted")
+	}
+	req.Windows = map[string]sd.ScheduledWindowTimes{"post": {StartAt: at.Add(2 * time.Hour), EndAt: at.Add(3 * time.Hour)}}
+	event, err := sd.UpsertSchedule(s, req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = sd.AdvanceScheduled(s, o, at.Add(time.Hour), p); err != nil || event.WindowsState["post"] != "PENDING" {
+		t.Fatal("explicit start ignored", err, event.WindowsState)
+	}
+	// A revision moves the still-PENDING window to the new explicit time.
+	req.Revision = 2
+	req.Windows = map[string]sd.ScheduledWindowTimes{"post": {StartAt: at.Add(time.Hour), EndAt: at.Add(4 * time.Hour)}}
+	if event, err = sd.UpsertSchedule(s, req); err != nil {
+		t.Fatal(err)
+	}
+	if err = sd.AdvanceScheduled(s, o, at.Add(time.Hour), p); err != nil || event.WindowsState["post"] != "OPEN" || !event.Windows["post"].End.Equal(at.Add(4*time.Hour)) {
+		t.Fatal("explicit window not opened at revised time", err, event.Windows["post"])
+	}
+	// Once open, a later revision cannot move it.
+	req.Revision = 3
+	req.Windows = map[string]sd.ScheduledWindowTimes{"post": {StartAt: at.Add(5 * time.Hour), EndAt: at.Add(6 * time.Hour)}}
+	if event, err = sd.UpsertSchedule(s, req); err != nil {
+		t.Fatal(err)
+	}
+	if !event.Windows["post"].Start.Equal(at.Add(time.Hour)) {
+		t.Fatal("open window moved")
+	}
 }
