@@ -350,7 +350,7 @@ figure{margin:24px 0;border:1px solid var(--line);border-radius:10px;padding:16p
 <g fill="none" stroke="#006e82" stroke-width="2" marker-end="url(#simframe-arrow)"><path d="M265 90H325"/><path d="M575 90H635"/></g></svg><figcaption>图 D1-F：SIM 前向撮合帧。</figcaption></figure>
 <ul>
 <li>采集器新增选项 <code>--sim-frames</code>，只能与 <code>--sim-capabilities</code> 同时使用，且运行环境须为 SIM，否则启动即拒绝（COLLECTOR_POLICY_INVALID）。</li>
-<li>每次轮询在快照被接受后，以 t+1 毫秒（t 为快照时刻）提交一帧：points 与快照相同；liquidity 为可用时刻晚于上一帧时刻、且不晚于 t 的公开成交数量之和（进程启动后的首帧取本次查询到的全部成交）；candle 为本次快照中开盘时刻晚于上一帧所带 K 线的最新已收盘 K 线，没有则为空。</li>
+<li>每次轮询在快照被接受后，以 t+1 毫秒（t 为快照时刻）提交一帧：points 与快照相同；liquidity 为成交时刻（交易所时间）晚于上一帧对应快照时刻、且不晚于 t 的公开成交数量之和（成交的可用时刻是接收时刻，不能用于去重）（进程启动后的首帧取本次查询到的全部成交）；candle 为本次快照中开盘时刻晚于上一帧所带 K 线的最新已收盘 K 线，没有则为空。</li>
 <li>帧的幂等键由运行、规则版本与帧时刻摘要得到；帧被拒绝时按采集错误处理，进程退出由 systemd 重启，下次轮询重新提交快照与帧，不补发遗漏的帧。</li>
 <li>不改变模拟器的撮合规则：成交量仍受参与率、延迟、滑点与 OHLC 规则约束；资金费率仍只经由快照写入。</li>
 <li>测试：开启后每次采集依次提交快照与帧，帧时刻严格晚于快照；流动性只计新成交；同一 K 线不重复携带；挂单在下一帧成交；未开启时只提交快照；缺少 <code>--sim-capabilities</code> 或非 SIM 环境时拒绝启动。</li>
