@@ -509,9 +509,9 @@ figure{margin:24px 0;border:1px solid var(--line);border-radius:10px;padding:16p
 <section id="sim-experiment-quality"><h2>v2.6.3 SIM 环境允许 EXPERIMENT_ONLY 增险</h2>
 <p>对应 S2-012/S2-013 的既有门控，业务式样不变。原实现在任何环境中，只要策略或参数的 quality_state 不是 VALIDATED，就阻止增险（RECOVERY_OR_PAUSE_OR_DELIVERY_BLOCK）。P3 设计对 EXPERIMENT_ONLY 的定义是“临时人工联调阈值，不能替代实盘准入证据”，即它本来就用于非 LIVE 的联调与影子运行。现在影子 SIM 运行因此永远无法形成持仓，前向检验也无从积累实际账务。</p>
 <ul>
-<li>环境为 SIM 时，策略与参数的 quality_state 为 VALIDATED 或 EXPERIMENT_ONLY 均允许增险；REQUIRED_UNSET 仍然阻止。</li>
+<li>环境为 SIM 时，策略与参数的 quality_state 为 VALIDATED 或 EXPERIMENT_ONLY 均允许增险，评分准入（S2-003）也不再因此标为 RESEARCH_ONLY；REQUIRED_UNSET 仍然阻止。只记录的事件调整由此可以在影子中积累前向证据。</li>
 <li>环境为 LIVE 时规则不变，必须两者都是 VALIDATED。</li>
 <li>对象状态、恢复状态、风险锁与交付未知的阻止条件不变；学习的启用门槛（S2-019～S2-021 中要求 VALIDATED 的部分）不变。</li>
-<li>测试：SIM + EXPERIMENT_ONLY 可以开仓；SIM + REQUIRED_UNSET 被阻止；LIVE + EXPERIMENT_ONLY 被阻止。</li>
+<li>测试：SIM + EXPERIMENT_ONLY 可以开仓且评分被准入；SIM + REQUIRED_UNSET 被阻止；LIVE + EXPERIMENT_ONLY 被阻止。</li>
 </ul></section>
 </article><footer>HTML 是本版唯一发布正文。图表为内嵌 SVG，无需联网或运行脚本。文档通过不代表程序实现、交易运行或实盘准入通过。</footer></main></div></body></html>
