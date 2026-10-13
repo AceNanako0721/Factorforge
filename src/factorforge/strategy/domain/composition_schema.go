@@ -125,6 +125,9 @@ func extendCompositionShapes(s map[string]shape) {
 	add("ObservedObject", "last_adjustment_trade_at", map[string]any{"anyOf": []any{map[string]any{"type": "string", "format": "date-time"}, map[string]any{"type": "null"}}})
 	add("ObservedObject", "layer_ledger_blocked", map[string]any{"type": "boolean"})
 	add("CaseRecord", "kind", map[string]any{"type": "string", "enum": []string{"SCHEDULED_WINDOW"}})
+	// A scheduled window censored for missing prices, or with a zero return, has
+	// no direction; position cases keep producing only -1 or 1.
+	add("CaseRecord", "direction", map[string]any{"type": "integer", "enum": []int{-1, 0, 1}})
 	add("TradingSnapshot", "funding", map[string]any{"type": "object", "additionalProperties": ref("FundingObservation")})
 	for key, n := range map[string]string{"factor_series": "FactorSeries", "scheduled_events": "ScheduledEvent", "templates": "ScheduledTemplate", "layer_ledger": "LayerDay", "layer_settlements": "LayerSettlement"} {
 		add("StrategyState", key, map[string]any{"type": "object", "additionalProperties": ref(n)})
