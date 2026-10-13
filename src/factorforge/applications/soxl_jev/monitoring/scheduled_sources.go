@@ -295,7 +295,9 @@ func ParseOfficialSchedule(raw []byte, s OfficialScheduleSource) ([]d.ScheduleCa
 	default:
 		return bad()
 	}
-	if len(out) == 0 {
+	// TreasuryDirect's upcoming list is often free of 10Y/30Y auctions; an empty
+	// result there is normal. Calendar pages must list at least one release.
+	if len(out) == 0 && s.Kind != "TREASURY" {
 		return bad()
 	}
 	return out, nil
