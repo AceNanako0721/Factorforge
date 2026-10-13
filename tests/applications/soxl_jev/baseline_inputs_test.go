@@ -211,6 +211,13 @@ func TestP3BaselineHysteresisAndVersionIdentity(t *testing.T) {
 			t.Fatal(v, e)
 		}
 	}
+	for id, ok := range map[string]bool{"soxx-trend-vol-2026a": true, "soxx-trend-vol@2026a": true, "soxx-trend-vol@2027a": false, "other@2026a": false, "soxx-trend-vol-x-2026a": false} {
+		q := p
+		q.FactorID = id
+		if q.Valid() != ok {
+			t.Fatal("factor id/version binding", id)
+		}
+	}
 	p.Version = "2027a"
 	p.FactorID = "soxx-trend-vol@2027a"
 	if _, e := operations.BaselineValue(bars, p, long); inputCode(e) != "BASELINE_OBSERVATION_INVALID" {
