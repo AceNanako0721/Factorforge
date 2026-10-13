@@ -18,7 +18,8 @@ figure{margin:24px 0;border:1px solid var(--line);border-radius:10px;padding:16p
 <a href="#workload-capacity">v2.5.8 工作负载并发与状态容量</a>
 <a href="#baseline-composition-design">v2.6.0 行情基线、预排事件与有界调整</a>
 <a href="#baseline-composition-patch">v2.6.1 合成路径的两处补充</a>
-<a href="#bar-sigma-fallback">v2.6.2 无价格代理时的波动估计（SIM）</a></nav><main><div class="meta">02_策略化框架层设计书 · <a href="02_策略化框架层式样书.html">对应仕様书</a></div><article id="document-body"><div class="note">v2.5.1 追加第三层独立模型接入模块（第五对仕様与设计）：API Key 与官方 ChatGPT 登录经显式选择提供候选文本。保留无 Python、三层接口及原四组业务式样；新模块不自动接入事件抽取、JEV 决策或交易。暂停的本地模型实验保持停止，账号验收与 P3/LIVE 准入分别记录。</div><div data-source-sha256="b421edc5545daf17abf967876a3d17a1fa98af6e1b0e4b0fe411274616ee1b36" data-source-document="02_策略化框架层设计书.md"><h1>策略化框架层设计书</h1>
+<a href="#bar-sigma-fallback">v2.6.2 无价格代理时的波动估计（SIM）</a>
+<a href="#sim-experiment-quality">v2.6.3 SIM 环境允许 EXPERIMENT_ONLY 增险</a></nav><main><div class="meta">02_策略化框架层设计书 · <a href="02_策略化框架层式样书.html">对应仕様书</a></div><article id="document-body"><div class="note">v2.5.1 追加第三层独立模型接入模块（第五对仕様与设计）：API Key 与官方 ChatGPT 登录经显式选择提供候选文本。保留无 Python、三层接口及原四组业务式样；新模块不自动接入事件抽取、JEV 决策或交易。暂停的本地模型实验保持停止，账号验收与 P3/LIVE 准入分别记录。</div><div data-source-sha256="b421edc5545daf17abf967876a3d17a1fa98af6e1b0e4b0fe411274616ee1b36" data-source-document="02_策略化框架层设计书.md"><h1>策略化框架层设计书</h1>
 <p>版本：2.6.3；日期：2026年10月12日。唯一对应式样书：<a href="02_%E7%AD%96%E7%95%A5%E5%8C%96%E6%A1%86%E6%9E%B6%E5%B1%82%E5%BC%8F%E6%A0%B7%E4%B9%A6.html">策略化框架层式样书</a>。本文实现 S2，数学核心继承 v1.1，其具体对象及模型选择留给应用。</p>
 <h2 id="section-1">1 包、边界与启动</h2>
 <p>实现 src/factorforge/strategy，子包 domain/{events,sentiment,regime,position,stop,case,attribution,learning,validation}、application/{object_service,event_service,score_admission,decision_cycle,case_service}、ports/{trading,store,clock,attribution_input}、adapters/{trading_v2,postgres}、api、workers。仅依赖 trading 公共DTO/客户端，禁止导入 trading 的数据库/执行实现，也禁止导入 applications、搜索SDK或模型SDK。</p>
@@ -505,4 +506,12 @@ figure{margin:24px 0;border:1px solid var(--line);border-radius:10px;padding:16p
 <li>K 线结构与 bars_ref 不变，现有冻结回放（均登记了价格代理）结果不变。</li>
 </ul>
 <p>测试：无清单的 SIM 对象由 K 线得到 σ 且与手算一致；K 线不足或有超限间隔时 σ 缺失；LIVE 无清单时暴露为 0；有清单时与原结果相同。</p></section>
+<section id="sim-experiment-quality"><h2>v2.6.3 SIM 环境允许 EXPERIMENT_ONLY 增险</h2>
+<p>对应 S2-012/S2-013 的既有门控，业务式样不变。原实现在任何环境中，只要策略或参数的 quality_state 不是 VALIDATED，就阻止增险（RECOVERY_OR_PAUSE_OR_DELIVERY_BLOCK）。P3 设计对 EXPERIMENT_ONLY 的定义是“临时人工联调阈值，不能替代实盘准入证据”，即它本来就用于非 LIVE 的联调与影子运行。现在影子 SIM 运行因此永远无法形成持仓，前向检验也无从积累实际账务。</p>
+<ul>
+<li>环境为 SIM 时，策略与参数的 quality_state 为 VALIDATED 或 EXPERIMENT_ONLY 均允许增险；REQUIRED_UNSET 仍然阻止。</li>
+<li>环境为 LIVE 时规则不变，必须两者都是 VALIDATED。</li>
+<li>对象状态、恢复状态、风险锁与交付未知的阻止条件不变；学习的启用门槛（S2-019～S2-021 中要求 VALIDATED 的部分）不变。</li>
+<li>测试：SIM + EXPERIMENT_ONLY 可以开仓；SIM + REQUIRED_UNSET 被阻止；LIVE + EXPERIMENT_ONLY 被阻止。</li>
+</ul></section>
 </article><footer>HTML 是本版唯一发布正文。图表为内嵌 SVG，无需联网或运行脚本。文档通过不代表程序实现、交易运行或实盘准入通过。</footer></main></div></body></html>

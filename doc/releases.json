@@ -462,7 +462,7 @@
       "directory": "doc/v2.6.3",
       "change_kind": "design",
       "date": "2026-10-13",
-      "reason": "影子部署发现公开采集器只声明限价与市价，SIM 运行缺少条件保护能力而从未下单；新增 SIM 能力模式，为 REPLAY 运行声明模拟器提供的保护、只减仓与做空能力，规则版本带 -sim 后缀且只允许 REPLAY 运行登记；业务式样不变。",
+      "reason": "影子部署发现公开采集器只声明限价与市价，SIM 运行缺少条件保护能力而从未下单；新增 SIM 能力模式，为 REPLAY 运行声明模拟器提供的保护、只减仓与做空能力，规则版本带 -sim 后缀且只允许 REPLAY 运行登记；SIM 环境允许 EXPERIMENT_ONLY 策略与参数增险，LIVE 仍须 VALIDATED；业务式样不变。",
       "format": "html",
       "document_pairs": [
         "01_交易系统层",
