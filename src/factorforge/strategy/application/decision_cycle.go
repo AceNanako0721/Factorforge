@@ -387,7 +387,13 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 				} else {
 					spec := snap.Specs[obj.ObjectID]
 					rules := Rules(spec)
-					if d.Text(spec["settlement_currency"]) != d.Text(bindings["account_currency"]) {
+					// A registered price-proxy binding may pin the account currency;
+					// otherwise P1's account view is authoritative.
+					currency := d.Text(bindings["account_currency"])
+					if currency == "" {
+						currency = snap.AccountCurrency
+					}
+					if d.Text(spec["settlement_currency"]) != currency {
 						raw = d.Zero()
 						reasons = append(reasons, "FX_OR_CURRENCY_UNKNOWN")
 					}

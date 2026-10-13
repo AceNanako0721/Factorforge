@@ -340,3 +340,25 @@ func TestBarSigmaEstimateAndGaps(t *testing.T) {
 		t.Fatal("gapped history produced sigma")
 	}
 }
+
+// Without a price-proxy binding, the account currency comes from P1's account
+// view; an unknown currency still blocks the target.
+func TestAccountCurrencyFromTradingSnapshot(t *testing.T) {
+	for _, test := range []struct {
+		currency string
+		open     bool
+	}{{"USDT", true}, {"", false}, {"USD", false}} {
+		s, o, _, snap, id, at := compositionCycleBase(t)
+		s.FactorManifests.Set(o.PriceProxyBinding, map[string]any{})
+		snap.AccountCurrency = test.currency
+		cycle := app.DecisionCycle{Store: adapters.NewMemory(s), Trading: &compositionTrading{snap: snap}, Clock: adapters.NewReplay(at)}
+		outputs, err := cycle.Tick(context.Background(), id, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		blocked := sd.Has(outputs[0].ReasonCodes, "FX_OR_CURRENCY_UNKNOWN")
+		if (outputs[0].TargetQuantity.Sign() > 0) != test.open || blocked == test.open {
+			t.Fatal(test.currency, outputs[0].TargetQuantity, outputs[0].ReasonCodes)
+		}
+	}
+}
