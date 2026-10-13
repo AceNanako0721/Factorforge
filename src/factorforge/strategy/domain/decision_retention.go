@@ -59,6 +59,13 @@ func ArchivableDecisions(s *StrategyState, at time.Time) []string {
 		}
 	}
 	referenced := map[string]bool{}
+	// Composition trigger comparisons and settlement need the last acknowledged
+	// decision even when more recent evaluations were blocked before delivery.
+	for _, obj := range s.Objects.Values() {
+		if latest := LatestExecuted(s, obj.ObjectID, at); latest != nil {
+			referenced[latest.DecisionID] = true
+		}
+	}
 	for _, c := range s.Cases.Values() {
 		if c.Status != "OPEN" && c.Status != "OBSERVING" {
 			continue

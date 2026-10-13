@@ -11,7 +11,7 @@ func FeedbackCases(s *StrategyState, obj *ObservedObject, snap *TradingSnapshot,
 		seen := []string{}
 		var active *CaseRecord
 		for _, c := range s.Cases.Values() {
-			if c.ObjectID == obj.ObjectID {
+			if c.ObjectID == obj.ObjectID && c.Kind != "SCHEDULED_WINDOW" {
 				records = append(records, c)
 				seen = append(seen, c.FillIDs...)
 				if active == nil && c.Status == "OPEN" {

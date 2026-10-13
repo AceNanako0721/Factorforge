@@ -85,6 +85,8 @@ func ScoreAmount(score *ScoreSubmission, event *Event, params *ParameterSnapshot
 	u := m.Mul(m.Sub(One(), *v.ExpectationCoverage), m.Sub(One(), p))
 	amount := m.Mul(m.Mul(m.Mul(v.ImpactPoints, *v.Credibility), *v.Relevance), event.Novelty)
 	amount = m.Mul(m.Mul(m.Mul(amount, u), params.Values["w"]), params.Values["g"])
+	// A negative source weight reverses direction; ledger amounts stay unsigned.
+	amount = amount.Abs()
 	return Min(policy.EventCap, amount), h, amount, m.Err()
 }
 func Prepricing(direction int, current, pre, benchmark, beta, rho Decimal) (Decimal, error) {

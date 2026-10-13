@@ -12,6 +12,9 @@ func UpdateCases(state *d.StrategyState, obj *d.ObservedObject, snap *d.TradingS
 	if err := d.FeedbackCases(state, obj, snap, p, params); err != nil {
 		return err
 	}
+	if err := d.SettleLayers(state, obj, snap, at, p); err != nil {
+		return err
+	}
 	for _, c := range state.Cases.Values() {
 		if c.ObjectID != obj.ObjectID || !d.Has([]string{"OBSERVING", "OPEN"}, c.Status) {
 			continue
@@ -93,6 +96,11 @@ func EvaluateLearning(state *d.StrategyState, obj *d.ObservedObject, at time.Tim
 			stable = stable && d.Text(d.Object(v)["state"]) != "UNKNOWN"
 		}
 		for _, parameter := range d.Strings(manifest["parameters"]) {
+			layerEvidence, err := d.LayerEvidence(state, obj, parameter, at)
+			if err != nil {
+				return err
+			}
+			evidence = append(evidence, layerEvidence...)
 			pending := false
 			for _, c := range state.Candidates.Values() {
 				pending = pending || d.Text(c["object_id"]) == obj.ObjectID && d.Has([]string{"PROPOSED", "APPROVED"}, d.Text(c["state"]))
@@ -156,7 +164,18 @@ func CorrectActualRisk(state *d.StrategyState, obj *d.ObservedObject, snap *d.Tr
 		}
 		id := "decision-" + d.Digest([]any{state.InstanceID, state.Environment, obj.ObjectID, "fill-risk", snap.Version})[:24]
 		inputs := map[string]any{"pool": d.Map(view), "snapshot": d.Map(snap), "policy": p.Version, "parameter_version": obj.ParameterVersion}
+		components, err := riskComponents(state, obj, snap, at, *target, p)
+		if err != nil {
+			return err
+		}
+		if components != nil {
+			inputs["components"] = d.Map(components)
+		}
 		decision = &d.DecisionView{DecisionID: id, ObjectID: obj.ObjectID, CycleID: "fill-risk:" + fmt.Sprint(snap.Version), AvailableCutoff: at, PoolPlus: view.Plus, PoolMinus: view.Minus, PoolNet: view.Net, PreviousLevel: obj.Level, NewLevel: obj.Level, TargetQuantity: *target, ActualQuantity: snap.Actual[obj.ObjectID], PendingQuantity: snap.Pending[obj.ObjectID], ParameterVersion: obj.ParameterVersion, InputHash: d.Digest(inputs), InputSnapshot: d.CompactDecisionInput(inputs), ReasonCodes: []string{"ACTUAL_FILL_STOP_BUDGET_REDUCTION"}, SourceEventVersions: map[string]int{}}
+		decision.Components = components
+		if components != nil {
+			decision.ProjectedExposure = components.Exposure
+		}
 		version := snap.TargetVersions[obj.ObjectID]
 		for _, item := range state.Outbox.Values() {
 			if item.Decision.ObjectID == obj.ObjectID && item.TargetVersion > version {

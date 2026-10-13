@@ -36,6 +36,24 @@ func RetainSamples(s *StrategyState, objectID string, at time.Time, p *Policy) {
 			keepFrom(*r.EligibleFrom)
 		}
 	}
+	for _, event := range s.ScheduledEvents.Values() {
+		if event.ObjectID != objectID || event.Status != "SCHEDULED" {
+			continue
+		}
+		for windowID, status := range event.WindowsState {
+			if status == "OPEN" && event.Windows[windowID] != nil {
+				keepFrom(event.Windows[windowID].Start)
+			}
+			if status == "PENDING" {
+				if template := s.Templates.Value(event.EventType + "/" + windowID); template != nil {
+					start := event.ExpectedAt.Add(time.Duration(template.StartOffsetSeconds) * time.Second)
+					if !start.After(at) {
+						keepFrom(start)
+					}
+				}
+			}
+		}
+	}
 	samples := s.Samples.Value(objectID)
 	sort.SliceStable(samples, func(i, j int) bool { return samples[i].AvailableAt.Before(samples[j].AvailableAt) })
 	first := sort.Search(len(samples), func(i int) bool { return !samples[i].AvailableAt.Before(cutoff) })

@@ -9,11 +9,13 @@ import (
 
 // MemoryStore is a transactional deterministic test adapter, never persistence.
 type MemoryStore struct {
-	mu          sync.Mutex
-	states      map[string]*d.StrategyState
-	audits      map[string][]d.AuditRecord
-	environment string
-	FailCommit  bool
+	mu            sync.Mutex
+	states        map[string]*d.StrategyState
+	audits        map[string][]d.AuditRecord
+	factorArchive map[string]map[string]*d.FactorObservation
+	archiveMu     sync.RWMutex
+	environment   string
+	FailCommit    bool
 }
 
 func NewMemory(state *d.StrategyState) *MemoryStore {
@@ -23,7 +25,7 @@ func NewMemory(state *d.StrategyState) *MemoryStore {
 		rows = append(rows, d.AuditRecord{Sequence: i + 1, Payload: row})
 	}
 	copy.AuditCount, copy.Audit = len(rows), nil
-	return &MemoryStore{states: map[string]*d.StrategyState{state.InstanceID: copy}, audits: map[string][]d.AuditRecord{state.InstanceID: rows}, environment: state.Environment}
+	return &MemoryStore{states: map[string]*d.StrategyState{state.InstanceID: copy}, audits: map[string][]d.AuditRecord{state.InstanceID: rows}, factorArchive: map[string]map[string]*d.FactorObservation{}, environment: state.Environment}
 }
 func (s *MemoryStore) Environment() string { return s.environment }
 func (s *MemoryStore) Read(ctx context.Context, id string) (*d.StrategyState, error) {
@@ -86,13 +88,44 @@ func (s *MemoryStore) Transaction(ctx context.Context, id string, fn func(*d.Str
 	if err := d.CheckAuditAppend(old, work); err != nil {
 		return err
 	}
+	removed, err := d.RemovedFactorObservations(old, work)
+	if err != nil {
+		return err
+	}
+	if err = d.PreserveLayerDays(old, work); err != nil {
+		return err
+	}
+	s.archiveMu.Lock()
+	defer s.archiveMu.Unlock()
+	archive := d.Clone(s.factorArchive[id])
+	if archive == nil {
+		archive = map[string]*d.FactorObservation{}
+	}
+	for factor, rows := range removed {
+		for _, row := range rows {
+			key := d.Digest([]string{factor, row.ObservationID})
+			if archive[key] != nil {
+				return &d.Error{Code: "FACTOR_OBSERVATION_IMMUTABLE", Status: 409}
+			}
+			archive[key] = d.Clone(&row)
+		}
+	}
 	for i, row := range work.Audit {
 		s.audits[id] = append(s.audits[id], d.AuditRecord{Sequence: old.AuditCount + i + 1, Payload: d.Clone(row)})
 	}
 	work.AuditCount += len(work.Audit)
 	work.Audit = nil
 	s.states[id] = work
+	s.factorArchive[id] = archive
 	return nil
+}
+
+// The archive has a separate lock: commands read immutable archived rows while
+// the aggregate transaction owns mu. Only that transaction writes the archive.
+func (s *MemoryStore) ReadFactorObservation(_ context.Context, id, factor, observation string) (*d.FactorObservation, error) {
+	s.archiveMu.RLock()
+	defer s.archiveMu.RUnlock()
+	return d.Clone(s.factorArchive[id][d.Digest([]string{factor, observation})]), nil
 }
 func (s *MemoryStore) CheckWorkload(_ context.Context, _ d.WorkloadIdentity, _ string) error {
 	return nil

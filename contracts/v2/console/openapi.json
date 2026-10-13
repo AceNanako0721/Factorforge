@@ -1634,6 +1634,12 @@
                                 "type": "array",
                                 "uniqueItems": true
                               },
+                              "kind": {
+                                "enum": [
+                                  "SCHEDULED_WINDOW"
+                                ],
+                                "type": "string"
+                              },
                               "label_status": {
                                 "enum": [
                                   "IMMATURE",
@@ -2195,6 +2201,76 @@
                                 "format": "date-time",
                                 "title": "Available Cutoff",
                                 "type": "string"
+                              },
+                              "components": {
+                                "anyOf": [
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "adjustment": {
+                                        "type": "string"
+                                      },
+                                      "assessment": {
+                                        "type": "string"
+                                      },
+                                      "baseline": {
+                                        "type": "string"
+                                      },
+                                      "combined": {
+                                        "type": "string"
+                                      },
+                                      "core": {
+                                        "type": "string"
+                                      },
+                                      "exposure": {
+                                        "type": "string"
+                                      },
+                                      "factors": {
+                                        "type": "null"
+                                      },
+                                      "level": {
+                                        "type": "string"
+                                      },
+                                      "observation_refs": {
+                                        "type": "null"
+                                      },
+                                      "scheduled": {
+                                        "type": "string"
+                                      },
+                                      "shadow": {
+                                        "type": "null"
+                                      },
+                                      "trigger_layer": {
+                                        "enum": [
+                                          "BASELINE",
+                                          "ASSESSMENT",
+                                          "SCHEDULED",
+                                          "ADJUSTMENT",
+                                          "UNATTRIBUTED"
+                                        ],
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "adjustment",
+                                      "assessment",
+                                      "baseline",
+                                      "combined",
+                                      "core",
+                                      "exposure",
+                                      "factors",
+                                      "level",
+                                      "observation_refs",
+                                      "scheduled",
+                                      "shadow",
+                                      "trigger_layer"
+                                    ],
+                                    "type": "object"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
                               },
                               "cycle_id": {
                                 "maxLength": 160,
@@ -5861,6 +5937,11 @@
                               "title": "Aggregate Version",
                               "type": "integer"
                             },
+                            "core_direction": {
+                              "maximum": 1,
+                              "minimum": -1,
+                              "type": "integer"
+                            },
                             "direction": {
                               "default": 0,
                               "title": "Direction",
@@ -5923,6 +6004,17 @@
                               ],
                               "title": "Last Adjustment"
                             },
+                            "last_adjustment_trade_at": {
+                              "anyOf": [
+                                {
+                                  "format": "date-time",
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
                             "last_cutoff": {
                               "anyOf": [
                                 {
@@ -5946,6 +6038,9 @@
                                 }
                               ],
                               "title": "Last Cycle"
+                            },
+                            "layer_ledger_blocked": {
+                              "type": "boolean"
                             },
                             "level": {
                               "default": 0,
@@ -5997,6 +6092,34 @@
                               "minLength": 1,
                               "title": "Regime Binding",
                               "type": "string"
+                            },
+                            "reverse_candidate": {
+                              "anyOf": [
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "direction": {
+                                      "enum": [
+                                        -1,
+                                        1
+                                      ],
+                                      "type": "integer"
+                                    },
+                                    "since": {
+                                      "format": "date-time",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "direction",
+                                    "since"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
                             },
                             "state": {
                               "default": "ACTIVE",
@@ -9529,6 +9652,76 @@
                                     "format": "date-time",
                                     "title": "Available Cutoff",
                                     "type": "string"
+                                  },
+                                  "components": {
+                                    "anyOf": [
+                                      {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "adjustment": {
+                                            "type": "string"
+                                          },
+                                          "assessment": {
+                                            "type": "string"
+                                          },
+                                          "baseline": {
+                                            "type": "string"
+                                          },
+                                          "combined": {
+                                            "type": "string"
+                                          },
+                                          "core": {
+                                            "type": "string"
+                                          },
+                                          "exposure": {
+                                            "type": "string"
+                                          },
+                                          "factors": {
+                                            "type": "null"
+                                          },
+                                          "level": {
+                                            "type": "string"
+                                          },
+                                          "observation_refs": {
+                                            "type": "null"
+                                          },
+                                          "scheduled": {
+                                            "type": "string"
+                                          },
+                                          "shadow": {
+                                            "type": "null"
+                                          },
+                                          "trigger_layer": {
+                                            "enum": [
+                                              "BASELINE",
+                                              "ASSESSMENT",
+                                              "SCHEDULED",
+                                              "ADJUSTMENT",
+                                              "UNATTRIBUTED"
+                                            ],
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "adjustment",
+                                          "assessment",
+                                          "baseline",
+                                          "combined",
+                                          "core",
+                                          "exposure",
+                                          "factors",
+                                          "level",
+                                          "observation_refs",
+                                          "scheduled",
+                                          "shadow",
+                                          "trigger_layer"
+                                        ],
+                                        "type": "object"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
                                   },
                                   "cycle_id": {
                                     "maxLength": 160,

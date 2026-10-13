@@ -19,6 +19,7 @@ var shapes = func() map[string]shape {
 		panic("invalid frozen request schema")
 	}
 	extendWindowShapes(s)
+	extendCompositionShapes(s)
 	return s
 }()
 

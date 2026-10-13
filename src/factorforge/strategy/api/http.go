@@ -106,6 +106,7 @@ func New(options Options) (http.Handler, error) {
 		{"/events/{event_id}/scores", "scores", "event_id"}, {"/objects/{object_id}/ledger", "ledger", "object_id"},
 		{"/cases/{case_id}/attributions", "attributions", "case_id"}, {"/cases/{case_id}/counterfactuals", "counterfactuals", "case_id"},
 		{"/parameter-activations", "parameter-activations", ""}, {"/audit", "audit", ""},
+		{"/factor-series", "factor-series", ""}, {"/scheduled-events", "scheduled-events", ""}, {"/templates", "templates", ""}, {"/layer-ledger", "layer-ledger", ""},
 	} {
 		registerWithAudit("GET", route.path, func(_ http.ResponseWriter, r *http.Request, p d.Identity) (any, int, error) {
 			filter, err := readFilter(r)
@@ -187,6 +188,22 @@ func New(options Options) (http.Handler, error) {
 			return nil, 0, err
 		}
 		v, e := service.Create(r.Context(), p, body)
+		return v, 201, e
+	})
+	register("POST", "/factor-observations", func(_ http.ResponseWriter, r *http.Request, p d.Identity) (any, int, error) {
+		var body d.FactorObservationCommand
+		if e := d.Decode(r.Body, &body); e != nil {
+			return nil, 0, e
+		}
+		v, e := service.SubmitFactorObservation(r.Context(), p, body)
+		return v, 201, e
+	})
+	register("POST", "/scheduled-events", func(_ http.ResponseWriter, r *http.Request, p d.Identity) (any, int, error) {
+		var body d.ScheduledEventCommand
+		if e := d.Decode(r.Body, &body); e != nil {
+			return nil, 0, e
+		}
+		v, e := service.UpsertScheduledEvent(r.Context(), p, body)
 		return v, 201, e
 	})
 	register("GET", "/objects/{object_id}", func(_ http.ResponseWriter, r *http.Request, p d.Identity) (any, int, error) {

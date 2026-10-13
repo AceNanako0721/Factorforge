@@ -34,6 +34,7 @@ type ParameterSnapshot struct {
 	QualityState   string                `json:"quality_state"`
 }
 type Policy struct {
+	Composition                 *Composition       `json:"composition,omitempty"`
 	Version                     string             `json:"version"`
 	QualityState                string             `json:"quality_state"`
 	SourceManifest              string             `json:"source_manifest"`
@@ -94,27 +95,31 @@ type Policy struct {
 	EventHalfLifeApproved       bool               `json:"event_half_life_approved"`
 }
 type ObservedObject struct {
-	ObjectID          string            `json:"object_id"`
-	InstanceID        string            `json:"instance_id"`
-	Environment       string            `json:"environment"`
-	TradingRunKey     RunBinding        `json:"trading_run_key"`
-	InstrumentKey     InstrumentBinding `json:"instrument_key"`
-	OwnerID           string            `json:"owner_id"`
-	State             string            `json:"state"`
-	ParameterVersion  string            `json:"parameter_version"`
-	PriceProxyBinding string            `json:"price_proxy_binding"`
-	RegimeBinding     string            `json:"regime_binding"`
-	TimePolicyVersion string            `json:"time_policy_version"`
-	AggregateVersion  int               `json:"aggregate_version"`
-	OwnerEpoch        int               `json:"owner_epoch"`
-	Level             int               `json:"level"`
-	Direction         int               `json:"direction"`
-	LastCycle         *time.Time        `json:"last_cycle"`
-	LastCutoff        *time.Time        `json:"last_cutoff"`
-	LastAdjustment    *time.Time        `json:"last_adjustment"`
-	RecoveryState     string            `json:"recovery_state"`
-	ActualQuantity    Decimal           `json:"actual_quantity"`
-	PendingQuantity   Decimal           `json:"pending_quantity"`
+	CoreDirection         int               `json:"core_direction,omitempty"`
+	ReverseCandidate      *ReverseCandidate `json:"reverse_candidate,omitempty"`
+	LastAdjustmentTradeAt *time.Time        `json:"last_adjustment_trade_at,omitempty"`
+	LayerLedgerBlocked    bool              `json:"layer_ledger_blocked,omitempty"`
+	ObjectID              string            `json:"object_id"`
+	InstanceID            string            `json:"instance_id"`
+	Environment           string            `json:"environment"`
+	TradingRunKey         RunBinding        `json:"trading_run_key"`
+	InstrumentKey         InstrumentBinding `json:"instrument_key"`
+	OwnerID               string            `json:"owner_id"`
+	State                 string            `json:"state"`
+	ParameterVersion      string            `json:"parameter_version"`
+	PriceProxyBinding     string            `json:"price_proxy_binding"`
+	RegimeBinding         string            `json:"regime_binding"`
+	TimePolicyVersion     string            `json:"time_policy_version"`
+	AggregateVersion      int               `json:"aggregate_version"`
+	OwnerEpoch            int               `json:"owner_epoch"`
+	Level                 int               `json:"level"`
+	Direction             int               `json:"direction"`
+	LastCycle             *time.Time        `json:"last_cycle"`
+	LastCutoff            *time.Time        `json:"last_cutoff"`
+	LastAdjustment        *time.Time        `json:"last_adjustment"`
+	RecoveryState         string            `json:"recovery_state"`
+	ActualQuantity        Decimal           `json:"actual_quantity"`
+	PendingQuantity       Decimal           `json:"pending_quantity"`
 }
 type EvidenceRef struct {
 	EvidenceID      string    `json:"evidence_id"`
@@ -195,49 +200,51 @@ type AdmissionReceipt struct {
 	CurrentVersion int        `json:"current_version"`
 }
 type DecisionView struct {
-	DecisionID          string         `json:"decision_id"`
-	ObjectID            string         `json:"object_id"`
-	CycleID             string         `json:"cycle_id"`
-	AvailableCutoff     time.Time      `json:"available_cutoff"`
-	PoolPlus            Decimal        `json:"pool_plus"`
-	PoolMinus           Decimal        `json:"pool_minus"`
-	PoolNet             Decimal        `json:"pool_net"`
-	PreviousLevel       int            `json:"previous_level"`
-	NewLevel            int            `json:"new_level"`
-	RawExposure         Decimal        `json:"raw_exposure"`
-	ProjectedExposure   Decimal        `json:"projected_exposure"`
-	TargetQuantity      Decimal        `json:"target_quantity"`
-	ActualQuantity      Decimal        `json:"actual_quantity"`
-	PendingQuantity     Decimal        `json:"pending_quantity"`
-	StopPlan            *StopPlan      `json:"stop_plan"`
-	ParameterVersion    string         `json:"parameter_version"`
-	InputHash           string         `json:"input_hash"`
-	ReasonCodes         []string       `json:"reason_codes"`
-	SourceEventVersions map[string]int `json:"source_event_versions"`
-	InputSnapshot       map[string]any `json:"input_snapshot"`
+	Components          *DecisionComponents `json:"components,omitempty"`
+	DecisionID          string              `json:"decision_id"`
+	ObjectID            string              `json:"object_id"`
+	CycleID             string              `json:"cycle_id"`
+	AvailableCutoff     time.Time           `json:"available_cutoff"`
+	PoolPlus            Decimal             `json:"pool_plus"`
+	PoolMinus           Decimal             `json:"pool_minus"`
+	PoolNet             Decimal             `json:"pool_net"`
+	PreviousLevel       int                 `json:"previous_level"`
+	NewLevel            int                 `json:"new_level"`
+	RawExposure         Decimal             `json:"raw_exposure"`
+	ProjectedExposure   Decimal             `json:"projected_exposure"`
+	TargetQuantity      Decimal             `json:"target_quantity"`
+	ActualQuantity      Decimal             `json:"actual_quantity"`
+	PendingQuantity     Decimal             `json:"pending_quantity"`
+	StopPlan            *StopPlan           `json:"stop_plan"`
+	ParameterVersion    string              `json:"parameter_version"`
+	InputHash           string              `json:"input_hash"`
+	ReasonCodes         []string            `json:"reason_codes"`
+	SourceEventVersions map[string]int      `json:"source_event_versions"`
+	InputSnapshot       map[string]any      `json:"input_snapshot"`
 }
 type TradingSnapshot struct {
-	RunKey          RunBinding                  `json:"run_key"`
-	Version         int                         `json:"version"`
-	At              time.Time                   `json:"at"`
-	Equity          Decimal                     `json:"equity"`
-	PolicyVersion   string                      `json:"policy_version"`
-	RiskLocks       []string                    `json:"risk_locks"`
-	RunState        string                      `json:"run_state"`
-	Actual          map[string]Decimal          `json:"actual"`
-	Pending         map[string]Decimal          `json:"pending"`
-	OwnerEpochs     map[string]int              `json:"owner_epochs"`
-	TargetVersions  map[string]int              `json:"target_versions"`
-	SourceDecisions []string                    `json:"source_decisions"`
-	Specs           map[string]map[string]any   `json:"specs"`
-	Samples         map[string]MarketSample     `json:"samples"`
-	Bars            map[string][]Bar            `json:"bars"`
-	Fills           []map[string]any            `json:"fills"`
-	Incomes         []map[string]any            `json:"incomes"`
-	ExternalChange  bool                        `json:"external_change"`
-	Protections     map[string][]map[string]any `json:"protections"`
-	OtherExposures  []ExposureRisk              `json:"other_exposures"`
-	AverageEntries  map[string]*Decimal         `json:"average_entries"`
+	Funding         map[string]FundingObservation `json:"funding,omitempty"`
+	RunKey          RunBinding                    `json:"run_key"`
+	Version         int                           `json:"version"`
+	At              time.Time                     `json:"at"`
+	Equity          Decimal                       `json:"equity"`
+	PolicyVersion   string                        `json:"policy_version"`
+	RiskLocks       []string                      `json:"risk_locks"`
+	RunState        string                        `json:"run_state"`
+	Actual          map[string]Decimal            `json:"actual"`
+	Pending         map[string]Decimal            `json:"pending"`
+	OwnerEpochs     map[string]int                `json:"owner_epochs"`
+	TargetVersions  map[string]int                `json:"target_versions"`
+	SourceDecisions []string                      `json:"source_decisions"`
+	Specs           map[string]map[string]any     `json:"specs"`
+	Samples         map[string]MarketSample       `json:"samples"`
+	Bars            map[string][]Bar              `json:"bars"`
+	Fills           []map[string]any              `json:"fills"`
+	Incomes         []map[string]any              `json:"incomes"`
+	ExternalChange  bool                          `json:"external_change"`
+	Protections     map[string][]map[string]any   `json:"protections"`
+	OtherExposures  []ExposureRisk                `json:"other_exposures"`
+	AverageEntries  map[string]*Decimal           `json:"average_entries"`
 }
 type TargetOutbox struct {
 	Decision       DecisionView    `json:"decision"`
@@ -257,6 +264,7 @@ type Reservation struct {
 	State         string `json:"state"`
 }
 type CaseRecord struct {
+	Kind                 string              `json:"kind,omitempty"`
 	CaseID               string              `json:"case_id"`
 	ObjectID             string              `json:"object_id"`
 	Direction            int                 `json:"direction"`
@@ -279,6 +287,11 @@ type CaseRecord struct {
 	LossCounted          bool                `json:"loss_counted"`
 }
 type StrategyState struct {
+	FactorSeries          Ordered[*FactorSeries]      `json:"factor_series,omitempty"`
+	ScheduledEvents       Ordered[*ScheduledEvent]    `json:"scheduled_events,omitempty"`
+	Templates             Ordered[*ScheduledTemplate] `json:"templates,omitempty"`
+	LayerLedger           Ordered[*LayerDay]          `json:"layer_ledger,omitempty"`
+	LayerSettlements      Ordered[*LayerSettlement]   `json:"layer_settlements,omitempty"`
 	TimeWindows           map[string]TimeWindowPlan   `json:"time_windows,omitempty"`
 	InstanceID            string                      `json:"instance_id"`
 	Environment           string                      `json:"environment"`

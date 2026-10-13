@@ -119,6 +119,9 @@ func Initialize(ctx context.Context, c config.Config) error {
 	for k, v := range d.Object(c.InitialRegistry["factor_manifests"]) {
 		state.FactorManifests.Set(k, d.Object(v))
 	}
+	if err = c.InstallCompositionRegistry(state); err != nil {
+		return err
+	}
 	store, err := postgres.Open(ctx, c.MigrationDatabaseURL, c.Environment, "worker")
 	if err != nil {
 		return err
