@@ -120,6 +120,9 @@ func TestP3InputDailyAdaptersAndWebhook(t *testing.T) {
 	var payload string
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.URL.Path, "chart") {
+			if !strings.HasPrefix(r.Header.Get("User-Agent"), "Factorforge-") {
+				t.Fatal("Yahoo request without an explicit User-Agent is rate limited")
+			}
 			payload = `{"chart":{"result":[{"timestamp":[1782912600],"indicators":{"quote":[{"open":[100],"high":[101],"low":[99],"close":[100],"volume":[200]}],"adjclose":[{"adjclose":[98]}]}}],"error":null}}`
 			io.WriteString(w, payload)
 			return
