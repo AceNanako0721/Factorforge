@@ -128,6 +128,7 @@ func extendCompositionShapes(s map[string]shape) {
 	// A scheduled window censored for missing prices, or with a zero return, has
 	// no direction; position cases keep producing only -1 or 1.
 	add("CaseRecord", "direction", map[string]any{"type": "integer", "enum": []int{-1, 0, 1}})
+	add("TradingSnapshot", "account_currency", map[string]any{"type": "string"})
 	add("TradingSnapshot", "funding", map[string]any{"type": "object", "additionalProperties": ref("FundingObservation")})
 	for key, n := range map[string]string{"factor_series": "FactorSeries", "scheduled_events": "ScheduledEvent", "templates": "ScheduledTemplate", "layer_ledger": "LayerDay", "layer_settlements": "LayerSettlement"} {
 		add("StrategyState", key, map[string]any{"type": "object", "additionalProperties": ref(n)})
