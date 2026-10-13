@@ -146,6 +146,7 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 					obj.RecoveryState = "NORMAL"
 				}
 				var sample *d.MarketSample
+				barSigma := false
 				if v, ok := snap.Samples[obj.ObjectID]; ok {
 					copy := v
 					sample = &copy
@@ -177,6 +178,19 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 							if v[name] != nil && d.Text(v[name]) != "" {
 								*target = d.Ptr(d.Amount(v[name]))
 							}
+						}
+					}
+					if !d.ValidManifest(bindings, "PRICE_PROXY", at) && state.Environment == "SIM" && sample.Sigma == nil {
+						// v2.6.2: without a registered proxy, SIM estimates sigma from
+						// completed candles; liquidity is assumed at the policy budget.
+						sigma, err := d.BarSigma(snap.Bars[obj.ObjectID], at, p.Numerical())
+						if err != nil {
+							return err
+						}
+						if sigma != nil {
+							sample.Sigma = sigma
+							sample.Liquidity = d.Ptr(p.LiquidityBudget)
+							barSigma = true
 						}
 					}
 					samples := state.Samples.Value(obj.ObjectID)
@@ -365,6 +379,9 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 				target, stress := actual, p.MaxStopFraction
 				var stop *d.StopPlan
 				reasons := append([]string{}, compositionReasons...)
+				if barSigma {
+					reasons = append(reasons, "SIGMA_FROM_BARS", "LIQUIDITY_ASSUMED")
+				}
 				if sample == nil || sample.Quality != "VALID" {
 					reasons = append(reasons, "PRICE_UNKNOWN")
 				} else {

@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 	"time"
 
@@ -279,5 +281,62 @@ func TestCompositionRiskAndUnsetParameterDecisionsKeepComponents(t *testing.T) {
 	}
 	if !sd.Has(decision.ReasonCodes, "ACTUAL_FILL_STOP_BUDGET_REDUCTION") {
 		t.Fatal(decision.ReasonCodes)
+	}
+}
+
+// v2.6.2: without a registered price proxy, SIM sizes from candle sigma.
+func TestBarSigmaFallbackSizesSimWithoutPriceProxy(t *testing.T) {
+	s, o, _, snap, id, at := compositionCycleBase(t)
+	sample := snap.Samples[o.ObjectID]
+	sample.Sigma, sample.Liquidity = nil, nil
+	snap.Samples[o.ObjectID] = sample
+	closes := []string{"100", "101", "99", "102", "100", "101"}
+	for i := range snap.Bars[o.ObjectID] {
+		snap.Bars[o.ObjectID][i].Close = compDecimal(closes[i])
+	}
+	cycle := app.DecisionCycle{Store: adapters.NewMemory(s), Trading: &compositionTrading{snap: snap}, Clock: adapters.NewReplay(at)}
+	outputs, err := cycle.Tick(context.Background(), id, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(outputs) != 1 || outputs[0].TargetQuantity.Sign() <= 0 || !sd.Has(outputs[0].ReasonCodes, "SIGMA_FROM_BARS") || !sd.Has(outputs[0].ReasonCodes, "LIQUIDITY_ASSUMED") {
+		t.Fatal("no candle-sigma sizing", outputs[0].ReasonCodes, outputs[0].TargetQuantity)
+	}
+}
+
+func TestBarSigmaEstimateAndGaps(t *testing.T) {
+	at := time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)
+	policy := sd.NumericalPolicy{NoiseWindow: 3, MaxBarGapSeconds: 600}
+	bars := func(closes ...float64) []sd.Bar {
+		out := []sd.Bar{}
+		for i, c := range closes {
+			close := at.Add(-time.Duration(len(closes)-1-i) * 5 * time.Minute)
+			out = append(out, sd.Bar{CloseAt: close, AvailableAt: close, Close: compDecimal(strconv.FormatFloat(c, 'f', -1, 64)), Final: true, Quality: "VALID"})
+		}
+		return out
+	}
+	sigma, err := sd.BarSigma(bars(100, 110, 99, 108.9), at, policy)
+	if err != nil || sigma == nil {
+		t.Fatal(sigma, err)
+	}
+	r := []float64{math.Log(1.1), math.Log(0.9), math.Log(1.1)}
+	mean := (r[0] + r[1] + r[2]) / 3
+	v := 0.0
+	for _, x := range r {
+		v += (x - mean) * (x - mean)
+	}
+	want := math.Sqrt(v / 2)
+	got, _ := strconv.ParseFloat(sigma.String(), 64)
+	if math.Abs(got-want) > 1e-12 {
+		t.Fatal("sigma", got, want)
+	}
+	if s, _ := sd.BarSigma(bars(100, 110, 99), at, policy); s != nil {
+		t.Fatal("short history produced sigma")
+	}
+	gapped := bars(100, 110, 99, 108.9)
+	gapped[0].CloseAt = gapped[0].CloseAt.Add(-time.Hour)
+	gapped[0].AvailableAt = gapped[0].CloseAt
+	if s, _ := sd.BarSigma(gapped, at, policy); s != nil {
+		t.Fatal("gapped history produced sigma")
 	}
 }
