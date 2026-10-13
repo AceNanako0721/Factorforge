@@ -109,3 +109,25 @@ func (c Calendar) Plan(ctx context.Context, objectID, policyVersion string, afte
 func (c Calendar) window(kind string, start, end time.Time) TimeWindow {
 	return TimeWindow{ID: "window-" + d.Digest([]any{c.Version, kind, start, end}), CalendarVersion: c.Version, Kind: kind, Start: start, End: end}
 }
+
+// CompletedSessions supplies actual exchange dates to input adapters. It does
+// not estimate a fixed count of calendar days for a trading-day lookback.
+func (c Calendar) CompletedSessions(ctx context.Context, before time.Time, count int) ([]TimeWindow, error) {
+	if count <= 0 || !d.UTC(before) || before.Before(c.ValidFrom) || !before.Before(c.ValidUntil) {
+		return nil, d.Fail("CALENDAR_SESSION_COVERAGE_REQUIRED", 503)
+	}
+	windows, e := c.Windows(ctx)
+	if e != nil {
+		return nil, e
+	}
+	result := []TimeWindow{}
+	for _, w := range windows {
+		if w.Kind == "REGULAR" && !w.End.After(before) {
+			result = append(result, w)
+		}
+	}
+	if len(result) < count {
+		return nil, d.Fail("CALENDAR_SESSION_COVERAGE_REQUIRED", 503)
+	}
+	return result[len(result)-count:], nil
+}

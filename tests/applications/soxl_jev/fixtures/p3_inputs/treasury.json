@@ -1,0 +1,11 @@
+[
+  {
+    "cusip": "91282CRF0",
+    "announcementDate": "2026-10-01T00:00:00",
+    "auctionDate": "2026-10-07T00:00:00",
+    "originalSecurityTerm": "10-Year",
+    "securityTerm": "9-Year 10-Month",
+    "closingTimeCompetitive": "01:00 PM",
+    "tips": "No"
+  }
+]
