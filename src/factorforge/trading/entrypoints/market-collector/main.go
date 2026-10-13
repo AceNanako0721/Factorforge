@@ -26,6 +26,7 @@ func run() error {
 	limit := flag.Int("trade-limit", 0, "trade query limit")
 	once := flag.Bool("once", false, "one acquisition")
 	simCapabilities := flag.Bool("sim-capabilities", false, "declare simulator protection/short capabilities (REPLAY runs only)")
+	simFrames := flag.Bool("sim-frames", false, "submit a simulation frame after each snapshot (SIM with --sim-capabilities only)")
 	flag.Parse()
 	multiplier, err := decimal.Parse(*multiple)
 	if err != nil || multiplier.Sign() <= 0 || *poll <= 0 || *lookback <= 0 || *delay < 0 || *limit < 1 || *limit > 1000 || *id == "" || *instrument == "" || *interval == "" {
@@ -38,11 +39,14 @@ func run() error {
 	if err = config.ValidateAPI(); err != nil {
 		return err
 	}
+	if *simFrames && (!*simCapabilities || config.Runtime.Environment != "SIM") {
+		return &d.Error{Code: "COLLECTOR_POLICY_INVALID", Status: 422}
+	}
 	ctx, cancel := r.Context()
 	defer cancel()
 	market := &binance.Market{Client: r.Client(10 * time.Second), Endpoint: config.Services.ExchangeAPIURL, Multipliers: map[string]string{*instrument: *multiple}, PublicationDelay: time.Duration(*delay) * time.Millisecond, SimCapabilities: *simCapabilities}
 	client := &httptrading.Client{HTTP: r.Client(15 * time.Second), Endpoint: config.Services.TradingAPIURL, Token: config.Credentials.TradingAPIToken}
-	collector := &workers.Collector{Market: market, Client: client, Key: d.RunKey{Environment: config.Runtime.Environment, AccountID: config.Trading.AccountID, RunID: *id}, TradeLimit: *limit}
+	collector := &workers.Collector{Market: market, Client: client, Key: d.RunKey{Environment: config.Runtime.Environment, AccountID: config.Trading.AccountID, RunID: *id}, TradeLimit: *limit, SimFrames: *simFrames}
 	for {
 		end := time.Now().UTC()
 		points, bars, err := collector.Collect(ctx, *instrument, *interval, end.Add(-time.Duration(*lookback)*time.Second), end)
