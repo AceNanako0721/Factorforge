@@ -23,8 +23,15 @@ func shape(t reflect.Type) map[string]any {
 		return map[string]any{"type": "boolean"}
 	case reflect.Int, reflect.Int64:
 		return map[string]any{"type": "integer"}
+	case reflect.Float64:
+		return map[string]any{"type": "number"}
 	case reflect.Slice:
 		return map[string]any{"type": "array", "items": shape(t.Elem())}
+	case reflect.Map:
+		if t.Key().Kind() != reflect.String {
+			panic("unsupported instance read contract type")
+		}
+		return map[string]any{"type": "object", "additionalProperties": shape(t.Elem())}
 	case reflect.Struct:
 		props := map[string]any{}
 		required := []string{}

@@ -839,8 +839,280 @@
           "report_id": {
             "type": "string"
           },
+          "shadow_assessment": {
+            "anyOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "available_at": {
+                    "format": "date-time",
+                    "pattern": "Z$",
+                    "type": "string"
+                  },
+                  "evidence_ref": {
+                    "type": "string"
+                  },
+                  "factor_id": {
+                    "type": "string"
+                  },
+                  "force_reduce": {
+                    "type": "boolean"
+                  },
+                  "inputs_hash": {
+                    "type": "string"
+                  },
+                  "observation_id": {
+                    "type": "string"
+                  },
+                  "supersedes": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "factor_id",
+                  "observation_id",
+                  "available_at",
+                  "value",
+                  "force_reduce",
+                  "inputs_hash",
+                  "evidence_ref"
+                ],
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "state": {
             "type": "string"
+          },
+          "watch_notification": {
+            "anyOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "abnormal_moves": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "daily_vol20": {
+                          "type": "number"
+                        },
+                        "intraday_return": {
+                          "type": "number"
+                        },
+                        "symbol": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "symbol",
+                        "intraday_return",
+                        "daily_vol20"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "events": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "confirmed_by_official": {
+                          "type": "boolean"
+                        },
+                        "direction_hint": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string"
+                        },
+                        "new_information": {
+                          "type": "string"
+                        },
+                        "novelty": {
+                          "type": "string"
+                        },
+                        "severity": {
+                          "type": "string"
+                        },
+                        "source_urls": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "subject": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "subject",
+                        "kind",
+                        "confirmed_by_official",
+                        "novelty",
+                        "severity",
+                        "direction_hint",
+                        "new_information",
+                        "source_urls"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "risk_refs": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "scheduled_risks": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "certainty": {
+                          "type": "string"
+                        },
+                        "event_type": {
+                          "type": "string"
+                        },
+                        "expected_at": {
+                          "format": "date-time",
+                          "pattern": "Z$",
+                          "type": "string"
+                        },
+                        "object_id": {
+                          "type": "string"
+                        },
+                        "revision": {
+                          "type": "integer"
+                        },
+                        "schedule_id": {
+                          "type": "string"
+                        },
+                        "source_ref": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string"
+                        },
+                        "window_times": {
+                          "additionalProperties": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "end_at": {
+                                "format": "date-time",
+                                "pattern": "Z$",
+                                "type": "string"
+                              },
+                              "start_at": {
+                                "format": "date-time",
+                                "pattern": "Z$",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "start_at",
+                              "end_at"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "schedule_id",
+                        "object_id",
+                        "event_type",
+                        "expected_at",
+                        "certainty",
+                        "source_ref",
+                        "revision",
+                        "status"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "sources": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "available_at": {
+                          "format": "date-time",
+                          "pattern": "Z$",
+                          "type": "string"
+                        },
+                        "official": {
+                          "type": "boolean"
+                        },
+                        "published_at": {
+                          "anyOf": [
+                            {
+                              "format": "date-time",
+                              "pattern": "Z$",
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "source_grade": {
+                          "type": "string"
+                        },
+                        "subject": {
+                          "type": "string"
+                        },
+                        "summary": {
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "url",
+                        "subject",
+                        "title",
+                        "summary",
+                        "source_grade",
+                        "official",
+                        "available_at",
+                        "published_at"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "events",
+                  "sources",
+                  "abnormal_moves",
+                  "risk_refs",
+                  "scheduled_risks"
+                ],
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
