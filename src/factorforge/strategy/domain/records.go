@@ -224,6 +224,7 @@ type DecisionView struct {
 }
 type TradingSnapshot struct {
 	Funding         map[string]FundingObservation `json:"funding,omitempty"`
+	AccountCurrency string                        `json:"account_currency,omitempty"`
 	RunKey          RunBinding                    `json:"run_key"`
 	Version         int                           `json:"version"`
 	At              time.Time                     `json:"at"`

@@ -90,7 +90,14 @@ func TestNativeP2UsesNativeP1SIMOverHTTP(t *testing.T) {
 			spec[key] = sd.JSONValue(sd.Unique(sd.Strings(spec[key])))
 		}
 	}
-	if e := firstDifference(expected, sd.JSONValue(snapshot), "public-P1-snapshot"); e != nil {
+	// The frozen fixture predates account_currency (taken from P1's account view
+	// since 2026-10-13); compare the rest unchanged.
+	projected := sd.Object(sd.JSONValue(snapshot))
+	if projected["account_currency"] != "USD" {
+		t.Fatal("account currency not taken from P1", projected["account_currency"])
+	}
+	delete(projected, "account_currency")
+	if e := firstDifference(expected, projected, "public-P1-snapshot"); e != nil {
 		t.Fatal(e)
 	}
 	cycle := app.DecisionCycle{Store: store, Clock: clock, Trading: client}
