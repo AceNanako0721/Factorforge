@@ -5,6 +5,7 @@ import (
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/domain"
 	p "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/ports"
 	"math"
+	"strings"
 	"time"
 )
 
@@ -22,8 +23,15 @@ type BaselineParameters struct {
 func Parameters2026a() BaselineParameters {
 	return BaselineParameters{"2026a", "soxx-trend-vol@2026a", 50, 200, 0.02, 20, 0.4, "E5-c8b5e289af27f315a4e1b5a8f7c5c35d576a667b3dc8f48060dbdcaab7a72e0f-2026-13-8"}
 }
+
+// versionedFactor requires the registered factor id to name its parameter
+// version (soxx-trend-vol@2026a or soxx-trend-vol-2026a), so a new parameter set
+// is always a new factor and old observations never carry over.
+func versionedFactor(id, version string) bool {
+	return strings.HasPrefix(id, "soxx-trend-vol") && (strings.HasSuffix(id, "@"+version) || strings.HasSuffix(id, "-"+version)) && len(id) == len("soxx-trend-vol")+1+len(version)
+}
 func (p BaselineParameters) Valid() bool {
-	return p.Version != "" && p.FactorID == "soxx-trend-vol@"+p.Version && p.Fast > 0 && p.Slow > p.Fast && p.VolDays > 1 && p.VolDays < p.Slow && d.Finite(p.Hysteresis) && p.Hysteresis >= 0 && p.Hysteresis < 1 && d.Finite(p.VolThreshold) && p.VolThreshold > 0 && p.EvidenceRef != ""
+	return p.Version != "" && versionedFactor(p.FactorID, p.Version) && p.Fast > 0 && p.Slow > p.Fast && p.VolDays > 1 && p.VolDays < p.Slow && d.Finite(p.Hysteresis) && p.Hysteresis >= 0 && p.Hysteresis < 1 && d.Finite(p.VolThreshold) && p.VolThreshold > 0 && p.EvidenceRef != ""
 }
 func BaselineValue(bars []d.DailyBar, params BaselineParameters, previous *d.FactorObservation) (string, error) {
 	if !params.Valid() || len(bars) < params.Slow {
