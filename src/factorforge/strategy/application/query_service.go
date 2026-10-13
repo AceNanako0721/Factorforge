@@ -179,6 +179,7 @@ func (q QueryService) Trace(ctx context.Context, identity d.Identity, resource, 
 		return q.auditPage(ctx, identity, state, filter, allowed, position, limit, binding, issued)
 	}
 	counts := map[string]int{"objects": state.Objects.Len(), "events": state.EventVersions.Len(), "event": state.EventVersions.Len(), "scores": state.Scores.Len(), "ledger": len(state.Ledger), "attributions": state.Attributions.Len(), "counterfactuals": state.Counterfactuals.Len()}
+	counts["factor-series"], counts["scheduled-events"], counts["templates"], counts["layer-ledger"] = state.FactorSeries.Len(), state.ScheduledEvents.Len(), state.Templates.Len(), state.LayerLedger.Len()
 	var audits []d.AuditRecord
 	if resource == "parameter-activations" {
 		var total int
@@ -344,6 +345,59 @@ func traceRows(s *d.StrategyState, resource, id string, f ReadFilter, audits []d
 		}
 	}
 	switch resource {
+	case "factor-series":
+		for _, series := range s.FactorSeries.Values() {
+			ids := []string{}
+			for _, obj := range s.Objects.Values() {
+				p := s.Policies.Value(obj.TimePolicyVersion)
+				if p == nil || p.Composition == nil {
+					continue
+				}
+				uses := false
+				for _, f := range p.Composition.Baseline {
+					uses = uses || f.FactorID == series.Definition.FactorID
+				}
+				uses = uses || p.Composition.Assessment != nil && p.Composition.Assessment.FactorID == series.Definition.FactorID
+				if uses {
+					ids = append(ids, obj.ObjectID)
+				}
+			}
+			var at *time.Time
+			if n := len(series.Observations); n > 0 {
+				at = &series.Observations[n-1].AvailableAt
+			}
+			observations := []map[string]any{}
+			for _, o := range series.Observations {
+				v := d.Map(o)
+				delete(v, "referenced")
+				observations = append(observations, v)
+			}
+			add(series.Definition.FactorID, at, map[string]any{"definition": series.Definition, "observations": observations}, ids...)
+		}
+	case "scheduled-events":
+		for _, e := range s.ScheduledEvents.Values() {
+			v := d.Map(e)
+			delete(v, "windows")
+			add(e.ScheduleID, &e.ExpectedAt, v, e.ObjectID)
+		}
+	case "templates":
+		for _, key := range s.Templates.Keys() {
+			ids := []string{}
+			for _, e := range s.ScheduledEvents.Values() {
+				if strings.HasPrefix(key, e.EventType+"/") {
+					ids = append(ids, e.ObjectID)
+				}
+			}
+			add(key, nil, map[string]any{"template_key": key, "template": s.Templates.Value(key)}, d.Unique(ids)...)
+		}
+	case "layer-ledger":
+		for _, row := range s.LayerLedger.Values() {
+			at, err := time.Parse("2006-01-02", row.Date)
+			if err != nil {
+				return nil, readError("STORE_STATE_INVALID", 503)
+			}
+			add(row.ObjectID+"/"+row.Date, &at, d.Map(row), row.ObjectID)
+		}
 	case "objects":
 		for _, o := range s.Objects.Values() {
 			add(o.ObjectID, nil, map[string]any{"object_id": o.ObjectID, "state": o.State, "instrument_key": o.InstrumentKey, "parameter_version": o.ParameterVersion, "aggregate_version": o.AggregateVersion, "owner_epoch": o.OwnerEpoch, "recovery_state": o.RecoveryState}, o.ObjectID)

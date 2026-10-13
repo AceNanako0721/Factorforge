@@ -39,7 +39,11 @@ func InjectReady(state *d.StrategyState, obj *d.ObservedObject, at time.Time, sa
 				}
 			}
 			if old != nil && score.RevisionKind == "REVISION" {
-				if old.State != "ACTIVE" || score.Vector.Direction != old.Direction {
+				direction := score.Vector.Direction
+				if state.Parameters.Value(old.FrozenParameterVersion).Values["w"].Sign() < 0 {
+					direction = -direction
+				}
+				if old.State != "ACTIVE" || direction != old.Direction {
 					receipt.State = "QUARANTINED"
 					receipt.ReasonCodes = []string{"INVALID_CONTRIBUTION_OR_DIRECTION_REVISION"}
 					continue
@@ -129,7 +133,11 @@ func InjectReady(state *d.StrategyState, obj *d.ObservedObject, at time.Time, sa
 				for _, c := range event.Claims {
 					weights[d.FactKey(c)] = c.Weight
 				}
-				contribution := &d.Contribution{ContributionID: "contribution-" + id, ObjectID: obj.ObjectID, EventID: event.EventID, FamilyID: event.FamilyID, Direction: score.Vector.Direction, InitialAmount: accepted, EffectiveAt: tau, LastUpdatedAt: tau, HalfLife: h, Eta: params.Values["eta"], ReferencePrice: reference.Price, ReferenceBenchmark: reference.Benchmark, FrozenParameterVersion: params.Version, ScoreID: id, Quality: *score.Vector.QualityScore, FactWeights: weights, State: "ACTIVE"}
+				direction := score.Vector.Direction
+				if params.Values["w"].Sign() < 0 {
+					direction = -direction
+				}
+				contribution := &d.Contribution{ContributionID: "contribution-" + id, ObjectID: obj.ObjectID, EventID: event.EventID, FamilyID: event.FamilyID, Direction: direction, InitialAmount: accepted, EffectiveAt: tau, LastUpdatedAt: tau, HalfLife: h, Eta: params.Values["eta"], ReferencePrice: reference.Price, ReferenceBenchmark: reference.Benchmark, FrozenParameterVersion: params.Version, ScoreID: id, Quality: *score.Vector.QualityScore, FactWeights: weights, State: "ACTIVE"}
 				state.Contributions.Set(contribution.ContributionID, contribution)
 				if err := state.Append(contribution, d.LedgerEntry{At: tau, Reason: "INJECTION", Injection: accepted, RejectedAmount: m.Sub(raw, accepted)}); err != nil {
 					return err

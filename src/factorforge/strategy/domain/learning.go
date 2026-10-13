@@ -27,7 +27,8 @@ func Propose(s *StrategyState, obj *ObservedObject, parameter string, evidence [
 		gates := current.EvidenceGates
 		reason := ""
 		m := Math()
-		if !Has(learnable, parameter) || parameter == "eta" && current.Values["eta_anchor"].Cmp(One()) == 0 {
+		isLayer := compositionParameter(s, obj, parameter)
+		if !Has(learnable, parameter) && !isLayer || parameter == "eta" && current.Values["eta_anchor"].Cmp(One()) == 0 {
 			reason = "PARAMETER_NOT_LEARNABLE"
 		} else if current.QualityState != "VALIDATED" || !stable {
 			reason = "REGISTRY_OR_REGIME_UNVALIDATED"
@@ -92,7 +93,7 @@ func Propose(s *StrategyState, obj *ObservedObject, parameter string, evidence [
 			if Int(len(usable)).Cmp(gates["min_groups"]) < 0 || neff.Cmp(gates["min_neff"]) < 0 || Int(nonzero).Cmp(gates["min_repeats"]) < 0 {
 				reason = "INSUFFICIENT_INDEPENDENT_EVIDENCE"
 			} else {
-				uncertain := mean.Sign() == 0 || gates["ci_low"].Sign() <= 0 && gates["ci_high"].Sign() >= 0
+				uncertain := mean.Sign() == 0 || !isLayer && gates["ci_low"].Sign() <= 0 && gates["ci_high"].Sign() >= 0
 				for _, e := range usable {
 					uncertain = uncertain || m.Mul(Amount(e["block_ci_low"]), Amount(e["block_ci_high"])).Sign() <= 0
 				}
@@ -152,14 +153,50 @@ func Propose(s *StrategyState, obj *ObservedObject, parameter string, evidence [
 		if !ok {
 			return &Error{"PARAMETER_BOUNDS_UNSET", 422}
 		}
-		value := Min(bounds[1], Max(bounds[0], m.Add(current.Values[parameter], m.Mul(Int(mean.Sign()), current.Steps[parameter]))))
+		currentValue, present := current.Values[parameter]
+		if !present && isLayer {
+			currentValue, _ = CompositionParameterValue(s, obj, parameter)
+		}
+		value := Min(bounds[1], Max(bounds[0], m.Add(currentValue, m.Mul(Int(mean.Sign()), current.Steps[parameter]))))
+		promotion := isLayer && compositionState(s, obj, parameter) == "SHADOW"
+		if isLayer {
+			state := compositionState(s, obj, parameter)
+			if state == "DISABLED" || promotion && mean.Sign() <= 0 || state == "ENABLED" && (currentValue.Sign() == 0 || mean.Sign() != -currentValue.Sign()) {
+				decision["reason"] = "LAYER_SIGNAL_NOT_ACTIONABLE"
+				return m.Err()
+			}
+			if !promotion && value.Sign() != currentValue.Sign() {
+				value = Zero()
+			}
+		}
+		if promotion {
+			if _, ok := gates["promotion_min_days"]; !ok {
+				decision["reason"] = "EVIDENCE_GATES_UNSET"
+				return nil
+			}
+			for _, e := range usable {
+				if Int(Number(e["promotion_days"])).Cmp(gates["promotion_min_days"]) < 0 {
+					decision["reason"] = "INSUFFICIENT_PROMOTION_DAYS"
+					return nil
+				}
+			}
+			value = Min(bounds[1], Max(bounds[0], current.Steps[parameter]))
+		}
+		if parameter == "w" && value.Sign() != 0 && (currentValue.Sign() == 0 || value.Sign() != currentValue.Sign()) && (Int(len(usable)).Cmp(m.Mul(Int(2), gates["min_groups"])) < 0 || neff.Cmp(m.Mul(Int(2), gates["min_neff"])) < 0) {
+			decision["reason"] = "INSUFFICIENT_CROSS_ZERO_EVIDENCE"
+			return m.Err()
+		}
 		parent := current
 		if current.ParentVersion != nil {
 			if v := s.Parameters.Value(*current.ParentVersion); v != nil {
 				parent = v
 			}
 		}
-		if value.Cmp(current.Values[parameter]) == 0 || m.Abs(m.Sub(value, parent.Values[parameter])).Cmp(gates["drift_budget"]) > 0 {
+		parentValue := parent.Values[parameter]
+		if _, ok := parent.Values[parameter]; !ok && isLayer {
+			parentValue, _ = CompositionParameterValue(s, obj, parameter)
+		}
+		if value.Cmp(currentValue) == 0 && !promotion || m.Abs(m.Sub(value, parentValue)).Cmp(gates["drift_budget"]) > 0 {
 			decision["reason"] = "BOUND_OR_DRIFT_LIMIT"
 			return m.Err()
 		}
@@ -170,6 +207,9 @@ func Propose(s *StrategyState, obj *ObservedObject, parameter string, evidence [
 		}
 		id := "candidate-" + Digest([]any{obj.ObjectID, parameter, current.Version, ids})[:24]
 		candidate := map[string]any{"candidate_id": id, "object_id": obj.ObjectID, "parameter": parameter, "parent_version": current.Version, "value": value.String(), "error": mean.String(), "state": "PROPOSED", "created_at": ISO(at), "proposal_evidence": ids, "proposal_groups": groups, "history": []string{"PROPOSED"}}
+		if promotion {
+			candidate["promotion"] = true
+		}
 		s.Candidates.Set(id, candidate)
 		result = candidate
 		return m.Err()
@@ -228,6 +268,14 @@ func Activate(s *StrategyState, obj *ObservedObject, at time.Time) error {
 			next.ParentVersion = Ptr(previous.Version)
 			next.Values[Text(c["parameter"])] = Amount(c["value"])
 			next.ValidFrom = at
+			if compositionParameter(s, obj, Text(c["parameter"])) && !validCompositionLearning(s, obj, &next) {
+				c["state"] = "REJECTED"
+				c["reason"] = "COMPOSITION_BOUND_CONFLICT"
+				continue
+			}
+			if err := applyLayerCandidate(s, obj, c, previous, &next, at); err != nil {
+				return err
+			}
 			s.Parameters.Set(next.Version, &next)
 			obj.ParameterVersion = next.Version
 			s.ConsumedEvidence = Unique(append(s.ConsumedEvidence, Strings(c["proposal_evidence"])...))
@@ -264,7 +312,11 @@ func Monitor(s *StrategyState, obj *ObservedObject, at time.Time) error {
 			key := Text(c["parameter"])
 			value := params.Values[key]
 			b := params.Bounds[key]
-			if value.Cmp(b[0]) < 0 || value.Cmp(b[1]) > 0 || m.Abs(m.Sub(value, parent.Values[key])).Cmp(params.EvidenceGates["drift_budget"]) > 0 {
+			parentValue := parent.Values[key]
+			if _, ok := parent.Values[key]; !ok && compositionParameter(s, obj, key) {
+				parentValue, _ = CompositionParameterValue(s, obj, key)
+			}
+			if value.Cmp(b[0]) < 0 || value.Cmp(b[1]) > 0 || m.Abs(m.Sub(value, parentValue)).Cmp(params.EvidenceGates["drift_budget"]) > 0 {
 				if e := Rollback(s, Text(c["candidate_id"]), "BOUND_OR_DRIFT_MONITOR", at); e != nil {
 					return e
 				}

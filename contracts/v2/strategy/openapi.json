@@ -109,6 +109,43 @@
         ],
         "type": "object"
       },
+      "AdjustmentRule": {
+        "additionalProperties": false,
+        "properties": {
+          "cap": {
+            "ge": "0",
+            "le": "1",
+            "type": "string",
+            "x-decimal": true
+          },
+          "event_only_cap": {
+            "ge": "0",
+            "le": "1",
+            "type": "string",
+            "x-decimal": true
+          },
+          "scale": {
+            "gt": "0",
+            "type": "string",
+            "x-decimal": true
+          },
+          "state": {
+            "enum": [
+              "ENABLED",
+              "SHADOW",
+              "DISABLED"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "cap",
+          "event_only_cap",
+          "scale",
+          "state"
+        ],
+        "type": "object"
+      },
       "AdmissionReceipt": {
         "additionalProperties": false,
         "properties": {
@@ -175,6 +212,42 @@
           "current_version"
         ],
         "title": "AdmissionReceipt",
+        "type": "object"
+      },
+      "AssessmentFactor": {
+        "additionalProperties": false,
+        "properties": {
+          "evidence_ref": {
+            "type": "string"
+          },
+          "factor_id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "force_reduce": {
+            "type": "boolean"
+          },
+          "max_age_seconds": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "state": {
+            "enum": [
+              "ENABLED",
+              "SHADOW",
+              "DISABLED"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "evidence_ref",
+          "factor_id",
+          "force_reduce",
+          "max_age_seconds",
+          "state"
+        ],
         "type": "object"
       },
       "AttributionCandidate": {
@@ -565,6 +638,43 @@
         },
         "type": "object"
       },
+      "BaselineFactor": {
+        "additionalProperties": false,
+        "properties": {
+          "evidence_ref": {
+            "type": "string"
+          },
+          "factor_id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "max_age_seconds": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "state": {
+            "enum": [
+              "ENABLED",
+              "SHADOW",
+              "DISABLED"
+            ],
+            "type": "string"
+          },
+          "weight": {
+            "type": "string",
+            "x-decimal": true
+          }
+        },
+        "required": [
+          "evidence_ref",
+          "factor_id",
+          "max_age_seconds",
+          "state",
+          "weight"
+        ],
+        "type": "object"
+      },
       "CaseRecord": {
         "additionalProperties": false,
         "properties": {
@@ -647,6 +757,12 @@
             "title": "Income Ids",
             "type": "array",
             "uniqueItems": true
+          },
+          "kind": {
+            "enum": [
+              "SCHEDULED_WINDOW"
+            ],
+            "type": "string"
           },
           "label_status": {
             "enum": [
@@ -929,6 +1045,63 @@
           "verified_at",
           "evidence_refs",
           "supersedes_claim_id"
+        ],
+        "type": "object"
+      },
+      "Composition": {
+        "additionalProperties": false,
+        "properties": {
+          "adjustment": {
+            "$ref": "#/components/schemas/AdjustmentRule"
+          },
+          "allow_short_baseline": {
+            "type": "boolean"
+          },
+          "assessment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AssessmentFactor"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "baseline": {
+            "items": {
+              "$ref": "#/components/schemas/BaselineFactor"
+            },
+            "type": "array"
+          },
+          "levels": {
+            "items": {
+              "$ref": "#/components/schemas/Level"
+            },
+            "type": "array"
+          },
+          "missing_policy": {
+            "enum": [
+              "ZERO",
+              "HOLD_REDUCE_ONLY"
+            ],
+            "type": "string"
+          },
+          "rebalance": {
+            "$ref": "#/components/schemas/RebalanceRule"
+          },
+          "scheduled": {
+            "$ref": "#/components/schemas/LayerCap"
+          }
+        },
+        "required": [
+          "adjustment",
+          "allow_short_baseline",
+          "assessment",
+          "baseline",
+          "levels",
+          "missing_policy",
+          "rebalance",
+          "scheduled"
         ],
         "type": "object"
       },
@@ -1245,6 +1418,89 @@
         "title": "CreateObject",
         "type": "object"
       },
+      "DecisionComponents": {
+        "additionalProperties": false,
+        "properties": {
+          "adjustment": {
+            "type": "string",
+            "x-decimal": true
+          },
+          "assessment": {
+            "type": "string",
+            "x-decimal": true
+          },
+          "baseline": {
+            "type": "string",
+            "x-decimal": true
+          },
+          "combined": {
+            "type": "string",
+            "x-decimal": true
+          },
+          "core": {
+            "type": "string",
+            "x-decimal": true
+          },
+          "exposure": {
+            "type": "string",
+            "x-decimal": true
+          },
+          "factors": {
+            "additionalProperties": {
+              "type": "string",
+              "x-decimal": true
+            },
+            "type": "object"
+          },
+          "level": {
+            "type": "string",
+            "x-decimal": true
+          },
+          "observation_refs": {
+            "additionalProperties": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "scheduled": {
+            "type": "string",
+            "x-decimal": true
+          },
+          "shadow": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ShadowComponent"
+            },
+            "type": "object"
+          },
+          "trigger_layer": {
+            "enum": [
+              "BASELINE",
+              "ASSESSMENT",
+              "SCHEDULED",
+              "ADJUSTMENT",
+              "UNATTRIBUTED"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "adjustment",
+          "assessment",
+          "baseline",
+          "combined",
+          "core",
+          "exposure",
+          "factors",
+          "level",
+          "observation_refs",
+          "scheduled",
+          "shadow",
+          "trigger_layer"
+        ],
+        "type": "object"
+      },
       "DecisionView": {
         "additionalProperties": false,
         "properties": {
@@ -1256,6 +1512,16 @@
             "format": "date-time",
             "title": "Available Cutoff",
             "type": "string"
+          },
+          "components": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecisionComponents"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "cycle_id": {
             "maxLength": 160,
@@ -1743,6 +2009,250 @@
         "title": "EvidenceRef",
         "type": "object"
       },
+      "FactorDefinition": {
+        "additionalProperties": false,
+        "properties": {
+          "cadence_seconds": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "factor_id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "purpose": {
+            "enum": [
+              "BASELINE",
+              "ASSESSMENT"
+            ],
+            "type": "string"
+          },
+          "source_manifest": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "value_max": {
+            "ge": "1",
+            "le": "1",
+            "type": "string",
+            "x-decimal": true
+          },
+          "value_min": {
+            "ge": "-1",
+            "le": "-1",
+            "type": "string",
+            "x-decimal": true
+          }
+        },
+        "required": [
+          "cadence_seconds",
+          "factor_id",
+          "purpose",
+          "source_manifest",
+          "value_max",
+          "value_min"
+        ],
+        "type": "object"
+      },
+      "FactorObservation": {
+        "additionalProperties": false,
+        "properties": {
+          "available_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "evidence_ref": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "force_reduce": {
+            "default": false,
+            "type": "boolean"
+          },
+          "inputs_hash": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "observation_id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "referenced": {
+            "type": "boolean"
+          },
+          "supersedes": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "value": {
+            "type": "string",
+            "x-decimal": true
+          }
+        },
+        "required": [
+          "available_at",
+          "evidence_ref",
+          "inputs_hash",
+          "observation_id",
+          "value"
+        ],
+        "type": "object"
+      },
+      "FactorObservationCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "available_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "evidence_ref": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "expected_version": {
+            "ge": "0",
+            "minimum": 0,
+            "title": "Expected Version",
+            "type": "integer"
+          },
+          "factor_id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "force_reduce": {
+            "default": false,
+            "type": "boolean"
+          },
+          "idempotency_key": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "inputs_hash": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "observation_id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "request_id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Request Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "strategy-2.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "supersedes": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "value": {
+            "type": "string",
+            "x-decimal": true
+          }
+        },
+        "required": [
+          "available_at",
+          "evidence_ref",
+          "expected_version",
+          "factor_id",
+          "idempotency_key",
+          "inputs_hash",
+          "observation_id",
+          "reason",
+          "request_id",
+          "schema_version",
+          "value"
+        ],
+        "type": "object"
+      },
+      "FactorSeries": {
+        "additionalProperties": false,
+        "properties": {
+          "definition": {
+            "$ref": "#/components/schemas/FactorDefinition"
+          },
+          "observations": {
+            "items": {
+              "$ref": "#/components/schemas/FactorObservation"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "definition",
+          "observations"
+        ],
+        "type": "object"
+      },
+      "FundingObservation": {
+        "additionalProperties": false,
+        "properties": {
+          "interval_hours": {
+            "gt": "0",
+            "type": "string",
+            "x-decimal": true
+          },
+          "next_funding_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "observed_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "rate": {
+            "type": "string",
+            "x-decimal": true
+          }
+        },
+        "required": [
+          "interval_hours",
+          "next_funding_at",
+          "observed_at",
+          "rate"
+        ],
+        "type": "object"
+      },
       "InstrumentBinding": {
         "additionalProperties": false,
         "properties": {
@@ -1772,6 +2282,173 @@
           "instrument_id"
         ],
         "title": "InstrumentBinding",
+        "type": "object"
+      },
+      "LayerCap": {
+        "additionalProperties": false,
+        "properties": {
+          "cap": {
+            "ge": "0",
+            "le": "1",
+            "type": "string",
+            "x-decimal": true
+          },
+          "state": {
+            "enum": [
+              "ENABLED",
+              "SHADOW",
+              "DISABLED"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "cap",
+          "state"
+        ],
+        "type": "object"
+      },
+      "LayerDay": {
+        "additionalProperties": false,
+        "properties": {
+          "cost_fee": {
+            "type": "string",
+            "x-decimal": true
+          },
+          "cost_funding": {
+            "type": "string",
+            "x-decimal": true
+          },
+          "date": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "entries": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/LayerEntry"
+            },
+            "type": "object"
+          },
+          "object_id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "pnl": {
+            "type": "string",
+            "x-decimal": true
+          },
+          "sealed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "cost_fee",
+          "cost_funding",
+          "date",
+          "entries",
+          "object_id",
+          "pnl",
+          "sealed"
+        ],
+        "type": "object"
+      },
+      "LayerEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "cost_fee": {
+            "type": "string",
+            "x-decimal": true
+          },
+          "cost_funding": {
+            "type": "string",
+            "x-decimal": true
+          },
+          "exposure_seconds": {
+            "type": "string",
+            "x-decimal": true
+          },
+          "hypothetical": {
+            "type": "boolean"
+          },
+          "pnl": {
+            "type": "string",
+            "x-decimal": true
+          }
+        },
+        "required": [
+          "cost_fee",
+          "cost_funding",
+          "exposure_seconds",
+          "hypothetical",
+          "pnl"
+        ],
+        "type": "object"
+      },
+      "LayerSettlement": {
+        "additionalProperties": false,
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "components": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecisionComponents"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "equity": {
+            "gt": "0",
+            "type": "string",
+            "x-decimal": true
+          },
+          "price": {
+            "gt": "0",
+            "type": "string",
+            "x-decimal": true
+          },
+          "quantity": {
+            "type": "string",
+            "x-decimal": true
+          },
+          "seen_fills": {
+            "additionalProperties": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "seen_incomes": {
+            "additionalProperties": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "shadow_exposure": {
+            "additionalProperties": {
+              "type": "string",
+              "x-decimal": true
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "at",
+          "components",
+          "equity",
+          "price",
+          "quantity",
+          "seen_fills",
+          "seen_incomes",
+          "shadow_exposure"
+        ],
         "type": "object"
       },
       "LearningDecisionView": {
@@ -1973,6 +2650,11 @@
             "title": "Aggregate Version",
             "type": "integer"
           },
+          "core_direction": {
+            "maximum": 1,
+            "minimum": -1,
+            "type": "integer"
+          },
           "direction": {
             "default": 0,
             "title": "Direction",
@@ -2007,6 +2689,17 @@
             ],
             "title": "Last Adjustment"
           },
+          "last_adjustment_trade_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "last_cutoff": {
             "anyOf": [
               {
@@ -2030,6 +2723,9 @@
               }
             ],
             "title": "Last Cycle"
+          },
+          "layer_ledger_blocked": {
+            "type": "boolean"
           },
           "level": {
             "default": 0,
@@ -2081,6 +2777,16 @@
             "minLength": 1,
             "title": "Regime Binding",
             "type": "string"
+          },
+          "reverse_candidate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReverseCandidate"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "state": {
             "default": "ACTIVE",
@@ -2264,6 +2970,16 @@
           "cleanup_threshold": {
             "title": "Cleanup Threshold",
             "type": "string"
+          },
+          "composition": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Composition"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "cooldown_seconds": {
             "minimum": 0,
@@ -2940,6 +3656,90 @@
         ],
         "type": "object"
       },
+      "ReadPage_FactorSeries": {
+        "additionalProperties": false,
+        "properties": {
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FactorSeries"
+            },
+            "type": "array"
+          },
+          "observed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "snapshot_version": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "cursor",
+          "snapshot_version",
+          "observed_at"
+        ],
+        "type": "object"
+      },
+      "ReadPage_LayerDay": {
+        "additionalProperties": false,
+        "properties": {
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LayerDay"
+            },
+            "type": "array"
+          },
+          "observed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "snapshot_version": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "cursor",
+          "snapshot_version",
+          "observed_at"
+        ],
+        "type": "object"
+      },
       "ReadPage_LedgerEntry": {
         "additionalProperties": false,
         "properties": {
@@ -3024,6 +3824,48 @@
         ],
         "type": "object"
       },
+      "ReadPage_ScheduledEventRead": {
+        "additionalProperties": false,
+        "properties": {
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ScheduledEventRead"
+            },
+            "type": "array"
+          },
+          "observed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "snapshot_version": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "cursor",
+          "snapshot_version",
+          "observed_at"
+        ],
+        "type": "object"
+      },
       "ReadPage_ScoreReadView": {
         "additionalProperties": false,
         "properties": {
@@ -3066,6 +3908,103 @@
         ],
         "type": "object"
       },
+      "ReadPage_TemplateRead": {
+        "additionalProperties": false,
+        "properties": {
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TemplateRead"
+            },
+            "type": "array"
+          },
+          "observed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "snapshot_version": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "cursor",
+          "snapshot_version",
+          "observed_at"
+        ],
+        "type": "object"
+      },
+      "RebalanceRule": {
+        "additionalProperties": false,
+        "properties": {
+          "adjust_interval_seconds": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "band_floor": {
+            "ge": "0",
+            "type": "string",
+            "x-decimal": true
+          },
+          "expected_hold_seconds": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "funding_fallback_annual": {
+            "type": "string",
+            "x-decimal": true
+          },
+          "reverse_confirm_seconds": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "adjust_interval_seconds",
+          "band_floor",
+          "expected_hold_seconds",
+          "funding_fallback_annual",
+          "reverse_confirm_seconds"
+        ],
+        "type": "object"
+      },
+      "ReverseCandidate": {
+        "additionalProperties": false,
+        "properties": {
+          "direction": {
+            "enum": [
+              -1,
+              1
+            ],
+            "type": "integer"
+          },
+          "since": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "direction",
+          "since"
+        ],
+        "type": "object"
+      },
       "RunBinding": {
         "additionalProperties": false,
         "properties": {
@@ -3098,6 +4037,397 @@
           "run_id"
         ],
         "title": "RunBinding",
+        "type": "object"
+      },
+      "ScheduledEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "certainty": {
+            "enum": [
+              "CONFIRMED",
+              "ESTIMATED"
+            ],
+            "type": "string"
+          },
+          "event_type": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "expected_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "object_id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "schedule_id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "source_ref": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "SCHEDULED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "window_times": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ScheduledWindowTimes"
+            },
+            "type": "object"
+          },
+          "windows": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ScheduledWindow"
+            },
+            "type": "object"
+          },
+          "windows_state": {
+            "additionalProperties": {
+              "enum": [
+                "PENDING",
+                "OPEN",
+                "CLOSED",
+                "VOID"
+              ],
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "certainty",
+          "event_type",
+          "expected_at",
+          "object_id",
+          "revision",
+          "schedule_id",
+          "source_ref",
+          "status",
+          "windows_state"
+        ],
+        "type": "object"
+      },
+      "ScheduledEventCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "certainty": {
+            "enum": [
+              "CONFIRMED",
+              "ESTIMATED"
+            ],
+            "type": "string"
+          },
+          "event_type": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "expected_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "expected_version": {
+            "ge": "0",
+            "minimum": 0,
+            "title": "Expected Version",
+            "type": "integer"
+          },
+          "idempotency_key": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "object_id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "request_id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Request Id",
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "schedule_id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "strategy-2.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "source_ref": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "SCHEDULED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "windows": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ScheduledWindowTimes"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "certainty",
+          "event_type",
+          "expected_at",
+          "expected_version",
+          "idempotency_key",
+          "object_id",
+          "reason",
+          "request_id",
+          "revision",
+          "schedule_id",
+          "schema_version",
+          "source_ref",
+          "status"
+        ],
+        "type": "object"
+      },
+      "ScheduledEventRead": {
+        "additionalProperties": false,
+        "properties": {
+          "certainty": {
+            "enum": [
+              "CONFIRMED",
+              "ESTIMATED"
+            ],
+            "type": "string"
+          },
+          "event_type": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "expected_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "object_id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "schedule_id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "source_ref": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "SCHEDULED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "window_times": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ScheduledWindowTimes"
+            },
+            "type": "object"
+          },
+          "windows_state": {
+            "additionalProperties": {
+              "enum": [
+                "PENDING",
+                "OPEN",
+                "CLOSED",
+                "VOID"
+              ],
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "certainty",
+          "event_type",
+          "expected_at",
+          "object_id",
+          "revision",
+          "schedule_id",
+          "source_ref",
+          "status",
+          "windows_state"
+        ],
+        "type": "object"
+      },
+      "ScheduledTemplate": {
+        "additionalProperties": false,
+        "properties": {
+          "cap": {
+            "ge": "0",
+            "le": "1",
+            "type": "string",
+            "x-decimal": true
+          },
+          "certainty_required": {
+            "enum": [
+              "CONFIRMED",
+              "ESTIMATED"
+            ],
+            "type": "string"
+          },
+          "end_offset_seconds": {
+            "type": "integer"
+          },
+          "forget_cases": {
+            "ge": "0",
+            "type": "string",
+            "x-decimal": true
+          },
+          "gate_t": {
+            "gt": "0",
+            "type": "string",
+            "x-decimal": true
+          },
+          "min_n": {
+            "gt": "0",
+            "type": "string",
+            "x-decimal": true
+          },
+          "prior": {
+            "$ref": "#/components/schemas/TemplatePrior"
+          },
+          "scale": {
+            "gt": "0",
+            "type": "string",
+            "x-decimal": true
+          },
+          "start_offset_seconds": {
+            "type": "integer"
+          },
+          "state": {
+            "enum": [
+              "ENABLED",
+              "SHADOW",
+              "DISABLED"
+            ],
+            "type": "string"
+          },
+          "stats": {
+            "$ref": "#/components/schemas/TemplateStats"
+          }
+        },
+        "required": [
+          "cap",
+          "certainty_required",
+          "end_offset_seconds",
+          "forget_cases",
+          "gate_t",
+          "min_n",
+          "prior",
+          "scale",
+          "start_offset_seconds",
+          "state",
+          "stats"
+        ],
+        "type": "object"
+      },
+      "ScheduledWindow": {
+        "additionalProperties": false,
+        "properties": {
+          "certainty": {
+            "enum": [
+              "CONFIRMED",
+              "ESTIMATED"
+            ],
+            "type": "string"
+          },
+          "end": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "start": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "start_price": {
+            "anyOf": [
+              {
+                "gt": "0",
+                "type": "string",
+                "x-decimal": true
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "template": {
+            "$ref": "#/components/schemas/ScheduledTemplate"
+          }
+        },
+        "required": [
+          "certainty",
+          "end",
+          "start",
+          "start_price",
+          "template"
+        ],
+        "type": "object"
+      },
+      "ScheduledWindowTimes": {
+        "additionalProperties": false,
+        "properties": {
+          "end_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "start_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "end_at",
+          "start_at"
+        ],
         "type": "object"
       },
       "ScoreCommand": {
@@ -3508,6 +4838,39 @@
         "title": "ScoreVector",
         "type": "object"
       },
+      "ShadowComponent": {
+        "additionalProperties": false,
+        "properties": {
+          "combined": {
+            "type": "string",
+            "x-decimal": true
+          },
+          "core": {
+            "type": "string",
+            "x-decimal": true
+          },
+          "exposure": {
+            "type": "string",
+            "x-decimal": true
+          },
+          "level": {
+            "type": "string",
+            "x-decimal": true
+          },
+          "value": {
+            "type": "string",
+            "x-decimal": true
+          }
+        },
+        "required": [
+          "combined",
+          "core",
+          "exposure",
+          "level",
+          "value"
+        ],
+        "type": "object"
+      },
       "StateCommand": {
         "additionalProperties": false,
         "properties": {
@@ -3694,6 +5057,75 @@
           "owner_epoch"
         ],
         "title": "TargetOutbox",
+        "type": "object"
+      },
+      "TemplatePrior": {
+        "additionalProperties": false,
+        "properties": {
+          "evidence_ref": {
+            "type": "string"
+          },
+          "mean": {
+            "type": "string",
+            "x-decimal": true
+          },
+          "n0": {
+            "ge": "0",
+            "type": "string",
+            "x-decimal": true
+          }
+        },
+        "required": [
+          "evidence_ref",
+          "mean",
+          "n0"
+        ],
+        "type": "object"
+      },
+      "TemplateRead": {
+        "additionalProperties": false,
+        "properties": {
+          "template": {
+            "$ref": "#/components/schemas/ScheduledTemplate"
+          },
+          "template_key": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "template_key",
+          "template"
+        ],
+        "type": "object"
+      },
+      "TemplateStats": {
+        "additionalProperties": false,
+        "properties": {
+          "m2": {
+            "ge": "0",
+            "type": "string",
+            "x-decimal": true
+          },
+          "mean": {
+            "type": "string",
+            "x-decimal": true
+          },
+          "n": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "n_eff": {
+            "ge": "0",
+            "type": "string",
+            "x-decimal": true
+          }
+        },
+        "required": [
+          "m2",
+          "mean",
+          "n",
+          "n_eff"
+        ],
         "type": "object"
       },
       "TimeWindowPlan": {
@@ -5231,6 +6663,247 @@
         "summary": "Score Revision"
       }
     },
+    "/api/v2/strategy/factor-observations": {
+      "post": {
+        "description": "Requires a bound workload signal capability; public research credentials do not grant signal qualification.",
+        "operationId": "SUBMIT_FACTOR_OBSERVATION",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FactorObservationCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FactorObservation"
+                }
+              }
+            },
+            "description": "Recorded composition data"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v2/strategy/factor-series": {
+      "get": {
+        "operationId": "trace_factor_series",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "object_id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadPage_FactorSeries"
+                }
+              }
+            },
+            "description": "Recorded composition data"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Read bounded composition records without side effects"
+      }
+    },
     "/api/v2/strategy/health": {
       "get": {
         "operationId": "health_api_v2_strategy_health_get",
@@ -5315,6 +6988,144 @@
           }
         },
         "summary": "Health"
+      }
+    },
+    "/api/v2/strategy/layer-ledger": {
+      "get": {
+        "operationId": "trace_layer_ledger",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "object_id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadPage_LayerDay"
+                }
+              }
+            },
+            "description": "Recorded composition data"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Read bounded composition records without side effects"
       }
     },
     "/api/v2/strategy/learning-decisions": {
@@ -6762,6 +8573,383 @@
           }
         ],
         "summary": "Parameters"
+      }
+    },
+    "/api/v2/strategy/scheduled-events": {
+      "get": {
+        "operationId": "trace_scheduled_events",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "object_id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadPage_ScheduledEventRead"
+                }
+              }
+            },
+            "description": "Recorded composition data"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Read bounded composition records without side effects"
+      },
+      "post": {
+        "description": "Requires a bound workload signal capability; public research credentials do not grant signal qualification.",
+        "operationId": "UPSERT_SCHEDULED_EVENT",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduledEventCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduledEvent"
+                }
+              }
+            },
+            "description": "Recorded composition data"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v2/strategy/templates": {
+      "get": {
+        "operationId": "trace_templates",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "object_id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadPage_TemplateRead"
+                }
+              }
+            },
+            "description": "Recorded composition data"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Rejected or unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Read bounded composition records without side effects"
       }
     },
     "/api/v2/strategy/validation-runs": {

@@ -18,18 +18,19 @@ type DecisionCycle struct {
 	Clock   ports.Clock
 }
 type dueObject struct {
-	obj       *d.ObservedObject
-	p         *d.Policy
-	sample    *d.MarketSample
-	target    d.Decimal
-	stop      *d.StopPlan
-	stress    d.Decimal
-	view      d.PoolView
-	level     int
-	raw       d.Decimal
-	reasons   []string
-	id        string
-	scheduled time.Time
+	obj        *d.ObservedObject
+	p          *d.Policy
+	sample     *d.MarketSample
+	target     d.Decimal
+	stop       *d.StopPlan
+	stress     d.Decimal
+	view       d.PoolView
+	level      int
+	raw        d.Decimal
+	reasons    []string
+	id         string
+	scheduled  time.Time
+	components *d.DecisionComponents
 }
 
 func unknownDelivery(s *d.StrategyState, id string) bool {
@@ -203,6 +204,15 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 					}
 					id := "decision-" + d.Digest([]any{state.InstanceID, state.Environment, obj.TradingRunKey, obj.ObjectID, d.ISO(scheduled)})[:24]
 					decision := &d.DecisionView{DecisionID: id, ObjectID: obj.ObjectID, CycleID: obj.ObjectID + ":" + d.ISO(at), AvailableCutoff: at, PoolPlus: view.Plus, PoolMinus: view.Minus, PoolNet: view.Net, PreviousLevel: obj.Level, NewLevel: obj.Level, TargetQuantity: m.Add(actual, pending), ActualQuantity: actual, PendingQuantity: pending, ParameterVersion: obj.ParameterVersion, InputHash: d.Digest([]any{snap, params}), ReasonCodes: []string{"PARAMETERS_REQUIRED_UNSET"}, InputSnapshot: map[string]any{}, SourceEventVersions: map[string]int{}}
+					if p.Composition != nil {
+						components, e := riskComponents(state, obj, snap, at, decision.TargetQuantity, p)
+						if e != nil {
+							return e
+						}
+						decision.Components = components
+						decision.ProjectedExposure = components.Exposure
+						decision.InputHash = d.Digest([]any{snap, params, components})
+					}
 					state.Decisions.Set(id, decision)
 					obj.LastCycle = d.Ptr(scheduled)
 					obj.LastCutoff = d.Ptr(at)
@@ -314,23 +324,47 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 				if err := EvaluateLearning(state, obj, at); err != nil {
 					return err
 				}
-				level, err := d.LevelFor(view.Net.Abs(), obj.Level, p.Levels)
-				if err != nil {
-					return err
+				var components *d.DecisionComponents
+				var compositionReasons []string
+				force := false
+				level := 0
+				raw := d.Zero()
+				if p.Composition == nil {
+					level, err = d.LevelFor(view.Net.Abs(), obj.Level, p.Levels)
+					if err != nil {
+						return err
+					}
+					raw, err = d.Exposure(view, level, sample, snap.Equity, p.Numerical())
+				} else {
+					if err = d.AdvanceScheduled(state, obj, at, p); err != nil {
+						return err
+					}
+					currentExposure := d.Zero()
+					if sample != nil && snap.Equity.Sign() > 0 {
+						currentExposure = m.Div(m.Mul(m.Mul(actual, sample.Price), d.Amount(snap.Specs[obj.ObjectID]["contract_multiplier"])), snap.Equity)
+					}
+					var composed d.ComposeResult
+					composed, err = d.Compose(state, obj, at, view, sample, snap.Equity, currentExposure, p)
+					components, raw, level, force, compositionReasons = composed.Components, composed.Raw, composed.Level, composed.Force, composed.Reasons
 				}
-				raw, err := d.Exposure(view, level, sample, snap.Equity, p.Numerical())
 				if err != nil {
 					return err
 				}
 				for _, v := range regime {
 					if d.Text(d.Object(v)["state"]) == "UNKNOWN" {
 						raw = m.Mul(raw, p.UnknownRegimeMultiplier)
+						if components != nil {
+							for key, v := range components.Shadow {
+								v.Exposure = m.Mul(v.Exposure, p.UnknownRegimeMultiplier)
+								components.Shadow[key] = v
+							}
+						}
 						break
 					}
 				}
 				target, stress := actual, p.MaxStopFraction
 				var stop *d.StopPlan
-				reasons := []string{}
+				reasons := append([]string{}, compositionReasons...)
 				if sample == nil || sample.Quality != "VALID" {
 					reasons = append(reasons, "PRICE_UNKNOWN")
 				} else {
@@ -348,7 +382,11 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 						target = d.Zero()
 						reasons = append(reasons, "SHORT_UNAVAILABLE")
 					}
-					if m.Mul(view.Net, actual).Sign() < 0 || m.Mul(view.Net, pending).Sign() < 0 {
+					directionInput := view.Net
+					if components != nil {
+						directionInput = raw
+					}
+					if m.Mul(directionInput, actual).Sign() < 0 || m.Mul(directionInput, pending).Sign() < 0 {
 						target = d.Zero()
 						reasons = append(reasons, "FLATTEN_BEFORE_REVERSE")
 					}
@@ -392,6 +430,7 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 					}
 				}
 				blocked := obj.State != "ACTIVE" || obj.RecoveryState != "NORMAL" || len(snap.RiskLocks) > 0 || p.QualityState != "VALIDATED" || params.QualityState != "VALIDATED"
+				blocked = blocked || obj.LayerLedgerBlocked
 				if (blocked || unknownDelivery(state, obj.ObjectID)) && target.Abs().Cmp(actual.Abs()) > 0 {
 					target, stop = actual, nil
 					reasons = append(reasons, "RECOVERY_OR_PAUSE_OR_DELIVERY_BLOCK")
@@ -412,12 +451,33 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 					reasons = append(reasons, "STOP_CYCLE_NO_REOPEN")
 				}
 				current := m.Add(actual, pending)
-				if target.Abs().Cmp(current.Abs()) > 0 && (m.Sub(target, current).Abs().Cmp(p.MinAdjustment) < 0 || obj.LastAdjustment != nil && at.Sub(*obj.LastAdjustment).Seconds() < float64(p.CooldownSeconds)) {
+				if components != nil && sample != nil && snap.Equity.Sign() > 0 && sample.Quality == "VALID" {
+					mult := d.Amount(snap.Specs[obj.ObjectID]["contract_multiplier"])
+					ec := m.Div(m.Mul(m.Mul(current, sample.Price), mult), snap.Equity)
+					et := m.Div(m.Mul(m.Mul(target, sample.Price), mult), snap.Equity)
+					funding, e := d.FundingAnnual(snap, obj.ObjectID, p)
+					if e != nil {
+						return e
+					}
+					var previous *d.DecisionComponents
+					if executed := d.LatestExecuted(state, obj.ObjectID, at); executed != nil {
+						previous = executed.Components
+					}
+					reason, e := d.RebalanceReason(obj, at, ec, et, funding, p, force || stopNow, components, previous)
+					if e != nil {
+						return e
+					}
+					if reason != "" {
+						target, stop = current, nil
+						reasons = append(reasons, reason)
+					}
+				}
+				if target.Abs().Cmp(current.Abs()) > 0 && !force && (components == nil && m.Sub(target, current).Abs().Cmp(p.MinAdjustment) < 0 || obj.LastAdjustment != nil && at.Sub(*obj.LastAdjustment).Seconds() < float64(p.CooldownSeconds)) {
 					target, stop = current, nil
 					reasons = append(reasons, "ADJUSTMENT_COOLDOWN")
 				}
 				id := "decision-" + d.Digest([]any{state.InstanceID, state.Environment, obj.TradingRunKey, obj.ObjectID, d.ISO(scheduled)})[:24]
-				due = append(due, &dueObject{obj: obj, p: p, sample: sample, target: target, stop: stop, stress: stress, view: view, level: level, raw: raw, reasons: reasons, id: id, scheduled: scheduled})
+				due = append(due, &dueObject{obj: obj, p: p, sample: sample, target: target, stop: stop, stress: stress, view: view, level: level, raw: raw, reasons: reasons, id: id, scheduled: scheduled, components: components})
 				if sample != nil {
 					mult := d.Amount(snap.Specs[obj.ObjectID]["contract_multiplier"])
 					rows = append(rows, d.Candidate{Current: m.Mul(m.Mul(current, sample.Price), mult), Desired: m.Mul(m.Mul(target, sample.Price), mult), Stress: stress, Group: riskGroup(snap.Specs[obj.ObjectID])})
@@ -550,12 +610,18 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 				if sample != nil && snap.Equity.Sign() > 0 {
 					projected = m.Div(m.Mul(m.Mul(item.target, sample.Price), d.Amount(snap.Specs[obj.ObjectID]["contract_multiplier"])), snap.Equity)
 				}
+				if item.components != nil {
+					item.components.Exposure = projected
+					inputs["components"] = d.Map(item.components)
+					inputs["composition"] = d.Map(d.EffectiveComposition(state, obj, p))
+				}
 				reasons := item.reasons
 				if len(reasons) == 0 {
 					reasons = []string{"TARGET_COMPUTED"}
 				}
 				decision := &d.DecisionView{DecisionID: item.id, ObjectID: obj.ObjectID, CycleID: obj.ObjectID + ":" + d.ISO(item.scheduled), AvailableCutoff: at, PoolPlus: item.view.Plus, PoolMinus: item.view.Minus, PoolNet: item.view.Net, PreviousLevel: obj.Level, NewLevel: item.level, RawExposure: item.raw, ProjectedExposure: projected, TargetQuantity: item.target, ActualQuantity: actual, PendingQuantity: pending, StopPlan: item.stop, ParameterVersion: obj.ParameterVersion, InputHash: d.Digest(inputs), InputSnapshot: d.CompactDecisionInput(inputs), ReasonCodes: reasons, SourceEventVersions: sourceVersions}
 				state.Decisions.Set(item.id, decision)
+				decision.Components = item.components
 				canReduce := m.Mul(item.target, actual).Sign() >= 0 && item.target.Abs().Cmp(actual.Abs()) <= 0 && obj.OwnerEpoch == snap.OwnerEpochs[obj.ObjectID]
 				unknown := unknownDelivery(state, obj.ObjectID)
 				if sample != nil && sample.Quality == "VALID" && (obj.RecoveryState == "NORMAL" || canReduce) && (!unknown || canReduce) {
@@ -575,6 +641,9 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 				obj.LastCutoff = d.Ptr(at)
 				obj.Level = item.level
 				obj.Direction = item.view.Net.Sign()
+				if item.components != nil {
+					obj.Direction = item.components.Combined.Sign()
+				}
 				if err := d.VerifyLedger(state.Sentiment(), p.NumericalTolerance); err != nil {
 					return err
 				}
@@ -712,7 +781,12 @@ func (c DecisionCycle) Dispatch(ctx context.Context, identity d.Identity) error 
 			row.Reason = reason
 			if status == "ACK" {
 				row.AcceptedAt = d.Ptr(now)
-				state.Objects.Value(obj.ObjectID).LastAdjustment = d.Ptr(now)
+				if row.Decision.Components == nil || row.Decision.TargetQuantity.Cmp(d.Math().Add(row.Decision.ActualQuantity, row.Decision.PendingQuantity)) != 0 {
+					state.Objects.Value(obj.ObjectID).LastAdjustment = d.Ptr(now)
+				}
+				if row.Decision.Components != nil && row.Decision.Components.TriggerLayer == "ADJUSTMENT" && row.Decision.TargetQuantity.Cmp(d.Math().Add(row.Decision.ActualQuantity, row.Decision.PendingQuantity)) != 0 {
+					state.Objects.Value(obj.ObjectID).LastAdjustmentTradeAt = d.Ptr(now)
+				}
 			}
 			if item.ReservationID != nil {
 				r := state.Reservations.Value(*item.ReservationID)

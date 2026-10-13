@@ -1,0 +1,12 @@
+{
+  "fixture_only": true,
+  "design_baseline": "v2.6.0/baseline-composition-design",
+  "description": "Synthetic daily baseline, one evidence-backed scheduled template and bounded event adjustment; no production calibration.",
+  "rows": [
+    {"baseline":"0.5","scheduled":false,"net":"0","core":"0.5","combined":"0.5","exposure":"0.5"},
+    {"baseline":"0.5","scheduled":true,"net":"0","core":"0.58","combined":"0.58","exposure":"0.5"},
+    {"baseline":"0.5","scheduled":true,"net":"0.2","core":"0.58","combined":"0.779999999000000004999999975","exposure":"1"},
+    {"baseline":"0.5","scheduled":true,"net":"-1","core":"0.58","combined":"0","exposure":"0"},
+    {"baseline":"0","scheduled":false,"net":"1","core":"0","combined":"0","exposure":"0"}
+  ]
+}

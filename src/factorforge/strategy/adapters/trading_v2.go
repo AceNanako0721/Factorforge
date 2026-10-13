@@ -157,6 +157,21 @@ func (t *TradingV2) Snapshot(ctx context.Context, objects []*d.ObservedObject) (
 			}
 			id := obj.ObjectID
 			snap.Specs[id] = spec
+			if raw := d.Object(spec["funding"]); len(raw) > 0 {
+				var funding d.FundingObservation
+				// P1 may encode a whole-hour interval as an integer. Normalize this
+				// public scalar before admitting P2's decimal-string value model.
+				raw = d.Clone(raw)
+				raw["interval_hours"] = d.Text(raw["interval_hours"])
+				data, e := d.Marshal(raw)
+				if e != nil || d.DecodeJSON(data, &funding) != nil {
+					return &d.Error{Code: "TRADING_FUNDING_INVALID", Status: 503}
+				}
+				if snap.Funding == nil {
+					snap.Funding = map[string]d.FundingObservation{}
+				}
+				snap.Funding[id] = funding
+			}
 			actual, pending := d.Zero(), d.Zero()
 			snap.AverageEntries[id] = nil
 			for _, p := range d.Rows(pages["positions"]["items"]) {

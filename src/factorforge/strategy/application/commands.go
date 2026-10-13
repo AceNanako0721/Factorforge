@@ -97,9 +97,22 @@ func (s Service) Create(ctx context.Context, identity d.Identity, request d.Crea
 			return nil, &d.Error{Code: "OPERATOR_REGISTRY_REQUIRED", Status: 403}
 		}
 		if params.QualityState == "VALIDATED" {
-			for _, key := range []string{"w", "g", "h", "eta", "kappa", "k_stop"} {
+			for _, key := range []string{"g", "h", "eta", "kappa", "k_stop"} {
 				if params.Values[key].Sign() <= 0 {
 					return nil, &d.Error{Code: "PARAMETERS_REQUIRED_UNSET", Status: 423}
+				}
+			}
+			if p.Composition == nil {
+				bounds, registered := params.Bounds["w"]
+				w, present := params.Values["w"]
+				if !present || !registered && w.Sign() <= 0 || registered && (w.Cmp(bounds[0]) < 0 || w.Cmp(bounds[1]) > 0) {
+					return nil, &d.Error{Code: "PARAMETERS_REQUIRED_UNSET", Status: 423}
+				}
+			} else {
+				bounds, ok := params.Bounds["w"]
+				w, present := params.Values["w"]
+				if !ok || !present || w.Cmp(bounds[0]) < 0 || w.Cmp(bounds[1]) > 0 {
+					return nil, &d.Error{Code: "W_BOUNDS_REQUIRED", Status: 423}
 				}
 			}
 		}
@@ -118,6 +131,10 @@ func (s Service) Create(ctx context.Context, identity d.Identity, request d.Crea
 		obj.LastCycle = nil
 		obj.LastCutoff = nil
 		obj.LastAdjustment = nil
+		obj.CoreDirection = 0
+		obj.ReverseCandidate = nil
+		obj.LastAdjustmentTradeAt = nil
+		obj.LayerLedgerBlocked = false
 		obj.RecoveryState = "RECOVERY_CHECK"
 		if v, ok := state.Policies.Get(p.Version); ok && d.Digest(v) != d.Digest(p) {
 			return nil, &d.Error{Code: "IMMUTABLE_VERSION_CONFLICT", Status: 409}

@@ -389,6 +389,11 @@ func walkValidate(v reflect.Value) error {
 			}
 		}
 	case ParameterSnapshot:
+		for _, step := range x.Steps {
+			if step.Sign() <= 0 {
+				return invalid()
+			}
+		}
 		for key, b := range x.Bounds {
 			if b[0].Cmp(b[1]) > 0 {
 				return invalid()
@@ -397,16 +402,39 @@ func walkValidate(v reflect.Value) error {
 				return invalid()
 			}
 		}
-		for _, s := range x.Steps {
-			if s.Sign() <= 0 {
+	case Composition:
+		if err := x.Validate(); err != nil {
+			return err
+		}
+	case ScheduledTemplate:
+		if err := x.Validate(); err != nil {
+			return err
+		}
+	case FactorDefinition:
+		if x.FactorID == "" || !Has([]string{"BASELINE", "ASSESSMENT"}, x.Purpose) || x.ValueMin.Cmp(Int(-1)) != 0 || x.ValueMax.Cmp(One()) != 0 || x.CadenceSeconds <= 0 || x.SourceManifest == "" {
+			return invalid()
+		}
+	case FactorSeries:
+		if len(x.Observations) > MaxFactorObservations {
+			return invalid()
+		}
+		seen := map[string]bool{}
+		for i, o := range x.Observations {
+			if seen[o.ObservationID] || o.Value.Cmp(Int(-1)) < 0 || o.Value.Cmp(One()) > 0 || i > 0 && o.AvailableAt.Before(x.Observations[i-1].AvailableAt) {
 				return invalid()
 			}
+			seen[o.ObservationID] = true
 		}
 	case Level:
 		if x.Exit.Cmp(x.Enter) >= 0 {
 			return invalid()
 		}
 	case Policy:
+		if x.Composition != nil {
+			if err := x.Composition.Validate(); err != nil {
+				return err
+			}
+		}
 		if x.TrendWindowSeconds != nil && (*x.TrendWindowSeconds < x.CycleSeconds || *x.TrendWindowSeconds > 604800) {
 			return invalid()
 		}

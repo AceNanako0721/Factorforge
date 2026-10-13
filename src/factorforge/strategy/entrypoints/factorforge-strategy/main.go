@@ -81,8 +81,8 @@ func run() error {
 		method = "GET"
 		resource := map[string]string{"show-pool": "pool", "show-target": "targets", "show-case": "cases"}[command]
 		route = "/objects/" + url.PathEscape(*objectID) + "/" + resource
-	case "create-object", "create-event", "submit-score", "advance-clock":
-		route = map[string]string{"create-object": "/objects", "create-event": "/events", "submit-score": "/events/" + url.PathEscape(*eventID) + "/scores", "advance-clock": "/clock"}[command]
+	case "create-object", "create-event", "submit-score", "submit-factor-observation", "upsert-scheduled-event", "advance-clock":
+		route = map[string]string{"create-object": "/objects", "create-event": "/events", "submit-score": "/events/" + url.PathEscape(*eventID) + "/scores", "submit-factor-observation": "/factor-observations", "upsert-scheduled-event": "/scheduled-events", "advance-clock": "/clock"}[command]
 		if *file == "" {
 			return &d.Error{Code: "CLI_PAYLOAD_REQUIRED", Status: 422}
 		}
