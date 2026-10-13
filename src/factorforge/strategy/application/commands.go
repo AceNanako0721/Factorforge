@@ -342,7 +342,7 @@ func (s Service) Submit(ctx context.Context, identity d.Identity, request d.Scor
 		case v.ExpectedHalfLife.Cmp(p.HalfLifeBounds[0]) < 0 || v.ExpectedHalfLife.Cmp(p.HalfLifeBounds[1]) > 0:
 			status = "QUARANTINED"
 			reasons = []string{"HALF_LIFE_NOT_VALIDATED"}
-		case p.QualityState != "VALIDATED" || params.QualityState != "VALIDATED":
+		case !d.RiskQuality(state.Environment, p.QualityState) || !d.RiskQuality(state.Environment, params.QualityState):
 			status = "RESEARCH_ONLY"
 			reasons = []string{"PARAMETERS_UNVALIDATED"}
 		default:

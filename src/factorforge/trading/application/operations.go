@@ -39,6 +39,9 @@ func (s *Service) RegisterSpec(ctx context.Context, p d.Principal, command Comma
 				return problem("MARGIN_TIERS_INVALID")
 			}
 		}
+		if strings.HasSuffix(spec.Version, "-sim") && run.ExecutionMode != "REPLAY" {
+			return problem("SIM_CAPABILITIES_FORBIDDEN", 403)
+		}
 		code := spec.Key.Code()
 		old := run.Specs.Value(code)
 		for _, past := range run.RuleHistory {
