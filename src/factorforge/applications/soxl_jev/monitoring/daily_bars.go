@@ -58,6 +58,8 @@ func (s *DailyHTTP) Bars(ctx context.Context, symbol string, from, to time.Time)
 	if e != nil {
 		return nil, d.Fail("BASELINE_REQUEST_INVALID", 422)
 	}
+	// Yahoo answers 429 to the default Go client identity.
+	req.Header.Set("User-Agent", "Factorforge-market-baseline/2.6")
 	if o.Kind == "ALPACA" {
 		req.Header.Set("APCA-API-KEY-ID", o.Key)
 		req.Header.Set("APCA-API-SECRET-KEY", o.Secret)
