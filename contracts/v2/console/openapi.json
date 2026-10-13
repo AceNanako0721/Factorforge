@@ -3777,6 +3777,45 @@
                                             "title": "Contract Multiplier",
                                             "type": "string"
                                           },
+                                          "funding": {
+                                            "anyOf": [
+                                              {
+                                                "additionalProperties": false,
+                                                "properties": {
+                                                  "interval_hours": {
+                                                    "minimum": 1,
+                                                    "title": "Interval Hours",
+                                                    "type": "integer"
+                                                  },
+                                                  "next_funding_at": {
+                                                    "format": "date-time",
+                                                    "title": "Next Funding At",
+                                                    "type": "string"
+                                                  },
+                                                  "observed_at": {
+                                                    "format": "date-time",
+                                                    "title": "Observed At",
+                                                    "type": "string"
+                                                  },
+                                                  "rate": {
+                                                    "title": "Rate",
+                                                    "type": "string"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "rate",
+                                                  "next_funding_at",
+                                                  "interval_hours",
+                                                  "observed_at"
+                                                ],
+                                                "title": "FundingObservation",
+                                                "type": "object"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
                                           "halted": {
                                             "default": false,
                                             "title": "Halted",
@@ -4838,6 +4877,45 @@
                                     "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                                     "title": "Contract Multiplier",
                                     "type": "string"
+                                  },
+                                  "funding": {
+                                    "anyOf": [
+                                      {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "interval_hours": {
+                                            "minimum": 1,
+                                            "title": "Interval Hours",
+                                            "type": "integer"
+                                          },
+                                          "next_funding_at": {
+                                            "format": "date-time",
+                                            "title": "Next Funding At",
+                                            "type": "string"
+                                          },
+                                          "observed_at": {
+                                            "format": "date-time",
+                                            "title": "Observed At",
+                                            "type": "string"
+                                          },
+                                          "rate": {
+                                            "title": "Rate",
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "rate",
+                                          "next_funding_at",
+                                          "interval_hours",
+                                          "observed_at"
+                                        ],
+                                        "title": "FundingObservation",
+                                        "type": "object"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
                                   },
                                   "halted": {
                                     "default": false,
