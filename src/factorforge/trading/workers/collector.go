@@ -98,7 +98,13 @@ func (c *Collector) Collect(ctx context.Context, instrument, interval string, st
 			return 0, 0, err
 		}
 	}
-	points, err := c.Market.LatestPoints(ctx, spec.Key)
+	var points []*d.MarketPoint
+	var funding *d.FundingObservation
+	if market, ok := c.Market.(ports.FundingMarket); ok && spec.Key.Product == "LINEAR_PERPETUAL" {
+		points, funding, err = market.LatestPointsWithFunding(ctx, spec.Key)
+	} else {
+		points, err = c.Market.LatestPoints(ctx, spec.Key)
+	}
 	if err != nil {
 		return 0, 0, err
 	}
@@ -129,6 +135,11 @@ func (c *Collector) Collect(ctx context.Context, instrument, interval string, st
 		}
 	}
 	body.At = at
+	if funding != nil && d.Validate(funding) == nil && !funding.ObservedAt.After(at) {
+		key := spec.Key
+		body.InstrumentKey = &key
+		body.Funding = funding
+	}
 	body.Command, err = c.command(ctx, observationID("market-", spec.Version, at), at)
 	if err != nil {
 		return 0, 0, err

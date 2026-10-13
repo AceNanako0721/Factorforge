@@ -20,3 +20,10 @@ type MarketSnapshot = d.MarketSnapshot
 type RunKey = d.RunKey
 type InstrumentKey = d.InstrumentKey
 type InstrumentSpec = d.InstrumentSpec
+type FundingObservation = d.FundingObservation
+
+// InstrumentView keeps live observations outside versioned instrument rules.
+type InstrumentView struct {
+	InstrumentSpec
+	Funding *FundingObservation `json:"funding,omitempty"`
+}

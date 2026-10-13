@@ -207,6 +207,20 @@ func (s *Service) IngestSnapshot(ctx context.Context, p d.Principal, body d.Mark
 		if err := boundary(e, body.At); err != nil {
 			return err
 		}
+		if body.Funding != nil {
+			if body.InstrumentKey == nil || body.InstrumentKey.Product != "LINEAR_PERPETUAL" || d.Validate(body.Funding) != nil || body.Funding.ObservedAt.After(body.At) {
+				return problem("FUNDING_OBSERVATION_INVALID")
+			}
+			code := body.InstrumentKey.Code()
+			if run.Specs.Value(code) == nil {
+				return problem("INSTRUMENT_RULES_UNVERIFIED", 423)
+			}
+			old := run.Funding.Value(code)
+			if old == nil || body.Funding.ObservedAt.After(old.ObservedAt) {
+				copy := *body.Funding
+				run.Funding.Set(code, &copy)
+			}
+		}
 		for _, point := range body.Points {
 			code := point.InstrumentKey.Code()
 			spec := run.Specs.Value(code)

@@ -114,6 +114,14 @@ func validateModel(v reflect.Value) error {
 }
 func validateBusiness(value any) error {
 	switch v := value.(type) {
+	case FundingObservation:
+		if v.IntervalHours <= 0 || v.ObservedAt.IsZero() || v.NextFundingAt.IsZero() {
+			return invalidModel()
+		}
+	case MarketSnapshot:
+		if v.Funding != nil && (v.InstrumentKey == nil || v.InstrumentKey.Product != "LINEAR_PERPETUAL") {
+			return invalidModel()
+		}
 	case ExternalFact:
 		for _, id := range v.ExternalFillIDs {
 			if len(id) < 1 || len(id) > 128 || !modelID.MatchString(id) {

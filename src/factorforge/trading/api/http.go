@@ -315,7 +315,11 @@ func (h *Handler) queryRun(r *http.Request, run *d.Aggregate, history ports.Hist
 		return page(), nil
 	case "instruments":
 		for _, x := range run.Specs.Values() {
-			items = append(items, x)
+			view := dto.InstrumentView{InstrumentSpec: *x}
+			if x.Key.Product == "LINEAR_PERPETUAL" {
+				view.Funding = run.Funding.Value(x.Key.Code())
+			}
+			items = append(items, view)
 		}
 		return page(), nil
 	case "positions":

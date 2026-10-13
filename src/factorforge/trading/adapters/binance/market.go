@@ -201,20 +201,36 @@ func (m *Market) InstrumentSpecs(ctx context.Context) ([]*d.InstrumentSpec, erro
 	return results, nil
 }
 func (m *Market) LatestPoints(ctx context.Context, key d.InstrumentKey) ([]*d.MarketPoint, error) {
+	points, _, err := m.latestPoints(ctx, key)
+	return points, err
+}
+
+// Share premiumIndex with the price read. A failed fundingInfo read drops only
+// the funding observation; the previous one stays with its own observed_at.
+func (m *Market) LatestPointsWithFunding(ctx context.Context, key d.InstrumentKey) ([]*d.MarketPoint, *d.FundingObservation, error) {
+	points, premium, err := m.latestPoints(ctx, key)
+	if err != nil {
+		return nil, nil, err
+	}
+	funding, _ := m.funding(ctx, key, premium)
+	return points, funding, nil
+}
+
+func (m *Market) latestPoints(ctx context.Context, key d.InstrumentKey) ([]*d.MarketPoint, map[string]any, error) {
 	spec, err := m.Spec(key)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	params := Params{"symbol": key.InstrumentID}
 	values := make([]map[string]any, 3)
 	for i, path := range []string{"/fapi/v1/ticker/bookTicker", "/fapi/v1/premiumIndex", "/fapi/v2/ticker/price"} {
 		raw, err := m.get(ctx, path, params)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		values[i], err = object(raw)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 	received := m.now()
@@ -232,11 +248,58 @@ func (m *Market) LatestPoints(ctx context.Context, key d.InstrumentKey) ([]*d.Ma
 		}
 		point := &d.MarketPoint{InstrumentKey: key, SourceID: "binance-public", Kind: field.kind, ObservedAt: observed, ReceivedAt: received, AvailableAt: available, Value: price, Currency: spec.QuoteCurrency, Quality: "VALID", SpecVersion: spec.Version}
 		if e1 != nil || e2 != nil || d.Validate(point) != nil {
-			return nil, reject("VENUE_MARKET_UNAVAILABLE", 503)
+			return nil, nil, reject("VENUE_MARKET_UNAVAILABLE", 503)
 		}
 		results = append(results, point)
 	}
-	return results, nil
+	return results, values[1], nil
+}
+
+func (m *Market) funding(ctx context.Context, key d.InstrumentKey, premium map[string]any) (*d.FundingObservation, error) {
+	if key.Product != "LINEAR_PERPETUAL" || premium == nil {
+		return nil, nil
+	}
+	if symbol := text(premium["symbol"]); symbol != "" && symbol != key.InstrumentID {
+		return nil, reject("VENUE_FORMAT_INVALID", 503)
+	}
+	rate, e1 := parseAmount(premium["lastFundingRate"])
+	next, e2 := stamp(premium["nextFundingTime"])
+	observed, e3 := stamp(premium["time"])
+	if e1 != nil || e2 != nil || e3 != nil || next.UnixMilli() <= 0 || observed.UnixMilli() <= 0 {
+		return nil, reject("VENUE_FORMAT_INVALID", 503)
+	}
+	raw, err := m.get(ctx, "/fapi/v1/fundingInfo", nil)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := array(raw)
+	if err != nil {
+		return nil, err
+	}
+	interval := int64(8) // Design chapter 15: only a successful missing entry defaults.
+	found := false
+	for _, value := range rows {
+		item, err := object(value)
+		if err != nil {
+			return nil, err
+		}
+		if text(item["symbol"]) != key.InstrumentID {
+			continue
+		}
+		if found {
+			return nil, reject("VENUE_FORMAT_INVALID", 503)
+		}
+		found = true
+		interval, err = strconv.ParseInt(text(item["fundingIntervalHours"]), 10, 64)
+		if err != nil || interval <= 0 {
+			return nil, reject("VENUE_FORMAT_INVALID", 503)
+		}
+	}
+	funding := &d.FundingObservation{Rate: rate, NextFundingAt: next, IntervalHours: interval, ObservedAt: observed}
+	if d.Validate(funding) != nil {
+		return nil, reject("VENUE_FORMAT_INVALID", 503)
+	}
+	return funding, nil
 }
 func (m *Market) Trades(ctx context.Context, key d.InstrumentKey, limit int) ([]*d.MarketTrade, error) {
 	spec, err := m.Spec(key)
