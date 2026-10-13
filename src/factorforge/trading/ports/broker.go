@@ -37,3 +37,9 @@ type Market interface {
 	Trades(context.Context, d.InstrumentKey, int) ([]*d.MarketTrade, error)
 	Candles(context.Context, d.InstrumentKey, string, time.Time, time.Time) ([]d.Candle, error)
 }
+
+// FundingMarket is optional so existing replay and non-perpetual markets retain
+// their original interface and do not synthesize a funding observation.
+type FundingMarket interface {
+	LatestPointsWithFunding(context.Context, d.InstrumentKey) ([]*d.MarketPoint, *d.FundingObservation, error)
+}

@@ -99,6 +99,14 @@ type MarketPoint struct {
 	SpecVersion   string        `json:"spec_version"`
 }
 
+// FundingObservation is a public rate estimate, never an accounting income.
+type FundingObservation struct {
+	Rate          decimal.Value `json:"rate"`
+	NextFundingAt time.Time     `json:"next_funding_at"`
+	IntervalHours int64         `json:"interval_hours"`
+	ObservedAt    time.Time     `json:"observed_at"`
+}
+
 type MarketTrade struct {
 	ExternalID    string        `json:"external_id"`
 	InstrumentKey InstrumentKey `json:"instrument_key"`
@@ -294,61 +302,62 @@ type Target struct {
 }
 
 type Aggregate struct {
-	RunKey                 RunKey                   `json:"run_key"`
-	ExecutionMode          string                   `json:"execution_mode"`
-	Version                int64                    `json:"version"`
-	State                  string                   `json:"state"`
-	Policy                 AccountPolicy            `json:"policy"`
-	SimConfig              SimConfig                `json:"sim_config"`
-	InitialCash            decimal.Value            `json:"initial_cash"`
-	Currency               string                   `json:"currency"`
-	Cash                   decimal.Value            `json:"cash"`
-	Clock                  time.Time                `json:"clock"`
-	RiskDay                string                   `json:"risk_day"`
-	DayStartEquity         decimal.Value            `json:"day_start_equity"`
-	DayExternalFlow        decimal.Value            `json:"day_external_flow"`
-	PeakEquity             decimal.Value            `json:"peak_equity"`
-	ConsecutiveLosses      int64                    `json:"consecutive_losses"`
-	RiskLocks              []string                 `json:"risk_locks"`
-	WouldTrigger           []string                 `json:"would_trigger"`
-	RecoveryIssues         []string                 `json:"recovery_issues"`
-	ExecutorEpoch          int64                    `json:"executor_epoch"`
-	Specs                  Ordered[*InstrumentSpec] `json:"specs"`
-	Points                 Ordered[*MarketPoint]    `json:"points"`
-	Candles                []Candle                 `json:"candles"`
-	Positions              Ordered[*Position]       `json:"positions"`
-	Orders                 Ordered[*Order]          `json:"orders"`
-	Protections            Ordered[*Protection]     `json:"protections"`
-	Fills                  Ordered[*Fill]           `json:"fills"`
-	Incomes                Ordered[*Income]         `json:"incomes"`
-	Owners                 Ordered[string]          `json:"owners"`
-	OwnerEpochs            Ordered[int64]           `json:"owner_epochs"`
-	Targets                Ordered[*Target]         `json:"targets"`
-	Outbox                 []OutboxItem             `json:"outbox"`
-	Dedup                  Ordered[Object]          `json:"dedup"`
-	Audit                  []Object                 `json:"audit"`
-	AuditCount             int64                    `json:"-"`
-	CandleWrites           []Candle                 `json:"-"`
-	ExternalFacts          Ordered[*ExternalFact]   `json:"external_facts"`
-	FXRates                Ordered[*FxRate]         `json:"fx_rates"`
-	ConvertedFees          Ordered[decimal.Value]   `json:"converted_fees"`
-	ConvertedIncome        Ordered[decimal.Value]   `json:"converted_income"`
-	CashBalances           Ordered[decimal.Value]   `json:"cash_balances"`
-	FXRevaluation          decimal.Value            `json:"fx_revaluation"`
-	RuleHistory            []InstrumentSpec         `json:"rule_history"`
-	QueueRemaining         Ordered[decimal.Value]   `json:"queue_remaining"`
-	HealthIssues           []string                 `json:"health_issues"`
-	HealthCheckedAt        *time.Time               `json:"health_checked_at"`
-	Alerts                 []Object                 `json:"alerts"`
-	EmergencyOrders        Ordered[string]          `json:"emergency_orders"`
-	LeaseHolder            *string                  `json:"lease_holder"`
-	LeaseUntil             *time.Time               `json:"lease_until"`
-	LeaseEpoch             int64                    `json:"lease_epoch"`
-	IsolatedEpoch          int64                    `json:"isolated_epoch"`
-	IsolationEvidence      *string                  `json:"isolation_evidence"`
-	RejectedRequests       []Object                 `json:"rejected_requests"`
-	MarketTrades           Ordered[*MarketTrade]    `json:"market_trades"`
-	FactsStartAt           *time.Time               `json:"facts_start_at"`
-	VenueReconciledVersion *int64                   `json:"venue_reconciled_version"`
-	VenueFactsCursorAt     *time.Time               `json:"venue_facts_cursor_at"`
+	RunKey                 RunKey                       `json:"run_key"`
+	ExecutionMode          string                       `json:"execution_mode"`
+	Version                int64                        `json:"version"`
+	State                  string                       `json:"state"`
+	Policy                 AccountPolicy                `json:"policy"`
+	SimConfig              SimConfig                    `json:"sim_config"`
+	InitialCash            decimal.Value                `json:"initial_cash"`
+	Currency               string                       `json:"currency"`
+	Cash                   decimal.Value                `json:"cash"`
+	Clock                  time.Time                    `json:"clock"`
+	RiskDay                string                       `json:"risk_day"`
+	DayStartEquity         decimal.Value                `json:"day_start_equity"`
+	DayExternalFlow        decimal.Value                `json:"day_external_flow"`
+	PeakEquity             decimal.Value                `json:"peak_equity"`
+	ConsecutiveLosses      int64                        `json:"consecutive_losses"`
+	RiskLocks              []string                     `json:"risk_locks"`
+	WouldTrigger           []string                     `json:"would_trigger"`
+	RecoveryIssues         []string                     `json:"recovery_issues"`
+	ExecutorEpoch          int64                        `json:"executor_epoch"`
+	Specs                  Ordered[*InstrumentSpec]     `json:"specs"`
+	Points                 Ordered[*MarketPoint]        `json:"points"`
+	Funding                Ordered[*FundingObservation] `json:"funding,omitzero"`
+	Candles                []Candle                     `json:"candles"`
+	Positions              Ordered[*Position]           `json:"positions"`
+	Orders                 Ordered[*Order]              `json:"orders"`
+	Protections            Ordered[*Protection]         `json:"protections"`
+	Fills                  Ordered[*Fill]               `json:"fills"`
+	Incomes                Ordered[*Income]             `json:"incomes"`
+	Owners                 Ordered[string]              `json:"owners"`
+	OwnerEpochs            Ordered[int64]               `json:"owner_epochs"`
+	Targets                Ordered[*Target]             `json:"targets"`
+	Outbox                 []OutboxItem                 `json:"outbox"`
+	Dedup                  Ordered[Object]              `json:"dedup"`
+	Audit                  []Object                     `json:"audit"`
+	AuditCount             int64                        `json:"-"`
+	CandleWrites           []Candle                     `json:"-"`
+	ExternalFacts          Ordered[*ExternalFact]       `json:"external_facts"`
+	FXRates                Ordered[*FxRate]             `json:"fx_rates"`
+	ConvertedFees          Ordered[decimal.Value]       `json:"converted_fees"`
+	ConvertedIncome        Ordered[decimal.Value]       `json:"converted_income"`
+	CashBalances           Ordered[decimal.Value]       `json:"cash_balances"`
+	FXRevaluation          decimal.Value                `json:"fx_revaluation"`
+	RuleHistory            []InstrumentSpec             `json:"rule_history"`
+	QueueRemaining         Ordered[decimal.Value]       `json:"queue_remaining"`
+	HealthIssues           []string                     `json:"health_issues"`
+	HealthCheckedAt        *time.Time                   `json:"health_checked_at"`
+	Alerts                 []Object                     `json:"alerts"`
+	EmergencyOrders        Ordered[string]              `json:"emergency_orders"`
+	LeaseHolder            *string                      `json:"lease_holder"`
+	LeaseUntil             *time.Time                   `json:"lease_until"`
+	LeaseEpoch             int64                        `json:"lease_epoch"`
+	IsolatedEpoch          int64                        `json:"isolated_epoch"`
+	IsolationEvidence      *string                      `json:"isolation_evidence"`
+	RejectedRequests       []Object                     `json:"rejected_requests"`
+	MarketTrades           Ordered[*MarketTrade]        `json:"market_trades"`
+	FactsStartAt           *time.Time                   `json:"facts_start_at"`
+	VenueReconciledVersion *int64                       `json:"venue_reconciled_version"`
+	VenueFactsCursorAt     *time.Time                   `json:"venue_facts_cursor_at"`
 }

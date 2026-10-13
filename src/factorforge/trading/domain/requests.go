@@ -81,8 +81,10 @@ type FenceExecutor struct {
 }
 type MarketSnapshot struct {
 	Command
-	At      time.Time     `json:"at"`
-	Points  []MarketPoint `json:"points"`
-	Candles []Candle      `json:"candles"`
-	Trades  []MarketTrade `json:"trades"`
+	At            time.Time           `json:"at"`
+	Points        []MarketPoint       `json:"points"`
+	Candles       []Candle            `json:"candles"`
+	Trades        []MarketTrade       `json:"trades"`
+	InstrumentKey *InstrumentKey      `json:"instrument_key,omitempty"`
+	Funding       *FundingObservation `json:"funding,omitempty"`
 }

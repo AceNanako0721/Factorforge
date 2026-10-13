@@ -6575,6 +6575,39 @@
           "title": "Fill",
           "type": "object"
         },
+        "FundingObservation": {
+          "additionalProperties": false,
+          "description": "Latest public perpetual funding rate observation; not a booked income.",
+          "properties": {
+            "interval_hours": {
+              "minimum": 1,
+              "title": "Interval Hours",
+              "type": "integer"
+            },
+            "next_funding_at": {
+              "format": "date-time",
+              "title": "Next Funding At",
+              "type": "string"
+            },
+            "observed_at": {
+              "format": "date-time",
+              "title": "Observed At",
+              "type": "string"
+            },
+            "rate": {
+              "title": "Rate",
+              "type": "string"
+            }
+          },
+          "required": [
+            "rate",
+            "next_funding_at",
+            "interval_hours",
+            "observed_at"
+          ],
+          "title": "FundingObservation",
+          "type": "object"
+        },
         "FxRate": {
           "additionalProperties": false,
           "properties": {
@@ -6992,6 +7025,16 @@
               "title": "Contract Multiplier",
               "type": "string"
             },
+            "funding": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/FundingObservation"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "halted": {
               "default": false,
               "title": "Halted",
@@ -7365,12 +7408,33 @@
               "title": "Expires At Utc",
               "type": "string"
             },
+            "funding": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/FundingObservation"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "idempotency_key": {
               "maxLength": 128,
               "minLength": 1,
               "pattern": "^[A-Za-z0-9_.-]+$",
               "title": "Idempotency Key",
               "type": "string"
+            },
+            "instrument_key": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/InstrumentKey"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Required when funding is provided; identifies the observed perpetual instrument."
             },
             "points": {
               "items": {

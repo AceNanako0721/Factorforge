@@ -5955,6 +5955,16 @@
             },
             "type": "array",
             "title": "Margin Tiers"
+          },
+          "funding": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FundingObservation"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -6201,6 +6211,39 @@
         ],
         "title": "MarketPoint"
       },
+      "FundingObservation": {
+        "properties": {
+          "rate": {
+            "type": "string",
+            "title": "Rate"
+          },
+          "next_funding_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Next Funding At"
+          },
+          "interval_hours": {
+            "type": "integer",
+            "minimum": 1,
+            "title": "Interval Hours"
+          },
+          "observed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Observed At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "rate",
+          "next_funding_at",
+          "interval_hours",
+          "observed_at"
+        ],
+        "title": "FundingObservation",
+        "description": "Latest public perpetual funding rate observation; not a booked income."
+      },
       "MarketSnapshot": {
         "properties": {
           "schema_version": {
@@ -6227,7 +6270,7 @@
           },
           "expected_version": {
             "type": "integer",
-            "minimum": 0.0,
+            "minimum": 0,
             "title": "Expected Version"
           },
           "reason": {
@@ -6267,6 +6310,27 @@
             },
             "type": "array",
             "title": "Trades"
+          },
+          "instrument_key": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InstrumentKey"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Required when funding is provided; identifies the observed perpetual instrument."
+          },
+          "funding": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FundingObservation"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
