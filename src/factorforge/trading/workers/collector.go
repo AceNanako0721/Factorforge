@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/trading/domain"
+	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/domain/decimal"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/ports"
 	"net/url"
 	"time"
@@ -17,6 +18,11 @@ type Collector struct {
 	Key        d.RunKey
 	TradeLimit int
 	Now        func() time.Time
+	// SimFrames (v2.6.4) follows each accepted snapshot with a REPLAY_FRAME so
+	// the simulator matches resting orders and protections on live data.
+	SimFrames  bool
+	lastFrame  time.Time
+	lastCandle time.Time
 }
 
 func (c *Collector) now() time.Time {
@@ -147,5 +153,42 @@ func (c *Collector) Collect(ctx context.Context, instrument, interval string, st
 	if _, err = c.Client.Call(ctx, "POST", "/api/v2/trading/market/snapshots", nil, body); err != nil {
 		return 0, 0, err
 	}
+	if c.SimFrames {
+		if err = c.frame(ctx, spec, body); err != nil {
+			return 0, 0, err
+		}
+	}
 	return len(points), len(body.Candles), nil
+}
+func (c *Collector) frame(ctx context.Context, spec *d.InstrumentSpec, body d.MarketSnapshot) error {
+	at := body.At.Add(time.Millisecond)
+	math := decimal.NewMath(28)
+	liquidity := []decimal.Value{}
+	for _, trade := range body.Trades {
+		if trade.ObservedAt.After(c.lastFrame) && !trade.ObservedAt.After(body.At) {
+			liquidity = append(liquidity, trade.Quantity)
+		}
+	}
+	frame := d.ReplayFrame{At: at, InstrumentKey: spec.Key, Points: body.Points, Liquidity: math.Sum(liquidity...)}
+	if err := math.Err(); err != nil {
+		return err
+	}
+	for i := range body.Candles {
+		candle := body.Candles[i]
+		if candle.OpenAt.After(c.lastCandle) && (frame.Candle == nil || candle.OpenAt.After(frame.Candle.OpenAt)) {
+			frame.Candle = &candle
+		}
+	}
+	command, err := c.command(ctx, observationID("frame-", spec.Version, at), at)
+	if err != nil {
+		return err
+	}
+	if _, err = c.Client.Call(ctx, "POST", "/api/v2/trading/simulation/frames", nil, d.AdvanceReplay{Command: command, Frame: frame}); err != nil {
+		return err
+	}
+	c.lastFrame = body.At
+	if frame.Candle != nil {
+		c.lastCandle = frame.Candle.OpenAt
+	}
+	return nil
 }
