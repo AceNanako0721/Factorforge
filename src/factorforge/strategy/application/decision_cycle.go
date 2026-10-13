@@ -452,7 +452,7 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 						}
 					}
 				}
-				blocked := obj.State != "ACTIVE" || obj.RecoveryState != "NORMAL" || len(snap.RiskLocks) > 0 || p.QualityState != "VALIDATED" || params.QualityState != "VALIDATED"
+				blocked := obj.State != "ACTIVE" || obj.RecoveryState != "NORMAL" || len(snap.RiskLocks) > 0 || !d.RiskQuality(state.Environment, p.QualityState) || !d.RiskQuality(state.Environment, params.QualityState)
 				blocked = blocked || obj.LayerLedgerBlocked
 				if (blocked || unknownDelivery(state, obj.ObjectID)) && target.Abs().Cmp(actual.Abs()) > 0 {
 					target, stop = actual, nil

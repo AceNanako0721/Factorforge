@@ -362,3 +362,32 @@ func TestAccountCurrencyFromTradingSnapshot(t *testing.T) {
 		}
 	}
 }
+
+// v2.6.3: SIM may add risk under EXPERIMENT_ONLY thresholds; LIVE may not.
+func TestRiskQualityGateBySimAndLive(t *testing.T) {
+	for _, c := range []struct {
+		env, quality string
+		ok           bool
+	}{{"SIM", "VALIDATED", true}, {"SIM", "EXPERIMENT_ONLY", true}, {"SIM", "REQUIRED_UNSET", false}, {"LIVE", "VALIDATED", true}, {"LIVE", "EXPERIMENT_ONLY", false}} {
+		if sd.RiskQuality(c.env, c.quality) != c.ok {
+			t.Fatal(c)
+		}
+	}
+	for _, c := range []struct {
+		quality string
+		open    bool
+	}{{"EXPERIMENT_ONLY", true}, {"REQUIRED_UNSET", false}} {
+		s, o, p, snap, id, at := compositionCycleBase(t)
+		p.QualityState = c.quality
+		params := s.Parameters.Value(o.ParameterVersion)
+		params.QualityState = c.quality
+		cycle := app.DecisionCycle{Store: adapters.NewMemory(s), Trading: &compositionTrading{snap: snap}, Clock: adapters.NewReplay(at)}
+		outputs, err := cycle.Tick(context.Background(), id, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if (outputs[0].TargetQuantity.Sign() > 0) != c.open {
+			t.Fatal(c.quality, outputs[0].TargetQuantity, outputs[0].ReasonCodes)
+		}
+	}
+}

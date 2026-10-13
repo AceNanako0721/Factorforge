@@ -23,9 +23,12 @@ type Market struct {
 	Endpoint         string
 	Multipliers      map[string]string
 	PublicationDelay time.Duration
-	Now              func() time.Time
-	mu               sync.Mutex
-	specs            map[string]*d.InstrumentSpec
+	// SimCapabilities declares simulator-provided protection, reduce-only and
+	// short for SIM (REPLAY) runs; the rule version gets a -sim suffix (v2.6.3).
+	SimCapabilities bool
+	Now             func() time.Time
+	mu              sync.Mutex
+	specs           map[string]*d.InstrumentSpec
 }
 
 func (m *Market) now() time.Time {
@@ -182,12 +185,19 @@ func (m *Market) InstrumentSpecs(ctx context.Context) ([]*d.InstrumentSpec, erro
 			return nil, err
 		}
 		capabilities := []string{}
+		stopMarket := false
 		for _, v := range types {
 			if text(v) == "LIMIT" || text(v) == "MARKET" {
 				capabilities = append(capabilities, text(v))
 			}
+			stopMarket = stopMarket || text(v) == "STOP_MARKET"
 		}
-		spec := &d.InstrumentSpec{Key: d.InstrumentKey{Venue: "BINANCE", Product: "LINEAR_PERPETUAL", InstrumentID: text(item["symbol"])}, Version: "bn-" + hex.EncodeToString(digest[:])[:24], ValidFrom: observed, PriceTick: tick, QuantityStep: step, ContractMultiplier: multiple, QuoteCurrency: text(item["quoteAsset"]), SettlementCurrency: text(item["marginAsset"]), MinNotional: notional, Halted: text(item["status"]) != "TRADING", Capabilities: capabilities, PriceRoles: []string{"BID", "ASK", "MARK", "LAST", "INDEX"}, MarginTiers: [][2]decimal.Value{}}
+		version := "bn-" + hex.EncodeToString(digest[:])[:24]
+		if m.SimCapabilities && stopMarket {
+			capabilities = append(capabilities, "CONDITIONAL_PROTECTION", "REDUCE_ONLY", "SHORT")
+			version += "-sim"
+		}
+		spec := &d.InstrumentSpec{Key: d.InstrumentKey{Venue: "BINANCE", Product: "LINEAR_PERPETUAL", InstrumentID: text(item["symbol"])}, Version: version, ValidFrom: observed, PriceTick: tick, QuantityStep: step, ContractMultiplier: multiple, QuoteCurrency: text(item["quoteAsset"]), SettlementCurrency: text(item["marginAsset"]), MinNotional: notional, Halted: text(item["status"]) != "TRADING", Capabilities: capabilities, PriceRoles: []string{"BID", "ASK", "MARK", "LAST", "INDEX"}, MarginTiers: [][2]decimal.Value{}}
 		if d.Validate(spec) != nil {
 			return nil, reject("INSTRUMENT_RULES_UNVERIFIED", 423)
 		}
