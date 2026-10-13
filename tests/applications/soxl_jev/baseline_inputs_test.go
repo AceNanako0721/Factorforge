@@ -254,6 +254,18 @@ func TestP3OfficialCalendarParsers(t *testing.T) {
 	}
 }
 
+// Upcoming auctions without a 10Y/30Y entry parse to nothing, not an error.
+func TestP3OfficialTreasuryWithoutLongAuctions(t *testing.T) {
+	raw := []byte(`[{"cusip":"912797VT1","announcementDate":"2026-10-08T00:00:00","auctionDate":"2026-10-13T00:00:00","originalSecurityTerm":"13-Week","securityTerm":"13-Week","closingTimeCompetitive":"11:30 AM","tips":"No"}]`)
+	rows, e := monitoring.ParseOfficialSchedule(raw, monitoring.OfficialScheduleSource{Kind: "TREASURY", SourceRef: "td-official"})
+	if e != nil || len(rows) != 0 {
+		t.Fatal(rows, e)
+	}
+	if _, e = monitoring.ParseOfficialSchedule([]byte(`{"not":"a list"}`), monitoring.OfficialScheduleSource{Kind: "TREASURY", SourceRef: "td-official"}); e == nil {
+		t.Fatal("malformed Treasury response accepted")
+	}
+}
+
 type scheduledFixture struct{ rows []d.ScheduleCandidate }
 
 func (s *scheduledFixture) Schedules(context.Context, time.Time) ([]d.ScheduleCandidate, error) {
