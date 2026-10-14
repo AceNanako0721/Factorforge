@@ -81,3 +81,7 @@ P3 当前只读 API 见 [实例说明](INSTANCE_GO.md)，私有队列/工作进�
 完整 OMP 接入仍在 model_access 的 api/config/adapters/application/entrypoints 五类目录；Bun入口、TOML CredentialStore、浏览器会话适配与OMP菜单均属该模块。沿用唯一 npm lockfile；Bun为执行依赖。测试与先行实验同层归位；运行/目录缓存/独立浏览器profile位于忽略的 runtime/model-access-omp，凭据只在私有TOML。
 
 语义候选沿用 soxl_jev 的 domain/semantic.go、ports/semantic.go、evidence/semantic.go、config/semantic.go、adapters/modelaccess/client.go 和 operations/semantic_file.go；由 instance-cli 装配，只经公开 JSONL v2 调用模型模块。测试/合成回放归 tests/applications/soxl_jev，先行模型实验归 tests/applications/model_access/experiments；响应契约归 contracts/v2/model-access。私有输入、attempt与候选产物只在忽略 runtime；无新语言包或下层依赖。
+
+## v2.7.0 输入工作器撤回
+
+P3 删除 operations/market_baseline.go、entrypoints/market-baseline-worker 和对应 service 模板；不再登记行情基线进程。日程与关注清单入口保留在原层，assembly/baseline_inputs.go 仅装配 CALENDAR/WATCHLIST；关注清单的 daily_bars/watch_moves 适配器、日线/报价端口和配置保留，仅为新闻检索和通知提供正常幅度标尺，不参与方向或仓位计算。测试仍归 tests/applications/soxl_jev，旧公开夹具只读保留。
