@@ -146,7 +146,7 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 					obj.RecoveryState = "NORMAL"
 				}
 				var sample *d.MarketSample
-				barSigma := false
+				liquidityAssumed := false
 				if v, ok := snap.Samples[obj.ObjectID]; ok {
 					copy := v
 					sample = &copy
@@ -155,6 +155,22 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 					}
 				}
 				bindings := state.FactorManifests.Value(obj.PriceProxyBinding)
+				// v2.7.0: completed candles may supply a SIM price point, never sigma.
+				if sample == nil && p.Composition != nil && state.Environment == "SIM" && !d.ValidManifest(bindings, "PRICE_PROXY", at) {
+					var latest *d.Bar
+					for _, b := range snap.Bars[obj.ObjectID] {
+						if b.Final && b.Quality == "VALID" && b.Close.Sign() > 0 && !b.CloseAt.After(at) && !b.AvailableAt.After(at) && (latest == nil || b.CloseAt.After(latest.CloseAt)) {
+							copy := b
+							latest = &copy
+						}
+					}
+					if latest != nil {
+						sample = &d.MarketSample{AvailableAt: latest.AvailableAt, Price: latest.Close, Quality: "VALID"}
+						if at.Sub(sample.AvailableAt).Seconds() > float64(p.MaxPriceAgeSeconds) {
+							sample.Quality = "STALE"
+						}
+					}
+				}
 				if sample != nil {
 					observations := []map[string]any{}
 					for _, v := range d.Rows(bindings["observations"]) {
@@ -180,18 +196,10 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 							}
 						}
 					}
-					if !d.ValidManifest(bindings, "PRICE_PROXY", at) && state.Environment == "SIM" && sample.Sigma == nil {
-						// v2.6.2: without a registered proxy, SIM estimates sigma from
-						// completed candles; liquidity is assumed at the policy budget.
-						sigma, err := d.BarSigma(snap.Bars[obj.ObjectID], at, p.Numerical())
-						if err != nil {
-							return err
-						}
-						if sigma != nil {
-							sample.Sigma = sigma
-							sample.Liquidity = d.Ptr(p.LiquidityBudget)
-							barSigma = true
-						}
+					if p.Composition != nil && !d.ValidManifest(bindings, "PRICE_PROXY", at) && state.Environment == "SIM" {
+						// v2.7.0: no historical-volatility estimate or sigma requirement.
+						sample.Liquidity = d.Ptr(p.LiquidityBudget)
+						liquidityAssumed = true
 					}
 					samples := state.Samples.Value(obj.ObjectID)
 					if len(samples) == 0 || !samples[len(samples)-1].AvailableAt.Equal(sample.AvailableAt) {
@@ -330,11 +338,16 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 				if err != nil {
 					return err
 				}
-				regime, err := d.UpdateRegime(state.Regimes.Value(obj.ObjectID), state.Samples.Value(obj.ObjectID), at, p, state.FactorManifests.Value(obj.RegimeBinding))
-				if err != nil {
-					return err
+				// v2.7.0: the historical-price regime engine is legacy-only.
+				regime := state.Regimes.Value(obj.ObjectID)
+				if p.Composition == nil {
+					var err error
+					regime, err = d.UpdateRegime(regime, state.Samples.Value(obj.ObjectID), at, p, state.FactorManifests.Value(obj.RegimeBinding))
+					if err != nil {
+						return err
+					}
+					state.Regimes.Set(obj.ObjectID, regime)
 				}
-				state.Regimes.Set(obj.ObjectID, regime)
 				if err := EvaluateLearning(state, obj, at); err != nil {
 					return err
 				}
@@ -364,23 +377,19 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 				if err != nil {
 					return err
 				}
-				for _, v := range regime {
-					if d.Text(d.Object(v)["state"]) == "UNKNOWN" {
-						raw = m.Mul(raw, p.UnknownRegimeMultiplier)
-						if components != nil {
-							for key, v := range components.Shadow {
-								v.Exposure = m.Mul(v.Exposure, p.UnknownRegimeMultiplier)
-								components.Shadow[key] = v
-							}
+				if p.Composition == nil {
+					for _, v := range regime {
+						if d.Text(d.Object(v)["state"]) == "UNKNOWN" {
+							raw = m.Mul(raw, p.UnknownRegimeMultiplier)
+							break
 						}
-						break
 					}
 				}
 				target, stress := actual, p.MaxStopFraction
 				var stop *d.StopPlan
 				reasons := append([]string{}, compositionReasons...)
-				if barSigma {
-					reasons = append(reasons, "SIGMA_FROM_BARS", "LIQUIDITY_ASSUMED")
+				if liquidityAssumed {
+					reasons = append(reasons, "LIQUIDITY_ASSUMED")
 				}
 				if sample == nil || sample.Quality != "VALID" {
 					reasons = append(reasons, "PRICE_UNKNOWN")

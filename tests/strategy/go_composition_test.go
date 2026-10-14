@@ -472,11 +472,11 @@ func TestCompositionShadowLayersConfidenceRiskAndCertainty(t *testing.T) {
 	if r.Force || r.Components.Shadow["ASSESSMENT"].Exposure.Sign() >= 0 || r.Components.Shadow["ADJUSTMENT"].Exposure.Sign() != 0 || r.Components.Shadow["SCHEDULED"].Value.Sign() <= 0 {
 		t.Fatal("shadow effects", r.Components.Shadow)
 	}
-	// Volatility and liquidity apply once; confidence affects only adjustment.
+	// v2.7.0: only liquidity scales exposure; sigma no longer scales it.
 	m.Sigma = sd.Ptr(compDecimal("0.02"))
 	m.Liquidity = sd.Ptr(sd.Int(2500))
 	r = compose(t, s, o, p, m, at, "0", "0")
-	assertAmount(t, r.Raw, "0.125")
+	assertAmount(t, r.Raw, "0.25")
 	p.Composition.Scheduled.State = "ENABLED"
 	s.ScheduledEvents.Value("fixture-shadow").Windows["post"].Certainty = "ESTIMATED"
 	r = compose(t, s, o, p, m, at, "0", "0")
@@ -599,5 +599,47 @@ func TestCompositionCensoredScheduledCaseRoundTrips(t *testing.T) {
 	var back sd.StrategyState
 	if err = sd.DecodeJSON(raw, &back); err != nil {
 		t.Fatal("state with censored scheduled case does not decode", err)
+	}
+}
+
+// v2.7.0 / T2-22: sigma and sigma_ref do not participate in composition sizing.
+func TestCompositionExposureUsesLiquidityWithoutSigma(t *testing.T) {
+	_, _, p, sample, _ := compositionBase(t)
+	for _, sigma := range []*sd.Decimal{nil, sd.Ptr(sd.Zero()), sd.Ptr(sd.Int(1000))} {
+		for _, reference := range []sd.Decimal{sd.Zero(), sd.Int(100)} {
+			sample.Sigma, p.SigmaRef = sigma, reference
+			sample.Liquidity = sd.Ptr(sd.Int(2500))
+			for _, direction := range []int{-1, 1} {
+				raw, err := sd.CompositionExposure(sd.Int(direction), 2, sample, sd.Int(10000), p.Composition, p)
+				if err != nil {
+					t.Fatal(err)
+				}
+				want := compDecimal("0.25")
+				if direction < 0 {
+					want = want.Neg()
+				}
+				if raw.Cmp(want) != 0 {
+					t.Fatal("sigma affected liquidity-limited composition", raw)
+				}
+			}
+		}
+	}
+	sample.Liquidity = nil
+	raw, err := sd.CompositionExposure(sd.One(), 2, sample, sd.Int(10000), p.Composition, p)
+	if err != nil || raw.Sign() != 0 {
+		t.Fatal("missing liquidity accepted", raw, err)
+	}
+}
+
+// v2.7.0 / T2-22: no baseline plus all remaining layers SHADOW means zero core.
+func TestCompositionEmptyBaselineKeepsAllShadowAtZeroTarget(t *testing.T) {
+	s, o, p, sample, at := compositionBase(t)
+	p.Composition.Baseline = []sd.BaselineFactor{}
+	p.Composition.Scheduled.State, p.Composition.Adjustment.State = "SHADOW", "SHADOW"
+	r := compose(t, s, o, p, sample, at, "100", "0")
+	assertAmount(t, r.Components.Core, "0")
+	assertAmount(t, r.Raw, "0")
+	if r.Components.Adjustment.Sign() != 0 {
+		t.Fatal("shadow adjustment entered target")
 	}
 }

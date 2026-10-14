@@ -22,7 +22,7 @@ func TestP3InputCanonicalConfigAndResearchLiveBoundary(t *testing.T) {
 		t.Fatal(e)
 	}
 	calendar, _ := baselineFixture(t)
-	assets := config.BaselineInputAssets{Calendar: calendar, Parameters: operations.Parameters2026a(), Schedules: []config.ScheduleRegistration{{Kind: "FOMC", SourceID: "fixture-fed", SourceRef: "fixture-official", ReleaseTime: "14:00", Year: 2026, MinIntervalSeconds: 3600}}}
+	assets := config.BaselineInputAssets{Calendar: calendar, Schedules: []config.ScheduleRegistration{{Kind: "FOMC", SourceID: "fixture-fed", SourceRef: "fixture-official", ReleaseTime: "14:00", Year: 2026, MinIntervalSeconds: 3600}}}
 	raw, _ := json.Marshal(assets)
 	assetPath := filepath.Join(root, "assets.json")
 	if e := os.WriteFile(assetPath, raw, 0600); e != nil {
@@ -45,8 +45,8 @@ daily_licence = "RESEARCH_ONLY"
 	if e := os.WriteFile(path, []byte(contents), 0600); e != nil {
 		t.Fatal(e)
 	}
-	c, a, e := config.LoadBaselineInputs(path, "BASELINE")
-	if e != nil || c.AssetsFile != assetPath || a.Parameters.Version != "2026a" {
+	c, a, e := config.LoadBaselineInputs(path, "CALENDAR")
+	if e != nil || c.AssetsFile != assetPath || len(a.Schedules) != 1 {
 		t.Fatal(c.AssetsFile, e)
 	}
 	_, a, e = config.LoadBaselineInputs(path, "CALENDAR")
@@ -56,15 +56,6 @@ daily_licence = "RESEARCH_ONLY"
 	if e := os.WriteFile(path, []byte(contents+"\nunknown_setting = true\n"), 0600); e != nil {
 		t.Fatal(e)
 	} // Canonical config permits peer sections; assets remain closed.
-	assets.Parameters.Slow = 0
-	raw, _ = json.Marshal(assets)
-	os.WriteFile(assetPath, raw, 0600)
-	if _, _, e = config.LoadBaselineInputs(path, "BASELINE"); inputCode(e) != "BASELINE_PARAMETERS_REQUIRED" {
-		t.Fatal("invalid parameters accepted", e)
-	}
-	assets.Parameters = operations.Parameters2026a()
-	raw, _ = json.Marshal(assets)
-	os.WriteFile(assetPath, raw, 0600)
 	live := []byte(contents)
 	for i := 0; i < len(live)-2; i++ {
 		if string(live[i:i+3]) == "SIM" {
@@ -73,8 +64,28 @@ daily_licence = "RESEARCH_ONLY"
 		}
 	}
 	os.WriteFile(path, live, 0600)
-	if _, _, e = config.LoadBaselineInputs(path, "BASELINE"); inputCode(e) != "BASELINE_SOURCE_NOT_LICENSED" {
-		t.Fatal("research source LIVE config accepted", e)
+	if _, _, e = config.LoadBaselineInputs(path, "CALENDAR"); e != nil {
+		t.Fatal("calendar unexpectedly requires daily-price licence", e)
+	}
+	// WATCHLIST retains main's LIVE source-licence rejection.
+	if _, _, e = config.LoadBaselineInputs(path, "WATCHLIST"); inputCode(e) != "BASELINE_SOURCE_NOT_LICENSED" {
+		t.Fatal("research source LIVE watch config accepted", e)
+	}
+	// v2.7.0 rejects the retired worker role and parameter asset.
+	if _, _, e = config.LoadBaselineInputs(path, "BASELINE"); inputCode(e) != "BASELINE_INPUT_CONFIG_REQUIRED" {
+		t.Fatal("retired role accepted", e)
+	}
+	var stale map[string]any
+	if json.Unmarshal(raw, &stale) != nil {
+		t.Fatal("fixture assets")
+	}
+	stale["parameters"] = map[string]any{"version": "fixture-retired"}
+	old, _ := json.Marshal(stale)
+	if err := os.WriteFile(assetPath, old, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, e = config.LoadBaselineInputs(path, "CALENDAR"); inputCode(e) != "BASELINE_INPUT_ASSETS_INVALID" {
+		t.Fatal("retired parameters accepted", e)
 	}
 }
 
