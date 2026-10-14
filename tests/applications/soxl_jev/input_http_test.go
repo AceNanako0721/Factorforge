@@ -6,15 +6,12 @@ import (
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/analysis"
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/domain"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/monitoring"
-	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/operations"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/reports"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/submission"
 	"io"
-	"math"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -32,7 +29,7 @@ func (s inputTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 func TestP3InputClientPublicShapePagingAndScope(t *testing.T) {
 	ctx := context.Background()
 	at := time.Date(2026, 10, 12, 20, 20, 0, 0, time.UTC)
-	ob := d.FactorObservation{FactorID: "soxx-trend-vol@2026a", ObservationID: "fixture-observation", AvailableAt: at, Value: "0.5", InputsHash: "fixture-hash", EvidenceRef: "fixture-evidence"}
+	ob := d.FactorObservation{FactorID: "fixture-user-factor", ObservationID: "fixture-observation", AvailableAt: at, Value: "0.5", InputsHash: "fixture-hash", EvidenceRef: "fixture-evidence"}
 	event := d.ScheduledEvent{ScheduleID: "fixture-schedule", ObjectID: "SOXLUSDT", EventType: "MACRO_FOMC", ExpectedAt: at, Certainty: "CONFIRMED", SourceRef: "fixture-fed", Revision: 1, Status: "SCHEDULED"}
 	posts := 0
 	handler := func(w http.ResponseWriter, r *http.Request) {
@@ -217,19 +214,9 @@ func TestP3InputWatchJevExistingProtocolAndResearchBudget(t *testing.T) {
 		t.Fatal(result, e, admission)
 	}
 }
-func TestP3InputE1TrainingPriorAndInitialScope(t *testing.T) {
-	rows := inputCSV(t, "e1_training_prior.csv")
-	sum := 0.0
-	for _, r := range rows {
-		x, e := strconv.ParseFloat(r[2], 64)
-		if e != nil {
-			t.Fatal(e)
-		}
-		sum += x
-	}
-	if len(rows) != 24 || math.Abs(sum/24-0.037987014142365785) > 1e-14 {
-		t.Fatal("E1 training prior differs")
-	}
+
+// v2.7.0: no built-in baseline or historical-return prior.
+func TestP3InputZeroPriorAndInitialScope(t *testing.T) {
 	raw, e := os.ReadFile("../../../src/factorforge/applications/soxl_jev/config/initial_strategy.example.json")
 	if e != nil {
 		t.Fatal(e)
@@ -252,11 +239,36 @@ func TestP3InputE1TrainingPriorAndInitialScope(t *testing.T) {
 				EventOnlyCap string `json:"event_only_cap"`
 			}
 		}
-		Parameters operations.BaselineParameters `json:"baseline_parameters"`
+		FactorSeries []struct{ Definition struct{ Purpose string } } `json:"factor_series"`
+		Templates    map[string]struct {
+			State string
+			Cap   string
+			Prior struct {
+				Mean        string
+				N0          int
+				EvidenceRef string `json:"evidence_ref"`
+			}
+			PriorN0 int `json:"prior_n0"`
+		} `json:"templates_registration_notes"`
 	}
-	if json.Unmarshal(raw, &example) != nil || !example.Parameters.Valid() || len(example.Composition.Baseline) != 1 || example.Composition.Baseline[0].State != "ENABLED" || example.Composition.AllowShort || example.Composition.Assessment.State != "SHADOW" || example.Composition.Assessment.Force || example.Composition.Scheduled.State != "SHADOW" || example.Composition.Adjustment.State != "SHADOW" || example.Composition.Adjustment.Cap != "1.0" || example.Composition.Adjustment.EventOnlyCap != "0" {
+	if json.Unmarshal(raw, &example) != nil || example.Composition.Baseline == nil || len(example.Composition.Baseline) != 0 || example.Composition.AllowShort || example.Composition.Assessment.State != "SHADOW" || example.Composition.Assessment.Force || example.Composition.Scheduled.State != "SHADOW" || example.Composition.Adjustment.State != "SHADOW" || example.Composition.Adjustment.Cap != "1.0" || example.Composition.Adjustment.EventOnlyCap != "0" {
 		t.Fatal("initial composition scope changed")
 	}
+	for _, f := range example.FactorSeries {
+		if f.Definition.Purpose == "BASELINE" {
+			t.Fatal("built-in baseline remains registered")
+		}
+	}
+	prior := example.Templates["EARNINGS_LEADER/pre20"]
+	if prior.State != "SHADOW" || prior.Prior.Mean != "0" || prior.Prior.N0 != 0 || prior.Prior.EvidenceRef != "" {
+		t.Fatal("historical prior remains", prior)
+	}
+	for id, template := range example.Templates {
+		if id != "EARNINGS_LEADER/pre20" && (template.Cap != "0" || template.PriorN0 != 0 || template.State != "SHADOW") {
+			t.Fatal("macro scope", id)
+		}
+	}
+
 }
 
 func TestP3InputClientRejectsCursorLoopAndMalformedObservation(t *testing.T) {

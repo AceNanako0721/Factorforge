@@ -6,10 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"math"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"testing"
 	"time"
 
@@ -284,63 +282,6 @@ func TestCompositionRiskAndUnsetParameterDecisionsKeepComponents(t *testing.T) {
 	}
 }
 
-// v2.6.2: without a registered price proxy, SIM sizes from candle sigma.
-func TestBarSigmaFallbackSizesSimWithoutPriceProxy(t *testing.T) {
-	s, o, _, snap, id, at := compositionCycleBase(t)
-	sample := snap.Samples[o.ObjectID]
-	sample.Sigma, sample.Liquidity = nil, nil
-	snap.Samples[o.ObjectID] = sample
-	closes := []string{"100", "101", "99", "102", "100", "101"}
-	for i := range snap.Bars[o.ObjectID] {
-		snap.Bars[o.ObjectID][i].Close = compDecimal(closes[i])
-	}
-	cycle := app.DecisionCycle{Store: adapters.NewMemory(s), Trading: &compositionTrading{snap: snap}, Clock: adapters.NewReplay(at)}
-	outputs, err := cycle.Tick(context.Background(), id, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(outputs) != 1 || outputs[0].TargetQuantity.Sign() <= 0 || !sd.Has(outputs[0].ReasonCodes, "SIGMA_FROM_BARS") || !sd.Has(outputs[0].ReasonCodes, "LIQUIDITY_ASSUMED") {
-		t.Fatal("no candle-sigma sizing", outputs[0].ReasonCodes, outputs[0].TargetQuantity)
-	}
-}
-
-func TestBarSigmaEstimateAndGaps(t *testing.T) {
-	at := time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)
-	policy := sd.NumericalPolicy{NoiseWindow: 3, MaxBarGapSeconds: 600}
-	bars := func(closes ...float64) []sd.Bar {
-		out := []sd.Bar{}
-		for i, c := range closes {
-			close := at.Add(-time.Duration(len(closes)-1-i) * 5 * time.Minute)
-			out = append(out, sd.Bar{CloseAt: close, AvailableAt: close, Close: compDecimal(strconv.FormatFloat(c, 'f', -1, 64)), Final: true, Quality: "VALID"})
-		}
-		return out
-	}
-	sigma, err := sd.BarSigma(bars(100, 110, 99, 108.9), at, policy)
-	if err != nil || sigma == nil {
-		t.Fatal(sigma, err)
-	}
-	r := []float64{math.Log(1.1), math.Log(0.9), math.Log(1.1)}
-	mean := (r[0] + r[1] + r[2]) / 3
-	v := 0.0
-	for _, x := range r {
-		v += (x - mean) * (x - mean)
-	}
-	want := math.Sqrt(v / 2)
-	got, _ := strconv.ParseFloat(sigma.String(), 64)
-	if math.Abs(got-want) > 1e-12 {
-		t.Fatal("sigma", got, want)
-	}
-	if s, _ := sd.BarSigma(bars(100, 110, 99), at, policy); s != nil {
-		t.Fatal("short history produced sigma")
-	}
-	gapped := bars(100, 110, 99, 108.9)
-	gapped[0].CloseAt = gapped[0].CloseAt.Add(-time.Hour)
-	gapped[0].AvailableAt = gapped[0].CloseAt
-	if s, _ := sd.BarSigma(gapped, at, policy); s != nil {
-		t.Fatal("gapped history produced sigma")
-	}
-}
-
 // Without a price-proxy binding, the account currency comes from P1's account
 // view; an unknown currency still blocks the target.
 func TestAccountCurrencyFromTradingSnapshot(t *testing.T) {
@@ -390,4 +331,116 @@ func TestRiskQualityGateBySimAndLive(t *testing.T) {
 			t.Fatal(c.quality, outputs[0].TargetQuantity, outputs[0].ReasonCodes)
 		}
 	}
+}
+
+// v2.7.0 / T2-22: the historical regime engine and UNKNOWN multiplier are
+// excluded from both actual and hypothetical composition exposure.
+func TestCompositionCycleIgnoresUnknownRegimeAndSigma(t *testing.T) {
+	for _, multiplier := range []string{"0", "0.1", "1"} {
+		t.Run(multiplier, func(t *testing.T) {
+			s, o, p, snap, id, at := compositionCycleBase(t)
+			p.UnknownRegimeMultiplier = compDecimal(multiplier)
+			p.SigmaRef = compDecimal("0.000001")
+			point := snap.Samples[o.ObjectID]
+			point.Sigma = sd.Ptr(sd.Int(1000))
+			snap.Samples[o.ObjectID] = point
+			p.Composition.Assessment = &sd.AssessmentFactor{FactorID: "fixture-assessment", State: "SHADOW", MaxAgeSeconds: 3600}
+			s.FactorSeries.Set("fixture-assessment", &sd.FactorSeries{Definition: sd.FactorDefinition{Purpose: "ASSESSMENT"}, Observations: []sd.FactorObservation{{ObservationID: "fixture-shadow", AvailableAt: at, Value: sd.One()}}})
+			regime := map[string]any{"trend": map[string]any{"state": "UNKNOWN", "reason": "REGISTERED_INPUT_UNKNOWN"}}
+			s.Regimes.Set(o.ObjectID, regime)
+			store := adapters.NewMemory(s)
+			cycle := app.DecisionCycle{Store: store, Trading: &compositionTrading{snap: snap}, Clock: adapters.NewReplay(at)}
+			outputs, err := cycle.Tick(context.Background(), id, nil)
+			if err != nil || len(outputs) != 1 {
+				t.Fatal(outputs, err)
+			}
+			assertAmount(t, outputs[0].ProjectedExposure, "0.5")
+			assertAmount(t, outputs[0].Components.Shadow["ASSESSMENT"].Exposure, "1")
+			assertAmount(t, outputs[0].TargetQuantity, "50")
+			after, err := store.Read(context.Background(), s.InstanceID)
+			if err != nil || sd.Digest(after.Regimes.Value(o.ObjectID)) != sd.Digest(regime) {
+				t.Fatal("historical regime engine ran", err)
+			}
+		})
+	}
+}
+
+// v2.7.0: SIM fallback supplies price/liquidity only; stop noise is independent.
+func TestCompositionSimPriceLiquidityFallbackAndStopGate(t *testing.T) {
+	for _, test := range []struct {
+		name, environment        string
+		missingPrice, shortNoise bool
+		open                     bool
+	}{
+		{"sim-mark", "SIM", false, false, true},
+		{"sim-completed-close", "SIM", true, false, true},
+		{"sim-stop-noise-missing", "SIM", false, true, false},
+		{"live-no-liquidity", "LIVE", false, false, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			s, o, _, snap, id, at := compositionCycleBase(t)
+			s.Environment, id.Environment = test.environment, test.environment
+			if test.environment == "LIVE" {
+				id.Capabilities = []sd.WorkloadCapability{sd.SignalLIVE}
+			}
+			snap.AccountCurrency = "USDT"
+			sample := snap.Samples[o.ObjectID]
+			sample.Sigma, sample.Liquidity = nil, nil
+			snap.Samples[o.ObjectID] = sample
+			if test.missingPrice {
+				delete(snap.Samples, o.ObjectID)
+				// Neither future nor incomplete candles can supply the price.
+				snap.Bars[o.ObjectID] = append(snap.Bars[o.ObjectID], sd.Bar{CloseAt: at.Add(time.Minute), AvailableAt: at.Add(time.Minute), Close: sd.Int(500), Final: true, Quality: "VALID"}, sd.Bar{CloseAt: at, AvailableAt: at, Close: sd.Int(400), Final: false, Quality: "VALID"})
+			}
+			if test.shortNoise {
+				snap.Bars[o.ObjectID] = snap.Bars[o.ObjectID][:1]
+			}
+			store := adapters.NewMemory(s)
+			cycle := app.DecisionCycle{Store: store, Trading: &compositionTrading{snap: snap}, Clock: adapters.NewReplay(at)}
+			outputs, err := cycle.Tick(context.Background(), id, nil)
+			if err != nil || len(outputs) != 1 {
+				t.Fatal(outputs, err)
+			}
+			decision := outputs[0]
+			if (decision.TargetQuantity.Sign() > 0) != test.open || sd.Has(decision.ReasonCodes, "SIGMA_FROM_BARS") {
+				t.Fatal(decision.ReasonCodes, decision.TargetQuantity)
+			}
+			if sd.Has(decision.ReasonCodes, "LIQUIDITY_ASSUMED") != (test.environment == "SIM") {
+				t.Fatal(decision.ReasonCodes)
+			}
+			if test.missingPrice {
+				assertAmount(t, decision.TargetQuantity, "50")
+			}
+			if test.shortNoise && !sd.Has(decision.ReasonCodes, "NOISE_UNKNOWN") {
+				t.Fatal("stop noise bypassed", decision.ReasonCodes)
+			}
+			after, err := store.Read(context.Background(), s.InstanceID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, point := range after.Samples.Value(o.ObjectID) {
+				if point.Sigma != nil {
+					t.Fatal("SIM fabricated sigma")
+				}
+			}
+		})
+	}
+}
+
+// v2.7.0 / T2-22: even registered nonzero shadow inputs cannot create a target.
+func TestCompositionCycleEmptyBaselineAndOnlyShadowHasZeroTarget(t *testing.T) {
+	s, _, p, snap, id, at := compositionCycleBase(t)
+	p.Composition.Baseline = []sd.BaselineFactor{}
+	p.Composition.Scheduled.State, p.Composition.Adjustment.State = "SHADOW", "SHADOW"
+	p.Composition.Assessment = &sd.AssessmentFactor{FactorID: "fixture-shadow", State: "SHADOW", MaxAgeSeconds: 3600}
+	s.FactorSeries.Set("fixture-shadow", &sd.FactorSeries{Definition: sd.FactorDefinition{Purpose: "ASSESSMENT"}, Observations: []sd.FactorObservation{{ObservationID: "fixture-observation", AvailableAt: at, Value: sd.One()}}})
+	cycle := app.DecisionCycle{Store: adapters.NewMemory(s), Trading: &compositionTrading{snap: snap}, Clock: adapters.NewReplay(at)}
+	outputs, err := cycle.Tick(context.Background(), id, nil)
+	if err != nil || len(outputs) != 1 {
+		t.Fatal(outputs, err)
+	}
+	assertAmount(t, outputs[0].Components.Core, "0")
+	assertAmount(t, outputs[0].ProjectedExposure, "0")
+	assertAmount(t, outputs[0].TargetQuantity, "0")
+	assertAmount(t, outputs[0].Components.Shadow["ASSESSMENT"].Exposure, "1")
 }

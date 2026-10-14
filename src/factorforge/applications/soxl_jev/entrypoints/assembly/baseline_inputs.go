@@ -38,24 +38,14 @@ func RunBaselineInputs(role string) error {
 		return e
 	}
 	var tick func(context.Context, time.Time) error
-	var store *pg.PipelineStore
-	if role != "BASELINE" {
-		connect, done := context.WithTimeout(ctx, timeout)
-		store, e = pg.OpenPipeline(connect, c.DatabaseURL, c.Binding(), "INGEST", c.MaxBytes)
-		done()
-		if e != nil {
-			return e
-		}
-		defer store.Close()
+	connect, done := context.WithTimeout(ctx, timeout)
+	store, e := pg.OpenPipeline(connect, c.DatabaseURL, c.Binding(), "INGEST", c.MaxBytes)
+	done()
+	if e != nil {
+		return e
 	}
+	defer store.Close()
 	switch role {
-	case "BASELINE":
-		source, e := monitoring.NewDailyHTTP(monitoring.DailyHTTPOptions{Kind: c.DailyKind, Endpoint: c.DailyEndpoint, Key: c.AlpacaKey, Secret: c.AlpacaSecret, Licence: c.DailyLicence, Client: &http.Client{Timeout: timeout}, MaxBytes: c.MaxBytes})
-		if e != nil {
-			return e
-		}
-		worker := operations.MarketBaseline{Calendar: a.Calendar, Source: source, Framework: framework, Parameters: a.Parameters, Environment: c.Environment}
-		tick = func(ctx context.Context, at time.Time) error { _, e := worker.Tick(ctx, at); return e }
 	case "CALENDAR":
 		sources := []p.ScheduleSource{}
 		for _, r := range a.Schedules {
@@ -183,8 +173,7 @@ func RunBaselineInputs(role string) error {
 		}
 		tick = worker.Tick
 	}
-	// Minute polling only checks due slots. Baseline uses close+20m; calendar
-	// runs at 00:30 UTC and hourly thereafter; watchlist has its own cadence.
+	// Minute polling checks calendar slots; watchlist has its own cadence.
 	lastCalendar := ""
 	for {
 		now := time.Now().UTC()

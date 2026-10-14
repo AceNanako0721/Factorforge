@@ -57,7 +57,6 @@ type ScheduleRegistration struct {
 }
 type BaselineInputAssets struct {
 	Calendar              operations.Calendar             `json:"calendar"`
-	Parameters            operations.BaselineParameters   `json:"parameters"`
 	Watchlist             []d.WatchItem                   `json:"watchlist"`
 	Themes                []string                        `json:"themes"`
 	AssessmentEvidenceRef string                          `json:"assessment_evidence_ref"`
@@ -95,7 +94,7 @@ func LoadBaselineInputs(path, role string) (BaselineInputConfig, BaselineInputAs
 			*ref = filepath.Join(base, *ref)
 		}
 	}
-	if !c.Binding().Valid() || !d.ValidID(c.ObjectID) || c.FrameworkURL == "" || c.FrameworkToken == "" || c.TimeoutSeconds <= 0 || c.TimeoutSeconds > 3600 || c.MaxBytes <= 0 || c.MaxBytes > 16<<20 || c.MaxPages <= 0 || !d.Has([]string{"BASELINE", "CALENDAR", "WATCHLIST"}, role) {
+	if !c.Binding().Valid() || !d.ValidID(c.ObjectID) || c.FrameworkURL == "" || c.FrameworkToken == "" || c.TimeoutSeconds <= 0 || c.TimeoutSeconds > 3600 || c.MaxBytes <= 0 || c.MaxBytes > 16<<20 || c.MaxPages <= 0 || !d.Has([]string{"CALENDAR", "WATCHLIST"}, role) {
 		return c, a, d.Fail("BASELINE_INPUT_CONFIG_REQUIRED", 503)
 	}
 	if role != "CALENDAR" && c.Environment == "LIVE" && c.DailyLicence != "LICENSED" {
@@ -112,13 +111,6 @@ func LoadBaselineInputs(path, role string) (BaselineInputConfig, BaselineInputAs
 		return c, a, e
 	}
 	switch role {
-	case "BASELINE":
-		if !a.Parameters.Valid() {
-			return c, a, d.Fail("BASELINE_PARAMETERS_REQUIRED", 503)
-		}
-		if c.Environment == "LIVE" && c.DailyLicence != "LICENSED" {
-			return c, a, d.Fail("BASELINE_SOURCE_NOT_LICENSED", 403)
-		}
 	case "CALENDAR":
 		if c.DatabaseURL == "" || len(a.Schedules) == 0 {
 			return c, a, d.Fail("SCHEDULE_CONFIGURATION_REQUIRED", 503)

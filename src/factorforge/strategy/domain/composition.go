@@ -176,9 +176,10 @@ func Combined(core, adjustment, eventOnlyCap Decimal) Decimal {
 	return clip(x, One())
 }
 
-// CompositionExposure deliberately excludes confidence: it has already entered A.
+// v2.7.0: composition uses liquidity only. Confidence has already entered A;
+// historical volatility and regime state do not scale actual or shadow exposure.
 func CompositionExposure(x Decimal, level int, sample *MarketSample, equity Decimal, c *Composition, p *Policy) (Decimal, error) {
-	if level == 0 || x.Sign() == 0 || sample == nil || sample.Quality != "VALID" || sample.Sigma == nil || sample.Liquidity == nil {
+	if level == 0 || x.Sign() == 0 || sample == nil || sample.Quality != "VALID" || sample.Liquidity == nil {
 		return Zero(), nil
 	}
 	if level < 0 || level > len(c.Levels) {
@@ -186,9 +187,8 @@ func CompositionExposure(x Decimal, level int, sample *MarketSample, equity Deci
 	}
 	m := Math()
 	v := c.Levels[level-1].Exposure
-	vol := Min(One(), m.Div(p.SigmaRef, Max(*sample.Sigma, p.Epsilon)))
 	liq := Min(One(), m.Div(Min(*sample.Liquidity, p.LiquidityBudget), Max(m.Mul(equity, v), p.Epsilon)))
-	return m.Mul(m.Mul(m.Mul(Int(x.Sign()), v), vol), liq), m.Err()
+	return m.Mul(m.Mul(Int(x.Sign()), v), liq), m.Err()
 }
 func LatestExecuted(s *StrategyState, id string, at time.Time) *DecisionView {
 	var result *DecisionView
