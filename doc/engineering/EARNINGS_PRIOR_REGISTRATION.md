@@ -1,3 +1,5 @@
+> 2026-10-14 · v2.7.0：以下 E1 历史行情先验登记已撤回，仅保留历史追溯。当前 pre20 prior.mean=0、n0=0、evidence_ref 为空，状态 SHADOW；不作为启用或生产标定依据。
+
 # P3 财报前模板先验登记证据
 
 设计依据：v2.6.0 第25.2节，`EARNINGS_LEADER/pre20`，NVDA/AVGO/MU，状态 SHADOW，cap=0.5，certainty_required=ESTIMATED。这份记录只登记已经封存的 E1 训练段，不选新策略、不启用交易。
