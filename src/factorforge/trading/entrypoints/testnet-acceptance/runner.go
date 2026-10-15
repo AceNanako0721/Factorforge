@@ -155,9 +155,16 @@ func (s *acceptance) refresh() (map[string]decimal.Value, error) {
 	return values, err
 }
 func (s *acceptance) reconcile(resume bool) error {
-	for range 4 {
+	for range 8 {
 		if _, err := s.refresh(); err != nil {
 			return err
+		}
+		// The protection worker runs beside reconciliation in production; flat
+		// conditional cleanup cancels one owned stop per pass.
+		if s.protection != nil {
+			if _, err := s.protection.Tick(s.ctx, s.key); err != nil {
+				return err
+			}
 		}
 		issues, err := a.Synchronize(s.ctx, s.store, s.key, s.broker, amount("0.0000001"), true)
 		if err != nil {
@@ -510,7 +517,9 @@ func (s *acceptance) run(readonly bool) error {
 	if readonly {
 		steps = append(steps, s.isolationDrill)
 	} else {
-		steps = append(steps, s.ordinary, s.lowerCompatibility, s.protectiveExit, s.recoveryDrill)
+		// Lower-compatibility scenarios leave a target-managed owner on the
+		// instrument, so they run after the ordinary-order scenarios.
+		steps = append(steps, s.ordinary, s.protectiveExit, s.recoveryDrill, s.lowerCompatibility)
 	}
 	steps = append(steps, s.storageDrill)
 	var runErr error

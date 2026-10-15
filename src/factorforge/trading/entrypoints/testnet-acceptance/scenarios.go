@@ -517,9 +517,17 @@ func (s *acceptance) recoveryDrill() error {
 		return err
 	}
 	for _, item := range outstanding {
-		identity := str(item["clientAlgoId"])
-		if current.Protections.Value(identity) == nil {
+		protection := protectionByClientID(current, str(item["clientAlgoId"]))
+		if protection == nil {
 			return failure("TESTNET_EXTERNAL_TRADING_INTERFERENCE")
+		}
+		identity := protection.ProtectionID
+		if item["algoStatus"] == "NEW" && protection.Role == "INSURANCE" {
+			// Upper callers cannot cancel INSURANCE; flat conditional cleanup does.
+			if _, err = s.protection.Tick(s.ctx, s.key); err != nil {
+				return err
+			}
+			continue
 		}
 		if item["algoStatus"] == "NEW" {
 			command, err = s.command()

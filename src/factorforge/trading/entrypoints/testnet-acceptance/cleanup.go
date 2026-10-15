@@ -98,7 +98,7 @@ func cleanupRun(ctx context.Context, root, profile, path string) error {
 			return failure("TESTNET_RESPONSE_INVALID")
 		}
 		id := str(item["clientAlgoId"])
-		if run.Protections.Value(id) != nil {
+		if protectionByClientID(&run, id) != nil {
 			if _, err = transport.Request(ctx, "DELETE", binance.Conditional, binance.Params{"clientAlgoId": id}, true); err != nil {
 				return err
 			}
@@ -118,13 +118,27 @@ func cleanupRun(ctx context.Context, root, profile, path string) error {
 		if !ok {
 			return failure("TESTNET_RESPONSE_INVALID")
 		}
-		if run.Protections.Value(str(item["clientAlgoId"])) != nil {
+		if protectionByClientID(&run, str(item["clientAlgoId"])) != nil {
 			remaining++
 		}
 	}
 	fmt.Printf("PROBE_CONDITIONALS_REMAINING %d\n", remaining)
 	if remaining != 0 {
 		return failure("TESTNET_CLEANUP_UNCONFIRMED")
+	}
+	return nil
+}
+
+// protectionByClientID maps a venue clientAlgoId to this run's protection.
+// v2.8.0 role-based IDs differ from protection IDs; legacy records still match.
+func protectionByClientID(run *d.Aggregate, id string) *d.Protection {
+	if id == "" {
+		return nil
+	}
+	for _, p := range run.Protections.Values() {
+		if p.ProtectionID == id || d.ConditionalClientID(run.RunKey, p) == id {
+			return p
+		}
 	}
 	return nil
 }
