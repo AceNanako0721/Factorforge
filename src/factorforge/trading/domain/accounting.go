@@ -187,49 +187,66 @@ func (e *Engine) ApplyFill(orderID string, fill Fill) bool {
 		e.Fail("REDUCE_ONLY_FILL_CONTRADICTION", 423)
 		return false
 	}
-	if p.Quantity.Sign() != 0 && e.Math.Mul(p.Quantity, delta).Sign() < 0 {
-		if e.Math.Abs(delta).Cmp(e.Math.Abs(p.Quantity)) > 0 {
-			e.Fail("REVERSAL_REQUIRES_FLAT", 423)
-			return false
-		}
+
+	before := p.Quantity
+	closing := zero
+	if before.Sign() != 0 && e.Math.Mul(before, delta).Sign() < 0 {
+		closing = decimal.Min(e.Math.Abs(before), fill.Quantity)
+	}
+	opening := e.Math.Sub(fill.Quantity, closing)
+	fee := e.Convert(fill.Fee, fill.FeeCurrency)
+	e.CreditCash(e.Math.Neg(fill.Fee), fill.FeeCurrency)
+	run.ConvertedFees.Set(factID, fee)
+	closingFee := zero
+	if closing.Sign() > 0 {
 		if p.AverageEntry == nil {
 			e.Fail("ACCOUNT_MARK_UNKNOWN", 423)
 			return false
 		}
-		realized := e.Math.Mul(e.Math.Mul(e.Math.Abs(delta), spec.ContractMultiplier), e.Math.Sub(fill.Price, *p.AverageEntry))
 		direction := one
-		if p.Quantity.Sign() < 0 {
+		if before.Sign() < 0 {
 			direction = e.Math.Neg(one)
 		}
-		realized = e.Math.Mul(realized, direction)
-		native := realized
-		realized = e.Convert(realized, spec.SettlementCurrency)
-		e.CreditCash(native, spec.SettlementCurrency)
-		p.CycleNet = e.Math.Add(p.CycleNet, realized)
-	} else {
-		entry := zero
-		if p.AverageEntry != nil {
-			entry = *p.AverageEntry
-		}
-		oldCost := e.Math.Mul(e.Math.Abs(p.Quantity), entry)
-		average := e.Math.Div(e.Math.Add(oldCost, e.Math.Mul(fill.Quantity, fill.Price)), e.Math.Add(e.Math.Abs(p.Quantity), fill.Quantity))
-		p.AverageEntry = &average
+		realized := e.Math.Mul(e.Math.Mul(closing, spec.ContractMultiplier), e.Math.Mul(e.Math.Sub(fill.Price, *p.AverageEntry), direction))
+		e.CreditCash(realized, spec.SettlementCurrency)
+		closingFee = e.Math.Mul(fee, e.Math.Div(closing, fill.Quantity))
+		p.CycleNet = e.Math.Add(p.CycleNet, e.Math.Sub(e.Convert(realized, spec.SettlementCurrency), closingFee))
 	}
-	fee := e.Convert(fill.Fee, fill.FeeCurrency)
-	e.CreditCash(e.Math.Neg(fill.Fee), fill.FeeCurrency)
-	p.CycleNet = e.Math.Sub(p.CycleNet, fee)
-	run.ConvertedFees.Set(factID, fee)
-	p.Quantity = e.Math.Add(p.Quantity, delta)
-	if p.Quantity.Sign() == 0 {
+	p.Quantity = e.Math.Add(before, delta)
+	closedCycle := closing.Sign() > 0 && closing.Cmp(e.Math.Abs(before)) == 0
+	if closedCycle {
 		if p.CycleNet.Sign() < 0 {
 			run.ConsecutiveLosses++
 		} else {
 			run.ConsecutiveLosses = 0
 		}
-		p.AverageEntry = nil
-		p.ProtectionState = "CLOSED"
 		p.CycleNet = zero
-	} else if !request.ReduceOnly {
+		p.AverageEntry = nil
+		p.RequestedPlan = nil
+		p.StrategyDeclaration = nil
+		p.EffectiveMode = ""
+		p.RequestedMode = ""
+		p.StrategyProtectionMode = ""
+		p.ReasonCodes = nil
+	}
+	if opening.Sign() > 0 {
+		if before.Sign() == 0 || closedCycle {
+			p.PositionCycleID = StableID("cycle-", code+":"+fill.ExternalFillID)
+			v := fill.Price
+			p.AverageEntry = &v
+		} else {
+			if p.AverageEntry == nil {
+				e.Fail("ACCOUNT_MARK_UNKNOWN", 423)
+				return false
+			}
+			avg := e.Math.Div(e.Math.Add(e.Math.Mul(e.Math.Abs(before), *p.AverageEntry), e.Math.Mul(opening, fill.Price)), e.Math.Add(e.Math.Abs(before), opening))
+			p.AverageEntry = &avg
+		}
+		p.CycleNet = e.Math.Sub(p.CycleNet, e.Math.Sub(fee, closingFee))
+	}
+	if p.Quantity.Sign() == 0 {
+		p.ProtectionState = "CLOSED"
+	} else {
 		p.ProtectionState = "UNPROTECTED"
 	}
 	run.Positions.Set(code, p)
@@ -246,8 +263,15 @@ func (e *Engine) ApplyFill(orderID string, fill Fill) bool {
 	if e.Remaining(order).Sign() == 0 {
 		order.State = "FILLED"
 	}
-	order.ReservedNotional = e.Math.Mul(order.ReservedNotional, e.Math.Div(e.Remaining(order), e.Math.Add(e.Remaining(order), fill.Quantity)))
+	oldOpen := e.OpeningQuantity(before, request.Side, e.Math.Add(e.Remaining(order), fill.Quantity))
+	newOpen := e.OpeningQuantity(p.Quantity, request.Side, e.Remaining(order))
+	if oldOpen.Sign() > 0 {
+		order.ReservedNotional = e.Math.Mul(order.ReservedNotional, e.Math.Div(newOpen, oldOpen))
+	} else {
+		order.ReservedNotional = zero
+	}
 	run.Fills.Set(factID, &fill)
+	e.ProtectActualPosition(order)
 	return e.Err() == nil
 }
 func (e *Engine) ApplyIncome(income Income) bool {

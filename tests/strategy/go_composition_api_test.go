@@ -143,7 +143,7 @@ func compositionCycleBase(t *testing.T) (*sd.StrategyState, *sd.ObservedObject, 
 		close := at.Add(-time.Duration(5-i) * time.Minute)
 		bars = append(bars, sd.Bar{CloseAt: close, AvailableAt: close, High: sd.Int(101), Low: sd.Int(99), Close: sd.Int(100), Final: true, Quality: "VALID"})
 	}
-	snap := &sd.TradingSnapshot{RunKey: o.TradingRunKey, Version: 1, At: at, Equity: sd.Int(10000), Actual: map[string]sd.Decimal{o.ObjectID: sd.Zero()}, Pending: map[string]sd.Decimal{o.ObjectID: sd.Zero()}, OwnerEpochs: map[string]int{o.ObjectID: 0}, TargetVersions: map[string]int{o.ObjectID: 0}, RunState: "NORMAL", Specs: map[string]map[string]any{o.ObjectID: {"contract_multiplier": "1", "quantity_step": "0.01", "price_tick": "0.01", "min_notional": "1", "capabilities": []string{"SHORT", "MARKET", "CONDITIONAL_PROTECTION"}, "price_roles": []string{"MARK"}, "version": "fixture-spec", "settlement_currency": "USDT", "risk_group": "DEFAULT"}}, Samples: map[string]sd.MarketSample{o.ObjectID: *m}, Bars: map[string][]sd.Bar{o.ObjectID: bars}, Protections: map[string][]map[string]any{}, AverageEntries: map[string]*sd.Decimal{}, Fills: []map[string]any{}, Incomes: []map[string]any{}}
+	snap := &sd.TradingSnapshot{LowerCompat: true, RunKey: o.TradingRunKey, Version: 1, At: at, Equity: sd.Int(10000), Actual: map[string]sd.Decimal{o.ObjectID: sd.Zero()}, Pending: map[string]sd.Decimal{o.ObjectID: sd.Zero()}, OwnerEpochs: map[string]int{o.ObjectID: 0}, TargetVersions: map[string]int{o.ObjectID: 0}, RunState: "NORMAL", Specs: map[string]map[string]any{o.ObjectID: {"contract_multiplier": "1", "quantity_step": "0.01", "price_tick": "0.01", "min_notional": "1", "capabilities": []string{"SHORT", "MARKET", "CONDITIONAL_PROTECTION"}, "price_roles": []string{"MARK"}, "version": "fixture-spec", "settlement_currency": "USDT", "risk_group": "DEFAULT"}}, Samples: map[string]sd.MarketSample{o.ObjectID: *m}, Bars: map[string][]sd.Bar{o.ObjectID: bars}, Protections: map[string][]map[string]any{}, AverageEntries: map[string]*sd.Decimal{}, Fills: []map[string]any{}, Incomes: []map[string]any{}}
 	return s, o, p, snap, identity, at
 }
 func TestCompositionDecisionCycleHashDispatchAndActualDirection(t *testing.T) {
@@ -167,7 +167,7 @@ func TestCompositionDecisionCycleHashDispatchAndActualDirection(t *testing.T) {
 		t.Fatal(outputs)
 	}
 	d := outputs[0]
-	if !sd.Has(d.ReasonCodes, "FLATTEN_BEFORE_REVERSE") || d.TargetQuantity.Sign() != 0 {
+	if sd.Has(d.ReasonCodes, "FLATTEN_BEFORE_REVERSE") || d.TargetQuantity.Sign() >= 0 || d.StopPlan == nil {
 		t.Fatal("compared pool direction instead of raw", d.ReasonCodes, d.TargetQuantity)
 	}
 	if sd.Object(d.InputSnapshot["components"])["baseline"] == nil {
@@ -176,7 +176,7 @@ func TestCompositionDecisionCycleHashDispatchAndActualDirection(t *testing.T) {
 	if err = cycle.Dispatch(context.Background(), id); err != nil {
 		t.Fatal(err)
 	}
-	// After flattening, the negative baseline may open a short regardless of net=0.
+	// A later genuinely flat snapshot can still open a short regardless of pool net=0.
 	snap.Actual[o.ObjectID] = sd.Zero()
 	snap.At = at.Add(time.Duration(p.CycleSeconds) * time.Second)
 	snap.Fills = []map[string]any{initialFill, {"external_fill_id": "fixture-flatten", "owner_id": o.OwnerID, "instrument_key": sd.Map(o.InstrumentKey), "quantity": "10", "side": "SELL", "price": "100", "fee": "0", "fee_currency": "USDT", "source_decision_id": d.DecisionID, "happened_at": sd.ISO(snap.At)}}

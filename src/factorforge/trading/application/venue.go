@@ -46,6 +46,13 @@ func Synchronize(ctx context.Context, store ports.Store, key d.RunKey, broker po
 	if err != nil {
 		return nil, err
 	}
+	// Legacy cycle labels are provisional until the external side/quantity query
+	// has verified the corresponding STRATEGY record. No insurance is inferred.
+	for _, pos := range snapshot.Positions.Values() {
+		if pos.Quantity.Sign() != 0 && pos.PositionCycleID == "" {
+			pos.PositionCycleID = d.StableID("cycle-", RequestHash(Response{"run": key, "instrument": pos.InstrumentKey, "direction": d.Direction(pos.Quantity), "epoch": snapshot.OwnerEpochs.Value(pos.InstrumentKey.Code()), "legacy": true}))
+		}
+	}
 	results := []orderFacts{}
 	protections := []*d.Protection{}
 	for _, order := range snapshot.Orders.Values() {
@@ -73,6 +80,28 @@ func Synchronize(ctx context.Context, store ports.Store, key d.RunKey, broker po
 			}
 			protections = append(protections, fact)
 			known.Protections.Set(fact.ProtectionID, fact)
+		}
+	}
+	conditionalFacts := map[string][]d.ConditionalOrderFact{}
+	for _, spec := range snapshot.Specs.Values() {
+		facts, err := broker.ListOpenConditionals(ctx, known, spec.Key)
+		if err != nil {
+			return nil, err
+		}
+		conditionalFacts[spec.Key.Code()] = facts
+		for _, p := range protections {
+			if p.InstrumentKey != spec.Key || p.State != "ACTIVE_VERIFIED" {
+				continue
+			}
+			found := false
+			for _, fact := range facts {
+				if fact.ClientID != nil && *fact.ClientID == d.ConditionalClientID(snapshot.RunKey, p) {
+					found = true
+				}
+			}
+			if !found {
+				p.State = "UNKNOWN"
+			}
 		}
 	}
 	if _, err = broker.ListOpenOrders(ctx, known); err != nil {
@@ -133,6 +162,11 @@ func Synchronize(ctx context.Context, store ports.Store, key d.RunKey, broker po
 			}
 			local.ExternalOrderID = &id
 		}
+		for _, observed := range snapshot.Positions.Values() {
+			if local := run.Positions.Value(observed.InstrumentKey.Code()); local != nil && local.PositionCycleID == "" && local.Quantity.Cmp(observed.Quantity) == 0 {
+				local.PositionCycleID = observed.PositionCycleID
+			}
+		}
 		for _, p := range protections {
 			prior := run.Protections.Value(p.ProtectionID)
 			if prior == nil {
@@ -149,7 +183,7 @@ func Synchronize(ctx context.Context, store ports.Store, key d.RunKey, broker po
 						continue
 					}
 					side := "BUY"
-					if position.Quantity.Sign() > 0 {
+					if p.PositionDirection == "LONG" {
 						side = "SELL"
 					}
 					created := run.Clock
@@ -160,6 +194,21 @@ func Synchronize(ctx context.Context, store ports.Store, key d.RunKey, broker po
 					run.Orders.Set(id, &d.Order{OrderID: id, ClientOrderID: id, ExternalOrderID: p.ExitOrderID, SourceProtectionID: &source, CreatedAt: created, State: "ACKNOWLEDGED", Request: d.OrderRequest{OwnerID: position.OwnerID, InstrumentKey: p.InstrumentKey, Side: side, OrderType: "MARKET", Quantity: p.Plan.CoveredQuantity, ReduceOnly: true, SpecVersion: p.Plan.SpecVersion, TimeInForce: "GTC", PositionSide: "BOTH"}})
 				}
 				if oldExit == nil {
+					for _, order := range run.Orders.Values() {
+						if order.Request.InstrumentKey == p.InstrumentKey && !order.Request.ReduceOnly && !d.Terminal(order.State) {
+							order.State = "CANCEL_PENDING"
+							commandID := d.StableID("stop-cancel-", p.ProtectionID+":"+order.OrderID)
+							found := false
+							for _, task := range run.Outbox {
+								if task.CommandID == commandID {
+									found = true
+								}
+							}
+							if !found {
+								run.Outbox = append(run.Outbox, d.OutboxItem{CommandID: commandID, Kind: "CANCEL", OrderID: order.OrderID, PrincipalID: "protection-exit", ExpiresAt: run.Clock, ExecutorEpoch: run.ExecutorEpoch, State: "PENDING"})
+							}
+						}
+					}
 					code := p.InstrumentKey.Code()
 					run.OwnerEpochs.Set(code, run.OwnerEpochs.Value(code)+1)
 					if target := run.Targets.Value(code); target != nil {
@@ -263,25 +312,47 @@ func Synchronize(ctx context.Context, store ports.Store, key d.RunKey, broker po
 		if e.Math.Abs(e.Math.Sub(e.Equity(), equity)).Cmp(tolerance) > 0 || e.Math.Abs(e.Math.Sub(run.Cash, cash)).Cmp(tolerance) > 0 {
 			run.RecoveryIssues = append(run.RecoveryIssues, "EXTERNAL_ACCOUNT_DIFFERENCE")
 		}
+		for code, facts := range conditionalFacts {
+			spec := run.Specs.Value(code)
+			pos := run.Positions.Value(code)
+			needsCleanup := false
+			foreign := false
+			for _, fact := range facts {
+				if !d.OwnConditional(run, fact) {
+					needsCleanup = true
+					foreign = true
+					run.Alerts = append(run.Alerts, d.Alert("UNRECOGNIZED_CONDITIONAL", run.Clock, "external_id", fact.ExternalID))
+					continue
+				}
+				if pos == nil || pos.Quantity.Sign() == 0 || fact.LocalProtectionID == nil {
+					needsCleanup = true
+					continue
+				}
+				local := run.Protections.Value(*fact.LocalProtectionID)
+				if local == nil || !d.CurrentProtection(local, pos) || local.State == "CLOSED" {
+					needsCleanup = true
+				}
+			}
+			if needsCleanup {
+				state := "PENDING"
+				if foreign {
+					state = "FOREIGN"
+				}
+				run.ConditionalCleanups.Set(code, &d.ConditionalCleanup{Instrument: spec.Key, State: state, Facts: facts})
+			} else if old := run.ConditionalCleanups.Value(code); old != nil {
+				old.Facts = facts
+				old.State = "CONFIRMED"
+			}
+		}
 		for _, code := range run.Positions.Keys() {
 			position := run.Positions.Value(code)
 			if position.Quantity.Sign() == 0 {
 				continue
 			}
-			covered, pending := false, false
-			for _, p := range run.Protections.Values() {
-				if p.InstrumentKey.Code() == code {
-					covered = covered || (p.State == "ACTIVE_VERIFIED" && p.Plan.CoveredQuantity.Cmp(position.Quantity.Abs()) == 0)
-					pending = pending || p.State == "PENDING"
-				}
+			if remotePos := remote[code]; remotePos != nil && remotePos.Quantity.Cmp(position.Quantity) == 0 {
+				e.ProtectActualPosition(&d.Order{Request: d.OrderRequest{InstrumentKey: position.InstrumentKey, ReduceOnly: true}})
 			}
-			if covered {
-				position.ProtectionState = "ACTIVE_VERIFIED"
-			} else if !pending {
-				position.ProtectionState = "UNPROTECTED"
-				run.State = "DEGRADED"
-				run.Alerts = append(run.Alerts, d.Alert("PROTECTION_NOT_VERIFIED:"+code, run.Clock))
-			}
+			e.ReconcileStrategyMode(position.InstrumentKey)
 		}
 		if recovery || len(run.RecoveryIssues) > 0 {
 			if err := Reconcile(e); err != nil {

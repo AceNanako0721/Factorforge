@@ -92,13 +92,18 @@ func (e *Engine) ImportExternal(fact ExternalFact) bool {
 			target.Reasons = []string{"EXTERNAL_OWNER_EPOCH_CHANGED"}
 		}
 	}
-	for _, p := range run.Protections.Values() {
-		if p.InstrumentKey == fact.InstrumentKey {
-			p.State = "CLOSED"
-			if fact.AfterQuantity.Sign() != 0 {
-				p.State = "UNKNOWN"
-			}
+	if fact.AfterQuantity.Sign() == 0 {
+		e.RequestConditionalCleanup(fact.InstrumentKey)
+		position.StrategyDeclaration = nil
+		position.RequestedPlan = nil
+	} else {
+		if fact.AfterQuantity.Sign() != actual.Sign() {
+			position.PositionCycleID = StableID("cycle-", fact.ExternalID)
+			position.RequestedPlan = nil
+			position.EffectiveMode = ""
+			position.StrategyDeclaration = nil
 		}
+		e.ProtectActualPosition(&Order{Request: OrderRequest{InstrumentKey: fact.InstrumentKey, ReduceOnly: true}})
 	}
 	for _, order := range run.Orders.Values() {
 		if order.Request.InstrumentKey == fact.InstrumentKey && !Terminal(order.State) {

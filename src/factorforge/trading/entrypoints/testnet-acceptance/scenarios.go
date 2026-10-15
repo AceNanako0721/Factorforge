@@ -719,18 +719,15 @@ func (s *acceptance) cleanup() error {
 	if err != nil {
 		return err
 	}
-	for _, item := range run.Protections.Values() {
-		if item.State != "CLOSED" {
-			command, err := s.command()
-			if err != nil {
-				return err
-			}
-			if _, err = s.service.CancelProtection(s.ctx, s.principal, command, item.ProtectionID); err != nil {
-				return err
-			}
-			if _, err = s.protection.Tick(s.ctx, s.key); err != nil {
-				return err
-			}
+	if err = s.store.Transaction(s.ctx, s.key, func(current *d.Aggregate) error {
+		d.NewEngine(current).RequestConditionalCleanup(s.spec.Key)
+		return nil
+	}); err != nil {
+		return err
+	}
+	for range 30 {
+		if _, err = s.protection.Tick(s.ctx, s.key); err != nil {
+			return err
 		}
 	}
 	ordinary, err := raw[[]map[string]any](s.ctx, s.broker, "/fapi/v1/openOrders", binance.Params{})

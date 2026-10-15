@@ -135,9 +135,17 @@ func CorrectActualRisk(state *d.StrategyState, obj *d.ObservedObject, snap *d.Tr
 	var decision *d.DecisionView
 	err := d.Guard(func() error {
 		p := state.Policies.Value(obj.TimePolicyVersion)
+		// Authorized position directives do not resize the position as a side effect.
+		// Account hard limits are still applied by the coordinated cycle/P1.
+		if effective := state.LastEffectiveStrategyStop.Value(obj.ObjectID); effective != nil && effective.PositionCycleID == d.Text(snap.Positions[obj.ObjectID]["position_cycle_id"]) {
+			return nil
+		}
+		if LatestStopDirective(state, obj, snap, "POSITION_STOP", d.DirectionName(snap.Actual[obj.ObjectID]), at) != nil {
+			return nil
+		}
 		plans := []d.StopPlan{}
 		for _, protection := range snap.Protections[obj.ObjectID] {
-			if d.Text(protection["state"]) == "ACTIVE_VERIFIED" {
+			if d.Text(protection["state"]) == "ACTIVE_VERIFIED" && d.Text(protection["role"]) != "INSURANCE" {
 				var plan d.StopPlan
 				raw, _ := d.Marshal(protection["plan"])
 				if err := d.DecodeJSON(raw, &plan); err != nil {

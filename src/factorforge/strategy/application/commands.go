@@ -38,8 +38,9 @@ func Authorize(s *d.StrategyState, identity d.Identity, scope d.ApiScope, object
 }
 
 type Service struct {
-	Store ports.Store
-	Clock ports.Clock
+	Store   ports.Store
+	Clock   ports.Clock
+	Trading ports.Trading
 }
 
 func (s Service) Command(ctx context.Context, identity d.Identity, command d.Command, scope d.ApiScope, payload any, objectID string, fn func(*d.StrategyState) (any, error)) (any, error) {

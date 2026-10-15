@@ -35,7 +35,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == "GET" && r.URL.Path == Prefix+"/health" {
-		write(w, 200, a.Response{"schema_version": "trading-2.0", "environment": h.Service.Store.Environment(), "live_ready": false, "upper_layers_required": false})
+		write(w, 200, a.Response{"capabilities": []string{"LOWER_COMPAT_280", "INSURANCE", "STRATEGY", "UPPER_MANAGED"}, "schema_version": "trading-2.0", "environment": h.Service.Store.Environment(), "live_ready": false, "upper_layers_required": false})
 		return
 	}
 	p, err := h.authenticate(r)
@@ -324,7 +324,11 @@ func (h *Handler) queryRun(r *http.Request, run *d.Aggregate, history ports.Hist
 		return page(), nil
 	case "positions":
 		for _, x := range run.Positions.Values() {
-			items = append(items, a.Response{"instrument_key": x.InstrumentKey, "owner_id": x.OwnerID, "quantity": x.Quantity, "average_entry": x.AverageEntry, "protection_state": x.ProtectionState, "reconciliation_state": run.State, "observed_at": run.Clock})
+			reasons := x.ReasonCodes
+			if reasons == nil {
+				reasons = []string{}
+			}
+			items = append(items, a.Response{"instrument_key": x.InstrumentKey, "owner_id": x.OwnerID, "quantity": x.Quantity, "average_entry": x.AverageEntry, "position_cycle_id": x.PositionCycleID, "strategy_protection_mode": x.StrategyProtectionMode, "strategy_declaration": x.StrategyDeclaration, "requested_mode": x.RequestedMode, "effective_mode": x.EffectiveMode, "transition_state": x.TransitionState, "reason_codes": reasons, "protection_state": x.ProtectionState, "reconciliation_state": run.State, "observed_at": run.Clock})
 		}
 		return page(), nil
 	case "owners":

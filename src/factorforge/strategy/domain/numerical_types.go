@@ -104,12 +104,15 @@ type ProductRules struct {
 	Version                                          string
 }
 type StopPlan struct {
-	TriggerKind     string  `json:"trigger_kind"`
-	TriggerPrice    Decimal `json:"trigger_price"`
-	CoveredQuantity Decimal `json:"covered_quantity"`
-	MaxSlippageBPS  Decimal `json:"max_slippage_bps"`
-	ExitOrderType   string  `json:"exit_order_type"`
-	SpecVersion     string  `json:"spec_version"`
+	StrategyProtectionMode string   `json:"strategy_protection_mode,omitempty"`
+	ManagedStopPrice       *Decimal `json:"managed_stop_price,omitempty"`
+	OvershootAllowance     *Decimal `json:"overshoot_allowance,omitempty"`
+	TriggerKind            string   `json:"trigger_kind"`
+	TriggerPrice           Decimal  `json:"trigger_price,omitzero"`
+	CoveredQuantity        Decimal  `json:"covered_quantity,omitzero"`
+	MaxSlippageBPS         Decimal  `json:"max_slippage_bps"`
+	ExitOrderType          string   `json:"exit_order_type,omitempty"`
+	SpecVersion            string   `json:"spec_version"`
 }
 type StopResult struct {
 	Quantity Decimal

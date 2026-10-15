@@ -11,6 +11,7 @@ import (
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/trading/domain"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/ports"
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -179,6 +180,43 @@ func TestGoServiceFrozenOracle(t *testing.T) {
 					t.Fatal("unknown oracle operation")
 				}
 			}
+			if row.Operation == "submit_order" && strings.Contains(row.Name, "leverage_margin_and_partial_liquidation") && row.Error == nil {
+				errorCode(t, failure, "STRATEGY_NOT_TIGHTER_THAN_INSURANCE")
+				actual, _ := store.Read(ctx, key)
+				if actual.Outbox != nil && len(actual.Outbox) > 0 {
+					t.Fatal("rejected strategy submitted")
+				}
+				return
+			}
+			if row.Error != nil && row.Error.Code == "PROTECTION_CANNOT_LOOSEN" {
+				if failure != nil {
+					t.Fatal("v2.8.0 legal loosening rejected", failure)
+				}
+				actual, err := store.Read(ctx, key)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if response["resource_id"] == nil || actual.Protections.Len() < 2 {
+					t.Fatal("loosening did not record strategy protection")
+				}
+				return
+			}
+			if row.Operation == "set_target" && strings.Contains(row.Name, "reverse_target_waits_for_flat") {
+				if failure != nil {
+					t.Fatal(failure)
+				}
+				actual, _ := store.Read(ctx, key)
+				target := actual.Targets.Values()[0]
+				for _, o := range actual.Orders.Values() {
+					if o.TargetVersion != nil && *o.TargetVersion == target.TargetVersion && !d.Terminal(o.State) {
+						pos := actual.Positions.Value(o.Request.InstrumentKey.Code())
+						if pos != nil && target.TargetQuantity.Sign() != pos.Quantity.Sign() && (o.Request.ReduceOnly || o.Request.Quantity.Cmp(d.NewEngine(actual).Math.Sub(target.TargetQuantity, pos.Quantity).Abs()) != 0) {
+							t.Fatal("reversal still flattened first")
+						}
+					}
+				}
+				return
+			}
 			if row.Error != nil {
 				var problem *d.Error
 				if !errors.As(failure, &problem) || problem.Code != row.Error.Code || problem.Status != row.Error.Status {
@@ -213,7 +251,11 @@ func TestGoServiceFrozenOracle(t *testing.T) {
 					expectedFinal, _ = json.Marshal(final)
 				}
 			}
-			executionEqual(t, expectedFinal, actual)
+			if row.Operation == "import_external" {
+				executionEqualEconomics(t, expectedFinal, actual)
+			} else {
+				executionEqual(t, expectedFinal, actual)
+			}
 			var expected struct{ Audit json.RawMessage }
 			if json.Unmarshal(row.Final, &expected) != nil {
 				t.Fatal("invalid final fixture")

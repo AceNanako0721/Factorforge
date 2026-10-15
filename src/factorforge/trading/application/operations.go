@@ -95,10 +95,13 @@ func (s *Service) CancelProtection(ctx context.Context, p d.Principal, command C
 		if protection == nil {
 			return problem("PROTECTION_NOT_FOUND", 404)
 		}
+		if protection.Role == "INSURANCE" {
+			return problem("INSURANCE_PROTECTION_FORBIDDEN", 403)
+		}
 		position := run.Positions.Value(protection.InstrumentKey.Code())
 		alternative := false
 		for _, other := range run.Protections.Values() {
-			if other.ProtectionID != id && other.InstrumentKey == protection.InstrumentKey && other.State == "ACTIVE_VERIFIED" && position != nil && other.Plan.CoveredQuantity.Cmp(e.Math.Abs(position.Quantity)) >= 0 {
+			if other.ProtectionID != id && other.Role == protection.Role && other.InstrumentKey == protection.InstrumentKey && other.State == "ACTIVE_VERIFIED" && position != nil && other.Plan.CoveredQuantity.Cmp(e.Math.Abs(position.Quantity)) >= 0 {
 				alternative = true
 			}
 		}
@@ -139,14 +142,15 @@ func Reconcile(e *d.Engine) error {
 		if position.Quantity.Sign() == 0 {
 			continue
 		}
-		covered := false
-		for _, p := range run.Protections.Values() {
-			if p.InstrumentKey.Code() == code && p.State == "ACTIVE_VERIFIED" && p.Plan.CoveredQuantity.Cmp(e.Math.Abs(position.Quantity)) == 0 {
-				covered = true
-			}
-		}
+		e.ReconcileStrategyMode(position.InstrumentKey)
+		covered := position.ProtectionState == "ACTIVE_VERIFIED"
 		if !covered {
 			issues = append(issues, "PROTECTION_NOT_VERIFIED:"+code)
+		}
+	}
+	for _, task := range run.ConditionalCleanups.Values() {
+		if task.State != "CONFIRMED" {
+			issues = append(issues, "CONDITION_CLEANUP_PENDING:"+task.Instrument.Code())
 		}
 	}
 	check := d.NewEngine(run)

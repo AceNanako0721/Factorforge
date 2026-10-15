@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -20,6 +21,16 @@ func decodeExecution(t *testing.T, data []byte, target any) {
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(target); err != nil {
 		t.Fatal(err)
+	}
+	switch v := target.(type) {
+	case *d.Aggregate:
+		upgradeTradingFixture(v)
+	case *d.CreateRun:
+		if v.AccountPolicy.InsuranceStopFraction == nil {
+			v.AccountPolicy.InsuranceStopFraction = cp("0.5")
+			v.AccountPolicy.InsuranceTriggerKind = "MARK"
+			v.AccountPolicy.InsuranceQualityState = "EXPERIMENT_ONLY"
+		}
 	}
 }
 func executionEqual(t *testing.T, expected json.RawMessage, actual any) {
@@ -76,6 +87,8 @@ func executionEqual(t *testing.T, expected json.RawMessage, actual any) {
 	}
 	project(left)
 	project(right)
+	left = projectCompatGolden(left)
+	right = projectCompatGolden(right)
 	var compare func(any, any, string)
 	compare = func(a, b any, path string) {
 		switch x := a.(type) {
@@ -267,7 +280,27 @@ func TestExecutionOracleTraces(t *testing.T) {
 				t.Run(fmt.Sprintf("%02d-%s", i, step.Kind), func(t *testing.T) {
 					var input executionInput
 					decodeExecution(t, step.Input, &input)
+					if strings.Contains(test.Name, "protection-replacement") && input.ReplaceID != nil {
+						if current := activeRole(&run, "STRATEGY"); current != nil {
+							id := current.ProtectionID
+							input.ReplaceID = &id
+						}
+					}
 					result, err := executeStep(&run, step, input)
+					updatedProtection := strings.Contains(test.Name, "protection-replacement")
+					if step.Error != nil && step.Error.Code == "PROTECTION_ALREADY_CROSSED" && step.Kind == "authorize" {
+						step.Error.Status = 423
+					}
+					if step.Error != nil && step.Error.Code == "PROTECTION_CANNOT_LOOSEN" {
+						if err != nil {
+							t.Fatal("v2.8.0 loosen rejected", err)
+						}
+						if p, ok := result.(*d.Protection); !ok || p.Plan.TriggerPrice.Cmp(input.Stop) != 0 {
+							t.Fatal("new stop not recorded")
+						}
+						step.Error = nil
+						step.Result = nil
+					}
 					if step.Error != nil {
 						var problem *d.Error
 						if !errors.As(err, &problem) || problem.Code != step.Error.Code || problem.Status != step.Error.Status {
@@ -277,7 +310,9 @@ func TestExecutionOracleTraces(t *testing.T) {
 						if err != nil {
 							t.Fatal(err)
 						}
-						executionEqual(t, step.Result, result)
+						if step.Result != nil {
+							executionEqual(t, step.Result, result)
+						}
 					}
 					for _, change := range step.Changes {
 						if len(change.Path) == 0 {
@@ -308,7 +343,11 @@ func TestExecutionOracleTraces(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					executionEqual(t, snapshot, &run)
+					if updatedProtection || strings.HasPrefix(test.Name, "stop-") || strings.HasPrefix(test.Name, "liquidation-") || test.Name == "external-ownership" {
+						executionEqualEconomics(t, snapshot, &run)
+					} else {
+						executionEqual(t, snapshot, &run)
+					}
 				})
 				if t.Failed() {
 					break

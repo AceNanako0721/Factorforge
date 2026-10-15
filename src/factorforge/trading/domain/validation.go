@@ -148,7 +148,12 @@ func validateBusiness(value any) error {
 		if v.Amount == nil && v.Fraction == nil && v.Count == nil {
 			return invalidModel()
 		}
+	case ProtectionPlan:
+		return ValidateProtectionPlan(v)
 	case AccountPolicy:
+		if v.InsuranceStopFraction != nil && (v.InsuranceStopFraction.Sign() <= 0 || v.InsuranceStopFraction.Cmp(one) >= 0) {
+			return &Error{"INSURANCE_STOP_FRACTION_INVALID", 422}
+		}
 		if _, err := time.LoadLocation(v.RiskDayZone); err != nil {
 			return invalidModel()
 		}

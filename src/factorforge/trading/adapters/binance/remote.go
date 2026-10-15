@@ -294,6 +294,18 @@ func dispatchProbe(ctx context.Context, m probeMessage, p *ProbeTransport, b *Br
 		return b.QueryProtection(ctx, &run, id)
 	case "cancel_protection":
 		return b.CancelProtection(ctx, &run, id)
+	case "list_open_conditionals", "cancel_conditional_by_id":
+		var key d.InstrumentKey
+		if decode(1, &key) != nil || key.InstrumentID != p.Manifest.Symbol {
+			return nil, reject("TESTNET_ACCOUNT_SCOPE", 403)
+		}
+		if m.Operation == "list_open_conditionals" {
+			return b.ListOpenConditionals(ctx, &run, key)
+		}
+		if decode(2, &id) != nil {
+			return nil, reject("TESTNET_PROTOCOL_INVALID", 422)
+		}
+		return true, b.CancelConditionalByID(ctx, &run, key, id)
 	case "list_open_orders":
 		return b.ListOpenOrders(ctx, &run)
 	case "list_fills":
@@ -307,4 +319,12 @@ func dispatchProbe(ctx context.Context, m probeMessage, p *ProbeTransport, b *Br
 	default:
 		return nil, reject("TESTNET_OPERATION_FORBIDDEN", 403)
 	}
+}
+
+func (r *RemoteProbe) ListOpenConditionals(c context.Context, a *d.Aggregate, key d.InstrumentKey) ([]d.ConditionalOrderFact, error) {
+	return remoteValue[[]d.ConditionalOrderFact](c, r, "list_open_conditionals", a, key)
+}
+func (r *RemoteProbe) CancelConditionalByID(c context.Context, a *d.Aggregate, key d.InstrumentKey, id string) error {
+	_, err := r.Call(c, "cancel_conditional_by_id", a, key, id)
+	return err
 }

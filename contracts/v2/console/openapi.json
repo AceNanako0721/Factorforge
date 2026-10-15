@@ -1751,14 +1751,41 @@
                                               "title": "Exit Order Type",
                                               "type": "string"
                                             },
+                                            "managed_stop_price": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "string"
+                                                },
+                                                {
+                                                  "type": "null"
+                                                }
+                                              ]
+                                            },
                                             "max_slippage_bps": {
                                               "title": "Max Slippage Bps",
                                               "type": "string"
+                                            },
+                                            "overshoot_allowance": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "string"
+                                                },
+                                                {
+                                                  "type": "null"
+                                                }
+                                              ]
                                             },
                                             "spec_version": {
                                               "maxLength": 160,
                                               "minLength": 1,
                                               "title": "Spec Version",
+                                              "type": "string"
+                                            },
+                                            "strategy_protection_mode": {
+                                              "enum": [
+                                                "VENUE",
+                                                "UPPER_MANAGED"
+                                              ],
                                               "type": "string"
                                             },
                                             "trigger_kind": {
@@ -1776,8 +1803,6 @@
                                           },
                                           "required": [
                                             "trigger_kind",
-                                            "trigger_price",
-                                            "covered_quantity",
                                             "max_slippage_bps",
                                             "spec_version"
                                           ],
@@ -2330,6 +2355,9 @@
                                 "title": "Projected Exposure",
                                 "type": "string"
                               },
+                              "protection_only": {
+                                "type": "boolean"
+                              },
                               "raw_exposure": {
                                 "title": "Raw Exposure",
                                 "type": "string"
@@ -2348,6 +2376,16 @@
                                 "title": "Source Event Versions",
                                 "type": "object"
                               },
+                              "stop_directive_id": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
                               "stop_plan": {
                                 "anyOf": [
                                   {
@@ -2363,14 +2401,41 @@
                                         "title": "Exit Order Type",
                                         "type": "string"
                                       },
+                                      "managed_stop_price": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
                                       "max_slippage_bps": {
                                         "title": "Max Slippage Bps",
                                         "type": "string"
+                                      },
+                                      "overshoot_allowance": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
                                       },
                                       "spec_version": {
                                         "maxLength": 160,
                                         "minLength": 1,
                                         "title": "Spec Version",
+                                        "type": "string"
+                                      },
+                                      "strategy_protection_mode": {
+                                        "enum": [
+                                          "VENUE",
+                                          "UPPER_MANAGED"
+                                        ],
                                         "type": "string"
                                       },
                                       "trigger_kind": {
@@ -2388,8 +2453,6 @@
                                     },
                                     "required": [
                                       "trigger_kind",
-                                      "trigger_price",
-                                      "covered_quantity",
                                       "max_slippage_bps",
                                       "spec_version"
                                     ],
@@ -7567,6 +7630,9 @@
                                     ],
                                     "title": "Average Entry"
                                   },
+                                  "effective_mode": {
+                                    "type": "string"
+                                  },
                                   "instrument_key": {
                                     "additionalProperties": false,
                                     "properties": {
@@ -7610,6 +7676,9 @@
                                     "title": "Owner Id",
                                     "type": "string"
                                   },
+                                  "position_cycle_id": {
+                                    "type": "string"
+                                  },
                                   "protection_state": {
                                     "title": "Protection State",
                                     "type": "string"
@@ -7619,8 +7688,83 @@
                                     "title": "Quantity",
                                     "type": "string"
                                   },
+                                  "reason_codes": {
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "type": "array"
+                                  },
                                   "reconciliation_state": {
                                     "title": "Reconciliation State",
+                                    "type": "string"
+                                  },
+                                  "requested_mode": {
+                                    "type": "string"
+                                  },
+                                  "strategy_declaration": {
+                                    "anyOf": [
+                                      {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "accepted_at": {
+                                            "format": "date-time",
+                                            "type": "string"
+                                          },
+                                          "declaration_hash": {
+                                            "type": "string"
+                                          },
+                                          "managed_stop_price": {
+                                            "type": "string"
+                                          },
+                                          "mode": {
+                                            "enum": [
+                                              "VENUE",
+                                              "UPPER_MANAGED"
+                                            ],
+                                            "type": "string"
+                                          },
+                                          "overshoot_allowance": {
+                                            "type": "string"
+                                          },
+                                          "position_cycle_id": {
+                                            "type": "string"
+                                          },
+                                          "position_direction": {
+                                            "type": "string"
+                                          },
+                                          "source_decision_id": {
+                                            "type": "string"
+                                          },
+                                          "target_version": {
+                                            "type": "integer"
+                                          },
+                                          "trigger_kind": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "mode",
+                                          "managed_stop_price",
+                                          "overshoot_allowance",
+                                          "trigger_kind",
+                                          "position_direction",
+                                          "position_cycle_id",
+                                          "source_decision_id",
+                                          "target_version",
+                                          "declaration_hash",
+                                          "accepted_at"
+                                        ],
+                                        "type": "object"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "strategy_protection_mode": {
+                                    "type": "string"
+                                  },
+                                  "transition_state": {
                                     "type": "string"
                                   }
                                 },
@@ -7777,10 +7921,16 @@
                               "items": {
                                 "additionalProperties": false,
                                 "properties": {
+                                  "cancel_attempted": {
+                                    "type": "boolean"
+                                  },
                                   "cancel_requested": {
                                     "default": false,
                                     "title": "Cancel Requested",
                                     "type": "boolean"
+                                  },
+                                  "client_algo_id": {
+                                    "type": "string"
                                   },
                                   "exit_order_id": {
                                     "anyOf": [
@@ -7806,6 +7956,9 @@
                                       }
                                     ],
                                     "title": "External Id"
+                                  },
+                                  "generation": {
+                                    "type": "integer"
                                   },
                                   "instrument_key": {
                                     "additionalProperties": false,
@@ -7858,9 +8011,15 @@
                                         "title": "Exit Order Type",
                                         "type": "string"
                                       },
+                                      "managed_stop_price": {
+                                        "type": "string"
+                                      },
                                       "max_slippage_bps": {
                                         "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                                         "title": "Max Slippage Bps",
+                                        "type": "string"
+                                      },
+                                      "overshoot_allowance": {
                                         "type": "string"
                                       },
                                       "spec_version": {
@@ -7868,6 +8027,13 @@
                                         "minLength": 1,
                                         "pattern": "^[A-Za-z0-9_.-]+$",
                                         "title": "Spec Version",
+                                        "type": "string"
+                                      },
+                                      "strategy_protection_mode": {
+                                        "enum": [
+                                          "VENUE",
+                                          "UPPER_MANAGED"
+                                        ],
                                         "type": "string"
                                       },
                                       "trigger_kind": {
@@ -7886,14 +8052,17 @@
                                     },
                                     "required": [
                                       "trigger_kind",
-                                      "trigger_price",
-                                      "covered_quantity",
-                                      "exit_order_type",
                                       "max_slippage_bps",
                                       "spec_version"
                                     ],
                                     "title": "ProtectionPlan",
                                     "type": "object"
+                                  },
+                                  "position_cycle_id": {
+                                    "type": "string"
+                                  },
+                                  "position_direction": {
+                                    "type": "string"
                                   },
                                   "protection_id": {
                                     "maxLength": 128,
@@ -7915,6 +8084,24 @@
                                       }
                                     ],
                                     "title": "Replaces Id"
+                                  },
+                                  "role": {
+                                    "enum": [
+                                      "INSURANCE",
+                                      "STRATEGY",
+                                      ""
+                                    ],
+                                    "type": "string"
+                                  },
+                                  "source_target_version": {
+                                    "anyOf": [
+                                      {
+                                        "type": "integer"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
                                   },
                                   "state": {
                                     "title": "State",
@@ -8757,6 +8944,12 @@
                             "aggregate_version": {
                               "title": "Aggregate Version",
                               "type": "integer"
+                            },
+                            "capabilities": {
+                              "items": {
+                                "type": "string"
+                              },
+                              "type": "array"
                             },
                             "execution_mode": {
                               "title": "Execution Mode",
@@ -10029,6 +10222,9 @@
                                     "title": "Projected Exposure",
                                     "type": "string"
                                   },
+                                  "protection_only": {
+                                    "type": "boolean"
+                                  },
                                   "raw_exposure": {
                                     "title": "Raw Exposure",
                                     "type": "string"
@@ -10047,6 +10243,16 @@
                                     "title": "Source Event Versions",
                                     "type": "object"
                                   },
+                                  "stop_directive_id": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
                                   "stop_plan": {
                                     "anyOf": [
                                       {
@@ -10062,14 +10268,41 @@
                                             "title": "Exit Order Type",
                                             "type": "string"
                                           },
+                                          "managed_stop_price": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
                                           "max_slippage_bps": {
                                             "title": "Max Slippage Bps",
                                             "type": "string"
+                                          },
+                                          "overshoot_allowance": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
                                           },
                                           "spec_version": {
                                             "maxLength": 160,
                                             "minLength": 1,
                                             "title": "Spec Version",
+                                            "type": "string"
+                                          },
+                                          "strategy_protection_mode": {
+                                            "enum": [
+                                              "VENUE",
+                                              "UPPER_MANAGED"
+                                            ],
                                             "type": "string"
                                           },
                                           "trigger_kind": {
@@ -10087,8 +10320,6 @@
                                         },
                                         "required": [
                                           "trigger_kind",
-                                          "trigger_price",
-                                          "covered_quantity",
                                           "max_slippage_bps",
                                           "spec_version"
                                         ],
@@ -10171,6 +10402,261 @@
                                 ],
                                 "title": "State",
                                 "type": "string"
+                              },
+                              "stop_directive": {
+                                "anyOf": [
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "content_hash": {
+                                        "type": "string"
+                                      },
+                                      "directive": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "directive_id": {
+                                            "maxLength": 128,
+                                            "minLength": 1,
+                                            "pattern": "^[A-Za-z0-9_.-]+$",
+                                            "type": "string"
+                                          },
+                                          "effective_at": {
+                                            "format": "date-time",
+                                            "type": "string"
+                                          },
+                                          "initial_stop_distance": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "kind": {
+                                            "enum": [
+                                              "POSITION_STOP",
+                                              "INITIAL_DISTANCE"
+                                            ],
+                                            "type": "string"
+                                          },
+                                          "mode": {
+                                            "default": "VENUE",
+                                            "enum": [
+                                              "VENUE",
+                                              "UPPER_MANAGED"
+                                            ],
+                                            "type": "string"
+                                          },
+                                          "object_id": {
+                                            "maxLength": 128,
+                                            "minLength": 1,
+                                            "pattern": "^[A-Za-z0-9_.-]+$",
+                                            "type": "string"
+                                          },
+                                          "overshoot_allowance": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "position_direction": {
+                                            "enum": [
+                                              "LONG",
+                                              "SHORT"
+                                            ],
+                                            "type": "string"
+                                          },
+                                          "reason_codes": {
+                                            "items": {
+                                              "maxLength": 128,
+                                              "minLength": 1,
+                                              "type": "string"
+                                            },
+                                            "maxItems": 32,
+                                            "minItems": 1,
+                                            "type": "array"
+                                          },
+                                          "source_module": {
+                                            "maxLength": 128,
+                                            "minLength": 1,
+                                            "pattern": "^[A-Za-z0-9_.-]+$",
+                                            "type": "string"
+                                          },
+                                          "trigger_kind": {
+                                            "type": "string"
+                                          },
+                                          "trigger_price": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "valid_for_seconds": {
+                                            "minimum": 1,
+                                            "type": "integer"
+                                          },
+                                          "version": {
+                                            "minimum": 1,
+                                            "type": "integer"
+                                          }
+                                        },
+                                        "required": [
+                                          "directive_id",
+                                          "effective_at",
+                                          "initial_stop_distance",
+                                          "kind",
+                                          "object_id",
+                                          "position_direction",
+                                          "reason_codes",
+                                          "source_module",
+                                          "trigger_kind",
+                                          "trigger_price",
+                                          "valid_for_seconds",
+                                          "version"
+                                        ],
+                                        "type": "object"
+                                      },
+                                      "executable": {
+                                        "type": "boolean"
+                                      },
+                                      "position_cycle_id": {
+                                        "type": "string"
+                                      },
+                                      "receipt": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "accepted_at": {
+                                            "anyOf": [
+                                              {
+                                                "format": "date-time",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "application_state": {
+                                            "type": "string"
+                                          },
+                                          "current_version": {
+                                            "type": "integer"
+                                          },
+                                          "directive_id": {
+                                            "type": "string"
+                                          },
+                                          "effective_at": {
+                                            "format": "date-time",
+                                            "type": "string"
+                                          },
+                                          "expires_at": {
+                                            "format": "date-time",
+                                            "type": "string"
+                                          },
+                                          "object_id": {
+                                            "type": "string"
+                                          },
+                                          "protection_id": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "reason_codes": {
+                                            "items": {
+                                              "type": "string"
+                                            },
+                                            "type": "array"
+                                          },
+                                          "received_at": {
+                                            "format": "date-time",
+                                            "type": "string"
+                                          },
+                                          "source_decision_id": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "state": {
+                                            "type": "string"
+                                          },
+                                          "target_version": {
+                                            "anyOf": [
+                                              {
+                                                "type": "integer"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "verified_at": {
+                                            "anyOf": [
+                                              {
+                                                "format": "date-time",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "version": {
+                                            "type": "integer"
+                                          }
+                                        },
+                                        "required": [
+                                          "accepted_at",
+                                          "application_state",
+                                          "current_version",
+                                          "directive_id",
+                                          "effective_at",
+                                          "expires_at",
+                                          "object_id",
+                                          "protection_id",
+                                          "reason_codes",
+                                          "received_at",
+                                          "source_decision_id",
+                                          "state",
+                                          "target_version",
+                                          "verified_at",
+                                          "version"
+                                        ],
+                                        "type": "object"
+                                      }
+                                    },
+                                    "required": [
+                                      "content_hash",
+                                      "directive",
+                                      "executable",
+                                      "position_cycle_id",
+                                      "receipt"
+                                    ],
+                                    "type": "object"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
                               },
                               "target_version": {
                                 "title": "Target Version",
@@ -10645,6 +11131,9 @@
                               "items": {
                                 "additionalProperties": false,
                                 "properties": {
+                                  "effective_mode": {
+                                    "type": "string"
+                                  },
                                   "expires_at": {
                                     "anyOf": [
                                       {
@@ -10733,9 +11222,15 @@
                                             "title": "Exit Order Type",
                                             "type": "string"
                                           },
+                                          "managed_stop_price": {
+                                            "type": "string"
+                                          },
                                           "max_slippage_bps": {
                                             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                                             "title": "Max Slippage Bps",
+                                            "type": "string"
+                                          },
+                                          "overshoot_allowance": {
                                             "type": "string"
                                           },
                                           "spec_version": {
@@ -10743,6 +11238,13 @@
                                             "minLength": 1,
                                             "pattern": "^[A-Za-z0-9_.-]+$",
                                             "title": "Spec Version",
+                                            "type": "string"
+                                          },
+                                          "strategy_protection_mode": {
+                                            "enum": [
+                                              "VENUE",
+                                              "UPPER_MANAGED"
+                                            ],
                                             "type": "string"
                                           },
                                           "trigger_kind": {
@@ -10761,9 +11263,6 @@
                                         },
                                         "required": [
                                           "trigger_kind",
-                                          "trigger_price",
-                                          "covered_quantity",
-                                          "exit_order_type",
                                           "max_slippage_bps",
                                           "spec_version"
                                         ],
@@ -10781,6 +11280,9 @@
                                     },
                                     "title": "Reasons",
                                     "type": "array"
+                                  },
+                                  "requested_mode": {
+                                    "type": "string"
                                   },
                                   "source_decision_id": {
                                     "anyOf": [
@@ -10814,6 +11316,69 @@
                                     "title": "State",
                                     "type": "string"
                                   },
+                                  "strategy_declaration": {
+                                    "anyOf": [
+                                      {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "accepted_at": {
+                                            "format": "date-time",
+                                            "type": "string"
+                                          },
+                                          "declaration_hash": {
+                                            "type": "string"
+                                          },
+                                          "managed_stop_price": {
+                                            "type": "string"
+                                          },
+                                          "mode": {
+                                            "enum": [
+                                              "VENUE",
+                                              "UPPER_MANAGED"
+                                            ],
+                                            "type": "string"
+                                          },
+                                          "overshoot_allowance": {
+                                            "type": "string"
+                                          },
+                                          "position_cycle_id": {
+                                            "type": "string"
+                                          },
+                                          "position_direction": {
+                                            "type": "string"
+                                          },
+                                          "source_decision_id": {
+                                            "type": "string"
+                                          },
+                                          "target_version": {
+                                            "type": "integer"
+                                          },
+                                          "trigger_kind": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "mode",
+                                          "managed_stop_price",
+                                          "overshoot_allowance",
+                                          "trigger_kind",
+                                          "position_direction",
+                                          "position_cycle_id",
+                                          "source_decision_id",
+                                          "target_version",
+                                          "declaration_hash",
+                                          "accepted_at"
+                                        ],
+                                        "type": "object"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "strategy_protection_mode": {
+                                    "type": "string"
+                                  },
                                   "target_quantity": {
                                     "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                                     "title": "Target Quantity",
@@ -10822,6 +11387,9 @@
                                   "target_version": {
                                     "title": "Target Version",
                                     "type": "integer"
+                                  },
+                                  "transition_state": {
+                                    "type": "string"
                                   }
                                 },
                                 "required": [

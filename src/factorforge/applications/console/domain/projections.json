@@ -3277,6 +3277,9 @@
               "title": "Projected Exposure",
               "type": "string"
             },
+            "protection_only": {
+              "type": "boolean"
+            },
             "raw_exposure": {
               "title": "Raw Exposure",
               "type": "string"
@@ -3294,6 +3297,16 @@
               },
               "title": "Source Event Versions",
               "type": "object"
+            },
+            "stop_directive_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "stop_plan": {
               "anyOf": [
@@ -3331,6 +3344,50 @@
             "reason_codes"
           ],
           "title": "DecisionView",
+          "type": "object"
+        },
+        "EffectiveStrategyStop": {
+          "additionalProperties": false,
+          "properties": {
+            "directive_id": {
+              "type": "string"
+            },
+            "plan": {
+              "$ref": "#/components/schemas/StopPlan"
+            },
+            "position_cycle_id": {
+              "type": "string"
+            },
+            "position_direction": {
+              "type": "string"
+            },
+            "protection_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "target_version": {
+              "type": "integer"
+            },
+            "verified_at": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          "required": [
+            "directive_id",
+            "plan",
+            "position_cycle_id",
+            "position_direction",
+            "protection_id",
+            "target_version",
+            "verified_at"
+          ],
           "type": "object"
         },
         "Event": {
@@ -4881,6 +4938,17 @@
               "title": "Regime Exit",
               "type": "string"
             },
+            "reverse_confirm_seconds": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "rubrics": {
               "items": {
                 "maxLength": 160,
@@ -5662,7 +5730,7 @@
               "x-decimal": true
             },
             "reverse_confirm_seconds": {
-              "minimum": 1,
+              "minimum": 0,
               "type": "integer"
             }
           },
@@ -6614,6 +6682,517 @@
           "title": "StateCommand",
           "type": "object"
         },
+        "StopDirective": {
+          "additionalProperties": false,
+          "properties": {
+            "directive_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.-]+$",
+              "type": "string"
+            },
+            "effective_at": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "initial_stop_distance": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "x-decimal": true
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "kind": {
+              "enum": [
+                "POSITION_STOP",
+                "INITIAL_DISTANCE"
+              ],
+              "type": "string"
+            },
+            "mode": {
+              "default": "VENUE",
+              "enum": [
+                "VENUE",
+                "UPPER_MANAGED"
+              ],
+              "type": "string"
+            },
+            "object_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.-]+$",
+              "type": "string"
+            },
+            "overshoot_allowance": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "x-decimal": true
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "position_direction": {
+              "enum": [
+                "LONG",
+                "SHORT"
+              ],
+              "type": "string"
+            },
+            "reason_codes": {
+              "items": {
+                "maxLength": 128,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 32,
+              "minItems": 1,
+              "type": "array"
+            },
+            "source_module": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.-]+$",
+              "type": "string"
+            },
+            "trigger_kind": {
+              "type": "string"
+            },
+            "trigger_price": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "x-decimal": true
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "valid_for_seconds": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "version": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "directive_id",
+            "effective_at",
+            "initial_stop_distance",
+            "kind",
+            "object_id",
+            "position_direction",
+            "reason_codes",
+            "source_module",
+            "trigger_kind",
+            "trigger_price",
+            "valid_for_seconds",
+            "version"
+          ],
+          "type": "object"
+        },
+        "StopDirectiveCommand": {
+          "additionalProperties": false,
+          "properties": {
+            "directive_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.-]+$",
+              "type": "string"
+            },
+            "effective_at": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "expected_version": {
+              "ge": "0",
+              "minimum": 0,
+              "title": "Expected Version",
+              "type": "integer"
+            },
+            "idempotency_key": {
+              "maxLength": 160,
+              "minLength": 1,
+              "title": "Idempotency Key",
+              "type": "string"
+            },
+            "initial_stop_distance": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "x-decimal": true
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "kind": {
+              "enum": [
+                "POSITION_STOP",
+                "INITIAL_DISTANCE"
+              ],
+              "type": "string"
+            },
+            "mode": {
+              "default": "VENUE",
+              "enum": [
+                "VENUE",
+                "UPPER_MANAGED"
+              ],
+              "type": "string"
+            },
+            "object_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.-]+$",
+              "type": "string"
+            },
+            "overshoot_allowance": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "x-decimal": true
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "position_direction": {
+              "enum": [
+                "LONG",
+                "SHORT"
+              ],
+              "type": "string"
+            },
+            "reason": {
+              "maxLength": 500,
+              "minLength": 1,
+              "title": "Reason",
+              "type": "string"
+            },
+            "reason_codes": {
+              "items": {
+                "maxLength": 128,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 32,
+              "minItems": 1,
+              "type": "array"
+            },
+            "request_id": {
+              "maxLength": 160,
+              "minLength": 1,
+              "title": "Request Id",
+              "type": "string"
+            },
+            "schema_version": {
+              "const": "strategy-2.0",
+              "title": "Schema Version",
+              "type": "string"
+            },
+            "source_module": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.-]+$",
+              "type": "string"
+            },
+            "trigger_kind": {
+              "type": "string"
+            },
+            "trigger_price": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "x-decimal": true
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "valid_for_seconds": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "version": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "directive_id",
+            "effective_at",
+            "expected_version",
+            "idempotency_key",
+            "initial_stop_distance",
+            "kind",
+            "object_id",
+            "position_direction",
+            "reason",
+            "reason_codes",
+            "request_id",
+            "schema_version",
+            "source_module",
+            "trigger_kind",
+            "trigger_price",
+            "valid_for_seconds",
+            "version"
+          ],
+          "type": "object",
+          "x-error-codes": [
+            "UNAUTHENTICATED",
+            "STOP_DIRECTIVE_WRITE_FORBIDDEN",
+            "OBJECT_NOT_FOUND",
+            "STOP_DIRECTIVE_VERSION_CONFLICT",
+            "STOP_DIRECTIVE_CONTENT_CONFLICT",
+            "STOP_DIRECTIVE_INVALID",
+            "STOP_DIRECTIVE_DIRECTION_MISMATCH",
+            "STOP_DIRECTIVE_NOT_EFFECTIVE",
+            "STOP_DIRECTIVE_EXPIRED",
+            "STOP_DIRECTIVE_TRIGGER_UNSUPPORTED",
+            "STOP_DIRECTIVE_TICK_MISMATCH",
+            "STOP_DIRECTIVE_ALREADY_CROSSED",
+            "STOP_DIRECTIVE_PRICE_UNUSABLE",
+            "P1_LOWER_COMPAT_REQUIRED",
+            "STRATEGY_NOT_TIGHTER_THAN_INSURANCE",
+            "MANAGED_STOP_OUTSIDE_INSURANCE"
+          ]
+        },
+        "StopDirectivePage": {
+          "additionalProperties": false,
+          "properties": {
+            "cursor": {
+              "type": "string"
+            },
+            "items": {
+              "items": {
+                "$ref": "#/components/schemas/StopDirectiveRecord"
+              },
+              "type": "array"
+            },
+            "snapshot_version": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "items",
+            "cursor",
+            "snapshot_version"
+          ],
+          "type": "object"
+        },
+        "StopDirectiveReceipt": {
+          "additionalProperties": false,
+          "properties": {
+            "accepted_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "application_state": {
+              "type": "string"
+            },
+            "current_version": {
+              "type": "integer"
+            },
+            "directive_id": {
+              "type": "string"
+            },
+            "effective_at": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "expires_at": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "object_id": {
+              "type": "string"
+            },
+            "protection_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "reason_codes": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "received_at": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "source_decision_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "state": {
+              "type": "string"
+            },
+            "target_version": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "verified_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "version": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "accepted_at",
+            "application_state",
+            "current_version",
+            "directive_id",
+            "effective_at",
+            "expires_at",
+            "object_id",
+            "protection_id",
+            "reason_codes",
+            "received_at",
+            "source_decision_id",
+            "state",
+            "target_version",
+            "verified_at",
+            "version"
+          ],
+          "type": "object"
+        },
+        "StopDirectiveRecord": {
+          "additionalProperties": false,
+          "properties": {
+            "content_hash": {
+              "type": "string"
+            },
+            "directive": {
+              "$ref": "#/components/schemas/StopDirective"
+            },
+            "executable": {
+              "type": "boolean"
+            },
+            "position_cycle_id": {
+              "type": "string"
+            },
+            "principal_id": {
+              "type": "string"
+            },
+            "receipt": {
+              "$ref": "#/components/schemas/StopDirectiveReceipt"
+            }
+          },
+          "required": [
+            "content_hash",
+            "directive",
+            "executable",
+            "position_cycle_id",
+            "principal_id",
+            "receipt"
+          ],
+          "type": "object"
+        },
+        "StopDirectiveWriterBinding": {
+          "additionalProperties": false,
+          "properties": {
+            "binding_id": {
+              "type": "string"
+            },
+            "can_write": {
+              "type": "boolean"
+            },
+            "environment": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "object_id": {
+              "type": "string"
+            },
+            "principal_id": {
+              "type": "string"
+            },
+            "source_module": {
+              "type": "string"
+            },
+            "valid_from": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "valid_until": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "version": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "binding_id",
+            "can_write",
+            "environment",
+            "kind",
+            "object_id",
+            "principal_id",
+            "source_module",
+            "valid_from",
+            "valid_until",
+            "version"
+          ],
+          "type": "object"
+        },
         "StopPlan": {
           "additionalProperties": false,
           "properties": {
@@ -6627,14 +7206,43 @@
               "title": "Exit Order Type",
               "type": "string"
             },
+            "managed_stop_price": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "x-decimal": true
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "max_slippage_bps": {
               "title": "Max Slippage Bps",
               "type": "string"
+            },
+            "overshoot_allowance": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "x-decimal": true
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "spec_version": {
               "maxLength": 160,
               "minLength": 1,
               "title": "Spec Version",
+              "type": "string"
+            },
+            "strategy_protection_mode": {
+              "enum": [
+                "VENUE",
+                "UPPER_MANAGED"
+              ],
               "type": "string"
             },
             "trigger_kind": {
@@ -6652,8 +7260,6 @@
           },
           "required": [
             "trigger_kind",
-            "trigger_price",
-            "covered_quantity",
             "max_slippage_bps",
             "spec_version"
           ],
@@ -6733,6 +7339,16 @@
               ],
               "title": "State",
               "type": "string"
+            },
+            "stop_directive": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/StopDirectiveRecord"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "target_version": {
               "title": "Target Version",
@@ -7023,6 +7639,9 @@
       "/api/v2/strategy/objects/{object_id}/pool": {
         "$ref": "#/components/schemas/PoolView"
       },
+      "/api/v2/strategy/objects/{object_id}/stop-directives": {
+        "$ref": "#/components/schemas/StopDirectivePage"
+      },
       "/api/v2/strategy/objects/{object_id}/targets": {
         "items": {
           "$ref": "#/components/schemas/TargetOutbox"
@@ -7235,6 +7854,25 @@
               },
               "title": "Group Notional Limits",
               "type": "object"
+            },
+            "insurance_quality_state": {
+              "default": "",
+              "type": "string"
+            },
+            "insurance_stop_fraction": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "insurance_trigger_kind": {
+              "default": "",
+              "type": "string"
             },
             "margin_limit": {
               "title": "Margin Limit",
@@ -10165,6 +10803,9 @@
               ],
               "title": "Average Entry"
             },
+            "effective_mode": {
+              "type": "string"
+            },
             "instrument_key": {
               "$ref": "#/components/schemas/InstrumentKey"
             },
@@ -10180,17 +10821,51 @@
               "title": "Owner Id",
               "type": "string"
             },
+            "position_cycle_id": {
+              "type": "string"
+            },
             "protection_state": {
               "title": "Protection State",
-              "type": "string"
+              "type": "string",
+              "x-states": [
+                "ACTIVE_VERIFIED",
+                "INSURANCE_ONLY",
+                "UNPROTECTED",
+                "CLOSED"
+              ]
             },
             "quantity": {
               "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
               "title": "Quantity",
               "type": "string"
             },
+            "reason_codes": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
             "reconciliation_state": {
               "title": "Reconciliation State",
+              "type": "string"
+            },
+            "requested_mode": {
+              "type": "string"
+            },
+            "strategy_declaration": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/StrategyProtectionDeclaration"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "strategy_protection_mode": {
+              "type": "string"
+            },
+            "transition_state": {
               "type": "string"
             }
           },
@@ -10256,6 +10931,57 @@
         },
         "ProtectionPlan-Input": {
           "additionalProperties": false,
+          "allOf": [
+            {
+              "else": {
+                "not": {
+                  "required": [
+                    "managed_stop_price"
+                  ]
+                },
+                "required": [
+                  "trigger_price",
+                  "covered_quantity",
+                  "exit_order_type"
+                ]
+              },
+              "if": {
+                "properties": {
+                  "strategy_protection_mode": {
+                    "const": "UPPER_MANAGED"
+                  }
+                },
+                "required": [
+                  "strategy_protection_mode"
+                ]
+              },
+              "then": {
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "trigger_price"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "covered_quantity"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "exit_order_type"
+                      ]
+                    }
+                  ]
+                },
+                "required": [
+                  "managed_stop_price",
+                  "overshoot_allowance"
+                ]
+              }
+            }
+          ],
           "properties": {
             "covered_quantity": {
               "title": "Covered Quantity",
@@ -10266,8 +10992,14 @@
               "title": "Exit Order Type",
               "type": "string"
             },
+            "managed_stop_price": {
+              "type": "string"
+            },
             "max_slippage_bps": {
               "title": "Max Slippage Bps",
+              "type": "string"
+            },
+            "overshoot_allowance": {
               "type": "string"
             },
             "spec_version": {
@@ -10275,6 +11007,13 @@
               "minLength": 1,
               "pattern": "^[A-Za-z0-9_.-]+$",
               "title": "Spec Version",
+              "type": "string"
+            },
+            "strategy_protection_mode": {
+              "enum": [
+                "VENUE",
+                "UPPER_MANAGED"
+              ],
               "type": "string"
             },
             "trigger_kind": {
@@ -10292,9 +11031,6 @@
           },
           "required": [
             "trigger_kind",
-            "trigger_price",
-            "covered_quantity",
-            "exit_order_type",
             "max_slippage_bps",
             "spec_version"
           ],
@@ -10303,6 +11039,57 @@
         },
         "ProtectionPlan-Output": {
           "additionalProperties": false,
+          "allOf": [
+            {
+              "else": {
+                "not": {
+                  "required": [
+                    "managed_stop_price"
+                  ]
+                },
+                "required": [
+                  "trigger_price",
+                  "covered_quantity",
+                  "exit_order_type"
+                ]
+              },
+              "if": {
+                "properties": {
+                  "strategy_protection_mode": {
+                    "const": "UPPER_MANAGED"
+                  }
+                },
+                "required": [
+                  "strategy_protection_mode"
+                ]
+              },
+              "then": {
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "trigger_price"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "covered_quantity"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "exit_order_type"
+                      ]
+                    }
+                  ]
+                },
+                "required": [
+                  "managed_stop_price",
+                  "overshoot_allowance"
+                ]
+              }
+            }
+          ],
           "properties": {
             "covered_quantity": {
               "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
@@ -10314,9 +11101,15 @@
               "title": "Exit Order Type",
               "type": "string"
             },
+            "managed_stop_price": {
+              "type": "string"
+            },
             "max_slippage_bps": {
               "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
               "title": "Max Slippage Bps",
+              "type": "string"
+            },
+            "overshoot_allowance": {
               "type": "string"
             },
             "spec_version": {
@@ -10324,6 +11117,13 @@
               "minLength": 1,
               "pattern": "^[A-Za-z0-9_.-]+$",
               "title": "Spec Version",
+              "type": "string"
+            },
+            "strategy_protection_mode": {
+              "enum": [
+                "VENUE",
+                "UPPER_MANAGED"
+              ],
               "type": "string"
             },
             "trigger_kind": {
@@ -10342,9 +11142,6 @@
           },
           "required": [
             "trigger_kind",
-            "trigger_price",
-            "covered_quantity",
-            "exit_order_type",
             "max_slippage_bps",
             "spec_version"
           ],
@@ -10354,10 +11151,16 @@
         "ProtectionView": {
           "additionalProperties": false,
           "properties": {
+            "cancel_attempted": {
+              "type": "boolean"
+            },
             "cancel_requested": {
               "default": false,
               "title": "Cancel Requested",
               "type": "boolean"
+            },
+            "client_algo_id": {
+              "type": "string"
             },
             "exit_order_id": {
               "anyOf": [
@@ -10384,6 +11187,9 @@
               ],
               "title": "External Id"
             },
+            "generation": {
+              "type": "integer"
+            },
             "instrument_key": {
               "$ref": "#/components/schemas/InstrumentKey"
             },
@@ -10396,6 +11202,12 @@
             },
             "plan": {
               "$ref": "#/components/schemas/ProtectionPlan-Output"
+            },
+            "position_cycle_id": {
+              "type": "string"
+            },
+            "position_direction": {
+              "type": "string"
             },
             "protection_id": {
               "maxLength": 128,
@@ -10417,6 +11229,24 @@
                 }
               ],
               "title": "Replaces Id"
+            },
+            "role": {
+              "enum": [
+                "INSURANCE",
+                "STRATEGY",
+                ""
+              ],
+              "type": "string"
+            },
+            "source_target_version": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "state": {
               "title": "State",
@@ -10920,6 +11750,12 @@
               "title": "Aggregate Version",
               "type": "integer"
             },
+            "capabilities": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
             "execution_mode": {
               "title": "Execution Mode",
               "type": "string"
@@ -11123,6 +11959,59 @@
           "title": "SimConfig",
           "type": "object"
         },
+        "StrategyProtectionDeclaration": {
+          "additionalProperties": false,
+          "properties": {
+            "accepted_at": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "declaration_hash": {
+              "type": "string"
+            },
+            "managed_stop_price": {
+              "type": "string"
+            },
+            "mode": {
+              "enum": [
+                "VENUE",
+                "UPPER_MANAGED"
+              ],
+              "type": "string"
+            },
+            "overshoot_allowance": {
+              "type": "string"
+            },
+            "position_cycle_id": {
+              "type": "string"
+            },
+            "position_direction": {
+              "type": "string"
+            },
+            "source_decision_id": {
+              "type": "string"
+            },
+            "target_version": {
+              "type": "integer"
+            },
+            "trigger_kind": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "mode",
+            "managed_stop_price",
+            "overshoot_allowance",
+            "trigger_kind",
+            "position_direction",
+            "position_cycle_id",
+            "source_decision_id",
+            "target_version",
+            "declaration_hash",
+            "accepted_at"
+          ],
+          "type": "object"
+        },
         "StressScenario": {
           "additionalProperties": false,
           "properties": {
@@ -11219,6 +12108,9 @@
         "Target": {
           "additionalProperties": false,
           "properties": {
+            "effective_mode": {
+              "type": "string"
+            },
             "expires_at": {
               "anyOf": [
                 {
@@ -11281,6 +12173,9 @@
               "title": "Reasons",
               "type": "array"
             },
+            "requested_mode": {
+              "type": "string"
+            },
             "source_decision_id": {
               "anyOf": [
                 {
@@ -11313,6 +12208,19 @@
               "title": "State",
               "type": "string"
             },
+            "strategy_declaration": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/StrategyProtectionDeclaration"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "strategy_protection_mode": {
+              "type": "string"
+            },
             "target_quantity": {
               "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
               "title": "Target Quantity",
@@ -11321,6 +12229,9 @@
             "target_version": {
               "title": "Target Version",
               "type": "integer"
+            },
+            "transition_state": {
+              "type": "string"
             }
           },
           "required": [
@@ -11449,7 +12360,27 @@
             "owner_epoch"
           ],
           "title": "TargetRequest",
-          "type": "object"
+          "type": "object",
+          "x-error-codes": [
+            "INSURANCE_STOP_FRACTION_INVALID",
+            "INSURANCE_POLICY_REQUIRED",
+            "INSURANCE_PROTECTION_FORBIDDEN",
+            "STRATEGY_NOT_TIGHTER_THAN_INSURANCE",
+            "PROTECTION_ALREADY_CROSSED",
+            "MARKET_DATA_UNUSABLE",
+            "PROTECTION_MUST_MATCH_ACTUAL_POSITION",
+            "PROTECTION_POSITION_CHANGED",
+            "POSITION_INSURANCE_ONLY",
+            "POSITION_UNPROTECTED",
+            "REVERSAL_SNAPSHOT_CHANGED",
+            "CONDITION_CLEANUP_PENDING",
+            "STRATEGY_PROTECTION_MODE_INVALID",
+            "MANAGED_STOP_DECLARATION_INVALID",
+            "MANAGED_STOP_OUTSIDE_INSURANCE",
+            "MANAGED_STOP_ALREADY_CROSSED",
+            "MANAGED_STOP_PRICE_UNUSABLE",
+            "STRATEGY_MODE_SWITCH_POSITION_CHANGED"
+          ]
         },
         "TargetView": {
           "additionalProperties": false,
@@ -11480,6 +12411,9 @@
               "title": "Delta Quantity",
               "type": "string"
             },
+            "effective_mode": {
+              "type": "string"
+            },
             "pending_quantity": {
               "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
               "title": "Pending Quantity",
@@ -11499,12 +12433,18 @@
               "title": "Reasons",
               "type": "array"
             },
+            "requested_mode": {
+              "type": "string"
+            },
             "resource_id": {
               "title": "Resource Id",
               "type": "string"
             },
             "state": {
               "title": "State",
+              "type": "string"
+            },
+            "strategy_protection_mode": {
               "type": "string"
             },
             "target_quantity": {
@@ -11515,6 +12455,9 @@
             "target_version": {
               "title": "Target Version",
               "type": "integer"
+            },
+            "transition_state": {
+              "type": "string"
             }
           },
           "required": [
@@ -11532,7 +12475,13 @@
             "reasons"
           ],
           "title": "TargetView",
-          "type": "object"
+          "type": "object",
+          "x-receipt-reasons": [
+            "PROTECTION_ONLY_UPDATED",
+            "TARGET_INTENT_UNCHANGED",
+            "REVERSAL_SINGLE_ORDER",
+            "MANAGED_DECLARATION_RECORDED"
+          ]
         }
       }
     },

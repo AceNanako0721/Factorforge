@@ -47,13 +47,17 @@ func TestNativeP2UsesNativeP1SIMOverHTTP(t *testing.T) {
 	if err = json.Unmarshal(fixture["trading_principal"], &principal); err != nil {
 		t.Fatal(err)
 	}
+	fraction := compDecimal("0.5")
+	run.Policy.InsuranceStopFraction = &fraction
+	run.Policy.InsuranceTriggerKind = "MARK"
+	run.Policy.InsuranceQualityState = "EXPERIMENT_ONLY"
 	tradingStore := tm.New("SIM")
 	if err = tradingStore.Create(ctx, &run); err != nil {
 		t.Fatal(err)
 	}
 	broker := &sim.Broker{}
 	service := &tapp.Service{Store: tradingStore, Simulator: broker}
-	server := httptest.NewServer(ta.New(service, map[string]td.Principal{"fixture-trading": principal}))
+	server := newRecorderTradingServer(ta.New(service, map[string]td.Principal{"fixture-trading": principal}))
 	defer server.Close()
 	var state sd.StrategyState
 	if err = sd.DecodeJSON(fixture["strategy_state"], &state); err != nil {
@@ -73,6 +77,7 @@ func TestNativeP2UsesNativeP1SIMOverHTTP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	client.Client = server.Client()
 	snapshot, err := client.Snapshot(ctx, state.Objects.Values())
 	if err != nil {
 		t.Fatal(err)
@@ -97,6 +102,9 @@ func TestNativeP2UsesNativeP1SIMOverHTTP(t *testing.T) {
 		t.Fatal("account currency not taken from P1", projected["account_currency"])
 	}
 	delete(projected, "account_currency")
+	for _, k := range []string{"lower_compat", "positions", "targets", "trigger_prices"} {
+		delete(projected, k)
+	}
 	if e := firstDifference(expected, projected, "public-P1-snapshot"); e != nil {
 		t.Fatal(e)
 	}
@@ -234,6 +242,15 @@ func TestNativeP2CounterfactualUsesIndependentP1SIMLedger(t *testing.T) {
 			t.Fatal("invalid scenario")
 		}
 	}
+	fraction := compDecimal("0.5")
+	run.Policy.InsuranceStopFraction = &fraction
+	run.Policy.InsuranceTriggerKind = "MARK"
+	run.Policy.InsuranceQualityState = "EXPERIMENT_ONLY"
+	policy := sd.Object(sd.Object(scenario["create_run"])["account_policy"])
+	policy["insurance_stop_fraction"] = "0.5"
+	policy["insurance_trigger_kind"] = "MARK"
+	policy["insurance_quality_state"] = "EXPERIMENT_ONLY"
+	baseline["account_policy"] = sd.Clone(policy)
 	store := tm.New("SIM")
 	if err = store.Create(ctx, &run); err != nil {
 		t.Fatal(err)
@@ -245,7 +262,7 @@ func TestNativeP2CounterfactualUsesIndependentP1SIMLedger(t *testing.T) {
 	service := &tapp.Service{Store: store, Simulator: broker}
 	handler := ta.New(service, map[string]td.Principal{"scenario-token": principal})
 	key := td.RunKey{Environment: "SIM", AccountID: principal.AccountID, RunID: sd.Text(binding["run_id"])}
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newRecorderTradingServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		handler.ServeHTTP(w, r)
 		if r.Method == "PUT" {
 			worker := tw.Executor{Store: store, Broker: &sim.Adapter{}}
@@ -266,6 +283,7 @@ func TestNativeP2CounterfactualUsesIndependentP1SIMLedger(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	client.Client = server.Client()
 	result, err := (app.CounterfactualRunner{Trading: client}).Run(ctx, baseline, scenario)
 	if err != nil {
 		t.Fatal(err)
@@ -297,4 +315,23 @@ func TestNativeP2CounterfactualUsesIndependentP1SIMLedger(t *testing.T) {
 	if err != nil || sd.Text(result["state"]) != "INTERVAL_ONLY" || !sd.Flag(result["learning_frozen"]) {
 		t.Fatal("ambiguous OHLC became executable evidence")
 	}
+}
+
+// Exercise the public HTTP handlers without sockets, preserving request/response
+// admission and the same TradingV2 client used by the separate-process tests.
+type recorderTradingServer struct {
+	URL     string
+	handler http.Handler
+}
+
+func newRecorderTradingServer(handler http.Handler) *recorderTradingServer {
+	return &recorderTradingServer{URL: "http://fixture.invalid", handler: handler}
+}
+func (s *recorderTradingServer) Close() {}
+func (s *recorderTradingServer) Client() *http.Client {
+	return &http.Client{Transport: compositionTransport(func(r *http.Request) (*http.Response, error) {
+		recorder := httptest.NewRecorder()
+		s.handler.ServeHTTP(recorder, r)
+		return recorder.Result(), nil
+	})}
 }

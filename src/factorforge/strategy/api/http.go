@@ -9,6 +9,7 @@ import (
 	"github.com/AceNanako0721/Factorforge/src/factorforge/strategy/ports"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -36,6 +37,9 @@ func New(options Options) (http.Handler, error) {
 	}
 	mux := http.NewServeMux()
 	service := app.Service{Store: options.Store, Clock: options.Clock}
+	if options.Cycle != nil {
+		service.Trading = options.Cycle.Trading
+	}
 	respond := func(w http.ResponseWriter, status int, value any) {
 		raw, err := d.Marshal(value)
 		if err != nil {
@@ -83,7 +87,7 @@ func New(options Options) (http.Handler, error) {
 				}
 			}
 			if identity == nil {
-				reject(w, r, nil, &d.Error{Code: "AUTHENTICATION_REQUIRED", Status: 401})
+				reject(w, r, nil, &d.Error{Code: "UNAUTHENTICATED", Status: 401})
 				return
 			}
 			var value any
@@ -190,6 +194,52 @@ func New(options Options) (http.Handler, error) {
 		v, e := service.Create(r.Context(), p, body)
 		return v, 201, e
 	})
+	register("POST", "/stop-directives", func(_ http.ResponseWriter, r *http.Request, p d.Identity) (any, int, error) {
+		var body d.StopDirectiveCommand
+		if err := d.Decode(r.Body, &body); err != nil {
+			return nil, 0, &d.Error{Code: "STOP_DIRECTIVE_INVALID", Status: 422}
+		}
+		v, e := service.SubmitStopDirective(r.Context(), p, body)
+		return v, 200, e
+	})
+	registerWithAudit("GET", "/objects/{object_id}/stop-directives", func(_ http.ResponseWriter, r *http.Request, p d.Identity) (any, int, error) {
+		state, err := query(r, p, r.PathValue("object_id"))
+		if err != nil {
+			return nil, 0, err
+		}
+		limit := 100
+		if raw := r.URL.Query().Get("limit"); raw != "" {
+			limit, err = strconv.Atoi(raw)
+			if err != nil || limit < 1 || limit > 100 {
+				return nil, 0, &d.Error{Code: "STOP_DIRECTIVE_INVALID", Status: 422}
+			}
+		}
+		cursor := r.URL.Query().Get("cursor")
+		rows := []*d.StopDirectiveRecord{}
+		if reader, ok := options.Store.(app.StopArchiveReader); ok {
+			rows, err = reader.ListStopDirectives(r.Context(), state.InstanceID, r.PathValue("object_id"), cursor, limit)
+			if err != nil {
+				return nil, 0, err
+			}
+		}
+		for _, record := range append(state.StopDirectives.Values(), state.ResearchStopDirectives.Values()...) {
+			if record.Directive.ObjectID == r.PathValue("object_id") && record.Directive.DirectiveID > cursor {
+				rows = append(rows, d.Clone(record))
+			}
+		}
+		for i, row := range rows {
+			rows[i] = app.StopRecordView(state, row)
+		}
+		sort.Slice(rows, func(i, j int) bool { return rows[i].Directive.DirectiveID < rows[j].Directive.DirectiveID })
+		if len(rows) > limit {
+			rows = rows[:limit]
+		}
+		next := ""
+		if len(rows) == limit {
+			next = rows[len(rows)-1].Directive.DirectiveID
+		}
+		return map[string]any{"items": rows, "cursor": next, "snapshot_version": state.Version}, 200, nil
+	}, false)
 	register("POST", "/factor-observations", func(_ http.ResponseWriter, r *http.Request, p d.Identity) (any, int, error) {
 		var body d.FactorObservationCommand
 		if e := d.Decode(r.Body, &body); e != nil {

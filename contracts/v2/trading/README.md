@@ -1,5 +1,7 @@
 # trading-2.0
 
-当前交易层的 OpenAPI 从已安装的 FastAPI/Pydantic DTO 生成，入口为 `python tools/export_trading_contract.py`。金额输入和输出均为十进制字符串；未知字段拒绝；写请求包含幂等键、运行身份、版本、理由与有效期。Bearer 身份由服务配置绑定，不能由请求正文授予环境/账户权限。
+当前契约由 Go DTO 与 OpenAPI 源码通过 `go run ./tools/export-trading-contract` 导出；`go run ./tools/check-contracts` 离线检查。金额始终为十进制字符串，未知字段拒绝，写入继续核验身份、幂等、版本和有效期。
 
-v1.1 契约仍保留在原目录作为历史校验资料，不用于生成 P1。接口可用不代表交易渠道或 LIVE 已验证；实现范围以 `doc/progress/P1.md` 为准。
+v2.8.0 增加一笔反手、INSURANCE/STRATEGY 角色、INSURANCE_ONLY、同量保护更新及 VENUE/UPPER_MANAGED 管理声明。保险策略必须显式配置并标记质量，无生产默认比例。客户端应核验运行 capabilities 的 LOWER_COMPAT_280；受理回执不代表条件单或模式切换已生效。
+
+导出后同步 `go run ./tools/export-strategy-contract`、`go run ./tools/generate-console-projections`，以 `--check` 校验投影。v1.1 保持历史冻结；契约和离线检查通过不代表渠道、测试网或 LIVE 准入通过。

@@ -261,7 +261,11 @@ func CheckHTML(root, directory, version string, pairs []string) (int, error) {
 				for _, prefix := range []string{"/api/v2/trading", "/api/v2/strategy"} {
 					suffix = strings.TrimPrefix(suffix, prefix)
 				}
-				if !strings.Contains(design, suffix) && suffix != "/protections/{protection_id}" && suffix != "/market/trades" {
+				// R10 publishes the P2 receipt query without extending the P4 UI.
+				// Require its exact published layer-design reference; other new
+				// queries still require the existing frontend mapping.
+				lowerStopQuery := contract == "contracts/v2/strategy/openapi.json" && suffix == "/objects/{object_id}/stop-directives" && strings.Contains(texts["02_策略化框架层设计书.html"], "GET /api/v2/strategy"+suffix)
+				if !strings.Contains(design, suffix) && suffix != "/protections/{protection_id}" && suffix != "/market/trades" && !lowerStopQuery {
 					return 0, fmt.Errorf("existing query absent from frontend design: %s", suffix)
 				}
 			}

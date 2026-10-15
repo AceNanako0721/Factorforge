@@ -52,3 +52,5 @@ runtime/go-bin/testnet-acceptance --config config/config.toml --postgres-bin <�
 报告/回执仅位于本轮 runtime/p1-go-*。失败时先保存 failure-snapshot.json，再执行受限清理；查询诊断只记录获准的方法、路径和稳定错误码，不记录参数、签名或供应商正文。未证明的外部仓位差异使清理保留物理止损并报失败，不修改账本来通过。`--cleanup-run <本轮目录> --authorize-testnet-orders` 只允许账户已平仓时取消 owned-snapshot.json 中本轮已知保护 ID，每次写前再证明平仓，不撤账户全部挂单。
 
 生产切换按 [恢复预案](TRADING_RECOVERY_RUNBOOK.md) 保存快照、确认旧执行隔离、Go 恢复核账及显式 resume；回退亦先隔离 Go。现场准入和参数标定独立于本地测试/CI。本次未自动启动生产交易。
+
+v2.8.0 的账户风控策略必须显式登记 `insurance_stop_fraction`（0<f<1）、`insurance_trigger_kind` 和 `insurance_quality_state`。没有生产默认比例；未配置拒绝新开风险。SIM 合成配置可显式使用 `insurance_stop_fraction="0.1"`、`insurance_trigger_kind="MARK"`、`insurance_quality_state="EXPERIMENT_ONLY"`，其中 **0.1 仅为实验值**，不代表标定或实盘准入。测试网签名套件也仅登记独立的 EXPERIMENT_ONLY 实验值；LIVE readiness 只接受 VALIDATED 保险策略。真实配置仍统一放在被忽略的 config/config.toml。

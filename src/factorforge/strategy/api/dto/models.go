@@ -44,3 +44,7 @@ type AdmissionReceipt = d.AdmissionReceipt
 
 // Decode uses the frozen wire schema, including required/null/decimal fields.
 func Decode(reader io.Reader, target any) error { return d.Decode(reader, target) }
+
+type StopDirectiveCommand = d.StopDirectiveCommand
+type StopDirective = d.StopDirective
+type StopDirectiveReceipt = d.StopDirectiveReceipt

@@ -34,6 +34,7 @@ type ParameterSnapshot struct {
 	QualityState   string                `json:"quality_state"`
 }
 type Policy struct {
+	ReverseConfirmSeconds       *int               `json:"reverse_confirm_seconds,omitempty"`
 	Composition                 *Composition       `json:"composition,omitempty"`
 	Version                     string             `json:"version"`
 	QualityState                string             `json:"quality_state"`
@@ -200,6 +201,8 @@ type AdmissionReceipt struct {
 	CurrentVersion int        `json:"current_version"`
 }
 type DecisionView struct {
+	StopDirectiveID     *string             `json:"stop_directive_id,omitempty"`
+	ProtectionOnly      bool                `json:"protection_only,omitempty"`
 	Components          *DecisionComponents `json:"components,omitempty"`
 	DecisionID          string              `json:"decision_id"`
 	ObjectID            string              `json:"object_id"`
@@ -223,40 +226,45 @@ type DecisionView struct {
 	InputSnapshot       map[string]any      `json:"input_snapshot"`
 }
 type TradingSnapshot struct {
-	Funding         map[string]FundingObservation `json:"funding,omitempty"`
-	AccountCurrency string                        `json:"account_currency,omitempty"`
-	RunKey          RunBinding                    `json:"run_key"`
-	Version         int                           `json:"version"`
-	At              time.Time                     `json:"at"`
-	Equity          Decimal                       `json:"equity"`
-	PolicyVersion   string                        `json:"policy_version"`
-	RiskLocks       []string                      `json:"risk_locks"`
-	RunState        string                        `json:"run_state"`
-	Actual          map[string]Decimal            `json:"actual"`
-	Pending         map[string]Decimal            `json:"pending"`
-	OwnerEpochs     map[string]int                `json:"owner_epochs"`
-	TargetVersions  map[string]int                `json:"target_versions"`
-	SourceDecisions []string                      `json:"source_decisions"`
-	Specs           map[string]map[string]any     `json:"specs"`
-	Samples         map[string]MarketSample       `json:"samples"`
-	Bars            map[string][]Bar              `json:"bars"`
-	Fills           []map[string]any              `json:"fills"`
-	Incomes         []map[string]any              `json:"incomes"`
-	ExternalChange  bool                          `json:"external_change"`
-	Protections     map[string][]map[string]any   `json:"protections"`
-	OtherExposures  []ExposureRisk                `json:"other_exposures"`
-	AverageEntries  map[string]*Decimal           `json:"average_entries"`
+	LowerCompat     bool                               `json:"lower_compat,omitempty"`
+	Positions       map[string]map[string]any          `json:"positions,omitempty"`
+	Targets         map[string]map[string]any          `json:"targets,omitempty"`
+	TriggerPrices   map[string]map[string]MarketSample `json:"trigger_prices,omitempty"`
+	Funding         map[string]FundingObservation      `json:"funding,omitempty"`
+	AccountCurrency string                             `json:"account_currency,omitempty"`
+	RunKey          RunBinding                         `json:"run_key"`
+	Version         int                                `json:"version"`
+	At              time.Time                          `json:"at"`
+	Equity          Decimal                            `json:"equity"`
+	PolicyVersion   string                             `json:"policy_version"`
+	RiskLocks       []string                           `json:"risk_locks"`
+	RunState        string                             `json:"run_state"`
+	Actual          map[string]Decimal                 `json:"actual"`
+	Pending         map[string]Decimal                 `json:"pending"`
+	OwnerEpochs     map[string]int                     `json:"owner_epochs"`
+	TargetVersions  map[string]int                     `json:"target_versions"`
+	SourceDecisions []string                           `json:"source_decisions"`
+	Specs           map[string]map[string]any          `json:"specs"`
+	Samples         map[string]MarketSample            `json:"samples"`
+	Bars            map[string][]Bar                   `json:"bars"`
+	Fills           []map[string]any                   `json:"fills"`
+	Incomes         []map[string]any                   `json:"incomes"`
+	ExternalChange  bool                               `json:"external_change"`
+	Protections     map[string][]map[string]any        `json:"protections"`
+	OtherExposures  []ExposureRisk                     `json:"other_exposures"`
+	AverageEntries  map[string]*Decimal                `json:"average_entries"`
 }
 type TargetOutbox struct {
-	Decision       DecisionView    `json:"decision"`
-	TargetVersion  int             `json:"target_version"`
-	ExpiresAt      time.Time       `json:"expires_at"`
-	ReservationID  *string         `json:"reservation_id"`
-	State          string          `json:"state"`
-	OwnerEpoch     int             `json:"owner_epoch"`
-	AcceptedAt     *time.Time      `json:"accepted_at"`
-	Reason         *string         `json:"reason"`
-	CommandPayload *map[string]any `json:"command_payload"`
+	StopDirective  *StopDirectiveRecord `json:"stop_directive,omitempty"`
+	Decision       DecisionView         `json:"decision"`
+	TargetVersion  int                  `json:"target_version"`
+	ExpiresAt      time.Time            `json:"expires_at"`
+	ReservationID  *string              `json:"reservation_id"`
+	State          string               `json:"state"`
+	OwnerEpoch     int                  `json:"owner_epoch"`
+	AcceptedAt     *time.Time           `json:"accepted_at"`
+	Reason         *string              `json:"reason"`
+	CommandPayload *map[string]any      `json:"command_payload"`
 }
 type Reservation struct {
 	ReservationID string `json:"reservation_id"`
@@ -288,46 +296,53 @@ type CaseRecord struct {
 	LossCounted          bool                `json:"loss_counted"`
 }
 type StrategyState struct {
-	FactorSeries          Ordered[*FactorSeries]      `json:"factor_series,omitempty"`
-	ScheduledEvents       Ordered[*ScheduledEvent]    `json:"scheduled_events,omitempty"`
-	Templates             Ordered[*ScheduledTemplate] `json:"templates,omitempty"`
-	LayerLedger           Ordered[*LayerDay]          `json:"layer_ledger,omitempty"`
-	LayerSettlements      Ordered[*LayerSettlement]   `json:"layer_settlements,omitempty"`
-	TimeWindows           map[string]TimeWindowPlan   `json:"time_windows,omitempty"`
-	InstanceID            string                      `json:"instance_id"`
-	Environment           string                      `json:"environment"`
-	Version               int                         `json:"version"`
-	Objects               Ordered[*ObservedObject]    `json:"objects"`
-	Policies              Ordered[*Policy]            `json:"policies"`
-	Parameters            Ordered[*ParameterSnapshot] `json:"parameters"`
-	Events                Ordered[*Event]             `json:"events"`
-	EventVersions         Ordered[*Event]             `json:"event_versions"`
-	EventReceived         Ordered[time.Time]          `json:"event_received"`
-	Scores                Ordered[*ScoreSubmission]   `json:"scores"`
-	Receipts              Ordered[*AdmissionReceipt]  `json:"receipts"`
-	ResearchReceipts      Ordered[*AdmissionReceipt]  `json:"research_receipts"`
-	PrepricingAssessments Ordered[map[string]any]     `json:"prepricing_assessments"`
-	Received              Ordered[time.Time]          `json:"received"`
-	Contributions         Ordered[*Contribution]      `json:"contributions"`
-	Ledger                []LedgerEntry               `json:"ledger"`
-	Samples               Ordered[[]MarketSample]     `json:"samples"`
-	Decisions             Ordered[*DecisionView]      `json:"decisions"`
-	Outbox                Ordered[*TargetOutbox]      `json:"outbox"`
-	Reservations          Ordered[*Reservation]       `json:"reservations"`
-	LossCases             Ordered[[]string]           `json:"loss_cases"`
-	Cases                 Ordered[*CaseRecord]        `json:"cases"`
-	Regimes               Ordered[map[string]any]     `json:"regimes"`
-	Attributions          Ordered[map[string]any]     `json:"attributions"`
-	Candidates            Ordered[map[string]any]     `json:"candidates"`
-	ConsumedEvidence      []string                    `json:"consumed_evidence"`
-	LearningDecisions     []map[string]any            `json:"learning_decisions"`
-	ValidationRuns        Ordered[map[string]any]     `json:"validation_runs"`
-	Counterfactuals       Ordered[map[string]any]     `json:"counterfactuals"`
-	FactorManifests       Ordered[map[string]any]     `json:"factor_manifests"`
-	SkippedCycles         []map[string]any            `json:"skipped_cycles"`
-	Audit                 []map[string]any            `json:"audit"`
-	AuditCount            int                         `json:"-"`
-	Dedup                 Ordered[map[string]any]     `json:"dedup"`
+	StopDirectiveVersions      Ordered[int]                         `json:"stop_directive_versions,omitempty"`
+	ResearchStopVersions       Ordered[int]                         `json:"research_stop_versions,omitempty"`
+	StopDirectiveArchiveWrites []*StopDirectiveRecord               `json:"-"`
+	ResearchStopDirectives     Ordered[*StopDirectiveRecord]        `json:"research_stop_directives,omitempty"`
+	StopDirectives             Ordered[*StopDirectiveRecord]        `json:"stop_directives,omitempty"`
+	StopDirectiveWriters       Ordered[*StopDirectiveWriterBinding] `json:"stop_directive_writers,omitempty"`
+	LastEffectiveStrategyStop  Ordered[*EffectiveStrategyStop]      `json:"last_effective_strategy_stop,omitempty"`
+	FactorSeries               Ordered[*FactorSeries]               `json:"factor_series,omitempty"`
+	ScheduledEvents            Ordered[*ScheduledEvent]             `json:"scheduled_events,omitempty"`
+	Templates                  Ordered[*ScheduledTemplate]          `json:"templates,omitempty"`
+	LayerLedger                Ordered[*LayerDay]                   `json:"layer_ledger,omitempty"`
+	LayerSettlements           Ordered[*LayerSettlement]            `json:"layer_settlements,omitempty"`
+	TimeWindows                map[string]TimeWindowPlan            `json:"time_windows,omitempty"`
+	InstanceID                 string                               `json:"instance_id"`
+	Environment                string                               `json:"environment"`
+	Version                    int                                  `json:"version"`
+	Objects                    Ordered[*ObservedObject]             `json:"objects"`
+	Policies                   Ordered[*Policy]                     `json:"policies"`
+	Parameters                 Ordered[*ParameterSnapshot]          `json:"parameters"`
+	Events                     Ordered[*Event]                      `json:"events"`
+	EventVersions              Ordered[*Event]                      `json:"event_versions"`
+	EventReceived              Ordered[time.Time]                   `json:"event_received"`
+	Scores                     Ordered[*ScoreSubmission]            `json:"scores"`
+	Receipts                   Ordered[*AdmissionReceipt]           `json:"receipts"`
+	ResearchReceipts           Ordered[*AdmissionReceipt]           `json:"research_receipts"`
+	PrepricingAssessments      Ordered[map[string]any]              `json:"prepricing_assessments"`
+	Received                   Ordered[time.Time]                   `json:"received"`
+	Contributions              Ordered[*Contribution]               `json:"contributions"`
+	Ledger                     []LedgerEntry                        `json:"ledger"`
+	Samples                    Ordered[[]MarketSample]              `json:"samples"`
+	Decisions                  Ordered[*DecisionView]               `json:"decisions"`
+	Outbox                     Ordered[*TargetOutbox]               `json:"outbox"`
+	Reservations               Ordered[*Reservation]                `json:"reservations"`
+	LossCases                  Ordered[[]string]                    `json:"loss_cases"`
+	Cases                      Ordered[*CaseRecord]                 `json:"cases"`
+	Regimes                    Ordered[map[string]any]              `json:"regimes"`
+	Attributions               Ordered[map[string]any]              `json:"attributions"`
+	Candidates                 Ordered[map[string]any]              `json:"candidates"`
+	ConsumedEvidence           []string                             `json:"consumed_evidence"`
+	LearningDecisions          []map[string]any                     `json:"learning_decisions"`
+	ValidationRuns             Ordered[map[string]any]              `json:"validation_runs"`
+	Counterfactuals            Ordered[map[string]any]              `json:"counterfactuals"`
+	FactorManifests            Ordered[map[string]any]              `json:"factor_manifests"`
+	SkippedCycles              []map[string]any                     `json:"skipped_cycles"`
+	Audit                      []map[string]any                     `json:"audit"`
+	AuditCount                 int                                  `json:"-"`
+	Dedup                      Ordered[map[string]any]              `json:"dedup"`
 }
 type CreateObject struct {
 	Command

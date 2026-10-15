@@ -119,7 +119,7 @@ func (c Composition) Validate() error {
 	m := Math()
 	sum := Zero()
 	seen := map[string]bool{}
-	if !Has([]string{"ZERO", "HOLD_REDUCE_ONLY"}, c.MissingPolicy) || !validLayerState(c.Scheduled.State) || !unit(c.Scheduled.Cap) || !validLayerState(c.Adjustment.State) || !unit(c.Adjustment.Cap) || !unit(c.Adjustment.EventOnlyCap) || c.Adjustment.EventOnlyCap.Cmp(c.Adjustment.Cap) > 0 || c.Adjustment.Scale.Sign() <= 0 || len(c.Levels) == 0 || c.Rebalance.BandFloor.Sign() < 0 || c.Rebalance.ExpectedHoldSeconds <= 0 || c.Rebalance.AdjustIntervalSeconds <= 0 || c.Rebalance.ReverseConfirmSeconds <= 0 {
+	if !Has([]string{"ZERO", "HOLD_REDUCE_ONLY"}, c.MissingPolicy) || !validLayerState(c.Scheduled.State) || !unit(c.Scheduled.Cap) || !validLayerState(c.Adjustment.State) || !unit(c.Adjustment.Cap) || !unit(c.Adjustment.EventOnlyCap) || c.Adjustment.EventOnlyCap.Cmp(c.Adjustment.Cap) > 0 || c.Adjustment.Scale.Sign() <= 0 || len(c.Levels) == 0 || c.Rebalance.BandFloor.Sign() < 0 || c.Rebalance.ExpectedHoldSeconds <= 0 || c.Rebalance.AdjustIntervalSeconds <= 0 || c.Rebalance.ReverseConfirmSeconds < 0 {
 		return invalid()
 	}
 	for _, f := range c.Baseline {
@@ -487,7 +487,7 @@ func Compose(s *StrategyState, obj *ObservedObject, at time.Time, view PoolView,
 			obj.ReverseCandidate = &ReverseCandidate{dir, at}
 		}
 		if at.Sub(obj.ReverseCandidate.Since) < time.Duration(c.Rebalance.ReverseConfirmSeconds)*time.Second {
-			level = 0
+			level = obj.Level
 			result.Reasons = append(result.Reasons, "REVERSE_CONFIRMING")
 		} else {
 			obj.CoreDirection = dir
@@ -507,6 +507,9 @@ func Compose(s *StrategyState, obj *ObservedObject, at time.Time, view PoolView,
 			raw = currentExposure
 		}
 		result.Reasons = append(result.Reasons, "FORCE_REDUCE_ONLY")
+	}
+	if Has(result.Reasons, "REVERSE_CONFIRMING") && !result.Force {
+		raw = currentExposure
 	}
 	previous := LatestExecuted(s, obj.ObjectID, at)
 	var prev *DecisionComponents

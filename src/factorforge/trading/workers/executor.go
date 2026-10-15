@@ -163,7 +163,24 @@ func (w *Executor) Tick(ctx context.Context, key d.RunKey) (bool, error) {
 			}
 			check.Orders.Delete(local.OrderID)
 			risk := d.NewEngine(check)
-			risk.AuthorizeOrder(local.Request)
+			if local.AuthorizedActual != nil {
+				actual := decimal.Value{}
+				if pos := run.Positions.Value(local.Request.InstrumentKey.Code()); pos != nil {
+					actual = pos.Quantity
+				}
+				if actual.Cmp(*local.AuthorizedActual) != 0 || run.OwnerEpochs.Value(local.Request.InstrumentKey.Code()) != local.AuthorizedOwnerEpoch {
+					finish("CANCELED")
+					if target := run.Targets.Value(local.Request.InstrumentKey.Code()); target != nil {
+						target.Reasons = []string{"REVERSAL_SNAPSHOT_CHANGED"}
+					}
+					return nil
+				}
+			}
+			request := local.Request
+			if local.IntentProtectionPlan != nil {
+				request.ProtectionPlan = local.IntentProtectionPlan
+			}
+			risk.AuthorizeOrder(request)
 			if err = risk.Err(); err != nil {
 				if _, ok := err.(*d.Error); !ok {
 					return err
