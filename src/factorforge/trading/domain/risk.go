@@ -38,58 +38,80 @@ func RiskDay(at time.Time, zone string) (string, error) {
 	return at.In(loc).Format("2006-01-02"), nil
 }
 
-// CombinationRisk retains directional worst-case fills and gross exit costs.
-func (e *Engine) CombinationRisk(request *OrderRequest, notional decimal.Value) {
+// OpeningQuantity decomposes a single signed order using the latest actual fact.
+func (e *Engine) OpeningQuantity(actual decimal.Value, side string, quantity decimal.Value) decimal.Value {
+	signed := quantity
+	if side != "BUY" {
+		signed = e.Math.Neg(signed)
+	}
+	if e.Math.Mul(actual, signed).Sign() < 0 {
+		return decimal.Max(zero, e.Math.Sub(quantity, e.Math.Abs(actual)))
+	}
+	return quantity
+}
+
+// exposureEnvelope includes every intermediate close/open point without counting
+// the original holding and the full reversal as two independent new exposures.
+func (e *Engine) exposureEnvelope(request *OrderRequest, notional decimal.Value) (Ordered[decimal.Value], Ordered[decimal.Value]) {
 	run := e.Run
-	var signed, gross, pending Ordered[decimal.Value]
+	var low, high Ordered[decimal.Value]
 	for _, code := range run.Positions.Keys() {
 		p := run.Positions.Value(code)
-		if p.Quantity.Sign() != 0 {
-			value := e.PositionNotional(code, nil)
-			gross.Set(code, value)
-			if p.Quantity.Sign() < 0 {
-				value = e.Math.Neg(value)
-			}
-			signed.Set(code, value)
-		}
-	}
-	buy, sell := zero, zero
-	for _, order := range run.Orders.Values() {
-		if Terminal(order.State) || order.Request.ReduceOnly {
+		if p.Quantity.Sign() == 0 {
 			continue
 		}
-		code := order.Request.InstrumentKey.Code()
-		value := order.ReservedNotional
-		pending.Set(code, e.Math.Add(pending.Value(code), value))
-		if order.Request.Side == "BUY" {
-			buy = e.Math.Add(buy, value)
+		v := e.PositionNotional(code, nil)
+		if p.Quantity.Sign() < 0 {
+			v = e.Math.Neg(v)
+		}
+		low.Set(code, v)
+		high.Set(code, v)
+	}
+	add := func(r OrderRequest, q, reserved decimal.Value) {
+		code := r.InstrumentKey.Code()
+		actual := zero
+		if p := run.Positions.Value(code); p != nil {
+			actual = p.Quantity
+		}
+		open := e.OpeningQuantity(actual, r.Side, q)
+		closed := e.Math.Sub(q, open)
+		reserved = decimal.Max(reserved, e.PositionNotional(code, &open))
+		v := e.Math.Add(reserved, e.PositionNotional(code, &closed))
+		if r.Side == "BUY" {
+			high.Set(code, e.Math.Add(high.Value(code), v))
+			if _, ok := low.Get(code); !ok {
+				low.Set(code, zero)
+			}
 		} else {
-			sell = e.Math.Add(sell, value)
+			low.Set(code, e.Math.Sub(low.Value(code), v))
+			if _, ok := high.Get(code); !ok {
+				high.Set(code, zero)
+			}
+		}
+	}
+	for _, o := range run.Orders.Values() {
+		if !Terminal(o.State) && !o.Request.ReduceOnly {
+			add(o.Request, e.Remaining(o), o.ReservedNotional)
 		}
 	}
 	if request != nil {
-		if request.Side == "BUY" {
-			buy = e.Math.Add(buy, notional)
-		} else {
-			sell = e.Math.Add(sell, notional)
-		}
+		add(*request, request.Quantity, notional)
 	}
-	base := e.Math.Sum(signed.Values()...)
-	if limit := run.Policy.NetNotionalLimit; limit != nil && decimal.Max(e.Math.Abs(e.Math.Add(base, buy)), e.Math.Abs(e.Math.Sub(base, sell))).Cmp(*limit) > 0 {
+	return low, high
+}
+func (e *Engine) CombinationRisk(request *OrderRequest, notional decimal.Value) {
+	run := e.Run
+	low, high := e.exposureEnvelope(request, notional)
+	if limit := run.Policy.NetNotionalLimit; limit != nil && decimal.Max(e.Math.Abs(e.Math.Sum(low.Values()...)), e.Math.Abs(e.Math.Sum(high.Values()...))).Cmp(*limit) > 0 {
 		e.Fail("ACCOUNT_NET_EXPOSURE_LIMIT")
 		return
 	}
-	code := ""
-	if request != nil {
-		code = request.InstrumentKey.Code()
-		pending.Set(code, e.Math.Add(pending.Value(code), notional))
-	}
 	for _, group := range run.Policy.GroupNotionalLimits.Keys() {
 		total := zero
-		for _, k := range run.Specs.Keys() {
-			spec := run.Specs.Value(k)
-			if spec.RiskGroup != nil && *spec.RiskGroup == group {
-				total = e.Math.Add(total, e.Math.Add(gross.Value(k), pending.Value(k)))
+		for _, code := range high.Keys() {
+			spec := run.Specs.Value(code)
+			if spec != nil && spec.RiskGroup != nil && *spec.RiskGroup == group {
+				total = e.Math.Add(total, decimal.Max(e.Math.Abs(low.Value(code)), e.Math.Abs(high.Value(code))))
 			}
 		}
 		if total.Cmp(run.Policy.GroupNotionalLimits.Value(group)) > 0 {
@@ -99,41 +121,18 @@ func (e *Engine) CombinationRisk(request *OrderRequest, notional decimal.Value) 
 	}
 	for _, scenario := range run.Policy.StressScenarios {
 		loss := zero
-		for _, k := range signed.Keys() {
-			shock, ok := scenario.Shocks.Get(k)
-			if !ok {
-				e.Fail("STRESS_SCENARIO_INCOMPLETE", 423)
-				return
-			}
-			value := signed.Value(k)
-			loss = e.Math.Add(loss, e.Math.Add(decimal.Max(zero, e.Math.Mul(e.Math.Neg(value), shock)), e.Math.Mul(e.Math.Abs(value), scenario.ExitCostRate)))
-		}
-		for _, order := range run.Orders.Values() {
-			if Terminal(order.State) || order.Request.ReduceOnly {
-				continue
-			}
-			shock, ok := scenario.Shocks.Get(order.Request.InstrumentKey.Code())
-			if !ok {
-				e.Fail("STRESS_SCENARIO_INCOMPLETE", 423)
-				return
-			}
-			direction := one
-			if order.Request.Side != "BUY" {
-				direction = e.Math.Neg(one)
-			}
-			loss = e.Math.Add(loss, e.Math.Mul(order.ReservedNotional, e.Math.Add(decimal.Max(zero, e.Math.Mul(e.Math.Neg(direction), shock)), scenario.ExitCostRate)))
-		}
-		if request != nil {
+		for _, code := range high.Keys() {
 			shock, ok := scenario.Shocks.Get(code)
 			if !ok {
 				e.Fail("STRESS_SCENARIO_INCOMPLETE", 423)
 				return
 			}
-			direction := one
-			if request.Side != "BUY" {
-				direction = e.Math.Neg(one)
+			worst := zero
+			for _, v := range []decimal.Value{low.Value(code), high.Value(code)} {
+				point := e.Math.Add(decimal.Max(zero, e.Math.Mul(e.Math.Neg(v), shock)), e.Math.Mul(e.Math.Abs(v), scenario.ExitCostRate))
+				worst = decimal.Max(worst, point)
 			}
-			loss = e.Math.Add(loss, e.Math.Mul(notional, e.Math.Add(decimal.Max(zero, e.Math.Mul(e.Math.Neg(direction), shock)), scenario.ExitCostRate)))
+			loss = e.Math.Add(loss, worst)
 		}
 		if loss.Cmp(scenario.LossLimit) > 0 {
 			e.Fail("ACCOUNT_EXIT_STRESS_LIMIT")
@@ -192,6 +191,20 @@ func (e *Engine) AuthorizeOrder(request OrderRequest) decimal.Value {
 		}
 		return zero
 	}
+	opening := e.OpeningQuantity(actual, request.Side, request.Quantity)
+	if opening.Sign() == 0 {
+		return zero
+	}
+	if cleanup := run.ConditionalCleanups.Value(code); cleanup != nil && cleanup.State != "CONFIRMED" {
+		e.Fail("CONDITION_CLEANUP_PENDING", 423)
+		return zero
+	}
+	for _, p := range run.Protections.Values() {
+		if p.InstrumentKey == request.InstrumentKey && p.CancelRequested && p.State != "CLOSED" {
+			e.Fail("CONDITION_CLEANUP_PENDING", 423)
+			return zero
+		}
+	}
 	if !IsTradable(spec, run.Clock) {
 		e.Fail("INSTRUMENT_NOT_TRADABLE", 423)
 		return zero
@@ -200,13 +213,17 @@ func (e *Engine) AuthorizeOrder(request OrderRequest) decimal.Value {
 		e.Fail("OPERATIONAL_HEALTH_NOT_VERIFIED", 423)
 		return zero
 	}
-	if e.Math.Mul(actual, signed).Sign() < 0 {
-		e.Fail("REVERSAL_REQUIRES_FLAT")
-		return zero
-	}
 	if signed.Sign() < 0 && !Has(spec.Capabilities, "SHORT") {
 		e.Fail("SHORT_UNSUPPORTED")
 		return zero
+	}
+	if run.State == "DEGRADED" {
+		for _, p := range run.Positions.Values() {
+			if p.Quantity.Sign() != 0 && p.ProtectionState == "INSURANCE_ONLY" {
+				e.Fail("POSITION_INSURANCE_ONLY", 423)
+				return zero
+			}
+		}
 	}
 	if run.State != "NORMAL" || len(run.RiskLocks) > 0 {
 		e.Fail("RUN_RISK_LOCKED", 423)
@@ -219,8 +236,16 @@ func (e *Engine) AuthorizeOrder(request OrderRequest) decimal.Value {
 		}
 	}
 	for _, p := range run.Positions.Values() {
+		if p.Quantity.Sign() != 0 && Has(p.ReasonCodes, "MANAGED_DECLARATION_REVIEW_REQUIRED") {
+			e.Fail("MANAGED_DECLARATION_REVIEW_REQUIRED", 423)
+			return zero
+		}
 		if p.Quantity.Sign() != 0 && p.ProtectionState != "ACTIVE_VERIFIED" {
-			e.Fail("POSITION_UNPROTECTED", 423)
+			if p.ProtectionState == "INSURANCE_ONLY" {
+				e.Fail("POSITION_INSURANCE_ONLY", 423)
+			} else {
+				e.Fail("POSITION_UNPROTECTED", 423)
+			}
 			return zero
 		}
 	}
@@ -235,57 +260,48 @@ func (e *Engine) AuthorizeOrder(request OrderRequest) decimal.Value {
 	}
 	entry := e.Quote(request.InstrumentKey, side)
 	mark := e.Quote(request.InstrumentKey, "MARK")
-	if plan.SpecVersion != spec.Version || !Has(spec.PriceRoles, plan.TriggerKind) {
-		e.Fail("PROTECTION_RULE_MISMATCH")
+
+	expected := e.Math.Add(actual, signed)
+	average := entry
+	if actual.Sign() == expected.Sign() && actual.Sign() != 0 {
+		if pos := run.Positions.Value(code); pos != nil && pos.AverageEntry != nil {
+			average = e.Math.Div(e.Math.Add(e.Math.Mul(actual.Abs(), *pos.AverageEntry), e.Math.Mul(opening, entry)), expected.Abs())
+		}
+	}
+	e.CheckStrategyPlan(request.InstrumentKey, *plan, expected, average, false)
+	if e.Err() != nil {
 		return zero
 	}
-	if e.Math.Step(plan.TriggerPrice, spec.PriceTick, decimal.TowardZero).Cmp(plan.TriggerPrice) != 0 {
-		e.Fail("PROTECTION_TICK_MISMATCH")
-		return zero
-	}
-	if (request.Side == "BUY" && plan.TriggerPrice.Cmp(decimal.Min(entry, mark)) >= 0) || (request.Side == "SELL" && plan.TriggerPrice.Cmp(decimal.Max(entry, mark)) <= 0) {
-		e.Fail("PROTECTION_ALREADY_CROSSED")
-		return zero
-	}
-	if plan.CoveredQuantity.Cmp(request.Quantity) < 0 {
+	if ProtectionMode(*plan) == "VENUE" && plan.CoveredQuantity.Cmp(opening) < 0 {
 		e.Fail("PROTECTION_QUANTITY_INSUFFICIENT")
 		return zero
-	}
-	if actual.Sign() != 0 {
-		for _, p := range run.Protections.Values() {
-			if p.InstrumentKey == request.InstrumentKey && p.State == "ACTIVE_VERIFIED" && ((actual.Sign() > 0 && plan.TriggerPrice.Cmp(p.Plan.TriggerPrice) < 0) || (actual.Sign() < 0 && plan.TriggerPrice.Cmp(p.Plan.TriggerPrice) > 0)) {
-				e.Fail("PROTECTION_CANNOT_LOOSEN")
-				return zero
-			}
-		}
 	}
 	limit := zero
 	if request.LimitPrice != nil {
 		limit = *request.LimitPrice
 	}
 	exposurePrice := e.Math.Mul(decimal.Max(entry, mark, limit), e.Math.Add(one, e.Math.Div(run.SimConfig.SlippageBps, tenThousand)))
-	native := e.Math.Mul(e.Math.Mul(request.Quantity, exposurePrice), spec.ContractMultiplier)
+	native := e.Math.Mul(e.Math.Mul(opening, exposurePrice), spec.ContractMultiplier)
 	notional := e.Convert(native, spec.QuoteCurrency)
-	if native.Cmp(spec.MinNotional) < 0 {
+	if e.Math.Mul(e.Math.Mul(request.Quantity, exposurePrice), spec.ContractMultiplier).Cmp(spec.MinNotional) < 0 {
 		e.Fail("MIN_NOTIONAL_NOT_MET")
 		return zero
 	}
 	costs := e.Math.Mul(notional, e.Math.Add(e.Math.Mul(run.SimConfig.FeeRate, two), e.Math.Div(plan.MaxSlippageBps, tenThousand)))
-	loss := e.Math.Add(e.Convert(e.Math.Mul(e.Math.Mul(request.Quantity, e.Math.Abs(e.Math.Sub(entry, plan.TriggerPrice))), spec.ContractMultiplier), spec.SettlementCurrency), costs)
+	distance := e.Math.Abs(e.Math.Sub(entry, plan.TriggerPrice))
+	if ProtectionMode(*plan) == "UPPER_MANAGED" {
+		distance = e.Math.Add(e.Math.Abs(e.Math.Sub(entry, *plan.ManagedStopPrice)), *plan.OvershootAllowance)
+	}
+	loss := e.Math.Add(e.Convert(e.Math.Mul(e.Math.Mul(opening, distance), spec.ContractMultiplier), spec.SettlementCurrency), costs)
 	if loss.Cmp(run.Policy.TradeLossLimit) > 0 {
 		e.Fail("TRADE_RISK_LIMIT")
 		return zero
 	}
-	held, pending := zero, zero
-	for _, k := range run.Positions.Keys() {
-		if run.Positions.Value(k).Quantity.Sign() != 0 {
-			held = e.Math.Add(held, e.PositionNotional(k, nil))
-		}
+	low, high := e.exposureEnvelope(&request, notional)
+	total := zero
+	for _, k := range high.Keys() {
+		total = e.Math.Add(total, decimal.Max(e.Math.Abs(low.Value(k)), e.Math.Abs(high.Value(k))))
 	}
-	for _, o := range run.Orders.Values() {
-		pending = e.Math.Add(pending, o.ReservedNotional)
-	}
-	total := e.Math.Add(e.Math.Add(held, pending), notional)
 	if total.Cmp(run.Policy.NotionalLimit) > 0 {
 		e.Fail("ACCOUNT_NOTIONAL_LIMIT")
 		return zero
@@ -295,14 +311,8 @@ func (e *Engine) AuthorizeOrder(request OrderRequest) decimal.Value {
 		return zero
 	}
 	if len(spec.MarginTiers) > 0 {
-		existing := e.Math.Mul(e.Math.Mul(e.Math.Abs(actual), mark), spec.ContractMultiplier)
-		outstanding := zero
-		for _, o := range run.Orders.Values() {
-			if o.Request.InstrumentKey == request.InstrumentKey && !o.Request.ReduceOnly && !Terminal(o.State) {
-				outstanding = e.Math.Add(outstanding, e.Math.Mul(e.Math.Mul(e.Remaining(o), exposurePrice), spec.ContractMultiplier))
-			}
-		}
-		if e.Math.Add(e.Math.Add(existing, outstanding), native).Cmp(spec.MarginTiers[len(spec.MarginTiers)-1][0]) > 0 {
+		nativeEnvelope := e.Math.Div(decimal.Max(e.Math.Abs(low.Value(code)), e.Math.Abs(high.Value(code))), e.Convert(one, spec.QuoteCurrency))
+		if nativeEnvelope.Cmp(spec.MarginTiers[len(spec.MarginTiers)-1][0]) > 0 {
 			e.Fail("MARGIN_TIER_UNVERIFIED", 423)
 			return zero
 		}
@@ -313,19 +323,12 @@ func (e *Engine) AuthorizeOrder(request OrderRequest) decimal.Value {
 func (e *Engine) AssessLossGates() decimal.Value {
 	run := e.Run
 	current := e.Equity()
-	held, pending := zero, zero
-	for _, k := range run.Positions.Keys() {
-		if run.Positions.Value(k).Quantity.Sign() != 0 {
-			held = e.Math.Add(held, e.PositionNotional(k, nil))
-		}
-	}
-	for _, o := range run.Orders.Values() {
-		if !Terminal(o.State) {
-			pending = e.Math.Add(pending, o.ReservedNotional)
-		}
+	low, high := e.exposureEnvelope(nil, zero)
+	total := zero
+	for _, k := range high.Keys() {
+		total = e.Math.Add(total, decimal.Max(e.Math.Abs(low.Value(k)), e.Math.Abs(high.Value(k))))
 	}
 	hard := []string{}
-	total := e.Math.Add(held, pending)
 	if total.Cmp(run.Policy.NotionalLimit) > 0 {
 		hard = append(hard, "PASSIVE_ACCOUNT_NOTIONAL_LIMIT")
 	}

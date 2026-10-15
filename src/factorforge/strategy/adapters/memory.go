@@ -3,6 +3,7 @@ package adapters
 import (
 	"context"
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/strategy/domain"
+	"sort"
 	"sync"
 	"time"
 )
@@ -12,6 +13,7 @@ type MemoryStore struct {
 	mu            sync.Mutex
 	states        map[string]*d.StrategyState
 	audits        map[string][]d.AuditRecord
+	stopArchive   map[string]map[string]*d.StopDirectiveRecord
 	factorArchive map[string]map[string]*d.FactorObservation
 	archiveMu     sync.RWMutex
 	environment   string
@@ -25,7 +27,7 @@ func NewMemory(state *d.StrategyState) *MemoryStore {
 		rows = append(rows, d.AuditRecord{Sequence: i + 1, Payload: row})
 	}
 	copy.AuditCount, copy.Audit = len(rows), nil
-	return &MemoryStore{states: map[string]*d.StrategyState{state.InstanceID: copy}, audits: map[string][]d.AuditRecord{state.InstanceID: rows}, factorArchive: map[string]map[string]*d.FactorObservation{}, environment: state.Environment}
+	return &MemoryStore{states: map[string]*d.StrategyState{state.InstanceID: copy}, audits: map[string][]d.AuditRecord{state.InstanceID: rows}, stopArchive: map[string]map[string]*d.StopDirectiveRecord{}, factorArchive: map[string]map[string]*d.FactorObservation{}, environment: state.Environment}
 }
 func (s *MemoryStore) Environment() string { return s.environment }
 func (s *MemoryStore) Read(ctx context.Context, id string) (*d.StrategyState, error) {
@@ -115,6 +117,44 @@ func (s *MemoryStore) Transaction(ctx context.Context, id string, fn func(*d.Str
 	}
 	work.AuditCount += len(work.Audit)
 	work.Audit = nil
+	if s.stopArchive[id] == nil {
+		s.stopArchive[id] = map[string]*d.StopDirectiveRecord{}
+	}
+	for index, collection := range []d.Ordered[*d.StopDirectiveRecord]{old.StopDirectives, old.ResearchStopDirectives} {
+		nextCollection := work.StopDirectives
+		if index == 1 {
+			nextCollection = work.ResearchStopDirectives
+		}
+		for _, r := range collection.Values() {
+			found := false
+			for _, next := range nextCollection.Values() {
+				if next.Directive.DirectiveID == r.Directive.DirectiveID {
+					found = true
+				}
+			}
+			if !found {
+				copy := d.Clone(r)
+				copy.Receipt.State = "SUPERSEDED"
+				for _, write := range work.StopDirectiveArchiveWrites {
+					if write.Directive.DirectiveID == r.Directive.DirectiveID {
+						copy = d.Clone(write)
+					}
+				}
+				s.stopArchive[id][r.Directive.DirectiveID] = copy
+			}
+		}
+	}
+	for _, key := range old.Outbox.Keys() {
+		row := old.Outbox.Value(key)
+		if work.Outbox.Value(key) == nil && row.StopDirective != nil {
+			record := row.StopDirective
+			if archived := s.stopArchive[id][record.Directive.DirectiveID]; archived != nil {
+				copy := d.Clone(record)
+				copy.Receipt.State = archived.Receipt.State
+				s.stopArchive[id][record.Directive.DirectiveID] = copy
+			}
+		}
+	}
 	s.states[id] = work
 	s.factorArchive[id] = archive
 	return nil
@@ -150,4 +190,25 @@ func (c *ReplayClock) Advance(at time.Time) error {
 	}
 	c.at = at.UTC()
 	return nil
+}
+
+func (s *MemoryStore) ReadStopDirective(_ context.Context, id, directive string) (*d.StopDirectiveRecord, error) {
+	s.archiveMu.RLock()
+	defer s.archiveMu.RUnlock()
+	return d.Clone(s.stopArchive[id][directive]), nil
+}
+func (s *MemoryStore) ListStopDirectives(_ context.Context, id, object, cursor string, limit int) ([]*d.StopDirectiveRecord, error) {
+	s.archiveMu.RLock()
+	defer s.archiveMu.RUnlock()
+	rows := []*d.StopDirectiveRecord{}
+	for _, r := range s.stopArchive[id] {
+		if r.Directive.ObjectID == object && r.Directive.DirectiveID > cursor {
+			rows = append(rows, d.Clone(r))
+		}
+	}
+	sort.Slice(rows, func(i, j int) bool { return rows[i].Directive.DirectiveID < rows[j].Directive.DirectiveID })
+	if len(rows) > limit {
+		rows = rows[:limit]
+	}
+	return rows, nil
 }

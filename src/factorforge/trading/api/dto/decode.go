@@ -41,14 +41,48 @@ func Decode(reader io.Reader, target any) error {
 	if !ok {
 		return invalid()
 	}
+	planMode := ""
+	var envelope map[string]json.RawMessage
+	if json.Unmarshal(data, &envelope) == nil {
+		plans := []json.RawMessage{envelope["protection_plan"], envelope["plan"]}
+		var order map[string]json.RawMessage
+		if json.Unmarshal(envelope["order"], &order) == nil {
+			plans = append(plans, order["protection_plan"])
+		}
+		for _, raw := range plans {
+			var plan map[string]json.RawMessage
+			if json.Unmarshal(raw, &plan) != nil {
+				continue
+			}
+			var role string
+			json.Unmarshal(plan["role"], &role)
+			if role == "INSURANCE" {
+				return &d.Error{Code: "INSURANCE_PROTECTION_FORBIDDEN", Status: 403}
+			}
+			if mode, ok := plan["strategy_protection_mode"]; ok {
+				if json.Unmarshal(mode, &planMode) != nil || planMode != "VENUE" && planMode != "UPPER_MANAGED" {
+					return &d.Error{Code: "STRATEGY_PROTECTION_MODE_INVALID", Status: 422}
+				}
+			}
+		}
+	}
 	normalized, err := admit(data, schema)
 	if err != nil {
+		if planMode == "UPPER_MANAGED" {
+			return &d.Error{Code: "MANAGED_STOP_DECLARATION_INVALID", Status: 422}
+		}
 		return invalid()
 	}
 	decoder := json.NewDecoder(bytes.NewReader(normalized))
 	decoder.DisallowUnknownFields()
-	if decoder.Decode(target) != nil || d.Validate(target) != nil {
+	if decoder.Decode(target) != nil {
+		if planMode == "UPPER_MANAGED" {
+			return &d.Error{Code: "MANAGED_STOP_DECLARATION_INVALID", Status: 422}
+		}
 		return invalid()
+	}
+	if err := d.Validate(target); err != nil {
+		return err
 	}
 	if err := validateRequest(target); err != nil {
 		return invalid()

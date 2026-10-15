@@ -169,7 +169,7 @@ func jsonValue(v reflect.Value) any {
 			if !f.IsExported() {
 				continue
 			}
-			if strings.Contains(f.Tag.Get("json"), ",omitempty") && v.Field(i).IsZero() {
+			if (strings.Contains(f.Tag.Get("json"), ",omitempty") || strings.Contains(f.Tag.Get("json"), ",omitzero")) && v.Field(i).IsZero() {
 				continue
 			}
 			key := strings.Split(f.Tag.Get("json"), ",")[0]
@@ -429,7 +429,12 @@ func walkValidate(v reflect.Value) error {
 		if x.Exit.Cmp(x.Enter) >= 0 {
 			return invalid()
 		}
+	case StopDirective:
+		return ValidateStopDirective(x)
 	case Policy:
+		if x.ReverseConfirmSeconds != nil && *x.ReverseConfirmSeconds < 0 {
+			return invalid()
+		}
 		if x.Composition != nil {
 			if err := x.Composition.Validate(); err != nil {
 				return err

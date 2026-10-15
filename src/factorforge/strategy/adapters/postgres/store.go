@@ -19,7 +19,7 @@ import (
 
 //go:embed migrations/*.sql
 var migrations embed.FS
-var publicFields = []string{"version", "objects", "events", "event_versions", "event_received", "scores", "research_receipts", "received", "dedup", "attributions"}
+var publicFields = []string{"research_stop_versions", "research_stop_directives", "version", "objects", "events", "event_versions", "event_received", "scores", "research_receipts", "received", "dedup", "attributions"}
 
 type Store struct {
 	pool                      *pgxpool.Pool
@@ -105,10 +105,10 @@ func Initialize(ctx context.Context, dsn, environment string) error {
 				return dbError(err)
 			}
 		}
-		statements := []string{"GRANT USAGE ON SCHEMA " + name + " TO " + role, "GRANT SELECT ON ALL TABLES IN SCHEMA " + name + " TO " + role, "GRANT INSERT,UPDATE ON " + name + ".public_state TO " + role, "GRANT INSERT ON " + name + ".audit_event TO " + role, "GRANT INSERT ON " + name + ".object_owner_binding TO " + role}
+		statements := []string{"GRANT USAGE ON SCHEMA " + name + " TO " + role, "GRANT SELECT ON ALL TABLES IN SCHEMA " + name + " TO " + role, "GRANT INSERT,UPDATE ON " + name + ".public_state TO " + role, "GRANT INSERT ON " + name + ".audit_event TO " + role, "GRANT INSERT ON " + name + ".object_owner_binding TO " + role, "GRANT INSERT ON " + name + ".stop_directive_research_archive TO " + role}
 		if kind == "worker" {
 			statements = append(statements, "GRANT INSERT,UPDATE ON "+name+".internal_state TO "+role, "GRANT INSERT ON "+name+".sentiment_entry TO "+role, "GRANT INSERT ON "+name+".decision_archive TO "+role)
-			statements = append(statements, "GRANT INSERT ON "+name+".factor_observation_archive TO "+role)
+			statements = append(statements, "GRANT INSERT ON "+name+".factor_observation_archive TO "+role, "GRANT INSERT ON "+name+".stop_directive_archive TO "+role)
 		} else {
 			statements = append(statements, "REVOKE ALL ON "+name+".workload_capability_grant FROM "+role)
 		}
@@ -495,6 +495,9 @@ func (s *Store) Transaction(ctx context.Context, id string, fn func(*d.StrategyS
 		return err
 	}
 	if err = d.PreserveLayerDays(before, state); err != nil {
+		return err
+	}
+	if err = s.archiveStops(ctx, tx, id, before, state); err != nil {
 		return err
 	}
 	if err = s.archiveFactors(ctx, tx, id, before, state); err != nil {

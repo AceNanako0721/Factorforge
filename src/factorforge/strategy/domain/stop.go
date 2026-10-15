@@ -109,7 +109,7 @@ func SizeAndStop(q, price Decimal, rules ProductRules, noise *Decimal, p Numeric
 	}
 	result.Quantity = sized
 	result.Reason = "STOP_MATCHED"
-	result.Plan = &StopPlan{kind, trigger, m.Abs(sized), m.Mul(p.SlippageFraction, constant("10000")), "MARKET", rules.Version}
+	result.Plan = &StopPlan{TriggerKind: kind, TriggerPrice: trigger, CoveredQuantity: m.Abs(sized), MaxSlippageBPS: m.Mul(p.SlippageFraction, constant("10000")), ExitOrderType: "MARKET", SpecVersion: rules.Version}
 	return result, m.Err()
 }
 

@@ -46,20 +46,35 @@ func feasible(alpha Decimal, candidates []Candidate, base []BaseRisk, p Numerica
 	rows := append([]BaseRisk(nil), base...)
 	for _, c := range candidates {
 		value := c.Desired
-		if m.Abs(c.Desired).Cmp(m.Abs(c.Current)) > 0 {
+		if c.Current.Sign() != 0 && c.Desired.Sign() != 0 && c.Current.Sign() != c.Desired.Sign() {
+			value = m.Mul(c.Desired, alpha)
+		} else if m.Abs(c.Desired).Cmp(m.Abs(c.Current)) > 0 {
 			value = m.Add(c.Current, m.Mul(alpha, m.Sub(c.Desired, c.Current)))
 		}
 		rows = append(rows, BaseRisk{value, m.Mul(c.Stress, m.Abs(value)), c.Group})
 	}
-	gross, net, stress := Decimal{}, Decimal{}, Decimal{}
+	gross, stress := Decimal{}, Decimal{}
+	low, high := Decimal{}, Decimal{}
 	groups := map[string]Decimal{}
 	for _, row := range rows {
 		gross = m.Add(gross, m.Abs(row.Value))
-		net = m.Add(net, row.Value)
+		low = m.Add(low, row.Value)
+		high = m.Add(high, row.Value)
 		stress = m.Add(stress, row.Stress)
 		groups[row.Group] = m.Add(groups[row.Group], m.Abs(row.Value))
 	}
-	if gross.Cmp(p.PortfolioGrossLimit) > 0 || m.Abs(net).Cmp(p.PortfolioNetLimit) > 0 || stress.Cmp(p.PortfolioStressLimit) > 0 {
+	for _, c := range candidates {
+		if c.Current.Sign() != 0 && c.Desired.Sign() != 0 && c.Current.Sign() != c.Desired.Sign() {
+			value := m.Mul(c.Desired, alpha)
+			extra := m.Sub(Max(c.Current.Abs(), value.Abs()), value.Abs())
+			gross = m.Add(gross, extra)
+			stress = m.Add(stress, m.Mul(c.Stress, extra))
+			groups[c.Group] = m.Add(groups[c.Group], extra)
+			low = m.Add(low, m.Sub(Min(c.Current, value), value))
+			high = m.Add(high, m.Sub(Max(c.Current, value), value))
+		}
+	}
+	if gross.Cmp(p.PortfolioGrossLimit) > 0 || Max(low.Abs(), high.Abs()).Cmp(p.PortfolioNetLimit) > 0 || stress.Cmp(p.PortfolioStressLimit) > 0 {
 		return false
 	}
 	for group, value := range groups {
@@ -104,7 +119,7 @@ func ExistingRiskScale(candidates []Candidate, base []BaseRisk, p NumericalPolic
 	planned := []BaseRisk{}
 	for _, c := range candidates {
 		value := c.Current
-		if m.Abs(c.Desired).Cmp(m.Abs(c.Current)) < 0 {
+		if c.Current.Sign() == c.Desired.Sign() && m.Abs(c.Desired).Cmp(m.Abs(c.Current)) < 0 {
 			value = c.Desired
 		}
 		planned = append(planned, BaseRisk{value, c.Stress, c.Group})
@@ -166,7 +181,7 @@ func ExistingRiskScale(candidates []Candidate, base []BaseRisk, p NumericalPolic
 func ReduceQuantity(current, desired, scale, step Decimal) (Decimal, error) {
 	m := dto.NewMath(28)
 	planned := current
-	if m.Abs(desired).Cmp(m.Abs(current)) < 0 {
+	if current.Sign() == desired.Sign() && m.Abs(desired).Cmp(m.Abs(current)) < 0 {
 		planned = desired
 	}
 	result := m.Step(m.Mul(planned, scale), step, dto.TowardZero)

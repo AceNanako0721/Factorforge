@@ -143,22 +143,25 @@ type LossGate struct {
 }
 
 type AccountPolicy struct {
-	Version             string                 `json:"version"`
-	ValidFrom           time.Time              `json:"valid_from"`
-	RiskDayZone         string                 `json:"risk_day_zone"`
-	NotionalLimit       decimal.Value          `json:"notional_limit"`
-	MarginLimit         decimal.Value          `json:"margin_limit"`
-	TradeLossLimit      decimal.Value          `json:"trade_loss_limit"`
-	DailyLoss           LossGate               `json:"daily_loss"`
-	Drawdown            LossGate               `json:"drawdown"`
-	ConsecutiveLoss     LossGate               `json:"consecutive_loss"`
-	BreachAction        string                 `json:"breach_action"`
-	RecoveryPolicy      string                 `json:"recovery_policy"`
-	MaxMarketAgeSeconds int64                  `json:"max_market_age_seconds"`
-	NetNotionalLimit    *decimal.Value         `json:"net_notional_limit"`
-	GroupNotionalLimits Ordered[decimal.Value] `json:"group_notional_limits"`
-	StressScenarios     []StressScenario       `json:"stress_scenarios"`
-	Operational         *OperationalPolicy     `json:"operational"`
+	InsuranceStopFraction *decimal.Value         `json:"insurance_stop_fraction"`
+	InsuranceTriggerKind  string                 `json:"insurance_trigger_kind"`
+	InsuranceQualityState string                 `json:"insurance_quality_state"`
+	Version               string                 `json:"version"`
+	ValidFrom             time.Time              `json:"valid_from"`
+	RiskDayZone           string                 `json:"risk_day_zone"`
+	NotionalLimit         decimal.Value          `json:"notional_limit"`
+	MarginLimit           decimal.Value          `json:"margin_limit"`
+	TradeLossLimit        decimal.Value          `json:"trade_loss_limit"`
+	DailyLoss             LossGate               `json:"daily_loss"`
+	Drawdown              LossGate               `json:"drawdown"`
+	ConsecutiveLoss       LossGate               `json:"consecutive_loss"`
+	BreachAction          string                 `json:"breach_action"`
+	RecoveryPolicy        string                 `json:"recovery_policy"`
+	MaxMarketAgeSeconds   int64                  `json:"max_market_age_seconds"`
+	NetNotionalLimit      *decimal.Value         `json:"net_notional_limit"`
+	GroupNotionalLimits   Ordered[decimal.Value] `json:"group_notional_limits"`
+	StressScenarios       []StressScenario       `json:"stress_scenarios"`
+	Operational           *OperationalPolicy     `json:"operational"`
 }
 
 type SimConfig struct {
@@ -175,12 +178,15 @@ type SimConfig struct {
 }
 
 type ProtectionPlan struct {
-	TriggerKind     string        `json:"trigger_kind"`
-	TriggerPrice    decimal.Value `json:"trigger_price"`
-	CoveredQuantity decimal.Value `json:"covered_quantity"`
-	ExitOrderType   string        `json:"exit_order_type"`
-	MaxSlippageBps  decimal.Value `json:"max_slippage_bps"`
-	SpecVersion     string        `json:"spec_version"`
+	StrategyProtectionMode string         `json:"strategy_protection_mode,omitempty"`
+	ManagedStopPrice       *decimal.Value `json:"managed_stop_price,omitempty"`
+	OvershootAllowance     *decimal.Value `json:"overshoot_allowance,omitempty"`
+	TriggerKind            string         `json:"trigger_kind"`
+	TriggerPrice           decimal.Value  `json:"trigger_price,omitzero"`
+	CoveredQuantity        decimal.Value  `json:"covered_quantity,omitzero"`
+	ExitOrderType          string         `json:"exit_order_type,omitempty"`
+	MaxSlippageBps         decimal.Value  `json:"max_slippage_bps"`
+	SpecVersion            string         `json:"spec_version"`
 }
 
 type OrderRequest struct {
@@ -215,18 +221,22 @@ type Principal struct {
 }
 
 type Order struct {
-	OrderID            string         `json:"order_id"`
-	ClientOrderID      string         `json:"client_order_id"`
-	ExternalOrderID    *string        `json:"external_order_id"`
-	Request            OrderRequest   `json:"request"`
-	State              string         `json:"state"`
-	FilledQuantity     decimal.Value  `json:"filled_quantity"`
-	AverageFillPrice   *decimal.Value `json:"average_fill_price"`
-	ReservedNotional   decimal.Value  `json:"reserved_notional"`
-	CreatedAt          time.Time      `json:"created_at"`
-	LastFillAt         *time.Time     `json:"last_fill_at"`
-	TargetVersion      *int64         `json:"target_version"`
-	SourceProtectionID *string        `json:"source_protection_id"`
+	AuthorizedActual      *decimal.Value  `json:"authorized_actual,omitempty"`
+	AuthorizedOwnerEpoch  int64           `json:"authorized_owner_epoch,omitempty"`
+	OriginalTargetVersion *int64          `json:"original_target_version,omitempty"`
+	IntentProtectionPlan  *ProtectionPlan `json:"intent_protection_plan,omitempty"`
+	OrderID               string          `json:"order_id"`
+	ClientOrderID         string          `json:"client_order_id"`
+	ExternalOrderID       *string         `json:"external_order_id"`
+	Request               OrderRequest    `json:"request"`
+	State                 string          `json:"state"`
+	FilledQuantity        decimal.Value   `json:"filled_quantity"`
+	AverageFillPrice      *decimal.Value  `json:"average_fill_price"`
+	ReservedNotional      decimal.Value   `json:"reserved_notional"`
+	CreatedAt             time.Time       `json:"created_at"`
+	LastFillAt            *time.Time      `json:"last_fill_at"`
+	TargetVersion         *int64          `json:"target_version"`
+	SourceProtectionID    *string         `json:"source_protection_id"`
 }
 
 type Fill struct {
@@ -243,25 +253,42 @@ type Fill struct {
 }
 
 type Position struct {
-	InstrumentKey   InstrumentKey  `json:"instrument_key"`
-	OwnerID         string         `json:"owner_id"`
-	Quantity        decimal.Value  `json:"quantity"`
-	AverageEntry    *decimal.Value `json:"average_entry"`
-	CycleNet        decimal.Value  `json:"cycle_net"`
-	ProtectionState string         `json:"protection_state"`
+	RequestedOwnerEpoch    int64                          `json:"requested_owner_epoch"`
+	ModeCleanupVerified    bool                           `json:"mode_cleanup_verified"`
+	PositionCycleID        string                         `json:"position_cycle_id"`
+	StrategyProtectionMode string                         `json:"strategy_protection_mode"`
+	StrategyDeclaration    *StrategyProtectionDeclaration `json:"strategy_declaration"`
+	RequestedMode          string                         `json:"requested_mode"`
+	EffectiveMode          string                         `json:"effective_mode"`
+	TransitionState        string                         `json:"transition_state"`
+	RequestedPlan          *ProtectionPlan                `json:"requested_plan,omitempty"`
+	ReasonCodes            []string                       `json:"reason_codes"`
+	InstrumentKey          InstrumentKey                  `json:"instrument_key"`
+	OwnerID                string                         `json:"owner_id"`
+	Quantity               decimal.Value                  `json:"quantity"`
+	AverageEntry           *decimal.Value                 `json:"average_entry"`
+	CycleNet               decimal.Value                  `json:"cycle_net"`
+	ProtectionState        string                         `json:"protection_state"`
 }
 
 type Protection struct {
-	ProtectionID    string         `json:"protection_id"`
-	InstrumentKey   InstrumentKey  `json:"instrument_key"`
-	OwnerID         string         `json:"owner_id"`
-	Plan            ProtectionPlan `json:"plan"`
-	State           string         `json:"state"`
-	VerifiedAt      *time.Time     `json:"verified_at"`
-	ExternalID      *string        `json:"external_id"`
-	ReplacesID      *string        `json:"replaces_id"`
-	ExitOrderID     *string        `json:"exit_order_id"`
-	CancelRequested bool           `json:"cancel_requested"`
+	CancelAttempted     bool           `json:"cancel_attempted"`
+	Role                string         `json:"role"`
+	PositionDirection   string         `json:"position_direction"`
+	PositionCycleID     string         `json:"position_cycle_id"`
+	Generation          int64          `json:"generation"`
+	SourceTargetVersion *int64         `json:"source_target_version"`
+	ClientAlgoID        string         `json:"client_algo_id"`
+	ProtectionID        string         `json:"protection_id"`
+	InstrumentKey       InstrumentKey  `json:"instrument_key"`
+	OwnerID             string         `json:"owner_id"`
+	Plan                ProtectionPlan `json:"plan"`
+	State               string         `json:"state"`
+	VerifiedAt          *time.Time     `json:"verified_at"`
+	ExternalID          *string        `json:"external_id"`
+	ReplacesID          *string        `json:"replaces_id"`
+	ExitOrderID         *string        `json:"exit_order_id"`
+	CancelRequested     bool           `json:"cancel_requested"`
 }
 
 type Income struct {
@@ -286,22 +313,67 @@ type OutboxItem struct {
 }
 
 type Target struct {
-	OwnerID          string          `json:"owner_id"`
-	InstrumentKey    InstrumentKey   `json:"instrument_key"`
-	TargetVersion    int64           `json:"target_version"`
-	TargetQuantity   decimal.Value   `json:"target_quantity"`
-	OwnerEpoch       int64           `json:"owner_epoch"`
-	State            string          `json:"state"`
-	ExpiresAt        *time.Time      `json:"expires_at"`
-	PolicyVersion    *string         `json:"policy_version"`
-	SpecVersion      *string         `json:"spec_version"`
-	ProtectionPlan   *ProtectionPlan `json:"protection_plan"`
-	SourceDecisionID *string         `json:"source_decision_id"`
-	Reasons          []string        `json:"reasons"`
-	Generation       int64           `json:"generation"`
+	StrategyDeclaration    *StrategyProtectionDeclaration `json:"strategy_declaration"`
+	StrategyProtectionMode string                         `json:"strategy_protection_mode"`
+	RequestedMode          string                         `json:"requested_mode"`
+	EffectiveMode          string                         `json:"effective_mode"`
+	TransitionState        string                         `json:"transition_state"`
+	OwnerID                string                         `json:"owner_id"`
+	InstrumentKey          InstrumentKey                  `json:"instrument_key"`
+	TargetVersion          int64                          `json:"target_version"`
+	TargetQuantity         decimal.Value                  `json:"target_quantity"`
+	OwnerEpoch             int64                          `json:"owner_epoch"`
+	State                  string                         `json:"state"`
+	ExpiresAt              *time.Time                     `json:"expires_at"`
+	PolicyVersion          *string                        `json:"policy_version"`
+	SpecVersion            *string                        `json:"spec_version"`
+	ProtectionPlan         *ProtectionPlan                `json:"protection_plan"`
+	SourceDecisionID       *string                        `json:"source_decision_id"`
+	Reasons                []string                       `json:"reasons"`
+	Generation             int64                          `json:"generation"`
+}
+
+type StrategyProtectionDeclaration struct {
+	Mode               string        `json:"mode"`
+	ManagedStopPrice   decimal.Value `json:"managed_stop_price"`
+	OvershootAllowance decimal.Value `json:"overshoot_allowance"`
+	TriggerKind        string        `json:"trigger_kind"`
+	PositionDirection  string        `json:"position_direction"`
+	PositionCycleID    string        `json:"position_cycle_id"`
+	SourceDecisionID   string        `json:"source_decision_id"`
+	TargetVersion      int64         `json:"target_version"`
+	DeclarationHash    string        `json:"declaration_hash"`
+	AcceptedAt         time.Time     `json:"accepted_at"`
+}
+
+type ConditionalOrderFact struct {
+	ExternalID        string         `json:"external_id"`
+	ClientID          *string        `json:"client_id"`
+	Instrument        InstrumentKey  `json:"instrument"`
+	Side              string         `json:"side"`
+	OrderType         string         `json:"order_type"`
+	ReduceOnly        bool           `json:"reduce_only"`
+	PositionSide      string         `json:"position_side"`
+	TriggerKind       *string        `json:"trigger_kind"`
+	TriggerPrice      *decimal.Value `json:"trigger_price"`
+	Quantity          *decimal.Value `json:"quantity"`
+	State             string         `json:"state"`
+	ObservedAt        time.Time      `json:"observed_at"`
+	LocalProtectionID *string        `json:"local_protection_id"`
+	Role              *string        `json:"role"`
+}
+
+type ConditionalCleanup struct {
+	Instrument      InstrumentKey          `json:"instrument"`
+	PositionCycleID string                 `json:"position_cycle_id"`
+	State           string                 `json:"state"`
+	Facts           []ConditionalOrderFact `json:"facts"`
 }
 
 type Aggregate struct {
+	SimFrameAt             Ordered[time.Time]           `json:"sim_frame_at"`
+	ProtectionDegraded     bool                         `json:"protection_degraded"`
+	ConditionalCleanups    Ordered[*ConditionalCleanup] `json:"conditional_cleanups"`
 	RunKey                 RunKey                       `json:"run_key"`
 	ExecutionMode          string                       `json:"execution_mode"`
 	Version                int64                        `json:"version"`

@@ -88,14 +88,18 @@ func AdvanceTargets(e *d.Engine, strict bool) error {
 		delta := e.Math.Sub(target.TargetQuantity, actual)
 		target.Reasons = []string{}
 		if e.Math.Mul(actual, target.TargetQuantity).Sign() < 0 {
-			delta = e.Math.Neg(actual)
-			target.Reasons = append(target.Reasons, "FLATTEN_BEFORE_REVERSE")
+			target.Reasons = append(target.Reasons, "REVERSAL_SINGLE_ORDER")
 		}
 		if delta.Sign() == 0 {
 			target.State = "ACTIVE"
 			continue
 		}
-		reducing := e.Math.Mul(actual, delta).Sign() < 0
+		delta = e.Math.Step(delta, spec.QuantityStep, decimal.TowardZero)
+		if delta.Sign() == 0 {
+			block("QUANTITY_STEP_MISMATCH")
+			continue
+		}
+		reducing := e.Math.Mul(actual, delta).Sign() < 0 && e.Math.Abs(delta).Cmp(e.Math.Abs(actual)) <= 0
 		quantity := e.Math.Abs(delta)
 		if reducing {
 			quantity = decimal.Min(quantity, e.Math.Abs(actual))
@@ -121,7 +125,7 @@ func AdvanceTargets(e *d.Engine, strict bool) error {
 		target.Generation++
 		id := "ord-" + RequestHash(Response{"run": run.RunKey, "target": target, "generation": target.Generation})[:28]
 		version := target.TargetVersion
-		run.Orders.Set(id, &d.Order{OrderID: id, ClientOrderID: "ff-" + id[4:], Request: request, State: "RESERVED", ReservedNotional: reserved, CreatedAt: run.Clock, TargetVersion: &version})
+		run.Orders.Set(id, &d.Order{OrderID: id, ClientOrderID: "ff-" + id[4:], Request: request, State: "RESERVED", ReservedNotional: reserved, CreatedAt: run.Clock, TargetVersion: &version, OriginalTargetVersion: &version, AuthorizedActual: &actual, AuthorizedOwnerEpoch: target.OwnerEpoch})
 		run.Outbox = append(run.Outbox, d.OutboxItem{CommandID: "cmd-" + id[4:], Kind: "SUBMIT", OrderID: id, PrincipalID: target.OwnerID, ExpiresAt: *target.ExpiresAt, ExecutorEpoch: run.ExecutorEpoch, State: "PENDING"})
 		target.State = "ACTIVE"
 	}
@@ -159,16 +163,95 @@ func (s *Service) SetTarget(ctx context.Context, p d.Principal, request d.Target
 			}
 		}
 		delta := e.Math.Sub(e.Math.Sub(quantity, actual), pending)
-		if e.Math.Mul(actual, quantity).Sign() < 0 {
-			delta = e.Math.Neg(actual)
+
+		old := run.Targets.Value(code)
+		plan := request.ProtectionPlan
+		sameQuantity := old != nil && old.TargetQuantity.Cmp(quantity) == 0
+		if plan == nil && old != nil {
+			plan = old.ProtectionPlan
 		}
-		target := &d.Target{OwnerID: request.OwnerID, InstrumentKey: request.InstrumentKey, TargetVersion: request.TargetVersion, TargetQuantity: quantity, OwnerEpoch: request.OwnerEpoch, State: "PENDING", ExpiresAt: &request.ExpiresAtUTC, PolicyVersion: &request.PolicyVersion, SpecVersion: &request.SpecVersion, ProtectionPlan: request.ProtectionPlan, SourceDecisionID: &request.SourceDecisionID, Reasons: []string{}}
+		if plan == nil {
+			if pos := run.Positions.Value(code); pos != nil && pos.Quantity.Sign() != 0 && pos.Quantity.Sign() == quantity.Sign() && pos.RequestedPlan != nil {
+				copy := *pos.RequestedPlan
+				if d.ProtectionMode(copy) == "VENUE" {
+					copy.CoveredQuantity = quantity.Abs()
+				}
+				plan = &copy
+			}
+		}
+		if plan != nil {
+			copy := *plan
+			plan = &copy
+			if plan.StrategyProtectionMode == "" {
+				plan.StrategyProtectionMode = "VENUE"
+				if old != nil && old.ProtectionPlan != nil {
+					plan.StrategyProtectionMode = d.ProtectionMode(*old.ProtectionPlan)
+				}
+			}
+			if err := d.ValidateProtectionPlan(*plan); err != nil {
+				return err
+			}
+		}
+		reasons := []string{}
+		if sameQuantity {
+			reasons = []string{"TARGET_INTENT_UNCHANGED"}
+			if !d.EqualModel(old.ProtectionPlan, plan) {
+				reasons = []string{"PROTECTION_ONLY_UPDATED"}
+			}
+		}
+		position := run.Positions.Value(code)
+		// Pure protection updates validate against the actual cycle, independently of trade sizing.
+		if sameQuantity && plan != nil && request.ProtectionPlan != nil && position != nil && actual.Sign() != 0 && quantity.Sign() == actual.Sign() {
+			if position.AverageEntry == nil {
+				return problem("ACCOUNT_MARK_UNKNOWN", 423)
+			}
+			check := d.NewEngine(run)
+			check.CheckStrategyPlan(request.InstrumentKey, *plan, actual, *position.AverageEntry, false)
+			if err := check.Err(); err != nil {
+				return err
+			}
+			if d.ProtectionMode(*plan) == "UPPER_MANAGED" {
+				reasons = []string{"MANAGED_DECLARATION_RECORDED"}
+			}
+		}
+		target := &d.Target{OwnerID: request.OwnerID, InstrumentKey: request.InstrumentKey, TargetVersion: request.TargetVersion, TargetQuantity: quantity, OwnerEpoch: request.OwnerEpoch, State: "PENDING", ExpiresAt: &request.ExpiresAtUTC, PolicyVersion: &request.PolicyVersion, SpecVersion: &request.SpecVersion, ProtectionPlan: plan, SourceDecisionID: &request.SourceDecisionID, Reasons: reasons}
+		if plan != nil {
+			target.RequestedMode = d.ProtectionMode(*plan)
+			target.StrategyProtectionMode = target.RequestedMode
+		}
 		run.Targets.Set(code, target)
 		run.Owners.Set(code, request.OwnerID)
-		if err := AdvanceTargets(e, true); err != nil {
+		if sameQuantity {
+			target.Generation = old.Generation
+			target.State = "ACTIVE"
+			for _, o := range run.Orders.Values() {
+				if o.Request.InstrumentKey == request.InstrumentKey && !d.Terminal(o.State) && o.TargetVersion != nil && *o.TargetVersion == old.TargetVersion {
+					if o.OriginalTargetVersion == nil {
+						original := *o.TargetVersion
+						o.OriginalTargetVersion = &original
+					}
+					v := target.TargetVersion
+					o.TargetVersion = &v
+					o.IntentProtectionPlan = plan
+				}
+			}
+			if position != nil && actual.Sign() != 0 && quantity.Sign() == actual.Sign() && request.ProtectionPlan != nil {
+				position.RequestedOwnerEpoch = request.OwnerEpoch
+				position.RequestedPlan = plan
+				e.ProtectActualPosition(&d.Order{Request: d.OrderRequest{InstrumentKey: request.InstrumentKey, ReduceOnly: true}})
+			}
+		} else if err := AdvanceTargets(e, true); err != nil {
 			return err
 		}
-		merge(r, Response{"resource_id": code, "state": target.State, "target_version": request.TargetVersion, "target_quantity": quantity, "actual_quantity": actual, "pending_quantity": pending, "delta_quantity": delta, "reasons": target.Reasons})
+
+		if position != nil {
+			if quantity.Sign() == position.Quantity.Sign() {
+				target.StrategyDeclaration = position.StrategyDeclaration
+			}
+			target.EffectiveMode = position.EffectiveMode
+			target.TransitionState = position.TransitionState
+		}
+		merge(r, Response{"strategy_protection_mode": target.RequestedMode, "requested_mode": target.RequestedMode, "effective_mode": target.EffectiveMode, "transition_state": target.TransitionState, "resource_id": code, "state": target.State, "target_version": request.TargetVersion, "target_quantity": quantity, "actual_quantity": actual, "pending_quantity": pending, "delta_quantity": delta, "reasons": target.Reasons})
 		return e.Err()
 	})
 }

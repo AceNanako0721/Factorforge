@@ -18,19 +18,21 @@ type DecisionCycle struct {
 	Clock   ports.Clock
 }
 type dueObject struct {
-	obj        *d.ObservedObject
-	p          *d.Policy
-	sample     *d.MarketSample
-	target     d.Decimal
-	stop       *d.StopPlan
-	stress     d.Decimal
-	view       d.PoolView
-	level      int
-	raw        d.Decimal
-	reasons    []string
-	id         string
-	scheduled  time.Time
-	components *d.DecisionComponents
+	obj            *d.ObservedObject
+	p              *d.Policy
+	sample         *d.MarketSample
+	target         d.Decimal
+	stop           *d.StopPlan
+	stress         d.Decimal
+	view           d.PoolView
+	level          int
+	raw            d.Decimal
+	reasons        []string
+	id             string
+	scheduled      time.Time
+	components     *d.DecisionComponents
+	directive      *d.StopDirectiveRecord
+	protectionOnly bool
 }
 
 func unknownDelivery(s *d.StrategyState, id string) bool {
@@ -131,6 +133,7 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 				if obj.LastCutoff != nil && at.Before(*obj.LastCutoff) {
 					return &d.Error{Code: "CLOCK_REWIND", Status: 422}
 				}
+				TrackStopReceipts(state, obj, snap, at)
 				if err := d.VerifyLedger(state.Sentiment(), p.NumericalTolerance); err != nil {
 					return err
 				}
@@ -387,6 +390,7 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 				}
 				target, stress := actual, p.MaxStopFraction
 				var stop *d.StopPlan
+				var sizingDirective *d.StopDirectiveRecord
 				reasons := append([]string{}, compositionReasons...)
 				if liquidityAssumed {
 					reasons = append(reasons, "LIQUIDITY_ASSUMED")
@@ -414,32 +418,60 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 						target = d.Zero()
 						reasons = append(reasons, "SHORT_UNAVAILABLE")
 					}
-					directionInput := view.Net
-					if components != nil {
-						directionInput = raw
-					}
-					if m.Mul(directionInput, actual).Sign() < 0 || m.Mul(directionInput, pending).Sign() < 0 {
-						target = d.Zero()
-						reasons = append(reasons, "FLATTEN_BEFORE_REVERSE")
+
+					if components == nil && target.Sign() != 0 && actual.Sign() != 0 && target.Sign() != actual.Sign() {
+						if p.ReverseConfirmSeconds == nil {
+							target = m.Add(actual, pending)
+							reasons = append(reasons, "REVERSE_CONFIRM_POLICY_REQUIRED")
+						} else {
+							if obj.ReverseCandidate == nil || obj.ReverseCandidate.Direction != target.Sign() {
+								obj.ReverseCandidate = &d.ReverseCandidate{Direction: target.Sign(), Since: at}
+							}
+							if at.Sub(obj.ReverseCandidate.Since) < time.Duration(*p.ReverseConfirmSeconds)*time.Second {
+								target = m.Add(actual, pending)
+								reasons = append(reasons, "REVERSE_CONFIRMING")
+							} else {
+								obj.ReverseCandidate = nil
+							}
+						}
+					} else if components == nil {
+						obj.ReverseCandidate = nil
 					}
 					if target.Sign() != 0 {
-						noise, err := d.NormalNoise(snap.Bars[obj.ObjectID], at, p.Numerical())
-						if err != nil {
-							return err
+
+						var result d.StopResult
+						var err error
+						initial := LatestStopDirective(state, obj, snap, "INITIAL_DISTANCE", d.DirectionName(target), at)
+						if initial != nil && stopWriterGrant(ctx, c.Store, state, initial) != nil {
+							initial = nil
 						}
-						result, err := d.SizeAndStop(target, sample.Price, rules, noise, p.Numerical(), params.Values["k_stop"])
+						saved := PreservedStopPlan(state, obj, snap, target)
+						if d.Has(reasons, "REVERSE_CONFIRMING") || d.Has(reasons, "REVERSE_CONFIRM_POLICY_REQUIRED") {
+							result = d.StopResult{Quantity: m.Add(actual, pending), Plan: saved, Reason: "TARGET_INTENT_PRESERVED"}
+						} else if saved != nil && (target.Cmp(m.Add(actual, pending)) == 0 || pending.Sign() != 0 && target.Sign() == m.Add(actual, pending).Sign()) {
+							result = d.StopResult{Quantity: target, Plan: saved, Reason: "TARGET_PLAN_PRESERVED"}
+						} else if initial != nil {
+							result, err = SizeDirective(target, sample.Price, rules, initial, p)
+							sizingDirective = initial
+						} else {
+							var noise *d.Decimal
+							noise, err = d.NormalNoise(snap.Bars[obj.ObjectID], at, p.Numerical())
+							if err == nil {
+								result, err = d.SizeAndStop(target, sample.Price, rules, noise, p.Numerical(), params.Values["k_stop"])
+							}
+						}
 						if err != nil {
 							return err
 						}
 						target, stop, stress = result.Quantity, result.Plan, result.Fraction
 						reasons = append(reasons, result.Reason)
 					}
-					if actual.Sign() != 0 && m.Mul(target, actual).Sign() > 0 && target.Abs().Cmp(actual.Abs()) <= 0 {
+					if pending.Sign() == 0 && actual.Sign() != 0 && m.Mul(target, actual).Sign() > 0 && target.Abs().Cmp(actual.Abs()) <= 0 {
 						stop = nil
-					} else if actual.Sign() != 0 && stop != nil {
+					} else if actual.Sign() != 0 && target.Sign() == actual.Sign() && stop != nil && stop.StrategyProtectionMode != "UPPER_MANAGED" {
 						active := []d.Decimal{}
 						for _, protection := range snap.Protections[obj.ObjectID] {
-							if d.Text(protection["state"]) == "ACTIVE_VERIFIED" {
+							if d.Text(protection["state"]) == "ACTIVE_VERIFIED" && d.Text(protection["role"]) == "STRATEGY" {
 								active = append(active, d.Amount(d.Object(protection["plan"])["trigger_price"]))
 							}
 						}
@@ -463,7 +495,7 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 				}
 				blocked := obj.State != "ACTIVE" || obj.RecoveryState != "NORMAL" || len(snap.RiskLocks) > 0 || !d.RiskQuality(state.Environment, p.QualityState) || !d.RiskQuality(state.Environment, params.QualityState)
 				blocked = blocked || obj.LayerLedgerBlocked
-				if (blocked || unknownDelivery(state, obj.ObjectID)) && target.Abs().Cmp(actual.Abs()) > 0 {
+				if (blocked || unknownDelivery(state, obj.ObjectID)) && d.NewRisk(actual, pending, target) {
 					target, stop = actual, nil
 					reasons = append(reasons, "RECOVERY_OR_PAUSE_OR_DELIVERY_BLOCK")
 				}
@@ -478,7 +510,7 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 						}
 					}
 				}
-				if stopNow && target.Abs().Cmp(actual.Abs()) > 0 {
+				if stopNow && d.NewRisk(actual, pending, target) {
 					target, stop = actual, nil
 					reasons = append(reasons, "STOP_CYCLE_NO_REOPEN")
 				}
@@ -504,12 +536,61 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 						reasons = append(reasons, reason)
 					}
 				}
-				if target.Abs().Cmp(current.Abs()) > 0 && !force && (components == nil && m.Sub(target, current).Abs().Cmp(p.MinAdjustment) < 0 || obj.LastAdjustment != nil && at.Sub(*obj.LastAdjustment).Seconds() < float64(p.CooldownSeconds)) {
+				if d.NewRisk(actual, pending, target) && !force && (components == nil && m.Sub(target, current).Abs().Cmp(p.MinAdjustment) < 0 || obj.LastAdjustment != nil && at.Sub(*obj.LastAdjustment).Seconds() < float64(p.CooldownSeconds)) {
 					target, stop = current, nil
 					reasons = append(reasons, "ADJUSTMENT_COOLDOWN")
 				}
+
+				directive := sizingDirective
+				protectionOnly := false
+				if target.Sign() == actual.Sign() && actual.Sign() != 0 && !unknownDelivery(state, obj.ObjectID) {
+					directive = LatestStopDirective(state, obj, snap, "POSITION_STOP", d.DirectionName(actual), at)
+					if directive != nil && stopWriterGrant(ctx, c.Store, state, directive) != nil {
+						directive = nil
+					}
+					if directive != nil {
+						proposed := StopPlanForDirective(directive.Directive, *directive.Directive.TriggerPrice, actual, Rules(snap.Specs[obj.ObjectID]), p)
+						if !StopAlreadyEffective(snap, obj, proposed) {
+							// A pure stop update keeps the canonical P1 target, including its unfilled remainder.
+							if target.Cmp(current) == 0 || stop == nil {
+								target = current
+								if t := snap.Targets[obj.ObjectID]; t != nil {
+									target = d.Amount(t["target_quantity"])
+								}
+								protectionOnly = true
+							}
+							stop = proposed
+						} else {
+							directive = nil
+						}
+					}
+				}
+				if stop == nil && target.Sign() != 0 && (pending.Sign() != 0 || d.NewRisk(actual, pending, target)) {
+					stop = PreservedStopPlan(state, obj, snap, target)
+				}
+				potentialOpening := target.Sign() != 0 && (target.Sign() != actual.Sign() || target.Abs().Cmp(actual.Abs()) > 0)
+				if potentialOpening && !ValidTargetStop(snap, obj, stop, target, p, at) {
+					if pending.Sign() != 0 && !unknownDelivery(state, obj.ObjectID) {
+						target = actual
+						stop = nil
+						reasons = append(reasons, "PENDING_PROTECTION_INVALID_CANCEL_REQUIRED")
+					} else {
+						target = current
+						stop = nil
+						reasons = append(reasons, "PROTECTION_PLAN_INVALID")
+					}
+				}
+				if d.NewRisk(actual, pending, target) && stop == nil {
+					target = current
+					reasons = append(reasons, "PROTECTION_REQUIRED")
+				}
+				if d.NewRisk(actual, pending, target) && !snap.LowerCompat {
+					target = current
+					stop = nil
+					reasons = append(reasons, "P1_LOWER_COMPAT_REQUIRED")
+				}
 				id := "decision-" + d.Digest([]any{state.InstanceID, state.Environment, obj.TradingRunKey, obj.ObjectID, d.ISO(scheduled)})[:24]
-				due = append(due, &dueObject{obj: obj, p: p, sample: sample, target: target, stop: stop, stress: stress, view: view, level: level, raw: raw, reasons: reasons, id: id, scheduled: scheduled, components: components})
+				due = append(due, &dueObject{obj: obj, p: p, sample: sample, target: target, stop: stop, stress: stress, view: view, level: level, raw: raw, reasons: reasons, id: id, scheduled: scheduled, components: components, directive: directive, protectionOnly: protectionOnly})
 				if sample != nil {
 					mult := d.Amount(snap.Specs[obj.ObjectID]["contract_multiplier"])
 					rows = append(rows, d.Candidate{Current: m.Mul(m.Mul(current, sample.Price), mult), Desired: m.Mul(m.Mul(target, sample.Price), mult), Stress: stress, Group: riskGroup(snap.Specs[obj.ObjectID])})
@@ -539,7 +620,7 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 							return err
 						}
 						item.target = target
-						if target.Abs().Cmp(obj.ActualQuantity.Abs()) <= 0 {
+						if !d.NewRisk(obj.ActualQuantity, obj.PendingQuantity, target) && target.Cmp(m.Add(obj.ActualQuantity, obj.PendingQuantity)) != 0 {
 							item.stop = nil
 						} else if item.stop != nil {
 							item.stop.CoveredQuantity = target.Abs()
@@ -594,13 +675,13 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 				if unresolved {
 					item.reasons = append(item.reasons, "ACCOUNT_RISK_RECONCILIATION_REQUIRED")
 				}
-				if alpha.Cmp(d.One()) < 0 && item.target.Abs().Cmp(current.Abs()) > 0 {
+				if alpha.Cmp(d.One()) < 0 && d.NewRisk(actual, pending, item.target) {
 					if sample == nil {
 						return &d.Error{Code: "PROJECTION_PRICE_MISSING", Status: 423}
 					}
 					spec := snap.Specs[obj.ObjectID]
 					mult := d.Amount(spec["contract_multiplier"])
-					target, err := d.Quantity(m.Div(m.Mul(m.Mul(m.Add(current, m.Mul(alpha, m.Sub(item.target, current))), sample.Price), mult), snap.Equity), snap.Equity, sample.Price, mult, d.Amount(spec["quantity_step"]))
+					target, err := d.Quantity(m.Div(m.Mul(m.Mul(projectedQuantity(current, item.target, alpha), sample.Price), mult), snap.Equity), snap.Equity, sample.Price, mult, d.Amount(spec["quantity_step"]))
 					if err != nil {
 						return err
 					}
@@ -611,7 +692,7 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 					}
 				}
 				var reservation *d.Reservation
-				if item.target.Abs().Cmp(current.Abs()) > 0 {
+				if d.NewRisk(actual, pending, item.target) {
 					r, err := d.Reserve(state, obj, at, p, item.id)
 					if err != nil {
 						var known *d.Error
@@ -652,11 +733,15 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 					reasons = []string{"TARGET_COMPUTED"}
 				}
 				decision := &d.DecisionView{DecisionID: item.id, ObjectID: obj.ObjectID, CycleID: obj.ObjectID + ":" + d.ISO(item.scheduled), AvailableCutoff: at, PoolPlus: item.view.Plus, PoolMinus: item.view.Minus, PoolNet: item.view.Net, PreviousLevel: obj.Level, NewLevel: item.level, RawExposure: item.raw, ProjectedExposure: projected, TargetQuantity: item.target, ActualQuantity: actual, PendingQuantity: pending, StopPlan: item.stop, ParameterVersion: obj.ParameterVersion, InputHash: d.Digest(inputs), InputSnapshot: d.CompactDecisionInput(inputs), ReasonCodes: reasons, SourceEventVersions: sourceVersions}
+				decision.ProtectionOnly = item.protectionOnly
+				if item.directive != nil {
+					decision.StopDirectiveID = d.Ptr(item.directive.Directive.DirectiveID)
+				}
 				state.Decisions.Set(item.id, decision)
 				decision.Components = item.components
 				canReduce := m.Mul(item.target, actual).Sign() >= 0 && item.target.Abs().Cmp(actual.Abs()) <= 0 && obj.OwnerEpoch == snap.OwnerEpochs[obj.ObjectID]
 				unknown := unknownDelivery(state, obj.ObjectID)
-				if sample != nil && sample.Quality == "VALID" && (obj.RecoveryState == "NORMAL" || canReduce) && (!unknown || canReduce) {
+				if sample != nil && sample.Quality == "VALID" && (obj.RecoveryState == "NORMAL" || canReduce || item.protectionOnly && !snap.ExternalChange) && (!unknown || canReduce) {
 					version := snap.TargetVersions[obj.ObjectID]
 					for _, i := range state.Outbox.Values() {
 						if i.Decision.ObjectID == obj.ObjectID && i.TargetVersion > version {
@@ -668,6 +753,15 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 						reservationID = d.Ptr(reservation.ReservationID)
 					}
 					state.Outbox.Set(item.id, &d.TargetOutbox{Decision: d.TargetDecision(decision), TargetVersion: version + 1, ExpiresAt: at.Add(time.Duration(p.TargetTTLSeconds) * time.Second), ReservationID: reservationID, State: "PENDING", OwnerEpoch: obj.OwnerEpoch})
+				}
+				if item.directive != nil {
+					r := &item.directive.Receipt
+					r.ApplicationState = "TARGET_PENDING"
+					r.SourceDecisionID = d.Ptr(item.id)
+					r.TargetVersion = d.Ptr(versionForDecision(state, item.id))
+					if row := state.Outbox.Value(item.id); row != nil {
+						row.StopDirective = d.Clone(item.directive)
+					}
 				}
 				obj.LastCycle = d.Ptr(item.scheduled)
 				obj.LastCutoff = d.Ptr(at)
@@ -734,7 +828,7 @@ func (c DecisionCycle) Dispatch(ctx context.Context, identity d.Identity) error 
 			return err
 		}
 		m := d.Math()
-		increase := item.Decision.TargetQuantity.Abs().Cmp(m.Add(snapshot.Actual[obj.ObjectID], snapshot.Pending[obj.ObjectID]).Abs()) > 0
+		increase := d.NewRisk(snapshot.Actual[obj.ObjectID], snapshot.Pending[obj.ObjectID], item.Decision.TargetQuantity)
 		revoked := obj.State != "ACTIVE" || len(snapshot.RiskLocks) > 0 || snapshot.RunState != "NORMAL" || snapshot.OwnerEpochs[obj.ObjectID] != item.OwnerEpoch
 		for eventID, version := range item.Decision.SourceEventVersions {
 			e := before.Events.Value(eventID)
@@ -742,11 +836,17 @@ func (c DecisionCycle) Dispatch(ctx context.Context, identity d.Identity) error 
 				revoked = true
 			}
 		}
+		if item.Decision.StopDirectiveID != nil {
+			record := findDirective(before, *item.Decision.StopDirectiveID)
+			if record == nil || stopWriterGrant(ctx, c.Store, before, record) != nil || !d.WriterAllowed(before, record.PrincipalID, record.Directive, now) || !now.Before(record.Receipt.ExpiresAt) || ValidateDirectiveSnapshot(record.Directive, obj, snapshot, before.Policies.Value(obj.TimePolicyVersion), now) != nil {
+				revoked = true
+			}
+		}
 		status := ""
 		var reason *string
 		if d.Has(snapshot.SourceDecisions, key) {
 			status = "ACK"
-		} else if increase && revoked {
+		} else if (increase || item.Decision.ProtectionOnly) && revoked {
 			status = "DELIVERY_UNKNOWN"
 			if item.State == "PENDING" {
 				status = "EXPIRED"
@@ -811,6 +911,12 @@ func (c DecisionCycle) Dispatch(ctx context.Context, identity d.Identity) error 
 			row := state.Outbox.Value(key)
 			row.State = status
 			row.Reason = reason
+			if row.Decision.StopDirectiveID != nil {
+				if record := findDirective(state, *row.Decision.StopDirectiveID); record != nil {
+					record.Receipt.ApplicationState = map[string]string{"ACK": "P1_ACCEPTED", "REJECTED": "REJECTED", "DELIVERY_UNKNOWN": "UNKNOWN", "EXPIRED": "REJECTED"}[status]
+					row.StopDirective = d.Clone(record)
+				}
+			}
 			if status == "ACK" {
 				row.AcceptedAt = d.Ptr(now)
 				if row.Decision.Components == nil || row.Decision.TargetQuantity.Cmp(d.Math().Add(row.Decision.ActualQuantity, row.Decision.PendingQuantity)) != 0 {

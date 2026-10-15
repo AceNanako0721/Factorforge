@@ -185,7 +185,7 @@ func (s *acceptance) newSigner(manual bool) (*binance.RemoteProbe, string, binan
 	if err != nil {
 		return nil, "", binance.ProbeManifest{}, err
 	}
-	manifest := binance.ProbeManifest{Endpoint: binance.TestnetURL, Config: s.config, Gateway: filepath.Join(s.directory, "gate.sock"), Token: token, DSN: s.server.LIVEDSN, Key: s.key, Holder: "probe-" + secret()[:12], ExpiresAt: now().Add(45 * time.Minute), Symbol: s.symbol, MaxQuantity: s.quantity, MaxNotional: s.limit, Manual: manual, ManualID: "ff-emergency-" + secret()[:16], AuthorizeOrders: s.authorized}
+	manifest := binance.ProbeManifest{Endpoint: binance.TestnetURL, Config: s.config, Gateway: filepath.Join(s.directory, "gate.sock"), Token: token, DSN: s.server.LIVEDSN, Key: s.key, Holder: "probe-" + secret()[:12], ExpiresAt: now().Add(45 * time.Minute), Symbol: s.symbol, MaxQuantity: decimal.NewMath(28).Mul(s.quantity, amount("2")), MaxNotional: s.limit, Manual: manual, ManualID: "ff-emergency-" + secret()[:16], AuthorizeOrders: s.authorized}
 	broker, err := binance.StartRemoteProbe(s.ctx, s.binary, manifest, s.log)
 	if err != nil {
 		s.gateway.Revoke(token)
@@ -463,7 +463,8 @@ func (s *acceptance) setup() error {
 	timestamp := now()
 	gateAmount := amount("20")
 	count := int64(5)
-	policy := d.AccountPolicy{Version: "EXPERIMENT_ONLY", ValidFrom: timestamp, RiskDayZone: "UTC", NotionalLimit: s.limit, MarginLimit: s.limit, TradeLossLimit: amount("10"), DailyLoss: d.LossGate{Mode: "ENFORCE", Amount: &gateAmount}, Drawdown: d.LossGate{Mode: "ENFORCE", Amount: &gateAmount}, ConsecutiveLoss: d.LossGate{Mode: "ENFORCE", Count: &count}, BreachAction: "EXIT_WHEN_TRADABLE", RecoveryPolicy: "MANUAL_RECONCILE", MaxMarketAgeSeconds: 120, StressScenarios: []d.StressScenario{}, Operational: &d.OperationalPolicy{MinDiskBytes: 1024 * 1024, MaxClockSkewSeconds: amount("2"), MaxAuditRecords: 10000, MaxPendingCommands: 20, MaxCommandAgeSeconds: 300, LeaseSeconds: 180}}
+	insuranceFraction := amount("0.02") // EXPERIMENT_ONLY experimental value; never a production default.
+	policy := d.AccountPolicy{InsuranceStopFraction: &insuranceFraction, InsuranceTriggerKind: "MARK", InsuranceQualityState: "EXPERIMENT_ONLY", Version: "EXPERIMENT_ONLY", ValidFrom: timestamp, RiskDayZone: "UTC", NotionalLimit: s.limit, MarginLimit: s.limit, TradeLossLimit: amount("10"), DailyLoss: d.LossGate{Mode: "ENFORCE", Amount: &gateAmount}, Drawdown: d.LossGate{Mode: "ENFORCE", Amount: &gateAmount}, ConsecutiveLoss: d.LossGate{Mode: "ENFORCE", Count: &count}, BreachAction: "EXIT_WHEN_TRADABLE", RecoveryPolicy: "MANUAL_RECONCILE", MaxMarketAgeSeconds: 120, StressScenarios: []d.StressScenario{}, Operational: &d.OperationalPolicy{MinDiskBytes: 1024 * 1024, MaxClockSkewSeconds: amount("2"), MaxAuditRecords: 10000, MaxPendingCommands: 20, MaxCommandAgeSeconds: 300, LeaseSeconds: 180}}
 	model := d.SimConfig{Seed: 1, FeeRate: amount("0.001"), SlippageBps: amount("10"), ParticipationRate: amount("1"), LatencySeconds: 0, MaintenanceMarginRate: amount("0.05"), OHLCRule: "CONSERVATIVE", Leverage: amount("1")}
 	run := &d.Aggregate{RunKey: s.key, ExecutionMode: "LIVE", State: "RECOVERY_CHECK", Policy: policy, SimConfig: model, InitialCash: cash, Currency: "USDT", Cash: cash, Clock: timestamp, RiskDay: timestamp.Format("2006-01-02"), DayStartEquity: cash, PeakEquity: cash, FactsStartAt: &timestamp, ExecutorEpoch: 1}
 	d.InitCollections(run)
@@ -509,7 +510,7 @@ func (s *acceptance) run(readonly bool) error {
 	if readonly {
 		steps = append(steps, s.isolationDrill)
 	} else {
-		steps = append(steps, s.ordinary, s.protectiveExit, s.recoveryDrill)
+		steps = append(steps, s.ordinary, s.lowerCompatibility, s.protectiveExit, s.recoveryDrill)
 	}
 	steps = append(steps, s.storageDrill)
 	var runErr error

@@ -10,7 +10,7 @@ import (
 // enablement defaults and is also usable by offline initialization checks.
 func (c Config) InstallCompositionRegistry(state *d.StrategyState) error {
 	fragment := d.Map(d.NewState(state.InstanceID, state.Environment))
-	for _, key := range []string{"factor_series", "templates"} {
+	for _, key := range []string{"factor_series", "templates", "stop_directive_writers"} {
 		if v, ok := c.InitialRegistry[key]; ok {
 			fragment[key] = v
 		}
@@ -37,5 +37,6 @@ func (c Config) InstallCompositionRegistry(state *d.StrategyState) error {
 	}
 	state.FactorSeries = registry.FactorSeries
 	state.Templates = registry.Templates
-	return nil
+	state.StopDirectiveWriters = registry.StopDirectiveWriters
+	return d.ValidateStopWriters(state)
 }

@@ -93,6 +93,11 @@ func New(root string) (*World, error) {
 	if run.RunKey.RunID == "" {
 		return nil, fmt.Errorf("missing fixture")
 	}
+	// v2.8.0 requires an explicit insurance policy; synthetic fixture value only.
+	fraction := value("0.5")
+	run.Policy.InsuranceStopFraction = &fraction
+	run.Policy.InsuranceTriggerKind = "MARK"
+	run.Policy.InsuranceQualityState = "EXPERIMENT_ONLY"
 	w.TradingStore = tm.New("SIM")
 	if e = w.TradingStore.Create(ctx, &run); e != nil {
 		return nil, e

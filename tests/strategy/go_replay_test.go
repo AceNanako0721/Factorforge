@@ -191,7 +191,7 @@ func (r *replayTrading) call(method string, args any) (map[string]any, error) {
 	if sd.Text(item["method"]) != method {
 		r.t.Fatalf("expected P1 %s, got %s", item["method"], method)
 	}
-	if err := firstDifference(compactFrozenDecisions(item["arguments"]), sd.JSONValue(args), "P1.arguments"); err != nil {
+	if err := firstDifference(projectCompatSnapshot(compactFrozenDecisions(item["arguments"])), projectCompatSnapshot(sd.JSONValue(args)), "P1.arguments"); err != nil {
 		r.t.Fatal(err)
 	}
 	if e := sd.Object(item["error"]); len(e) > 0 {
@@ -206,6 +206,7 @@ func (r *replayTrading) Snapshot(_ context.Context, objects []*sd.ObservedObject
 	}
 	var snap sd.TradingSnapshot
 	decodeRecord(r.t, value, &snap)
+	snap.LowerCompat = true // explicit synthetic v2.8.0 lower contract
 	return &snap, nil
 }
 func (r *replayTrading) Prepare(obj *sd.ObservedObject, item *sd.TargetOutbox, snap *sd.TradingSnapshot) (map[string]any, error) {
@@ -315,7 +316,17 @@ func TestFrozenP2StateTransitions(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if e := firstDifference(compactFrozenDecisions(item["result"]), sd.JSONValue(result), "result"); e != nil {
+				expectedResult, actualResult := compactFrozenDecisions(item["result"]), sd.JSONValue(result)
+				if kind == "tick" {
+					expectedResult = projectLegacyTick(expectedResult)
+					actualResult = projectLegacyTick(actualResult)
+					for _, decision := range result.([]*sd.DecisionView) {
+						if sd.Has(decision.ReasonCodes, "FLATTEN_BEFORE_REVERSE") {
+							t.Fatal("legacy reversal branch returned")
+						}
+					}
+				}
+				if e := firstDifference(expectedResult, actualResult, "result"); e != nil {
 					t.Fatal(e)
 				}
 			}
@@ -335,7 +346,12 @@ func TestFrozenP2StateTransitions(t *testing.T) {
 					state.Audit = append(state.Audit, row.Payload)
 				}
 			}
-			if e := firstDifference(compactFrozenDecisions(states[sd.Text(item["after"])]), compactFrozenDecisions(sd.JSONValue(state)), "state"); e != nil {
+			expectedState, actualState := compactFrozenDecisions(states[sd.Text(item["after"])]), compactFrozenDecisions(sd.JSONValue(state))
+			if kind == "tick" {
+				expectedState = projectLegacyTick(expectedState)
+				actualState = projectLegacyTick(actualState)
+			}
+			if e := firstDifference(expectedState, actualState, "state"); e != nil {
 				t.Fatal(e)
 			}
 			if trading.cursor != len(trading.calls) {
@@ -343,4 +359,51 @@ func TestFrozenP2StateTransitions(t *testing.T) {
 			}
 		})
 	}
+}
+
+// v2.8.0 intentionally changes execution targets, retained stop plans, input
+// hashes and risk reservations. The frozen transition oracle still compares
+// sentiment, cases, policies, levels, learning and audit; T2-23..27 check execution.
+func projectLegacyTick(v any) any {
+	switch x := v.(type) {
+	case map[string]any:
+		out := map[string]any{}
+		for k, item := range x {
+			if sd.Has([]string{"decisions", "outbox", "reservations", "input_hash", "lower_compat"}, k) {
+				continue
+			}
+			if x["decision_id"] != nil && sd.Has([]string{"target_quantity", "projected_exposure", "stop_plan", "reason_codes", "stop_directive_id", "protection_only"}, k) {
+				continue
+			}
+			out[k] = projectLegacyTick(item)
+		}
+		return out
+	case []any:
+		out := make([]any, len(x))
+		for i, item := range x {
+			out[i] = projectLegacyTick(item)
+		}
+		return out
+	}
+	return v
+}
+func projectCompatSnapshot(v any) any {
+	switch x := v.(type) {
+	case map[string]any:
+		out := map[string]any{}
+		for k, item := range x {
+			if k == "lower_compat" {
+				continue
+			}
+			out[k] = projectCompatSnapshot(item)
+		}
+		return out
+	case []any:
+		out := make([]any, len(x))
+		for i, item := range x {
+			out[i] = projectCompatSnapshot(item)
+		}
+		return out
+	}
+	return v
 }

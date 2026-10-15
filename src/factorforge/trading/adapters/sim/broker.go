@@ -3,6 +3,7 @@ package sim
 
 import (
 	"encoding/json"
+	"sort"
 	"strconv"
 
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/trading/domain"
@@ -194,7 +195,15 @@ func (Broker) AdvanceFrame(run *d.Aggregate, key d.InstrumentKey, liquidity deci
 	if liquidity.Sign() < 0 {
 		return &d.Error{Code: "LIQUIDITY_INVALID", Status: 422}
 	}
-	return d.Mutate(run, func(engine *d.Engine) { matchFrame(engine, key, liquidity, candle) })
+	if at, ok := run.SimFrameAt.Get(key.Code()); ok && at.Equal(run.Clock) {
+		return nil
+	}
+	return d.Mutate(run, func(engine *d.Engine) {
+		matchFrame(engine, key, liquidity, candle)
+		if engine.Err() == nil {
+			engine.Run.SimFrameAt.Set(key.Code(), engine.Run.Clock)
+		}
+	})
 }
 
 func slipped(e *d.Engine, price decimal.Value, side string, bps decimal.Value) decimal.Value {
@@ -252,13 +261,32 @@ func matchFrame(e *d.Engine, key d.InstrumentKey, liquidity decimal.Value, candl
 	if e.Err() != nil {
 		return
 	}
-	// Snapshot the insertion order before creating exit orders and protections.
-	for _, p := range run.Protections.Values() {
+	// Snapshot current protections and match the first reachable trigger.
+	candidates := run.Protections.Values()
+	sort.SliceStable(candidates, func(i, j int) bool {
+		a, b := candidates[i], candidates[j]
+		if a.State == "EXIT_PARTIAL" {
+			return b.State != "EXIT_PARTIAL"
+		}
+		if b.State == "EXIT_PARTIAL" {
+			return false
+		}
+		pos := run.Positions.Value(code)
+		if pos != nil && pos.Quantity.Sign() > 0 {
+			return a.Plan.TriggerPrice.Cmp(b.Plan.TriggerPrice) > 0
+		}
+		return a.Plan.TriggerPrice.Cmp(b.Plan.TriggerPrice) < 0
+	})
+	for _, p := range candidates {
 		if p.InstrumentKey != key || (p.State != "ACTIVE_VERIFIED" && p.State != "EXIT_PARTIAL") {
 			continue
 		}
 		position := run.Positions.Value(code)
 		if position == nil || position.Quantity.Sign() == 0 {
+			p.State = "CLOSED"
+			continue
+		}
+		if !d.CurrentProtection(p, position) && p.PositionDirection != "" {
 			p.State = "CLOSED"
 			continue
 		}
@@ -283,6 +311,11 @@ func matchFrame(e *d.Engine, key d.InstrumentKey, liquidity decimal.Value, candl
 		if !crossed && p.State != "EXIT_PARTIAL" {
 			continue
 		}
+		for _, other := range run.Protections.Values() {
+			if other.ProtectionID != p.ProtectionID && other.InstrumentKey == key && other.State != "CLOSED" {
+				other.State = "CLOSED"
+			}
+		}
 		quantity := decimal.Min(e.Math.Abs(position.Quantity), remaining)
 		p.State = "EXIT_PARTIAL"
 		position.ProtectionState = "EXIT_PARTIAL"
@@ -294,6 +327,12 @@ func matchFrame(e *d.Engine, key d.InstrumentKey, liquidity decimal.Value, candl
 				return
 			}
 			remaining = e.Math.Sub(remaining, quantity)
+			for _, pending := range run.Orders.Values() {
+				if pending.Request.InstrumentKey == key && !pending.Request.ReduceOnly && !d.Terminal(pending.State) {
+					pending.State = "CANCELED"
+					pending.ReservedNotional = zero
+				}
+			}
 			for _, target := range run.Targets.Values() {
 				if target.InstrumentKey == key {
 					target.State = "BLOCKED"
@@ -303,7 +342,12 @@ func matchFrame(e *d.Engine, key d.InstrumentKey, liquidity decimal.Value, candl
 		}
 		if position.Quantity.Sign() == 0 {
 			p.State = "CLOSED"
+			e.RequestConditionalCleanup(key)
+		} else {
+			p.State = "EXIT_PARTIAL"
+			e.RefreshProtectionState(key)
 		}
+		break
 	}
 	for _, order := range run.Orders.Values() {
 		if order.Request.InstrumentKey != key || !d.Has([]string{"ACKNOWLEDGED", "PARTIALLY_FILLED", "CANCEL_PENDING"}, order.State) || !order.CreatedAt.Before(run.Clock) || (order.LastFillAt != nil && order.LastFillAt.Equal(run.Clock)) || run.Clock.Sub(order.CreatedAt).Seconds() < float64(run.SimConfig.LatencySeconds) {

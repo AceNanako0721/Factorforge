@@ -133,7 +133,7 @@ func TestCompositionReverseConfirmationAndHysteresis(t *testing.T) {
 	o.Level = r.Level
 	s.FactorSeries.Value("daily").Observations[0].Value = compDecimal("-0.5")
 	r = compose(t, s, o, p, m, at.Add(time.Second), "0", "0.5")
-	assertAmount(t, r.Raw, "0")
+	assertAmount(t, r.Raw, "0.5")
 	if !sd.Has(r.Reasons, "REVERSE_CONFIRMING") {
 		t.Fatal(r.Reasons)
 	}
@@ -522,7 +522,7 @@ func TestCompositionFirstCoreAgainstExistingPositionConfirms(t *testing.T) {
 	o.ActualQuantity = sd.Int(10)
 	s.FactorSeries.Value("daily").Observations[0].Value = compDecimal("-0.5")
 	r := compose(t, s, o, p, m, at, "0", "0.1")
-	assertAmount(t, r.Raw, "0")
+	assertAmount(t, r.Raw, "0.1")
 	if !sd.Has(r.Reasons, "REVERSE_CONFIRMING") {
 		t.Fatal("existing position direction skipped confirmation", r)
 	}

@@ -91,3 +91,38 @@ func (a Adapter) GetAccount(ctx context.Context, run *d.Aggregate) (map[string]a
 	err = decoder.Decode(&result)
 	return result, err
 }
+
+func (a Adapter) ListOpenConditionals(ctx context.Context, run *d.Aggregate, key d.InstrumentKey) ([]d.ConditionalOrderFact, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	rows := []d.ConditionalOrderFact{}
+	for _, p := range run.Protections.Values() {
+		if p.InstrumentKey != key || p.State == "CLOSED" {
+			continue
+		}
+		id := d.ConditionalClientID(run.RunKey, p)
+		local := p.ProtectionID
+		role := p.Role
+		kind := p.Plan.TriggerKind
+		price := p.Plan.TriggerPrice
+		q := p.Plan.CoveredQuantity
+		side := "BUY"
+		if p.PositionDirection == "LONG" {
+			side = "SELL"
+		}
+		rows = append(rows, d.ConditionalOrderFact{ExternalID: id, ClientID: &id, Instrument: key, Side: side, OrderType: "STOP_MARKET", ReduceOnly: true, PositionSide: "BOTH", TriggerKind: &kind, TriggerPrice: &price, Quantity: &q, State: p.State, ObservedAt: run.Clock, LocalProtectionID: &local, Role: &role})
+	}
+	return rows, nil
+}
+func (a Adapter) CancelConditionalByID(ctx context.Context, run *d.Aggregate, key d.InstrumentKey, id string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	for _, p := range run.Protections.Values() {
+		if p.InstrumentKey == key && d.ConditionalClientID(run.RunKey, p) == id {
+			p.State = "CLOSED"
+		}
+	}
+	return nil
+}

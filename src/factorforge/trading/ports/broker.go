@@ -25,6 +25,8 @@ type Broker interface {
 	SubmitProtection(context.Context, *d.Aggregate, *d.Protection) (*d.Protection, error)
 	QueryProtection(context.Context, *d.Aggregate, string) (*d.Protection, error)
 	CancelProtection(context.Context, *d.Aggregate, string) (*d.Protection, error)
+	ListOpenConditionals(context.Context, *d.Aggregate, d.InstrumentKey) ([]d.ConditionalOrderFact, error)
+	CancelConditionalByID(context.Context, *d.Aggregate, d.InstrumentKey, string) error
 	GetAccount(context.Context, *d.Aggregate) (map[string]any, error)
 	GetIncome(context.Context, *d.Aggregate) ([]*d.Income, error)
 }

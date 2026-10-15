@@ -50,6 +50,31 @@ func FeedbackCases(s *StrategyState, obj *ObservedObject, snap *TradingSnapshot,
 			if frozenParams == nil || frozenPolicy == nil {
 				return &Error{"CASE_FROZEN_INPUT_MISSING", 423}
 			}
+			if active != nil {
+				before := Amount(active.EntrySnapshot["quantity"])
+				after := m.Add(before, signed)
+				if m.Mul(before, after).Sign() < 0 {
+					total := signed.Abs()
+					closeFee := m.Mul(Amount(fill["fee"]), m.Div(before.Abs(), total))
+					cash := m.Add(Amount(active.EntrySnapshot["cash_flow"]), m.Mul(m.Mul(before, Amount(fill["price"])), Amount(spec["contract_multiplier"])))
+					active.EntrySnapshot["quantity"] = "0"
+					active.EntrySnapshot["cash_flow"] = cash.String()
+					active.PNLComponents["fees"] = m.Add(active.PNLComponents["fees"], closeFee)
+					if Text(fill["fee_currency"]) != Text(spec["settlement_currency"]) {
+						active.EntrySnapshot["cost_known"] = false
+					}
+					active.FillIDs = Unique(append(active.FillIDs, id))
+					active.ExitAt = Ptr(at)
+					active.ObservationEnd = Ptr(at.Add(time.Duration(active.ObservationSeconds) * time.Second))
+					active.Status = "OBSERVING"
+					active.PNLComponents["realized"] = cash
+					active = nil
+					fill = Clone(fill)
+					fill["fee"] = m.Sub(Amount(fill["fee"]), closeFee).String()
+					fill["quantity"] = after.Abs().String()
+					signed = after
+				}
+			}
 			if active == nil {
 				obs := Max(Int(frozenPolicy.ObservationMinSeconds), Min(Int(frozenPolicy.ObservationMaxSeconds), m.Mul(frozenPolicy.ObservationMultiplier, frozenParams.Values["h"])))
 				seconds := IntegralInt(obs)

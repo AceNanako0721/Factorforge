@@ -173,7 +173,7 @@ func RunView(run *d.Aggregate) Response {
 	}
 	reasons := append([]string{}, run.RecoveryIssues...)
 	reasons = append(reasons, run.RiskLocks...)
-	return Wire(Response{"resource_id": run.RunKey.RunID, "run_key": run.RunKey, "aggregate_version": run.Version, "execution_mode": run.ExecutionMode, "state": run.State, "policy_version": run.Policy.Version, "executor_epoch": run.ExecutorEpoch, "active_owners": unique, "reasons": reasons}).(map[string]any)
+	return Wire(Response{"capabilities": []string{"LOWER_COMPAT_280", "INSURANCE", "STRATEGY", "UPPER_MANAGED", "PROTECTION_ONLY_UPDATED", "REVERSAL_SINGLE_ORDER"}, "resource_id": run.RunKey.RunID, "run_key": run.RunKey, "aggregate_version": run.Version, "execution_mode": run.ExecutionMode, "state": run.State, "policy_version": run.Policy.Version, "executor_epoch": run.ExecutorEpoch, "active_owners": unique, "reasons": reasons}).(map[string]any)
 }
 func (s *Service) CreateRun(ctx context.Context, principal d.Principal, body d.CreateRun) (Response, error) {
 	if err := Require(principal, body.RunKey, "run:create"); err != nil {

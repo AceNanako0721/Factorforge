@@ -4408,7 +4408,7 @@
           },
           "max_market_age_seconds": {
             "type": "integer",
-            "exclusiveMinimum": 0.0,
+            "exclusiveMinimum": 0,
             "title": "Max Market Age Seconds"
           },
           "net_notional_limit": {
@@ -4446,6 +4446,25 @@
                 "type": "null"
               }
             ]
+          },
+          "insurance_stop_fraction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "insurance_trigger_kind": {
+            "type": "string",
+            "default": ""
+          },
+          "insurance_quality_state": {
+            "type": "string",
+            "default": ""
           }
         },
         "additionalProperties": false,
@@ -4618,7 +4637,7 @@
           },
           "expected_version": {
             "type": "integer",
-            "minimum": 0.0,
+            "minimum": 0,
             "title": "Expected Version"
           },
           "reason": {
@@ -4713,7 +4732,7 @@
         "properties": {
           "sequence": {
             "type": "integer",
-            "exclusiveMinimum": 0.0,
+            "exclusiveMinimum": 0,
             "title": "Sequence"
           },
           "action": {
@@ -4813,7 +4832,7 @@
           },
           "revision": {
             "type": "integer",
-            "minimum": 0.0,
+            "minimum": 0,
             "title": "Revision"
           }
         },
@@ -4901,7 +4920,7 @@
           },
           "revision": {
             "type": "integer",
-            "minimum": 0.0,
+            "minimum": 0,
             "title": "Revision"
           }
         },
@@ -4950,7 +4969,7 @@
           },
           "expected_version": {
             "type": "integer",
-            "minimum": 0.0,
+            "minimum": 0,
             "title": "Expected Version"
           },
           "reason": {
@@ -5320,7 +5339,7 @@
           },
           "expected_version": {
             "type": "integer",
-            "minimum": 0.0,
+            "minimum": 0,
             "title": "Expected Version"
           },
           "reason": {
@@ -5336,7 +5355,7 @@
           },
           "epoch": {
             "type": "integer",
-            "exclusiveMinimum": 0.0,
+            "exclusiveMinimum": 0,
             "title": "Epoch"
           },
           "evidence_ref": {
@@ -5504,7 +5523,7 @@
           },
           "expected_version": {
             "type": "integer",
-            "minimum": 0.0,
+            "minimum": 0,
             "title": "Expected Version"
           },
           "reason": {
@@ -6024,7 +6043,7 @@
             "anyOf": [
               {
                 "type": "integer",
-                "exclusiveMinimum": 0.0
+                "exclusiveMinimum": 0
               },
               {
                 "type": "null"
@@ -6484,7 +6503,7 @@
         "properties": {
           "min_disk_bytes": {
             "type": "integer",
-            "exclusiveMinimum": 0.0,
+            "exclusiveMinimum": 0,
             "title": "Min Disk Bytes"
           },
           "max_clock_skew_seconds": {
@@ -6493,22 +6512,22 @@
           },
           "max_audit_records": {
             "type": "integer",
-            "exclusiveMinimum": 0.0,
+            "exclusiveMinimum": 0,
             "title": "Max Audit Records"
           },
           "max_pending_commands": {
             "type": "integer",
-            "exclusiveMinimum": 0.0,
+            "exclusiveMinimum": 0,
             "title": "Max Pending Commands"
           },
           "max_command_age_seconds": {
             "type": "integer",
-            "exclusiveMinimum": 0.0,
+            "exclusiveMinimum": 0,
             "title": "Max Command Age Seconds"
           },
           "lease_seconds": {
             "type": "integer",
-            "exclusiveMinimum": 0.0,
+            "exclusiveMinimum": 0,
             "title": "Lease Seconds"
           }
         },
@@ -7326,7 +7345,13 @@
           },
           "protection_state": {
             "type": "string",
-            "title": "Protection State"
+            "title": "Protection State",
+            "x-states": [
+              "ACTIVE_VERIFIED",
+              "INSURANCE_ONLY",
+              "UNPROTECTED",
+              "CLOSED"
+            ]
           },
           "reconciliation_state": {
             "type": "string",
@@ -7336,6 +7361,37 @@
             "type": "string",
             "format": "date-time",
             "title": "Observed At"
+          },
+          "strategy_protection_mode": {
+            "type": "string"
+          },
+          "requested_mode": {
+            "type": "string"
+          },
+          "effective_mode": {
+            "type": "string"
+          },
+          "transition_state": {
+            "type": "string"
+          },
+          "position_cycle_id": {
+            "type": "string"
+          },
+          "strategy_declaration": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StrategyProtectionDeclaration"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "additionalProperties": false,
@@ -7432,19 +7488,80 @@
             "minLength": 1,
             "pattern": "^[A-Za-z0-9_.-]+$",
             "title": "Spec Version"
+          },
+          "strategy_protection_mode": {
+            "type": "string",
+            "enum": [
+              "VENUE",
+              "UPPER_MANAGED"
+            ]
+          },
+          "managed_stop_price": {
+            "type": "string"
+          },
+          "overshoot_allowance": {
+            "type": "string"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
           "trigger_kind",
-          "trigger_price",
-          "covered_quantity",
-          "exit_order_type",
           "max_slippage_bps",
           "spec_version"
         ],
-        "title": "ProtectionPlan"
+        "title": "ProtectionPlan",
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "strategy_protection_mode": {
+                  "const": "UPPER_MANAGED"
+                }
+              },
+              "required": [
+                "strategy_protection_mode"
+              ]
+            },
+            "then": {
+              "required": [
+                "managed_stop_price",
+                "overshoot_allowance"
+              ],
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "trigger_price"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "covered_quantity"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "exit_order_type"
+                    ]
+                  }
+                ]
+              }
+            },
+            "else": {
+              "required": [
+                "trigger_price",
+                "covered_quantity",
+                "exit_order_type"
+              ],
+              "not": {
+                "required": [
+                  "managed_stop_price"
+                ]
+              }
+            }
+          }
+        ]
       },
       "ProtectionPlan-Output": {
         "properties": {
@@ -7482,19 +7599,80 @@
             "minLength": 1,
             "pattern": "^[A-Za-z0-9_.-]+$",
             "title": "Spec Version"
+          },
+          "strategy_protection_mode": {
+            "type": "string",
+            "enum": [
+              "VENUE",
+              "UPPER_MANAGED"
+            ]
+          },
+          "managed_stop_price": {
+            "type": "string"
+          },
+          "overshoot_allowance": {
+            "type": "string"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
           "trigger_kind",
-          "trigger_price",
-          "covered_quantity",
-          "exit_order_type",
           "max_slippage_bps",
           "spec_version"
         ],
-        "title": "ProtectionPlan"
+        "title": "ProtectionPlan",
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "strategy_protection_mode": {
+                  "const": "UPPER_MANAGED"
+                }
+              },
+              "required": [
+                "strategy_protection_mode"
+              ]
+            },
+            "then": {
+              "required": [
+                "managed_stop_price",
+                "overshoot_allowance"
+              ],
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "trigger_price"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "covered_quantity"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "exit_order_type"
+                    ]
+                  }
+                ]
+              }
+            },
+            "else": {
+              "required": [
+                "trigger_price",
+                "covered_quantity",
+                "exit_order_type"
+              ],
+              "not": {
+                "required": [
+                  "managed_stop_price"
+                ]
+              }
+            }
+          }
+        ]
       },
       "ProtectionView": {
         "properties": {
@@ -7577,6 +7755,39 @@
             "type": "boolean",
             "title": "Cancel Requested",
             "default": false
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "INSURANCE",
+              "STRATEGY",
+              ""
+            ]
+          },
+          "position_direction": {
+            "type": "string"
+          },
+          "position_cycle_id": {
+            "type": "string"
+          },
+          "generation": {
+            "type": "integer"
+          },
+          "source_target_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "client_algo_id": {
+            "type": "string"
+          },
+          "cancel_attempted": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false,
@@ -7663,7 +7874,7 @@
           },
           "expected_version": {
             "type": "integer",
-            "minimum": 0.0,
+            "minimum": 0,
             "title": "Expected Version"
           },
           "reason": {
@@ -7721,7 +7932,7 @@
           },
           "expected_version": {
             "type": "integer",
-            "minimum": 0.0,
+            "minimum": 0,
             "title": "Expected Version"
           },
           "reason": {
@@ -7779,7 +7990,7 @@
           },
           "expected_version": {
             "type": "integer",
-            "minimum": 0.0,
+            "minimum": 0,
             "title": "Expected Version"
           },
           "reason": {
@@ -7880,7 +8091,7 @@
           },
           "expected_version": {
             "type": "integer",
-            "minimum": 0.0,
+            "minimum": 0,
             "title": "Expected Version"
           },
           "reason": {
@@ -7906,7 +8117,7 @@
           },
           "owner_epoch": {
             "type": "integer",
-            "minimum": 0.0,
+            "minimum": 0,
             "title": "Owner Epoch"
           },
           "evidence_ref": {
@@ -8096,6 +8307,12 @@
             },
             "type": "array",
             "title": "Reasons"
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "additionalProperties": false,
@@ -8160,7 +8377,7 @@
           },
           "expected_version": {
             "type": "integer",
-            "minimum": 0.0,
+            "minimum": 0,
             "title": "Expected Version"
           },
           "reason": {
@@ -8216,7 +8433,7 @@
           },
           "latency_seconds": {
             "type": "integer",
-            "minimum": 0.0,
+            "minimum": 0,
             "title": "Latency Seconds"
           },
           "maintenance_margin_rate": {
@@ -8329,7 +8546,7 @@
           },
           "expected_version": {
             "type": "integer",
-            "minimum": 0.0,
+            "minimum": 0,
             "title": "Expected Version"
           },
           "reason": {
@@ -8465,6 +8682,28 @@
             "type": "integer",
             "title": "Generation",
             "default": 0
+          },
+          "strategy_protection_mode": {
+            "type": "string"
+          },
+          "requested_mode": {
+            "type": "string"
+          },
+          "effective_mode": {
+            "type": "string"
+          },
+          "transition_state": {
+            "type": "string"
+          },
+          "strategy_declaration": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StrategyProtectionDeclaration"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -8505,7 +8744,7 @@
           },
           "expected_version": {
             "type": "integer",
-            "minimum": 0.0,
+            "minimum": 0,
             "title": "Expected Version"
           },
           "reason": {
@@ -8531,7 +8770,7 @@
           },
           "target_version": {
             "type": "integer",
-            "exclusiveMinimum": 0.0,
+            "exclusiveMinimum": 0,
             "title": "Target Version"
           },
           "target_quantity": {
@@ -8571,7 +8810,7 @@
           },
           "owner_epoch": {
             "type": "integer",
-            "minimum": 0.0,
+            "minimum": 0,
             "title": "Owner Epoch"
           }
         },
@@ -8594,7 +8833,27 @@
           "source_decision_id",
           "owner_epoch"
         ],
-        "title": "TargetRequest"
+        "title": "TargetRequest",
+        "x-error-codes": [
+          "INSURANCE_STOP_FRACTION_INVALID",
+          "INSURANCE_POLICY_REQUIRED",
+          "INSURANCE_PROTECTION_FORBIDDEN",
+          "STRATEGY_NOT_TIGHTER_THAN_INSURANCE",
+          "PROTECTION_ALREADY_CROSSED",
+          "MARKET_DATA_UNUSABLE",
+          "PROTECTION_MUST_MATCH_ACTUAL_POSITION",
+          "PROTECTION_POSITION_CHANGED",
+          "POSITION_INSURANCE_ONLY",
+          "POSITION_UNPROTECTED",
+          "REVERSAL_SNAPSHOT_CHANGED",
+          "CONDITION_CLEANUP_PENDING",
+          "STRATEGY_PROTECTION_MODE_INVALID",
+          "MANAGED_STOP_DECLARATION_INVALID",
+          "MANAGED_STOP_OUTSIDE_INSURANCE",
+          "MANAGED_STOP_ALREADY_CROSSED",
+          "MANAGED_STOP_PRICE_UNUSABLE",
+          "STRATEGY_MODE_SWITCH_POSITION_CHANGED"
+        ]
       },
       "TargetView": {
         "properties": {
@@ -8659,6 +8918,18 @@
             },
             "type": "array",
             "title": "Reasons"
+          },
+          "strategy_protection_mode": {
+            "type": "string"
+          },
+          "requested_mode": {
+            "type": "string"
+          },
+          "effective_mode": {
+            "type": "string"
+          },
+          "transition_state": {
+            "type": "string"
           }
         },
         "additionalProperties": false,
@@ -8677,7 +8948,66 @@
           "delta_quantity",
           "reasons"
         ],
-        "title": "TargetView"
+        "title": "TargetView",
+        "x-receipt-reasons": [
+          "PROTECTION_ONLY_UPDATED",
+          "TARGET_INTENT_UNCHANGED",
+          "REVERSAL_SINGLE_ORDER",
+          "MANAGED_DECLARATION_RECORDED"
+        ]
+      },
+      "StrategyProtectionDeclaration": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "VENUE",
+              "UPPER_MANAGED"
+            ]
+          },
+          "managed_stop_price": {
+            "type": "string"
+          },
+          "overshoot_allowance": {
+            "type": "string"
+          },
+          "trigger_kind": {
+            "type": "string"
+          },
+          "position_direction": {
+            "type": "string"
+          },
+          "position_cycle_id": {
+            "type": "string"
+          },
+          "source_decision_id": {
+            "type": "string"
+          },
+          "target_version": {
+            "type": "integer"
+          },
+          "declaration_hash": {
+            "type": "string"
+          },
+          "accepted_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "mode",
+          "managed_stop_price",
+          "overshoot_allowance",
+          "trigger_kind",
+          "position_direction",
+          "position_cycle_id",
+          "source_decision_id",
+          "target_version",
+          "declaration_hash",
+          "accepted_at"
+        ]
       }
     },
     "securitySchemes": {

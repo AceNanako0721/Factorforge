@@ -132,7 +132,7 @@ func (t *TradingV2) Snapshot(ctx context.Context, objects []*d.ObservedObject) (
 			return &d.Error{Code: "TRADING_SNAPSHOT_CONFLICT", Status: 409}
 		}
 		at := d.At(account["observed_at"])
-		snap := &d.TradingSnapshot{RunKey: binding, Version: d.Number(run["aggregate_version"]), At: at, Equity: d.Amount(account["equity"]), AccountCurrency: d.Text(account["currency"]), PolicyVersion: d.Text(account["policy_version"]), RiskLocks: d.Strings(account["risk_locks"]), RunState: d.Text(run["state"]), Actual: map[string]d.Decimal{}, Pending: map[string]d.Decimal{}, OwnerEpochs: map[string]int{}, TargetVersions: map[string]int{}, Specs: map[string]map[string]any{}, Samples: map[string]d.MarketSample{}, Bars: map[string][]d.Bar{}, Protections: map[string][]map[string]any{}, AverageEntries: map[string]*d.Decimal{}, SourceDecisions: []string{}, Fills: []map[string]any{}, Incomes: d.Rows(pages["income"]["items"]), OtherExposures: []d.ExposureRisk{}, ExternalChange: d.Text(run["state"]) != "NORMAL"}
+		snap := &d.TradingSnapshot{LowerCompat: d.Has(d.Strings(run["capabilities"]), "LOWER_COMPAT_280"), Positions: map[string]map[string]any{}, Targets: map[string]map[string]any{}, TriggerPrices: map[string]map[string]d.MarketSample{}, RunKey: binding, Version: d.Number(run["aggregate_version"]), At: at, Equity: d.Amount(account["equity"]), AccountCurrency: d.Text(account["currency"]), PolicyVersion: d.Text(account["policy_version"]), RiskLocks: d.Strings(account["risk_locks"]), RunState: d.Text(run["state"]), Actual: map[string]d.Decimal{}, Pending: map[string]d.Decimal{}, OwnerEpochs: map[string]int{}, TargetVersions: map[string]int{}, Specs: map[string]map[string]any{}, Samples: map[string]d.MarketSample{}, Bars: map[string][]d.Bar{}, Protections: map[string][]map[string]any{}, AverageEntries: map[string]*d.Decimal{}, SourceDecisions: []string{}, Fills: []map[string]any{}, Incomes: d.Rows(pages["income"]["items"]), OtherExposures: []d.ExposureRisk{}, ExternalChange: d.Has([]string{"RECOVERY_CHECK", "RECOVERY_REQUIRED", "UNCERTAIN"}, d.Text(run["state"])) || len(d.Strings(run["reasons"])) > 0}
 		m := d.Math()
 		orders := map[string]map[string]any{}
 		terminal := []string{"FILLED", "CANCELED", "CANCELLED", "REJECTED", "EXPIRED"}
@@ -183,6 +183,7 @@ func (t *TradingV2) Snapshot(ctx context.Context, objects []*d.ObservedObject) (
 					return &d.Error{Code: "OWNER_CONFLICT", Status: 409}
 				}
 				if d.Text(p["owner_id"]) == obj.OwnerID {
+					snap.Positions[id] = p
 					actual = m.Add(actual, q)
 					if p["average_entry"] != nil {
 						snap.AverageEntries[id] = d.Ptr(d.Amount(p["average_entry"]))
@@ -218,12 +219,33 @@ func (t *TradingV2) Snapshot(ctx context.Context, objects []*d.ObservedObject) (
 			for _, target := range d.Rows(pages["targets"]["items"]) {
 				if d.Digest(target["instrument_key"]) == identity && d.Number(target["target_version"]) > snap.TargetVersions[id] {
 					snap.TargetVersions[id] = d.Number(target["target_version"])
+					snap.Targets[id] = target
 				}
 			}
 			snap.Protections[id] = []map[string]any{}
 			for _, p := range d.Rows(pages["protections"]["items"]) {
 				if d.Digest(p["instrument_key"]) == identity && d.Text(p["owner_id"]) == obj.OwnerID {
 					snap.Protections[id] = append(snap.Protections[id], p)
+				}
+			}
+			snap.TriggerPrices[id] = map[string]d.MarketSample{}
+			for _, p := range d.Rows(pages["market/points"]["items"]) {
+				if d.Digest(p["instrument_key"]) == identity && !d.At(p["available_at"]).After(at) {
+					kind := d.Text(p["kind"])
+					old, ok := snap.TriggerPrices[id][kind]
+					if !ok || d.At(p["available_at"]).After(old.AvailableAt) {
+						quality := d.Text(p["quality"])
+						observed := d.At(p["available_at"])
+						if p["observed_at"] != nil {
+							observed = d.At(p["observed_at"])
+						}
+						if at.Sub(observed).Seconds() > float64(d.Number(account["max_market_age_seconds"])) {
+							if age := d.Number(account["max_market_age_seconds"]); age > 0 {
+								quality = "STALE"
+							}
+						}
+						snap.TriggerPrices[id][kind] = d.MarketSample{AvailableAt: d.At(p["available_at"]), Price: d.Amount(p["value"]), Quality: quality}
+					}
 				}
 			}
 			prices := []map[string]any{}
@@ -281,6 +303,7 @@ func (t *TradingV2) Snapshot(ctx context.Context, objects []*d.ObservedObject) (
 			copy["owner_id"] = order["owner_id"]
 			copy["protection_exit"] = d.Has(exits, d.Text(order["order_id"]))
 			copy["source_decision_id"] = origin
+			copy["protection_exit"] = d.Flag(copy["protection_exit"]) || d.Has(exits, d.Text(fact["external_order_id"]))
 			snap.Fills = append(snap.Fills, copy)
 		}
 		for _, spec := range d.Rows(pages["instruments"]["items"]) {

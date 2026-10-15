@@ -25,7 +25,7 @@ type Readiness struct {
 }
 
 func (r Readiness) Require(run *Aggregate, now time.Time, endpoint string) error {
-	ok := run.RunKey.Environment == "LIVE" && r.AccountID == run.RunKey.AccountID && r.ValidUntil.After(now) && r.PolicyVersion == run.Policy.Version && endpoint == r.ApprovedEndpoint && r.OperatorID != "" && r.ReviewerID != "" && r.OperatorID != r.ReviewerID && len(r.ApprovedInstrumentVersions) > 0 && run.Policy.Operational != nil && run.SimConfig.Leverage.Cmp(one) == 0
+	ok := run.Policy.InsuranceQualityState == "VALIDATED" && run.Policy.InsuranceStopFraction != nil && run.Policy.InsuranceStopFraction.Sign() > 0 && run.Policy.InsuranceStopFraction.Cmp(one) < 0 && run.RunKey.Environment == "LIVE" && r.AccountID == run.RunKey.AccountID && r.ValidUntil.After(now) && r.PolicyVersion == run.Policy.Version && endpoint == r.ApprovedEndpoint && r.OperatorID != "" && r.ReviewerID != "" && r.OperatorID != r.ReviewerID && len(r.ApprovedInstrumentVersions) > 0 && run.Policy.Operational != nil && run.SimConfig.Leverage.Cmp(one) == 0
 	for _, ref := range []string{r.AccountProbeRef, r.OrdinaryProbeRef, r.ProtectionProbeRef, r.EgressIsolationRef, r.OfficialRunbookExerciseRef, r.RiskCalibrationRef} {
 		ok = ok && strings.TrimSpace(ref) != ""
 	}

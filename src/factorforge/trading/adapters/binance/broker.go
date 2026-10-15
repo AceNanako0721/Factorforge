@@ -444,10 +444,10 @@ func (b *Broker) SubmitProtection(ctx context.Context, run *d.Aggregate, p *d.Pr
 		return nil, reject("PROTECTION_POSITION_REQUIRED", 423)
 	}
 	side := "BUY"
-	if position.Quantity.Sign() > 0 {
+	if p.PositionDirection == "LONG" || p.PositionDirection == "" && position.Quantity.Sign() > 0 {
 		side = "SELL"
 	}
-	params, err := ProtectionRequest(p.InstrumentKey, p.Plan, side, p.ProtectionID)
+	params, err := ProtectionRequest(p.InstrumentKey, p.Plan, side, d.ConditionalClientID(run.RunKey, p))
 	if err != nil {
 		return nil, err
 	}
@@ -470,7 +470,7 @@ func (b *Broker) QueryProtection(ctx context.Context, run *d.Aggregate, id strin
 	if err != nil {
 		return nil, err
 	}
-	raw, err := b.Transport.Request(ctx, "GET", Conditional, Params{"clientAlgoId": p.ProtectionID}, false)
+	raw, err := b.Transport.Request(ctx, "GET", Conditional, Params{"clientAlgoId": d.ConditionalClientID(run.RunKey, p)}, false)
 	if err != nil {
 		return nil, err
 	}
@@ -485,20 +485,31 @@ func (b *Broker) QueryProtection(ctx context.Context, run *d.Aggregate, id strin
 	quantity, e1 := parseAmount(item["quantity"])
 	trigger, e2 := parseAmount(item["triggerPrice"])
 	external := text(item["algoId"])
-	position := run.Positions.Value(p.InstrumentKey.Code())
-	sideOkay := true
-	if position != nil && position.Quantity.Sign() != 0 {
-		side := "BUY"
-		if position.Quantity.Sign() > 0 {
-			side = "SELL"
-		}
-		sideOkay = text(item["side"]) == side
+	side := "BUY"
+	if p.PositionDirection == "LONG" {
+		side = "SELL"
 	}
-	if text(item["clientAlgoId"]) != p.ProtectionID || text(item["symbol"]) != p.InstrumentKey.InstrumentID || text(item["algoType"]) != "CONDITIONAL" || text(item["orderType"]) != "STOP_MARKET" || text(item["positionSide"]) != "BOTH" || text(item["workingType"]) != working || !sideOkay || text(item["reduceOnly"]) != "true" || e1 != nil || e2 != nil || quantity.Cmp(p.Plan.CoveredQuantity) != 0 || trigger.Cmp(p.Plan.TriggerPrice) != 0 || external == "" || (p.ExternalID != nil && *p.ExternalID != external) {
+	sideOkay := text(item["side"]) == side
+	if p.PositionDirection == "" {
+		sideOkay = text(item["side"]) == "BUY" || text(item["side"]) == "SELL"
+	}
+	if text(item["clientAlgoId"]) != d.ConditionalClientID(run.RunKey, p) || text(item["symbol"]) != p.InstrumentKey.InstrumentID || text(item["algoType"]) != "CONDITIONAL" || text(item["orderType"]) != "STOP_MARKET" || text(item["positionSide"]) != "BOTH" || text(item["workingType"]) != working || !sideOkay || text(item["reduceOnly"]) != "true" || e1 != nil || e2 != nil || quantity.Cmp(p.Plan.CoveredQuantity) != 0 || trigger.Cmp(p.Plan.TriggerPrice) != 0 || external == "" || (p.ExternalID != nil && *p.ExternalID != external) {
 		return nil, &ports.Ambiguous{}
 	}
 	copy := *p
 	copy.ExternalID = &external
+	if p.Role == "" {
+		copy.Role = "STRATEGY"
+		copy.ClientAlgoID = p.ProtectionID
+		copy.PositionDirection = "SHORT"
+		if text(item["side"]) == "SELL" {
+			copy.PositionDirection = "LONG"
+		}
+		copy.PositionCycleID = "legacy-" + external
+		if pos := run.Positions.Value(p.InstrumentKey.Code()); pos != nil && d.Direction(pos.Quantity) == copy.PositionDirection {
+			copy.PositionCycleID = pos.PositionCycleID
+		}
+	}
 	copy.State = map[string]string{"NEW": "ACTIVE_VERIFIED", "TRIGGERED": "TRIGGERED", "FINISHED": "CLOSED", "CANCELED": "CLOSED", "REJECTED": "CLOSED", "EXPIRED": "CLOSED"}[text(item["algoStatus"])]
 	if copy.State == "" {
 		copy.State = "UNKNOWN"
@@ -519,7 +530,7 @@ func (b *Broker) CancelProtection(ctx context.Context, run *d.Aggregate, id stri
 	if err != nil {
 		return nil, err
 	}
-	if _, err = b.Transport.Request(ctx, "DELETE", Conditional, Params{"clientAlgoId": p.ProtectionID}, true); err != nil {
+	if _, err = b.Transport.Request(ctx, "DELETE", Conditional, Params{"clientAlgoId": d.ConditionalClientID(run.RunKey, p)}, true); err != nil {
 		return nil, err
 	}
 	copy := *p

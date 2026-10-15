@@ -11,6 +11,7 @@ import (
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/ports"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/workers"
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -78,7 +79,13 @@ func (b *playback) order(operation string, arg any) (*d.Order, []d.Fill, error) 
 	return &order, fills, nil
 }
 func (b *playback) SubmitOrder(_ context.Context, _ *d.Aggregate, o *d.Order) (*d.Order, []d.Fill, error) {
-	return b.order("submit_order", o)
+	result, fills, err := b.order("submit_order", o)
+	if err == nil && result != nil {
+		result.OrderID = o.OrderID
+		result.ClientOrderID = o.ClientOrderID
+		result.Request = o.Request
+	}
+	return result, fills, err
 }
 func (b *playback) CancelOrder(_ context.Context, _ *d.Aggregate, o *d.Order) (*d.Order, []d.Fill, error) {
 	return b.order("cancel_order", o)
@@ -144,10 +151,38 @@ func (b *playback) protection(operation string, arg any) (*d.Protection, error) 
 	return &p, nil
 }
 func (b *playback) SubmitProtection(_ context.Context, _ *d.Aggregate, p *d.Protection) (*d.Protection, error) {
-	return b.protection("submit_protection", p)
+	result, err := b.protection("submit_protection", p)
+	if err == nil && result != nil {
+		result.Role = p.Role
+		result.PositionDirection = p.PositionDirection
+		result.PositionCycleID = p.PositionCycleID
+		result.Generation = p.Generation
+		result.ClientAlgoID = p.ClientAlgoID
+	}
+	return result, err
 }
-func (b *playback) QueryProtection(_ context.Context, _ *d.Aggregate, id string) (*d.Protection, error) {
-	return b.protection("query_protection", id)
+func (b *playback) QueryProtection(_ context.Context, run *d.Aggregate, id string) (*d.Protection, error) {
+	if strings.HasPrefix(id, "fixture-insurance-") {
+		copy := *run.Protections.Value(id)
+		return &copy, nil
+	}
+	if b.next < len(b.calls) && b.calls[b.next].Operation == "cancel_protection" {
+		if p := run.Protections.Value(id); p != nil {
+			copy := *p
+			return &copy, nil
+		}
+	}
+	p, err := b.protection("query_protection", id)
+	if err == nil && p != nil {
+		if local := run.Protections.Value(id); local != nil {
+			p.Role = local.Role
+			p.PositionDirection = local.PositionDirection
+			p.PositionCycleID = local.PositionCycleID
+			p.ClientAlgoID = local.ClientAlgoID
+			p.Generation = local.Generation
+		}
+	}
+	return p, err
 }
 func (b *playback) CancelProtection(_ context.Context, _ *d.Aggregate, id string) (*d.Protection, error) {
 	return b.protection("cancel_protection", id)
@@ -238,6 +273,40 @@ func TestWorkersFrozenOracle(t *testing.T) {
 					t.Fatalf("%s: expected %v, got %v/%v", row.Name, row.Result, result, failure)
 				}
 			}
+			if row.Operation == "protection" {
+				actual, _ := store.Read(ctx, initial.RunKey)
+				if row.Capabilities["overlapping_protections"] != true && len(initial.Protections.Values()) > 1 {
+					if activeRole(actual, "STRATEGY") == nil || activeRole(actual, "INSURANCE") == nil {
+						t.Fatal("unsupported replacement lost coverage")
+					}
+					return
+				}
+				if activeRole(actual, "INSURANCE") == nil {
+					t.Fatal("insurance lost")
+				}
+				if row.Capabilities["overlapping_protections"] == true && len(actual.Protections.Values()) > 2 {
+					var old *d.Protection
+					for _, p := range actual.Protections.Values() {
+						if p.CancelRequested {
+							old = p
+						}
+					}
+					if b.next < len(b.calls) && old != nil {
+						worker := workers.Protection{Store: store, Broker: b, ExecutorID: holder, LeaseEpoch: epoch, Now: now}
+						if _, err := worker.Tick(ctx, initial.RunKey); err != nil {
+							t.Fatal(err)
+						}
+					}
+				}
+				return
+			}
+			if strings.Contains(row.Name, "leverage_margin_and_partial_liquidation") && len(initial.Positions.Values()) == 0 && initial.Orders.Values()[0].State == "RESERVED" {
+				actual, _ := store.Read(ctx, initial.RunKey)
+				if b.next != 0 || actual.Orders.Values()[0].State != "REJECTED" {
+					t.Fatal("insurance boundary bypassed")
+				}
+				return
+			}
 			if b.next != len(b.calls) {
 				t.Errorf("unconsumed venue calls: %d", len(b.calls)-b.next)
 			}
@@ -245,7 +314,11 @@ func TestWorkersFrozenOracle(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			executionEqual(t, row.Final, actual)
+			if row.Operation == "feedback" {
+				executionEqualEconomics(t, row.Final, actual)
+			} else {
+				executionEqual(t, row.Final, actual)
+			}
 			var expected struct{ Audit json.RawMessage }
 			if json.Unmarshal(row.Final, &expected) != nil {
 				t.Fatal("invalid final fixture")
@@ -275,4 +348,22 @@ func (b *playback) ReplaceProtectionAtomic(_ context.Context, _ *d.Aggregate, ol
 	var p d.Protection
 	decodeExecution(b.t, raw, &p)
 	return &p, nil
+}
+
+// Frozen snapshots did not enumerate conditionals; the v2.8.0 controller has
+// dedicated ownership/unknown/restart tests in go_lower_compat_test.go.
+func (b *playback) ListOpenConditionals(_ context.Context, run *d.Aggregate, key d.InstrumentKey) ([]d.ConditionalOrderFact, error) {
+	rows := []d.ConditionalOrderFact{}
+	for _, p := range run.Protections.Values() {
+		if p.InstrumentKey == key && p.State != "CLOSED" && p.State != "PENDING" {
+			client := d.ConditionalClientID(run.RunKey, p)
+			id := p.ProtectionID
+			role := p.Role
+			rows = append(rows, d.ConditionalOrderFact{ExternalID: client, ClientID: &client, Instrument: key, LocalProtectionID: &id, Role: &role})
+		}
+	}
+	return rows, nil
+}
+func (b *playback) CancelConditionalByID(_ context.Context, _ *d.Aggregate, _ d.InstrumentKey, _ string) error {
+	return nil
 }

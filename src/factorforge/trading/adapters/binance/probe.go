@@ -197,16 +197,23 @@ func (p *ProbeTransport) Request(ctx context.Context, method, path string, param
 					position := run.Positions.Value(protection.InstrumentKey.Code())
 					if position != nil && position.Quantity.Sign() != 0 {
 						side := "BUY"
-						if position.Quantity.Sign() > 0 {
+						if protection.PositionDirection == "LONG" || protection.PositionDirection == "" && position.Quantity.Sign() > 0 {
 							side = "SELL"
 						}
-						expected, _ = ProtectionRequest(protection.InstrumentKey, protection.Plan, side, protection.ProtectionID)
+						expected, _ = ProtectionRequest(protection.InstrumentKey, protection.Plan, side, d.ConditionalClientID(run.RunKey, protection))
 					}
 				}
 				if method == "DELETE" && path == Conditional {
-					expected = Params{"clientAlgoId": protection.ProtectionID}
+					expected = Params{"clientAlgoId": d.ConditionalClientID(run.RunKey, protection)}
 				}
 				matched = matched || (expected != nil && sameParams(expected, params))
+			}
+			for _, task := range run.ConditionalCleanups.Values() {
+				for _, fact := range task.Facts {
+					if method == "DELETE" && path == Conditional && fact.Instrument.InstrumentID == m.Symbol && d.OwnConditional(run, fact) && sameParams(Params{"algoId": fact.ExternalID}, params) {
+						matched = true
+					}
+				}
 			}
 			if !matched {
 				return nil, reject("TESTNET_INTENT_NOT_REGISTERED", 403)
