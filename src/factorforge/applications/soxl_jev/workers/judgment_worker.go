@@ -361,7 +361,7 @@ func (w *JudgmentWorker) versioned(ctx context.Context, fn func(dto.Command) err
 
 func (w *JudgmentWorker) inputs(ctx context.Context, now time.Time) ([]d.NewsItem, []d.NewsItem, bool, error) {
 	s := w.Settings
-	rows, err := w.Store.Records(ctx, "NEWS", now.Add(-s.OlderWindow), now.Add(time.Nanosecond), 5000)
+	rows, err := w.Store.Records(ctx, "NEWS", now.Add(-s.OlderWindow), now.Add(time.Second), 5000)
 	if err != nil {
 		return nil, nil, false, err
 	}
@@ -399,7 +399,7 @@ func (w *JudgmentWorker) inputs(ctx context.Context, now time.Time) ([]d.NewsIte
 }
 
 func (w *JudgmentWorker) latestJudgment(ctx context.Context, now time.Time) (*d.Judgment, error) {
-	rows, err := w.Store.Records(ctx, "JUDGMENT", now.Add(-72*time.Hour), now.Add(time.Nanosecond), 200)
+	rows, err := w.Store.Records(ctx, "JUDGMENT", now.Add(-72*time.Hour), now.Add(time.Second), 200)
 	if err != nil {
 		return nil, err
 	}
