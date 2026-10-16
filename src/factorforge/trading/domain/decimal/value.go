@@ -40,7 +40,11 @@ func (v Value) Abs() Value {
 func (v Value) Neg() Value {
 	return Value{value: new(apd.Decimal).Neg(v.raw()), extendedExponent: v.extendedExponent}
 }
-func (v Value) MarshalJSON() ([]byte, error) { return json.Marshal(v.String()) }
+
+// MarshalJSON writes the published plain decimal form. Small magnitudes such
+// as a zero with scale 15 would otherwise print as "0E-15", which the public
+// contract pattern rejects; the plain form keeps the same value and scale.
+func (v Value) MarshalJSON() ([]byte, error) { return json.Marshal(jsonString(v)) }
 func (v *Value) UnmarshalJSON(data []byte) error {
 	// json.Unmarshal(null, &string) succeeds; explicitly exclude null and numbers.
 	if len(data) == 0 || data[0] != '"' {

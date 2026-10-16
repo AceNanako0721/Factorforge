@@ -76,6 +76,18 @@ func (v Value) adjusted() int64       { return v.exponent() + int64(len(v.raw().
 func (v Value) wide() bool {
 	return v.exponent() > 90000 || v.exponent() < -90000 || v.adjusted() > 90000 || v.adjusted() < -90000
 }
+func jsonString(v Value) string {
+	exp := v.exponent()
+	digits := v.raw().Coeff.String()
+	if exp >= 0 || exp+int64(len(digits))-1 >= -6 || exp < -90000 {
+		return valueString(v)
+	}
+	sign := ""
+	if v.raw().Negative {
+		sign = "-"
+	}
+	return sign + "0." + strings.Repeat("0", int(-exp)-len(digits)) + digits
+}
 func valueString(v Value) string {
 	digits := v.raw().Coeff.String()
 	exp := v.exponent()
