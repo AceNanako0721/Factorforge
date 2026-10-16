@@ -35,6 +35,10 @@ type Options struct {
 	// TrustedPeers admits a registered tunnel host besides loopback (S4-018,
 	// P4 design 16.4); empty keeps the previous behaviour.
 	TrustedPeers []netip.Prefix
+	// Live serves the S4-019 reference push (P4 design 17.3); nil disables
+	// GET /live. LiveHeartbeat is the state/heartbeat and session recheck period.
+	Live          *app.LiveHub
+	LiveHeartbeat time.Duration
 }
 type Problem struct {
 	Code      string `json:"code"`
@@ -95,7 +99,7 @@ func originAllowed(r *http.Request, origin string) bool {
 }
 func New(o Options) (http.Handler, error) {
 	origin, e := url.Parse(o.Origin)
-	if e != nil || origin.Host == "" || origin.User != nil || origin.Path != "" || origin.RawQuery != "" || origin.Fragment != "" || o.Sessions == nil || o.Registry == nil || !o.Query.Policy.Valid() || o.RefreshSeconds < 1 || o.MaxRetries < 0 {
+	if e != nil || origin.Host == "" || origin.User != nil || origin.Path != "" || origin.RawQuery != "" || origin.Fragment != "" || o.Sessions == nil || o.Registry == nil || !o.Query.Policy.Valid() || o.RefreshSeconds < 1 || o.MaxRetries < 0 || o.Live != nil && o.LiveHeartbeat <= 0 {
 		return nil, d.Fail("CONSOLE_CONFIGURATION_REQUIRED", 503)
 	}
 	if origin.Scheme != "https" {
@@ -248,6 +252,33 @@ func New(o Options) (http.Handler, error) {
 			Refresh int               `json:"refresh_seconds"`
 			Retries int               `json:"max_retries"`
 		}{d.SchemaVersion, pages, o.RefreshSeconds, o.MaxRetries})
+	})
+	mux.HandleFunc("GET "+Prefix+"/live", func(w http.ResponseWriter, r *http.Request) {
+		u, ok := authorize(w, r)
+		if !ok {
+			return
+		}
+		q, e := strictQuery(r.URL.RawQuery, []string{"selection_id"})
+		if e != nil || q.Get("selection_id") == "" {
+			reject(w, d.Fail("SELECTION_REQUIRED", 422))
+			return
+		}
+		s, e := o.Registry.Get(u, q.Get("selection_id"))
+		if e != nil {
+			reject(w, e)
+			return
+		}
+		if o.Live == nil || s.InstrumentKey.Venue != o.Live.Venue || s.InstrumentKey.Product != o.Live.Product {
+			reject(w, d.Fail("LIVE_NOT_APPLICABLE", 404))
+			return
+		}
+		sub, e := o.Live.Subscribe(s.InstrumentKey.InstrumentID)
+		if e != nil {
+			reject(w, e)
+			return
+		}
+		defer sub.Close()
+		serveLive(w, r, o, sub, s.ID)
 	})
 	routes := map[string]string{"overview": "overview", "market": "market", "events": "events", "events/{event_id}": "event", "evidence/{evidence_id}": "evidence", "sentiment": "sentiment", "decisions": "decisions", "execution": "execution", "cases": "cases", "cases/{case_id}": "case", "learning": "learning", "operations": "operations", "reports": "reports", "audit": "audit", "dynamic": "dynamic"}
 	for path, view := range routes {
@@ -408,6 +439,92 @@ func New(o Options) (http.Handler, error) {
 }
 
 type PanelContext struct{ Source, State string }
+
+// serveLive writes the reference push as server-sent events until the
+// browser leaves or the session ends. The server-wide read and write
+// timeouts would cut a long stream, so each write extends its own deadline.
+func serveLive(w http.ResponseWriter, r *http.Request, o Options, sub *app.LiveSubscription, selection string) {
+	rc := http.NewResponseController(w)
+	rc.SetReadDeadline(time.Time{})
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("X-Accel-Buffering", "no")
+	w.WriteHeader(200)
+	stamp := func(t time.Time) any {
+		if t.IsZero() {
+			return nil
+		}
+		return t.UTC().Format(time.RFC3339Nano)
+	}
+	send := func(event string, value any) bool {
+		raw, e := json.Marshal(value)
+		if e != nil {
+			return false
+		}
+		rc.SetWriteDeadline(time.Now().Add(o.Query.Policy.RequestTimeout))
+		if _, e = w.Write([]byte("event: " + event + "\ndata: " + string(raw) + "\n\n")); e != nil {
+			return false
+		}
+		return rc.Flush() == nil
+	}
+	state := func(snap app.LiveSnapshot) bool {
+		var code any
+		if snap.Code != "" {
+			code = snap.Code
+		}
+		return send("state", map[string]any{"state": snap.State, "at": stamp(snap.LastAt), "code": code})
+	}
+	var markSeq, klineSeq uint64
+	lastState := ""
+	push := func() bool {
+		snap := sub.Snapshot()
+		if snap.State != lastState {
+			if !state(snap) {
+				return false
+			}
+			lastState = snap.State
+		}
+		if snap.Mark != nil && snap.MarkSeq != markSeq {
+			markSeq = snap.MarkSeq
+			if !send("mark", map[string]any{"at": stamp(snap.Mark.At), "price": snap.Mark.Price}) {
+				return false
+			}
+		}
+		if k := snap.Kline; k != nil && snap.KlineSeq != klineSeq {
+			klineSeq = snap.KlineSeq
+			if !send("kline", map[string]any{"open_at": stamp(k.OpenAt), "close_at": stamp(k.CloseAt), "open": k.Open, "high": k.High, "low": k.Low, "close": k.Close, "final": k.Final}) {
+				return false
+			}
+		}
+		return true
+	}
+	heartbeat := time.NewTicker(o.LiveHeartbeat)
+	defer heartbeat.Stop()
+	if !push() {
+		return
+	}
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case <-sub.C:
+			if !push() {
+				return
+			}
+		case <-heartbeat.C:
+			u, _, e := o.Sessions.Current(cookieID(r, sessionCookie))
+			if e == nil {
+				_, e = o.Registry.Get(u, selection)
+			}
+			if e != nil {
+				send("end", map[string]any{"code": "SESSION_ENDED"})
+				return
+			}
+			if !state(sub.Snapshot()) {
+				return
+			}
+		}
+	}
+}
 
 func strictQuery(raw string, allowed []string) (url.Values, error) {
 	q, e := url.ParseQuery(raw)

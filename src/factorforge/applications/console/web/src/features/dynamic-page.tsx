@@ -7,6 +7,7 @@ import {
   type Selection,
 } from "../api/client";
 import { displayTime, useDisplay } from "./display-settings";
+import { liveStateText, useLiveMarket } from "./live-market";
 import type { PriceLine, TimeMarker } from "./market-chart";
 const MarketChart = lazy(() =>
   import("./market-chart").then((module) => ({ default: module.MarketChart })),
@@ -81,6 +82,7 @@ export function DynamicView({
   selection: Selection;
 }) {
   const { zone } = useDisplay();
+  const live = useLiveMarket(selection.selection_id);
   const t = (v: Json) => (typeof v === "string" ? displayTime(v, zone) : "未记录");
   const statusPanel = panelOf(panels, "dynamic.status");
   const status = record(record(statusPanel?.data ?? null).data ?? null);
@@ -117,6 +119,16 @@ export function DynamicView({
   const unrealized = num(account.unrealized_pnl);
   const protectionOf = (role: string) =>
     protections.find((p) => p.role === role && p.state !== "CANCELLED");
+  // S4-019 reference layer: venue public push, display conversion only.
+  const refMark = live.mark ? num(live.mark.price) : null;
+  const qty = position ? num(position.quantity) : null;
+  const avg = position ? num(position.average_entry) : null;
+  const refPnl = refMark !== null && qty !== null && avg !== null ? qty * (refMark - avg) : null;
+  const liveFresh = live.state === "LIVE";
+  const liveNote =
+    live.state === "UNAVAILABLE" && live.code === "LIVE_NOT_APPLICABLE"
+      ? "不适用或未启用"
+      : `${liveStateText[live.state]}${live.mark ? " · " + t(live.mark.at) : ""}`;
   const strategy = protectionOf("STRATEGY");
   const insurance = protectionOf("INSURANCE");
   const ladder: {
@@ -176,12 +188,22 @@ export function DynamicView({
     note: lastCandle ? t(lastCandle.close_at) : "无 K 线",
     color: "#203a2c",
   });
+  if (refMark !== null)
+    ladder.push({
+      name: "参考标记价",
+      price: refMark,
+      source: "交易所公开行情（参考，不是账务）",
+      note: liveNote,
+      color: "#2f5d8a",
+    });
   ladder.sort((a, b) => (b.price ?? -Infinity) - (a.price ?? -Infinity));
 
   const lines: PriceLine[] = useMemo(
     () =>
       ladder
-        .filter((l) => l.price !== null && l.name !== "最新完成 K 线收盘")
+        .filter(
+          (l) => l.price !== null && l.name !== "最新完成 K 线收盘" && l.name !== "参考标记价",
+        )
         .map((l) => ({
           price: l.price as number,
           title: l.name,
@@ -239,6 +261,22 @@ export function DynamicView({
           </small>
           <StateNote panel={accountPanel} />
         </div>
+        <div className={`summary-card live-card${liveFresh ? "" : " live-stale"}`} aria-label="参考标记价">
+          <p>参考标记价 · 交易所公开行情</p>
+          <strong>{refMark !== null ? live.mark!.price : "—"}</strong>
+          <small>{liveNote}</small>
+        </div>
+        <div className={`summary-card live-card${liveFresh ? "" : " live-stale"}`} aria-label="参考浮动盈亏">
+          <p>参考浮动盈亏（显示换算）</p>
+          <strong>{refPnl !== null ? `${fmt(refPnl)} USDT` : "—"}</strong>
+          <small>
+            {refPnl !== null && budget
+              ? `约 ${(refPnl / budget).toFixed(2)}R · P1 仓位 × (参考标记价 − 均价)，不含费用`
+              : position
+                ? "等待参考标记价"
+                : "无持仓"}
+          </small>
+        </div>
         <div className="summary-card">
           <p>权益（P1）</p>
           <strong>{fmt(num(account.equity))} USDT</strong>
@@ -290,6 +328,7 @@ export function DynamicView({
                 <th>价位</th>
                 <th>价格</th>
                 <th>相对最新收盘</th>
+                <th>相对参考</th>
                 <th>来源</th>
                 <th>状态</th>
               </tr>
@@ -303,6 +342,7 @@ export function DynamicView({
                   </td>
                   <td>{fmt(l.price)}</td>
                   <td>{l.name === "最新完成 K 线收盘" ? "—" : pct(l.price, last)}</td>
+                  <td>{l.name === "参考标记价" ? "—" : pct(l.price, refMark)}</td>
                   <td>{l.source}</td>
                   <td>{l.note}</td>
                 </tr>
@@ -318,9 +358,11 @@ export function DynamicView({
           <StateNote panel={candlePanel} />
         </div>
         <Suspense fallback={<p role="status">正在装载图表…</p>}>
-          <MarketChart candles={candles} lines={lines} markers={markers} />
+          <MarketChart candles={candles} lines={lines} markers={markers} live={live.kline} />
         </Suspense>
-        <p className="muted">箭头为研判时刻（空/多 + 信心），横线为入场价与各止损位；不画预测。</p>
+        <p className="muted">
+          箭头为研判时刻（空/多 + 信心），横线为入场价与各止损位；半透明的最后一根是交易所推送的未完成 K 线（参考），收盘后以 P1 最终 K 线为准；不画预测。
+        </p>
       </section>
 
       <div className="dynamic-columns">

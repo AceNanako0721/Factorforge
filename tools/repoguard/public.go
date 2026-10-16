@@ -116,6 +116,12 @@ func TemplateIssue(name string, data []byte, historical bool) string {
 					console["trusted_peers"] = []any{}
 					actual["console"] = console
 				}
+				// Pre-v2.11.0 templates lack the empty live_market block.
+				if _, has := console["live_market"]; !has {
+					console = cloneMap(console)
+					console["live_market"] = map[string]any{"enabled": false, "url": "", "interval": "", "stale_seconds": int64(0), "heartbeat_seconds": int64(0), "idle_seconds": int64(0), "max_streams": int64(0)}
+					actual["console"] = console
+				}
 			}
 		}
 		if equalJSON(actual, expected) {

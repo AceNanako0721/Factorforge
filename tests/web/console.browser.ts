@@ -142,6 +142,14 @@ test("S4-017 judgment and stop page on desktop and phone width", async ({
   await expect(page.getByText("注入研判 · 做空", { exact: true })).toBeVisible();
   await expect(page.getByText("未实现", { exact: true })).toBeVisible();
   await expect(page.getByText("PRIVATE RAW")).toHaveCount(0);
+  // S4-019 reference layer: pushed values arrive and keep changing.
+  const mark = page.getByLabel("参考标记价");
+  await expect(mark.locator("strong")).toHaveText(/^100\.\d+$/);
+  await expect(mark.locator("small")).toContainText("实时");
+  const first = await mark.locator("strong").innerText();
+  await expect(mark.locator("strong")).not.toHaveText(first);
+  await expect(page.getByText("参考标记价", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("参考浮动盈亏").locator("strong")).not.toHaveText("—");
   await page.screenshot({
     path: "../../../../../runtime/console-dynamic-1440.png",
     fullPage: true,

@@ -5,6 +5,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/console/adapters"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/console/api"
 	app "github.com/AceNanako0721/Factorforge/src/factorforge/applications/console/application"
 	"github.com/AceNanako0721/Factorforge/tests/applications/console/fixture"
@@ -13,6 +14,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"syscall"
 	"time"
 )
@@ -30,7 +32,9 @@ func main() {
 		panic(e)
 	}
 	defer w.Close()
-	handler, e := api.New(api.Options{Sessions: w.Sessions, Registry: w.Registry, Query: app.ReadQuery{Client: w.Client, Registry: w.Registry, Policy: w.Policy, Now: time.Now}, Origin: "http://" + *addr, FixtureOnly: true, StaticDir: filepath.Join(*root, "runtime/web-build"), RefreshSeconds: 60, MaxRetries: 0})
+	key := w.Selection.InstrumentKey
+	live := &app.LiveHub{Venue: key.Venue, Product: key.Product, Source: syntheticPush{}, Interval: "5m", Stale: 5 * time.Second, Idle: time.Second, MaxStreams: 8, MaxAge: time.Hour}
+	handler, e := api.New(api.Options{Live: live, LiveHeartbeat: 2 * time.Second, Sessions: w.Sessions, Registry: w.Registry, Query: app.ReadQuery{Client: w.Client, Registry: w.Registry, Policy: w.Policy, Now: time.Now}, Origin: "http://" + *addr, FixtureOnly: true, StaticDir: filepath.Join(*root, "runtime/web-build"), RefreshSeconds: 60, MaxRetries: 0})
 	if e != nil {
 		panic(e)
 	}
@@ -66,5 +70,25 @@ func main() {
 	fmt.Fprintln(os.Stdout, "SYNTHETIC_BROWSER_FIXTURE_READY")
 	if e = server.ListenAndServe(); e != nil && e != http.ErrServerClosed {
 		panic(e)
+	}
+}
+
+// syntheticPush stands in for the venue public push (S4-019): a mark price
+// that moves every 300 ms and a forming 5-minute bar. Not market data.
+type syntheticPush struct{}
+
+func (syntheticPush) Run(ctx context.Context, _, _ string, _ time.Duration, emit func(adapters.MarketEvent)) (int, error) {
+	tick := time.NewTicker(300 * time.Millisecond)
+	defer tick.Stop()
+	for n := 0; ; n++ {
+		select {
+		case <-ctx.Done():
+			return 0, ctx.Err()
+		case now := <-tick.C:
+			price := "100." + strconv.Itoa(10+n%80)
+			open := now.UTC().Truncate(5 * time.Minute)
+			emit(adapters.MarketEvent{At: now, Price: price})
+			emit(adapters.MarketEvent{At: now, Kline: &adapters.LiveKline{OpenAt: open, CloseAt: open.Add(5 * time.Minute), Open: "100.10", High: "100.95", Low: "100.05", Close: price}})
+		}
 	}
 }
