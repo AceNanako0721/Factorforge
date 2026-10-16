@@ -137,7 +137,7 @@ func InjectReady(state *d.StrategyState, obj *d.ObservedObject, at time.Time, sa
 				if params.Values["w"].Sign() < 0 {
 					direction = -direction
 				}
-				contribution := &d.Contribution{ContributionID: "contribution-" + id, ObjectID: obj.ObjectID, EventID: event.EventID, FamilyID: event.FamilyID, Direction: direction, InitialAmount: accepted, EffectiveAt: tau, LastUpdatedAt: tau, HalfLife: h, Eta: params.Values["eta"], ReferencePrice: reference.Price, ReferenceBenchmark: reference.Benchmark, FrozenParameterVersion: params.Version, ScoreID: id, Quality: *score.Vector.QualityScore, FactWeights: weights, State: "ACTIVE"}
+				contribution := &d.Contribution{ContributionID: "contribution-" + id, ObjectID: obj.ObjectID, EventID: event.EventID, FamilyID: event.FamilyID, Direction: direction, InitialAmount: accepted, EffectiveAt: tau, LastUpdatedAt: tau, HalfLife: h, Eta: params.Values["eta"], ReferencePrice: reference.Price, ReferenceBenchmark: reference.Benchmark, FrozenParameterVersion: params.Version, ScoreID: id, Quality: *score.Vector.QualityScore, FactWeights: weights, State: "ACTIVE", RealizationDisabled: d.Has(p.RealizationDisabledTypes, event.EventType)}
 				state.Contributions.Set(contribution.ContributionID, contribution)
 				if err := state.Append(contribution, d.LedgerEntry{At: tau, Reason: "INJECTION", Injection: accepted, RejectedAmount: m.Sub(raw, accepted)}); err != nil {
 					return err

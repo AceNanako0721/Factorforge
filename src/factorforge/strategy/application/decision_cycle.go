@@ -33,6 +33,8 @@ type dueObject struct {
 	components     *d.DecisionComponents
 	directive      *d.StopDirectiveRecord
 	protectionOnly bool
+	exitID         string
+	intended       d.Decimal
 }
 
 func unknownDelivery(s *d.StrategyState, id string) bool {
@@ -252,6 +254,9 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 				if err := UpdateCases(state, obj, snap, at, p, params); err != nil {
 					return err
 				}
+				if err := TrackBatches(state, obj, snap, at); err != nil {
+					return err
+				}
 				corrected, err := CorrectActualRisk(state, obj, snap, at)
 				if err != nil {
 					return err
@@ -391,6 +396,7 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 				target, stress := actual, p.MaxStopFraction
 				var stop *d.StopPlan
 				var sizingDirective *d.StopDirectiveRecord
+				exitID, intended := "", d.Zero()
 				reasons := append([]string{}, compositionReasons...)
 				if liquidityAssumed {
 					reasons = append(reasons, "LIQUIDITY_ASSUMED")
@@ -413,6 +419,14 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 					target, err = d.Quantity(raw, snap.Equity, sample.Price, rules.Multiplier, rules.QuantityStep)
 					if err != nil {
 						return err
+					}
+					if components != nil {
+						dyn, e := c.DynamicTarget(ctx, state, obj, snap, at, p, components, level, sample, rules, target, force, reasons)
+						if e != nil {
+							return e
+						}
+						target, force, exitID, intended = dyn.target, force || dyn.force, dyn.exitID, dyn.intended
+						reasons = append(reasons, dyn.reasons...)
 					}
 					if target.Sign() < 0 && !d.Has(rules.Capabilities, "SHORT") {
 						target = d.Zero()
@@ -534,6 +548,9 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 					if reason != "" {
 						target, stop = current, nil
 						reasons = append(reasons, reason)
+					} else if UnitBandHold(obj, p, current, target, force || stopNow) {
+						target, stop = current, nil
+						reasons = append(reasons, "UNIT_BAND_HOLD")
 					}
 				}
 				if d.NewRisk(actual, pending, target) && !force && (components == nil && m.Sub(target, current).Abs().Cmp(p.MinAdjustment) < 0 || obj.LastAdjustment != nil && at.Sub(*obj.LastAdjustment).Seconds() < float64(p.CooldownSeconds)) {
@@ -590,7 +607,7 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 					reasons = append(reasons, "P1_LOWER_COMPAT_REQUIRED")
 				}
 				id := "decision-" + d.Digest([]any{state.InstanceID, state.Environment, obj.TradingRunKey, obj.ObjectID, d.ISO(scheduled)})[:24]
-				due = append(due, &dueObject{obj: obj, p: p, sample: sample, target: target, stop: stop, stress: stress, view: view, level: level, raw: raw, reasons: reasons, id: id, scheduled: scheduled, components: components, directive: directive, protectionOnly: protectionOnly})
+				due = append(due, &dueObject{obj: obj, p: p, sample: sample, target: target, stop: stop, stress: stress, view: view, level: level, raw: raw, reasons: reasons, id: id, scheduled: scheduled, components: components, directive: directive, protectionOnly: protectionOnly, exitID: exitID, intended: intended})
 				if sample != nil {
 					mult := d.Amount(snap.Specs[obj.ObjectID]["contract_multiplier"])
 					rows = append(rows, d.Candidate{Current: m.Mul(m.Mul(current, sample.Price), mult), Desired: m.Mul(m.Mul(target, sample.Price), mult), Stress: stress, Group: riskGroup(snap.Specs[obj.ObjectID])})
@@ -707,6 +724,18 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 				}
 				if item.target.Sign() == 0 {
 					item.stop = nil
+				}
+				if ru := obj.RiskUnit; ru != nil && ru.Direction == item.intended.Sign() && item.target.Sign() == ru.Direction && item.target.Abs().Cmp(item.intended.Abs()) < 0 {
+					ru.Truncated = true
+					item.reasons = append(item.reasons, "RISK_UNIT_TRUNCATED")
+				}
+				if item.exitID != "" {
+					if r := state.ExitRequests.Value(item.exitID); r != nil {
+						r.State, r.DecisionID = "APPLIED", item.id
+						if obj.RiskUnit != nil {
+							r.BatchID = obj.RiskUnit.BatchID
+						}
+					}
 				}
 				pricing := map[string]any{}
 				sourceVersions := map[string]int{}

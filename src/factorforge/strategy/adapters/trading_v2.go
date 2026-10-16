@@ -282,9 +282,11 @@ func (t *TradingV2) Snapshot(ctx context.Context, objects []*d.ObservedObject) (
 			}
 		}
 		exits := []string{}
+		roles := map[string]string{}
 		for _, p := range d.Rows(pages["protections"]["items"]) {
 			if p["exit_order_id"] != nil {
 				exits = append(exits, d.Text(p["exit_order_id"]))
+				roles[d.Text(p["exit_order_id"])] = d.Text(p["role"])
 			}
 		}
 		for _, fact := range d.Rows(pages["fills"]["items"]) {
@@ -304,6 +306,14 @@ func (t *TradingV2) Snapshot(ctx context.Context, objects []*d.ObservedObject) (
 			copy["protection_exit"] = d.Has(exits, d.Text(order["order_id"]))
 			copy["source_decision_id"] = origin
 			copy["protection_exit"] = d.Flag(copy["protection_exit"]) || d.Has(exits, d.Text(fact["external_order_id"]))
+			if d.Flag(copy["protection_exit"]) {
+				// v2.9.0: the protection role distinguishes venue and insurance stops.
+				role := roles[d.Text(order["order_id"])]
+				if role == "" {
+					role = roles[d.Text(fact["external_order_id"])]
+				}
+				copy["protection_role"] = role
+			}
 			snap.Fills = append(snap.Fills, copy)
 		}
 		for _, spec := range d.Rows(pages["instruments"]["items"]) {

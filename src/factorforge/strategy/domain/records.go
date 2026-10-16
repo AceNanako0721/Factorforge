@@ -94,12 +94,23 @@ type Policy struct {
 	AbsolutePriceProxyValidated bool               `json:"absolute_price_proxy_validated"`
 	HalfLifeBounds              [2]Decimal         `json:"half_life_bounds"`
 	EventHalfLifeApproved       bool               `json:"event_half_life_approved"`
+	// v2.9.0 S2-039～041; omitted fields keep legacy policy hashes.
+	JudgmentEventTypes       []string          `json:"judgment_event_types,omitempty"`
+	PrepricingModes          map[string]string `json:"prepricing_modes,omitempty"`
+	ExperimentCalibrations   []string          `json:"experiment_calibrations,omitempty"`
+	LearningMode             string            `json:"learning_mode,omitempty"`
+	RealizationDisabledTypes []string          `json:"realization_disabled_types,omitempty"`
+	CleanupFractionOfInitial *Decimal          `json:"cleanup_fraction_of_initial,omitempty"`
 }
 type ObservedObject struct {
 	CoreDirection         int               `json:"core_direction,omitempty"`
 	ReverseCandidate      *ReverseCandidate `json:"reverse_candidate,omitempty"`
 	LastAdjustmentTradeAt *time.Time        `json:"last_adjustment_trade_at,omitempty"`
 	LayerLedgerBlocked    bool              `json:"layer_ledger_blocked,omitempty"`
+	RiskUnit              *RiskUnitState    `json:"risk_unit,omitempty"`
+	Reentry               *ReentryState     `json:"reentry,omitempty"`
+	Chain                 *ChainState       `json:"chain,omitempty"`
+	PreEventApplied       []string          `json:"pre_event_applied,omitempty"`
 	ObjectID              string            `json:"object_id"`
 	InstanceID            string            `json:"instance_id"`
 	Environment           string            `json:"environment"`
@@ -303,6 +314,10 @@ type StrategyState struct {
 	StopDirectives             Ordered[*StopDirectiveRecord]        `json:"stop_directives,omitempty"`
 	StopDirectiveWriters       Ordered[*StopDirectiveWriterBinding] `json:"stop_directive_writers,omitempty"`
 	LastEffectiveStrategyStop  Ordered[*EffectiveStrategyStop]      `json:"last_effective_strategy_stop,omitempty"`
+	ExitRequests               Ordered[*ExitRequestRecord]          `json:"exit_requests,omitempty"`
+	BaselineTransfers          Ordered[*BaselineTransferRecord]     `json:"baseline_transfers,omitempty"`
+	Batches                    Ordered[*BatchRecord]                `json:"batches,omitempty"`
+	FrozenCandidates           Ordered[map[string]any]              `json:"frozen_candidates,omitempty"`
 	FactorSeries               Ordered[*FactorSeries]               `json:"factor_series,omitempty"`
 	ScheduledEvents            Ordered[*ScheduledEvent]             `json:"scheduled_events,omitempty"`
 	Templates                  Ordered[*ScheduledTemplate]          `json:"templates,omitempty"`

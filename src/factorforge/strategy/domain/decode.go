@@ -21,6 +21,7 @@ var shapes = func() map[string]shape {
 	extendWindowShapes(s)
 	extendCompositionShapes(s)
 	extendStopShapes(s)
+	extendDynamicShapes(s)
 	return s
 }()
 

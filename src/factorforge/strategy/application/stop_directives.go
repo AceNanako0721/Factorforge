@@ -65,6 +65,12 @@ func (s Service) SubmitStopDirective(ctx context.Context, identity d.Identity, r
 		if err := d.ValidateStopDirective(request.StopDirective); err != nil {
 			return nil, err
 		}
+		if f := request.RiskFraction; f != nil {
+			p := state.Policies.Value(obj.TimePolicyVersion)
+			if p == nil || p.Composition == nil || p.Composition.Sizing == nil || f.Cmp(p.Composition.Sizing.MaxRiskFraction) > 0 {
+				return nil, &d.Error{Code: "STOP_DIRECTIVE_INVALID", Status: 422}
+			}
+		}
 		principal := directivePrincipal(identity)
 		executable := identity.Worker() != nil
 		if !d.WriterAllowed(state, principal, request.StopDirective, now) {
@@ -333,7 +339,7 @@ func TrackStopReceipts(state *d.StrategyState, obj *d.ObservedObject, snap *d.Tr
 		}
 		receipt.ApplicationState = applicationState
 		out.StopDirective = d.Clone(r)
-		state.LastEffectiveStrategyStop.Set(obj.ObjectID, &d.EffectiveStrategyStop{DirectiveID: r.Directive.DirectiveID, TargetVersion: out.TargetVersion, PositionDirection: d.DirectionName(snap.Actual[obj.ObjectID]), PositionCycleID: d.Text(pos["position_cycle_id"]), ProtectionID: receipt.ProtectionID, Plan: plan, VerifiedAt: at})
+		state.LastEffectiveStrategyStop.Set(obj.ObjectID, &d.EffectiveStrategyStop{DirectiveID: r.Directive.DirectiveID, TargetVersion: out.TargetVersion, PositionDirection: d.DirectionName(snap.Actual[obj.ObjectID]), PositionCycleID: d.Text(pos["position_cycle_id"]), ProtectionID: receipt.ProtectionID, Plan: plan, VerifiedAt: at, CloseStop: CloseStopFor(r.Directive, plan, snap.Actual[obj.ObjectID].Sign())})
 	}
 	expireStopIndex(state, obj.ObjectID, at)
 }
@@ -416,4 +422,25 @@ func expireStopIndex(state *d.StrategyState, object string, at time.Time) {
 			collection.Delete(key)
 		}
 	}
+}
+
+// CloseStopFor derives the P2-only close-stop price of a verified plan
+// (S2-034). UPPER_MANAGED uses its managed price; VENUE uses the directive's
+// close_stop_price, or for an initial distance trigger ± (D − close distance).
+func CloseStopFor(v d.StopDirective, plan d.StopPlan, direction int) *d.Decimal {
+	if plan.StrategyProtectionMode == "UPPER_MANAGED" {
+		return d.Clone(plan.ManagedStopPrice)
+	}
+	if v.Kind == "POSITION_STOP" {
+		return d.Clone(v.CloseStopPrice)
+	}
+	if v.CloseStopDistance == nil || v.InitialStopDistance == nil || direction == 0 {
+		return nil
+	}
+	m := d.Math()
+	value := m.Add(plan.TriggerPrice, m.Mul(d.Int(direction), m.Sub(*v.InitialStopDistance, *v.CloseStopDistance)))
+	if m.Err() != nil {
+		return nil
+	}
+	return &value
 }
