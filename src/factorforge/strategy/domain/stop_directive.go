@@ -71,6 +71,7 @@ type EffectiveStrategyStop struct {
 	Plan              StopPlan  `json:"plan"`
 	VerifiedAt        time.Time `json:"verified_at"`
 	CloseStop         *Decimal  `json:"close_stop,omitempty"`
+	DirectiveVersion  int       `json:"directive_version,omitempty"`
 }
 
 func StopDirectiveKey(d StopDirective, principal string, research bool) string {

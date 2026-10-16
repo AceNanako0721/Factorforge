@@ -55,7 +55,11 @@ func (s Service) SubmitCloseExit(ctx context.Context, identity d.Identity, reque
 		if effective == nil || effective.DirectiveID != v.DirectiveID || effective.PositionCycleID != d.Text(snap.Positions[obj.ObjectID]["position_cycle_id"]) {
 			return nil, &d.Error{Code: "EXIT_NO_CLOSE_STOP", Status: 422}
 		}
-		if version := directiveVersion(state, effective.DirectiveID); version != v.DirectiveVersion {
+		version := effective.DirectiveVersion
+		if version == 0 {
+			version = directiveVersion(state, effective.DirectiveID)
+		}
+		if version != v.DirectiveVersion {
 			return nil, &d.Error{Code: "EXIT_NO_CLOSE_STOP", Status: 422}
 		}
 		closeStop := effective.CloseStop

@@ -339,7 +339,7 @@ func TrackStopReceipts(state *d.StrategyState, obj *d.ObservedObject, snap *d.Tr
 		}
 		receipt.ApplicationState = applicationState
 		out.StopDirective = d.Clone(r)
-		state.LastEffectiveStrategyStop.Set(obj.ObjectID, &d.EffectiveStrategyStop{DirectiveID: r.Directive.DirectiveID, TargetVersion: out.TargetVersion, PositionDirection: d.DirectionName(snap.Actual[obj.ObjectID]), PositionCycleID: d.Text(pos["position_cycle_id"]), ProtectionID: receipt.ProtectionID, Plan: plan, VerifiedAt: at, CloseStop: CloseStopFor(r.Directive, plan, snap.Actual[obj.ObjectID].Sign())})
+		state.LastEffectiveStrategyStop.Set(obj.ObjectID, &d.EffectiveStrategyStop{DirectiveID: r.Directive.DirectiveID, TargetVersion: out.TargetVersion, PositionDirection: d.DirectionName(snap.Actual[obj.ObjectID]), PositionCycleID: d.Text(pos["position_cycle_id"]), ProtectionID: receipt.ProtectionID, Plan: plan, VerifiedAt: at, CloseStop: CloseStopFor(r.Directive, plan, snap.Actual[obj.ObjectID].Sign()), DirectiveVersion: r.Directive.Version})
 	}
 	expireStopIndex(state, obj.ObjectID, at)
 }

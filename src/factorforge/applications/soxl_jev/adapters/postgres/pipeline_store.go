@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-//go:embed migrations/002_pipeline.sql migrations/003_operations.sql migrations/004_search.sql migrations/006_watch_state.sql
+//go:embed migrations/002_pipeline.sql migrations/003_operations.sql migrations/004_search.sql migrations/006_watch_state.sql migrations/007_dynamic_stop.sql
 var pipelineFiles embed.FS
 
 type QueueBudget struct {
@@ -58,7 +58,7 @@ func InitializePipeline(ctx context.Context, dsn string, b d.Binding) error {
 		return safe(err)
 	}
 	defer tx.Rollback(ctx)
-	for _, file := range []string{"migrations/002_pipeline.sql", "migrations/003_operations.sql", "migrations/004_search.sql", "migrations/006_watch_state.sql"} {
+	for _, file := range []string{"migrations/002_pipeline.sql", "migrations/003_operations.sql", "migrations/004_search.sql", "migrations/006_watch_state.sql", "migrations/007_dynamic_stop.sql"} {
 		raw, e := pipelineFiles.ReadFile(file)
 		if e != nil {
 			return d.Fail("MIGRATION_UNAVAILABLE", 503)
@@ -114,6 +114,28 @@ func InitializePipeline(ctx context.Context, dsn string, b d.Binding) error {
 			}
 		}
 	}
+	// v2.9.0: the DYNAMIC worker only reads its grant and owns dynamic tables.
+	role := pipelineRole(b, "DYNAMIC")
+	var exists bool
+	if err = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM pg_roles WHERE rolname=$1)", role).Scan(&exists); err != nil {
+		return safe(err)
+	}
+	if !exists {
+		if _, err = tx.Exec(ctx, "CREATE ROLE "+pgx.Identifier{role}.Sanitize()+" NOLOGIN"); err != nil {
+			return safe(err)
+		}
+	}
+	for _, sql := range []string{
+		"REVOKE ALL ON ALL TABLES IN SCHEMA " + schema + " FROM " + role,
+		"GRANT USAGE ON SCHEMA " + schema + " TO " + role,
+		"GRANT SELECT ON " + schema + ".worker_grant TO " + role,
+		"GRANT SELECT,INSERT ON " + schema + ".dynamic_record TO " + role,
+		"GRANT SELECT,INSERT,UPDATE ON " + schema + ".dynamic_state TO " + role,
+	} {
+		if _, err = tx.Exec(ctx, sql); err != nil {
+			return safe(err)
+		}
+	}
 	return safe(tx.Commit(ctx))
 }
 func GrantPipeline(ctx context.Context, dsn string, b d.Binding, login, kind string) error {
@@ -121,7 +143,7 @@ func GrantPipeline(ctx context.Context, dsn string, b d.Binding, login, kind str
 	if err != nil {
 		return err
 	}
-	if !d.ValidID(login) || !d.Has([]string{"INGEST", "RESEARCH", "TRADING"}, kind) {
+	if !d.ValidID(login) || !d.Has([]string{"INGEST", "RESEARCH", "TRADING", "DYNAMIC"}, kind) {
 		return d.Fail("PIPELINE_GRANT_INVALID", 422)
 	}
 	conn, err := pgx.Connect(ctx, dsn)
@@ -171,7 +193,7 @@ func OpenPipeline(ctx context.Context, dsn string, b d.Binding, kind string, max
 	if err != nil {
 		return nil, err
 	}
-	if !d.Has([]string{"INGEST", "RESEARCH", "TRADING"}, kind) || maxBytes <= 0 {
+	if !d.Has([]string{"INGEST", "RESEARCH", "TRADING", "DYNAMIC"}, kind) || maxBytes <= 0 {
 		return nil, d.Fail("PIPELINE_CONFIGURATION_REQUIRED", 503)
 	}
 	pool, err := pgxpool.New(ctx, dsn)
@@ -179,7 +201,7 @@ func OpenPipeline(ctx context.Context, dsn string, b d.Binding, kind string, max
 		return nil, safe(err)
 	}
 	s := &PipelineStore{pool: pool, binding: b, kind: kind, schema: schema, maxBytes: maxBytes}
-	if kind != "INGEST" {
+	if kind != "INGEST" && kind != "DYNAMIC" {
 		s.table = "app_" + strings.ToLower(kind) + "_analysis_job"
 		s.outbox = strings.ToLower(kind) + "_submission_outbox"
 	}
