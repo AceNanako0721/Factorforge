@@ -284,6 +284,8 @@ func (m *memDynamic) AppendRecord(_ context.Context, kind, id string, at time.Ti
 	return nil
 }
 func (m *memDynamic) Records(_ context.Context, kind string, since, until time.Time, limit int) ([]json.RawMessage, error) {
+	// PostgreSQL timestamps are microseconds; query bounds lose nanoseconds.
+	since, until = since.Truncate(time.Microsecond), until.Truncate(time.Microsecond)
 	rows := []memRecord{}
 	for _, r := range m.records[kind] {
 		if !r.at.Before(since) && r.at.Before(until) {

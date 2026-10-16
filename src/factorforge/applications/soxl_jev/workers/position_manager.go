@@ -220,7 +220,7 @@ func (m *PositionManager) noise(ctx context.Context, st *PositionState, now time
 	if st.NoiseID == "" || now.Sub(st.NoiseAt) > m.Settings.NoiseMaxAge {
 		return nil, false
 	}
-	rows, err := m.Store.Records(ctx, "NOISE", st.NoiseAt, st.NoiseAt.Add(time.Nanosecond), 1)
+	rows, err := m.Store.Records(ctx, "NOISE", st.NoiseAt, st.NoiseAt.Add(time.Second), 1)
 	if err != nil || len(rows) != 1 {
 		return nil, false
 	}
@@ -327,7 +327,7 @@ func (m *PositionManager) view(ctx context.Context, now time.Time) (int, int, er
 }
 
 func (m *PositionManager) judgments(ctx context.Context, now time.Time, n int) ([]d.Judgment, error) {
-	rows, err := m.Store.Records(ctx, "JUDGMENT", now.Add(-72*time.Hour), now.Add(time.Nanosecond), 400)
+	rows, err := m.Store.Records(ctx, "JUDGMENT", now.Add(-72*time.Hour), now.Add(time.Second), 400)
 	if err != nil {
 		return nil, err
 	}
