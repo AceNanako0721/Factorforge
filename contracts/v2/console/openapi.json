@@ -8673,6 +8673,12 @@
                                           "observation_id": {
                                             "type": "string"
                                           },
+                                          "reason_code": {
+                                            "type": "string"
+                                          },
+                                          "reconfirm": {
+                                            "type": "boolean"
+                                          },
                                           "supersedes": {
                                             "anyOf": [
                                               {

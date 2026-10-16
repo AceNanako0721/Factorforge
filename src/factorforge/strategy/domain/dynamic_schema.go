@@ -73,7 +73,7 @@ func DynamicExtensions() map[string]map[string]any {
 		"StrategyState":            {"exit_requests": dict(ref("ExitRequestRecord")), "baseline_transfers": dict(ref("BaselineTransferRecord")), "batches": dict(ref("BatchRecord")), "frozen_candidates": dict(map[string]any{"type": "object"})},
 		"StopDirective":            {"risk_fraction": nullable(decimal), "close_stop_price": nullable(decimal), "close_stop_distance": nullable(decimal)},
 		"StopDirectiveCommand":     {"risk_fraction": nullable(decimal), "close_stop_price": nullable(decimal), "close_stop_distance": nullable(decimal)},
-		"EffectiveStrategyStop":    {"close_stop": nullable(decimal)},
+		"EffectiveStrategyStop":    {"close_stop": nullable(decimal), "directive_version": map[string]any{"type": "integer", "minimum": 1}},
 		"Contribution":             {"realization_disabled": map[string]any{"type": "boolean"}},
 	}
 }

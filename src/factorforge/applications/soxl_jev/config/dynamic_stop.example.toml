@@ -1,0 +1,81 @@
+# v2.9.0 news judgment / position manager role profile (P3 design 28.1).
+# Empty public template. Real values live only in the ignored private profile.
+instance_id = ""
+environment = "SIM"
+object_id = ""
+root = ""
+model_config = ""
+prompt_path = ""
+prompt_version = ""
+timeout_seconds = 0
+max_bytes = 0
+
+[access]
+database_url = ""
+framework_url = ""
+framework_token = ""
+trading_read_url = ""
+trading_read_token = ""
+account_id = ""
+run_id = ""
+
+[[models]]
+name = ""
+bun_path = ""
+provider = ""
+account_id = 0
+model = ""
+timeout_seconds = 0
+
+[news]
+hosts = []
+collect_seconds = 0
+judge_minutes = []
+recent_hours = 0
+older_hours = 0
+max_recent = 0
+max_older = 0
+max_news_age_minutes = 0
+feeds = []
+
+[judgment]
+subject_id = ""
+event_type = ""
+impact_by_confidence = ["", "", "", "", ""]
+credibility = ""
+relevance = ""
+quality = ""
+rubric = ""
+calibration = ""
+verification = ""
+producer_id = ""
+producer_version = ""
+licence = ""
+min_half_life_hours = 0
+max_half_life_hours = 0
+
+[position]
+owner_id = ""
+venue = ""
+instrument_id = ""
+source_module = ""
+trigger_kind = ""
+baseline_factor_id = ""
+close_minutes = 0
+close_quantile = ""
+wick_quantile = ""
+wick_multiplier = 0.0
+trail_quantile = ""
+insurance_fraction = 0.0
+insurance_margin = 0.0
+directive_ttl_minutes = 0
+reentry_wait_minutes = 0
+baseline_max_share = 0.0
+baseline_renew_minutes = 0
+round_trip_cost = 0.0
+price_tick = 0.0
+noise_max_age_hours = 0
+noise_lookback_days = 0
+noise_symbol = ""
+noise_host = ""
+event_types = []

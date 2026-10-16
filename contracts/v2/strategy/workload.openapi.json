@@ -2026,6 +2026,10 @@
           "directive_id": {
             "type": "string"
           },
+          "directive_version": {
+            "minimum": 1,
+            "type": "integer"
+          },
           "plan": {
             "$ref": "#/components/schemas/StopPlan"
           },
