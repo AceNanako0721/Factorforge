@@ -387,7 +387,11 @@ func New(o Options) (http.Handler, error) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; connect-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'")
-		if r.Header.Get("Sec-Fetch-Site") == "cross-site" {
+		// A top-level GET navigation to a static page (for example the
+		// redirect back from an edge login) carries no session effect; every
+		// API call and non-GET stays same-site only.
+		navigation := (r.Method == "GET" || r.Method == "HEAD") && r.Header.Get("Sec-Fetch-Mode") == "navigate" && !strings.HasPrefix(r.URL.Path, "/api/")
+		if r.Header.Get("Sec-Fetch-Site") == "cross-site" && !navigation {
 			reject(w, d.Fail("CSRF_REJECTED", 403))
 			return
 		}

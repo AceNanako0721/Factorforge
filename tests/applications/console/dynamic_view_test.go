@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http/httptest"
 	"net/netip"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -102,5 +104,32 @@ func TestT416TrustedPeersAndHost(t *testing.T) {
 	open.ServeHTTP(rw, r)
 	if rw.Code != 200 {
 		t.Fatal("default gate changed", rw.Code)
+	}
+}
+
+// A cross-site top-level navigation (edge login redirect) may load a static
+// page, while cross-site API calls stay rejected.
+func TestCrossSiteNavigationLoadsStaticOnly(t *testing.T) {
+	w := world(t)
+	dir := t.TempDir()
+	if e := os.WriteFile(filepath.Join(dir, "index.html"), []byte("<!doctype html>ok"), 0600); e != nil {
+		t.Fatal(e)
+	}
+	h, e := api.New(api.Options{Sessions: w.Sessions, Registry: w.Registry, Query: query(w), Origin: "https://console.example.invalid", RefreshSeconds: 10, StaticDir: dir})
+	if e != nil {
+		t.Fatal(e)
+	}
+	for _, c := range []struct {
+		path, mode string
+		code       int
+	}{{"/dynamic", "navigate", 200}, {"/api/v2/console/session", "navigate", 403}, {"/dynamic", "cors", 403}, {"/api/v2/console/capabilities", "cors", 403}} {
+		r := httptest.NewRequest("GET", c.path, nil)
+		r.Header.Set("Sec-Fetch-Site", "cross-site")
+		r.Header.Set("Sec-Fetch-Mode", c.mode)
+		rw := httptest.NewRecorder()
+		h.ServeHTTP(rw, r)
+		if rw.Code != c.code {
+			t.Fatalf("%s %s -> %d", c.path, c.mode, rw.Code)
+		}
 	}
 }
