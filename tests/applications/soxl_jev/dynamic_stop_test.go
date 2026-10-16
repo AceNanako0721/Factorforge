@@ -413,6 +413,17 @@ func TestT320JudgmentWorkerFreshnessFallbackAndInjection(t *testing.T) {
 	if len(fw.events) != 1 || len(fw.scores) != 1 {
 		t.Fatal("writes", len(fw.events), len(fw.scores))
 	}
+	// The bodies must pass the framework's frozen request schema.
+	for _, body := range []any{fw.events[0], fw.scores[0]} {
+		raw, _ := json.Marshal(body)
+		var target any = &dto.EventCommand{}
+		if _, ok := body.(dto.ScoreCommand); ok {
+			target = &dto.ScoreCommand{}
+		}
+		if err := dto.Decode(strings.NewReader(string(raw)), target); err != nil {
+			t.Fatal("framework schema rejected", string(raw))
+		}
+	}
 	e, s := fw.events[0].Event, fw.scores[0].Score
 	if e.EventType != "NEWS_JUDGMENT" || e.FamilyID != e.EventID || len(e.Claims) != 1 || e.EvidenceRefs[0].EvidenceID != item.ItemID || fw.events[0].Command.ExpectedVersion != 7 {
 		t.Fatal("event shape", e)

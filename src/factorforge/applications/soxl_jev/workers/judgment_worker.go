@@ -209,7 +209,7 @@ func (w *JudgmentWorker) apply(ctx context.Context, state *d.InjectionState, ver
 
 func (w *JudgmentWorker) inject(ctx context.Context, state *d.InjectionState, j d.Judgment, a d.InjectionAction, items map[string]d.NewsItem) error {
 	s := w.Settings
-	event := dto.Event{EventID: a.EventID, FamilyID: a.EventID, FactVersion: 1, Relation: "NEW", SubjectID: s.SubjectID, EventType: s.EventType, OccurredAt: j.At, FirstPublicAt: j.At, EvidenceRefs: []dto.EvidenceRef{}, Claims: []dto.Claim{}, ObjectIDs: []string{s.ObjectID}}
+	event := dto.Event{EventID: a.EventID, FamilyID: a.EventID, FactVersion: 1, Relation: "NEW", SubjectID: s.SubjectID, EventType: s.EventType, OccurredAt: j.At, FirstPublicAt: j.At, EvidenceRefs: []dto.EvidenceRef{}, Claims: []dto.Claim{}, ObjectIDs: []string{s.ObjectID}, State: "QUARANTINED"}
 	weight, _ := tdto.ParseDecimal("1")
 	for n, id := range a.ItemIDs {
 		x, ok := items[id]
@@ -220,7 +220,7 @@ func (w *JudgmentWorker) inject(ctx context.Context, state *d.InjectionState, j 
 			event.FirstPublicAt = x.PublishedAt
 		}
 		h := sha256.Sum256([]byte(x.Source + "|" + x.Title + "|" + x.Summary))
-		event.EvidenceRefs = append(event.EvidenceRefs, dto.EvidenceRef{EvidenceID: id, ContentHash: hex.EncodeToString(h[:]), SourceID: x.Source, LicenceRef: s.Licence, FirstPublicAt: x.PublishedAt, ReceivedAt: x.ReceivedAt, AvailableAt: x.ReceivedAt, SpanRefs: []string{}, VerificationRef: s.Verification})
+		event.EvidenceRefs = append(event.EvidenceRefs, dto.EvidenceRef{EvidenceID: id, ContentHash: hex.EncodeToString(h[:]), SourceID: x.Source, LicenceRef: s.Licence, FirstPublicAt: x.PublishedAt, ReceivedAt: x.ReceivedAt, AvailableAt: x.ReceivedAt, SpanRefs: []string{"headline"}, VerificationRef: s.Verification})
 		event.Claims = append(event.Claims, dto.Claim{ClaimID: a.EventID + "-c" + strconv.Itoa(n+1), NormalizedFact: "judgment:" + a.EventID + ":" + id, SubjectID: s.SubjectID, EconomicItem: s.EventType, Period: a.EventID, FactTime: x.PublishedAt, NumbersWithUnits: map[string]string{}, EvidenceRefs: []string{id}, VerifiedAt: j.At, Weight: weight, VerificationManifest: s.Rubric})
 	}
 	if err := w.versioned(ctx, func(c dto.Command) error {
