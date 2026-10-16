@@ -584,7 +584,10 @@ func RebalanceReason(obj *ObservedObject, at time.Time, current, target, funding
 	if m.Sub(target, current).Abs().Cmp(band) < 0 {
 		return "NO_TRADE_BAND", nil
 	}
-	onlyAdjustment := previous != nil && components.Core.Cmp(previous.Core) == 0 && components.Baseline.Cmp(previous.Baseline) == 0 && components.Assessment.Cmp(previous.Assessment) == 0 && components.Scheduled.Cmp(previous.Scheduled) == 0 && components.Adjustment.Cmp(previous.Adjustment) != 0
+	// v2.9.0: under RISK_UNIT the target is Q × level ratio, so an unchanged
+	// level already yields an unchanged target; comparing with the last
+	// executed level would wrongly hold a batch whose opening a gate delayed.
+	onlyAdjustment := p.Composition.Sizing == nil && previous != nil && components.Core.Cmp(previous.Core) == 0 && components.Baseline.Cmp(previous.Baseline) == 0 && components.Assessment.Cmp(previous.Assessment) == 0 && components.Scheduled.Cmp(previous.Scheduled) == 0 && components.Adjustment.Cmp(previous.Adjustment) != 0
 	if onlyAdjustment {
 		components.TriggerLayer = "ADJUSTMENT"
 		if components.Level.Cmp(previous.Level) == 0 {
