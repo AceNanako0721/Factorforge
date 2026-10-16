@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strconv"
 	"time"
 
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/domain"
@@ -16,6 +17,15 @@ import (
 
 func (s *PipelineStore) dynamic(ctx context.Context) error {
 	if s.kind != "DYNAMIC" {
+		return d.Fail("DYNAMIC_SCOPE_FORBIDDEN", 403)
+	}
+	return s.VerifyRole(ctx)
+}
+
+// dynamicRead admits the worker and the v2.10.0 read-only identity (P3
+// design 29.1). Writers keep calling dynamic, so DYNAMIC_READ never writes.
+func (s *PipelineStore) dynamicRead(ctx context.Context) error {
+	if s.kind != "DYNAMIC" && s.kind != "DYNAMIC_READ" {
 		return d.Fail("DYNAMIC_SCOPE_FORBIDDEN", 403)
 	}
 	return s.VerifyRole(ctx)
@@ -53,7 +63,7 @@ func (s *PipelineStore) AppendRecord(ctx context.Context, kind, id string, at ti
 
 // Records returns payloads of one kind recorded in [since, until), oldest first.
 func (s *PipelineStore) Records(ctx context.Context, kind string, since, until time.Time, limit int) ([]json.RawMessage, error) {
-	if err := s.dynamic(ctx); err != nil {
+	if err := s.dynamicRead(ctx); err != nil {
 		return nil, err
 	}
 	if limit <= 0 || limit > 10000 {
@@ -77,7 +87,7 @@ func (s *PipelineStore) Records(ctx context.Context, kind string, since, until t
 
 // LoadState returns the payload and version (0 when absent).
 func (s *PipelineStore) LoadState(ctx context.Context, key string, target any) (int64, error) {
-	if err := s.dynamic(ctx); err != nil {
+	if err := s.dynamicRead(ctx); err != nil {
 		return 0, err
 	}
 	var raw []byte
@@ -127,4 +137,90 @@ func sameJSON(a, b []byte) bool {
 	ra, _ := json.Marshal(x)
 	rb, _ := json.Marshal(y)
 	return string(ra) == string(rb)
+}
+
+// RecordPage returns records of the given kinds in [since, until), newest
+// first, strictly after before when given. STOP_EVENT rows of kind INITIAL
+// are routine renewals and are left out when skipInitial is set (S3-032).
+func (s *PipelineStore) RecordPage(ctx context.Context, kinds []string, since, until time.Time, before *d.DynamicRecordKey, skipInitial bool, limit int) ([]d.DynamicRecord, error) {
+	if err := s.dynamicRead(ctx); err != nil {
+		return nil, err
+	}
+	if limit <= 0 || limit > 10000 || len(kinds) == 0 || !d.UTC(since) || !d.UTC(until) {
+		return nil, d.Fail("DYNAMIC_QUERY_INVALID", 422)
+	}
+	sql := "SELECT recorded_at,record_kind,record_id,payload FROM " + s.schema + ".dynamic_record WHERE instance_id=$1 AND record_kind=ANY($2) AND recorded_at>=$3 AND recorded_at<$4"
+	args := []any{s.binding.InstanceID, kinds, since, until}
+	if skipInitial {
+		sql += " AND NOT (record_kind='STOP_EVENT' AND payload->>'kind'='INITIAL')"
+	}
+	if before != nil {
+		sql += " AND (recorded_at,record_kind,record_id)<($5,$6,$7)"
+		args = append(args, before.At, before.Kind, before.ID)
+	}
+	sql += " ORDER BY recorded_at DESC,record_kind DESC,record_id DESC LIMIT " + strconv.Itoa(limit)
+	rows, err := s.pool.Query(ctx, sql, args...)
+	if err != nil {
+		return nil, safe(err)
+	}
+	defer rows.Close()
+	out := []d.DynamicRecord{}
+	for rows.Next() {
+		var r d.DynamicRecord
+		var raw []byte
+		if err = rows.Scan(&r.At, &r.Kind, &r.ID, &raw); err != nil {
+			return nil, safe(err)
+		}
+		r.At = r.At.UTC()
+		r.Payload = raw
+		out = append(out, r)
+	}
+	return out, safe(rows.Err())
+}
+
+// RecordsByID reads up to 64 records of one kind by identifier.
+func (s *PipelineStore) RecordsByID(ctx context.Context, kind string, ids []string) (map[string]json.RawMessage, error) {
+	if err := s.dynamicRead(ctx); err != nil {
+		return nil, err
+	}
+	out := map[string]json.RawMessage{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	if len(ids) > 64 {
+		return nil, d.Fail("DYNAMIC_QUERY_INVALID", 422)
+	}
+	rows, err := s.pool.Query(ctx, "SELECT record_id,payload FROM "+s.schema+".dynamic_record WHERE instance_id=$1 AND record_kind=$2 AND record_id=ANY($3)", s.binding.InstanceID, kind, ids)
+	if err != nil {
+		return nil, safe(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		var raw []byte
+		if err = rows.Scan(&id, &raw); err != nil {
+			return nil, safe(err)
+		}
+		out[id] = raw
+	}
+	return out, safe(rows.Err())
+}
+
+// StateWithVersion returns the raw payload, version and update time (version
+// 0 when absent).
+func (s *PipelineStore) StateWithVersion(ctx context.Context, key string) (json.RawMessage, int64, time.Time, error) {
+	if err := s.dynamicRead(ctx); err != nil {
+		return nil, 0, time.Time{}, err
+	}
+	var raw []byte
+	var version int64
+	var at time.Time
+	err := s.pool.QueryRow(ctx, "SELECT version,updated_at,payload FROM "+s.schema+".dynamic_state WHERE instance_id=$1 AND state_key=$2", s.binding.InstanceID, key).Scan(&version, &at, &raw)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, 0, time.Time{}, nil
+	}
+	if err != nil {
+		return nil, 0, time.Time{}, safe(err)
+	}
+	return raw, version, at.UTC(), nil
 }

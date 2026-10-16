@@ -9,6 +9,9 @@ import (
 // SafeSchema describes the same finite projection as Project. Source contracts
 // are embedded public schemas; callers cannot introduce files/URLs or $refs.
 func SafeSchema(service, path string, original bool) (map[string]any, error) {
+	if service == "dynamic" {
+		service = "instances"
+	}
 	shapeOnce.Do(loadShapes)
 	if shapeErr != nil {
 		return nil, shapeErr

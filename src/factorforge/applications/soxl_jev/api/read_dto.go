@@ -17,6 +17,9 @@ type EvidenceView = operations.EvidenceView
 type BudgetView = operations.BudgetView
 type ReportView = d.Report
 type InstanceAuditView = d.Audit
+type DynamicStatusView = operations.DynamicStatusView
+type DynamicJudgmentView = operations.DynamicJudgmentView
+type DynamicActionView = operations.DynamicActionView
 
 func readFilter(raw, resource string) (operations.Filter, error) {
 	var f operations.Filter
@@ -30,7 +33,7 @@ func readFilter(raw, resource string) (operations.Filter, error) {
 		allowed = []string{"cursor", "limit"}
 	case "analysis-jobs":
 		allowed = []string{"queue_kind", "state", "cursor", "limit"}
-	case "reports", "audit":
+	case "reports", "audit", "dynamic-judgments", "dynamic-actions":
 		allowed = []string{"from", "to", "cursor", "limit"}
 	}
 	for key, items := range values {

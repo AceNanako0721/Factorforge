@@ -11,6 +11,7 @@ import (
 	"mime"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -31,6 +32,9 @@ type Options struct {
 	Origin, StaticDir          string
 	FixtureOnly                bool
 	RefreshSeconds, MaxRetries int
+	// TrustedPeers admits a registered tunnel host besides loopback (S4-018,
+	// P4 design 16.4); empty keeps the previous behaviour.
+	TrustedPeers []netip.Prefix
 }
 type Problem struct {
 	Code      string `json:"code"`
@@ -77,6 +81,12 @@ func peer(r *http.Request) string {
 	host, _, e := net.SplitHostPort(r.RemoteAddr)
 	if e != nil {
 		return r.RemoteAddr
+	}
+	return host
+}
+func hostOnly(host string) string {
+	if h, _, e := net.SplitHostPort(host); e == nil {
+		return h
 	}
 	return host
 }
@@ -239,7 +249,7 @@ func New(o Options) (http.Handler, error) {
 			Retries int               `json:"max_retries"`
 		}{d.SchemaVersion, pages, o.RefreshSeconds, o.MaxRetries})
 	})
-	routes := map[string]string{"overview": "overview", "market": "market", "events": "events", "events/{event_id}": "event", "evidence/{evidence_id}": "evidence", "sentiment": "sentiment", "decisions": "decisions", "execution": "execution", "cases": "cases", "cases/{case_id}": "case", "learning": "learning", "operations": "operations", "reports": "reports", "audit": "audit"}
+	routes := map[string]string{"overview": "overview", "market": "market", "events": "events", "events/{event_id}": "event", "evidence/{evidence_id}": "evidence", "sentiment": "sentiment", "decisions": "decisions", "execution": "execution", "cases": "cases", "cases/{case_id}": "case", "learning": "learning", "operations": "operations", "reports": "reports", "audit": "audit", "dynamic": "dynamic"}
 	for path, view := range routes {
 		mux.HandleFunc("GET "+Prefix+"/"+path, func(w http.ResponseWriter, r *http.Request) {
 			u, ok := authorize(w, r)
@@ -282,7 +292,7 @@ func New(o Options) (http.Handler, error) {
 			return
 		}
 		view := r.URL.Query().Get("view")
-		if !d.Has([]string{"overview", "market", "events", "sentiment", "decisions", "execution", "cases", "learning", "operations", "reports", "audit"}, view) {
+		if !d.Has([]string{"overview", "market", "events", "sentiment", "decisions", "execution", "cases", "learning", "operations", "reports", "audit", "dynamic"}, view) {
 			reject(w, d.Fail("EXPORT_VIEW_INVALID", 422))
 			return
 		}
@@ -358,6 +368,21 @@ func New(o Options) (http.Handler, error) {
 	})
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { serveStatic(w, r, o.StaticDir) })
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if len(o.TrustedPeers) > 0 {
+			addr, e := netip.ParseAddr(peer(r))
+			trusted := false
+			for _, p := range o.TrustedPeers {
+				trusted = trusted || e == nil && p.Contains(addr.Unmap())
+			}
+			if e != nil || !addr.Unmap().IsLoopback() && !trusted {
+				reject(w, d.Fail("PEER_FORBIDDEN", 403))
+				return
+			}
+			if !addr.Unmap().IsLoopback() && hostOnly(r.Host) != origin.Hostname() {
+				reject(w, d.Fail("HOST_FORBIDDEN", 403))
+				return
+			}
+		}
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "no-referrer")
@@ -397,6 +422,8 @@ func filter(r *http.Request, view string, export bool) (string, app.Filter, erro
 	switch view {
 	case "market":
 		keys = append(keys, "interval", "start", "end")
+	case "dynamic":
+		keys = append(keys, "interval", "start", "end", "from", "to")
 	case "events", "reports", "audit", "learning":
 		keys = append(keys, "from", "to")
 	case "event":
@@ -456,7 +483,7 @@ func serveStatic(w http.ResponseWriter, r *http.Request, root string) {
 	}
 	path := r.URL.Path
 	name := ""
-	if d.Has([]string{"/", "/login", "/overview", "/market", "/events", "/sentiment", "/decisions", "/execution", "/cases", "/learning", "/operations", "/reports", "/audit"}, path) {
+	if d.Has([]string{"/", "/login", "/overview", "/market", "/events", "/sentiment", "/decisions", "/execution", "/cases", "/learning", "/operations", "/reports", "/audit", "/dynamic"}, path) {
 		name = "index.html"
 	} else if strings.HasPrefix(path, "/assets/") {
 		name = strings.TrimPrefix(path, "/")

@@ -15,12 +15,14 @@ import {
 import { Button } from "../components/button";
 import { DataTable, DataValue } from "../components/data-table";
 import { label } from "../schemas/display";
+import { DynamicView, dynamicRange } from "./dynamic-page";
 const MarketChart = lazy(() =>
   import("./market-chart").then((module) => ({ default: module.MarketChart })),
 );
 import { useSession, useVisible } from "./session";
 export const pages = [
   ["overview", "总览", "◈"],
+  ["dynamic", "研判与止损", "⇅"],
   ["market", "行情", "⌁"],
   ["events", "事件与评分", "◎"],
   ["sentiment", "情绪组成", "◒"],
@@ -34,6 +36,8 @@ export const pages = [
 ] as const;
 const descriptions: Record<string, string> = {
   overview: "从实际事实开始，分别查看框架判断与应用状态。",
+  dynamic:
+    "新闻研判、三层止损与行情基线；仓位与账务以交易层为准，距离与 R 为显示换算。",
   market: "产品实际记录的行情，公开、可用与观察时间分别保留。",
   events: "追溯事实版本、证据和矢量评分；准入与评分生产分别展示。",
   sentiment: "查看框架已记录的贡献和消耗，不推演未记录的历史。",
@@ -202,8 +206,11 @@ export function Page({ name }: { name: string }) {
     queryFn: async ({ signal }) => {
       const s = selection as Selection;
       const g = generation;
+      // The dynamic page reads a rolling window unless a page cursor is set.
+      const effective =
+        name === "dynamic" ? { ...dynamicRange(), ...filters } : filters;
       const value = checkResponse(
-        await request<Response>(query("/" + name, s, filters), signal),
+        await request<Response>(query("/" + name, s, effective), signal),
         s,
       );
       if (
@@ -500,8 +507,13 @@ export function Page({ name }: { name: string }) {
           </Suspense>
         </section>
       )}
+      {name === "dynamic" && data.data && (
+        <DynamicView panels={data.data.panels} selection={selection} />
+      )}
       <div className="panel-grid">
-        {data.data?.panels.map((p) => (
+        {data.data?.panels
+          .filter((p) => name !== "dynamic" || !["candles", "dynamic.judgments", "dynamic.actions"].includes(p.source))
+          .map((p) => (
           <PanelView
             key={p.source}
             panel={p}

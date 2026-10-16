@@ -58,6 +58,7 @@ query_max_snapshot_bytes = 0
 query_max_original_bytes = 0
 query_cursor_age_seconds = 0
 query_cursor_key = ""
+dynamic_database_url = ""
 
 [[application.pipeline.search_backends]]
 id = ""
@@ -215,6 +216,7 @@ max_pages = 0
 max_hash_iterations = 0
 cursor_key = ""
 users = []
+trusted_peers = []
 bindings = []
 `
 const expectedPrompts = `{

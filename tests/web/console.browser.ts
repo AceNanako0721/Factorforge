@@ -121,6 +121,45 @@ test("a late response cannot restore data after deselection", async ({
   ).not.toContain("fixture");
 });
 
+test("S4-017 judgment and stop page on desktop and phone width", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await login(page);
+  await page.evaluate(() =>
+    fetch("/fixture/state?action=online", {
+      method: "POST",
+      headers: { Origin: location.origin },
+    }),
+  );
+  await page.getByRole("link", { name: "研判与止损", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "三层止损与价格", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("收盘止损", { exact: true })).toBeVisible();
+  await expect(page.getByText("synthetic thesis", { exact: true })).toBeVisible();
+  await expect(page.getByText("注入研判 · 做空", { exact: true })).toBeVisible();
+  await expect(page.getByText("未实现", { exact: true })).toBeVisible();
+  await expect(page.getByText("PRIVATE RAW")).toHaveCount(0);
+  await page.screenshot({
+    path: "../../../../../runtime/console-dynamic-1440.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 900 });
+  await expect(
+    page.getByRole("heading", { name: "三层止损与价格", exact: true }),
+  ).toBeVisible();
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - window.innerWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(1);
+  await page.screenshot({
+    path: "../../../../../runtime/console-dynamic-390.png",
+    fullPage: true,
+  });
+  expect(errors).toEqual([]);
+});
 test("narrow keyboard navigation and revocation clears selected data", async ({
   page,
 }) => {

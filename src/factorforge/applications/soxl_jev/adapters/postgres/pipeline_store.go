@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-//go:embed migrations/002_pipeline.sql migrations/003_operations.sql migrations/004_search.sql migrations/006_watch_state.sql migrations/007_dynamic_stop.sql
+//go:embed migrations/002_pipeline.sql migrations/003_operations.sql migrations/004_search.sql migrations/006_watch_state.sql migrations/007_dynamic_stop.sql migrations/008_dynamic_read.sql
 var pipelineFiles embed.FS
 
 type QueueBudget struct {
@@ -58,7 +58,7 @@ func InitializePipeline(ctx context.Context, dsn string, b d.Binding) error {
 		return safe(err)
 	}
 	defer tx.Rollback(ctx)
-	for _, file := range []string{"migrations/002_pipeline.sql", "migrations/003_operations.sql", "migrations/004_search.sql", "migrations/006_watch_state.sql", "migrations/007_dynamic_stop.sql"} {
+	for _, file := range []string{"migrations/002_pipeline.sql", "migrations/003_operations.sql", "migrations/004_search.sql", "migrations/006_watch_state.sql", "migrations/007_dynamic_stop.sql", "migrations/008_dynamic_read.sql"} {
 		raw, e := pipelineFiles.ReadFile(file)
 		if e != nil {
 			return d.Fail("MIGRATION_UNAVAILABLE", 503)
@@ -136,6 +136,25 @@ func InitializePipeline(ctx context.Context, dsn string, b d.Binding) error {
 			return safe(err)
 		}
 	}
+	// v2.10.0: DYNAMIC_READ serves the instance read API and never writes.
+	role = pipelineRole(b, "DYNAMIC_READ")
+	if err = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM pg_roles WHERE rolname=$1)", role).Scan(&exists); err != nil {
+		return safe(err)
+	}
+	if !exists {
+		if _, err = tx.Exec(ctx, "CREATE ROLE "+pgx.Identifier{role}.Sanitize()+" NOLOGIN"); err != nil {
+			return safe(err)
+		}
+	}
+	for _, sql := range []string{
+		"REVOKE ALL ON ALL TABLES IN SCHEMA " + schema + " FROM " + role,
+		"GRANT USAGE ON SCHEMA " + schema + " TO " + role,
+		"GRANT SELECT ON " + schema + ".worker_grant," + schema + ".dynamic_record," + schema + ".dynamic_state TO " + role,
+	} {
+		if _, err = tx.Exec(ctx, sql); err != nil {
+			return safe(err)
+		}
+	}
 	return safe(tx.Commit(ctx))
 }
 func GrantPipeline(ctx context.Context, dsn string, b d.Binding, login, kind string) error {
@@ -143,7 +162,7 @@ func GrantPipeline(ctx context.Context, dsn string, b d.Binding, login, kind str
 	if err != nil {
 		return err
 	}
-	if !d.ValidID(login) || !d.Has([]string{"INGEST", "RESEARCH", "TRADING", "DYNAMIC"}, kind) {
+	if !d.ValidID(login) || !d.Has([]string{"INGEST", "RESEARCH", "TRADING", "DYNAMIC", "DYNAMIC_READ"}, kind) {
 		return d.Fail("PIPELINE_GRANT_INVALID", 422)
 	}
 	conn, err := pgx.Connect(ctx, dsn)
@@ -193,7 +212,7 @@ func OpenPipeline(ctx context.Context, dsn string, b d.Binding, kind string, max
 	if err != nil {
 		return nil, err
 	}
-	if !d.Has([]string{"INGEST", "RESEARCH", "TRADING", "DYNAMIC"}, kind) || maxBytes <= 0 {
+	if !d.Has([]string{"INGEST", "RESEARCH", "TRADING", "DYNAMIC", "DYNAMIC_READ"}, kind) || maxBytes <= 0 {
 		return nil, d.Fail("PIPELINE_CONFIGURATION_REQUIRED", 503)
 	}
 	pool, err := pgxpool.New(ctx, dsn)
@@ -201,7 +220,7 @@ func OpenPipeline(ctx context.Context, dsn string, b d.Binding, kind string, max
 		return nil, safe(err)
 	}
 	s := &PipelineStore{pool: pool, binding: b, kind: kind, schema: schema, maxBytes: maxBytes}
-	if kind != "INGEST" && kind != "DYNAMIC" {
+	if kind != "INGEST" && kind != "DYNAMIC" && kind != "DYNAMIC_READ" {
 		s.table = "app_" + strings.ToLower(kind) + "_analysis_job"
 		s.outbox = strings.ToLower(kind) + "_submission_outbox"
 	}
@@ -257,6 +276,20 @@ func (s *PipelineStore) verifyRole(ctx context.Context, q pipelineQuerier) error
 	}
 	// Extra privileges on peer queues or grant tables must not survive a grant.
 	tables := []string{"worker_grant", "budget", "raw_evidence_manifest", "routing_receipt", "app_research_analysis_job", "app_trading_analysis_job", "research_submission_outbox", "trading_submission_outbox", "operation_fact", "framework_report", "search_state", "watch_seen"}
+	if s.kind == "DYNAMIC_READ" {
+		// The read identity sees only its grant and the dynamic tables, read-only.
+		for _, table := range append(tables, "dynamic_record", "dynamic_state") {
+			var read, write bool
+			err = q.QueryRow(ctx, "SELECT has_any_column_privilege(session_user,$1,'SELECT'),has_any_column_privilege(session_user,$1,'INSERT,UPDATE') OR has_table_privilege(session_user,$1,'DELETE,TRUNCATE,TRIGGER')", s.schema+"."+table).Scan(&read, &write)
+			if err != nil {
+				return safe(err)
+			}
+			if write || read && !d.Has([]string{"worker_grant", "dynamic_record", "dynamic_state"}, table) {
+				return d.Fail("PIPELINE_DATABASE_ROLE_NOT_ISOLATED", 403)
+			}
+		}
+		return nil
+	}
 	for _, table := range tables {
 		var read, write, insert, remove bool
 		err = q.QueryRow(ctx, "SELECT has_any_column_privilege(session_user,$1,'SELECT'),has_any_column_privilege(session_user,$1,'UPDATE'),has_any_column_privilege(session_user,$1,'INSERT'),has_table_privilege(session_user,$1,'DELETE,TRUNCATE,TRIGGER')", s.schema+"."+table).Scan(&read, &write, &insert, &remove)

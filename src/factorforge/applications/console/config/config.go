@@ -9,6 +9,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 	"math"
 	"net"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"time"
@@ -62,6 +63,8 @@ type Profile struct {
 	CursorKey         string    `toml:"cursor_key" json:"cursor_key"`
 	Users             []d.User  `toml:"users" json:"users"`
 	Bindings          []Binding `toml:"bindings" json:"bindings"`
+	// v2.10.0 (S4-018): tunnel hosts allowed besides loopback, as IP or CIDR.
+	TrustedPeers []string `toml:"trusted_peers" json:"trusted_peers"`
 }
 
 // User's runtime JSON omits secrets by design; profiles require separate private
@@ -83,7 +86,27 @@ type wire struct {
 func (p Profile) Policy() d.Policy {
 	return d.Policy{SessionTTL: time.Duration(p.SessionSeconds) * time.Second, ChallengeTTL: time.Duration(p.ChallengeSeconds) * time.Second, RateWindow: time.Duration(p.RateWindowSeconds) * time.Second, CursorTTL: time.Duration(p.CursorSeconds) * time.Second, RequestTimeout: time.Duration(p.TimeoutSeconds) * time.Second, MaxAttempts: p.MaxAttempts, MaxSessions: p.MaxSessions, MaxChallenges: p.MaxChallenges, MaxBytes: p.MaxBytes, MaxRecords: p.MaxRecords, DefaultLimit: p.DefaultLimit, MaxLimit: p.MaxLimit, MaxPages: p.MaxPages, CursorKey: []byte(p.CursorKey)}
 }
+
+// Peers parses trusted_peers; a bare address becomes a single-host prefix.
+func (p Profile) Peers() ([]netip.Prefix, error) {
+	out := []netip.Prefix{}
+	for _, raw := range p.TrustedPeers {
+		prefix, e := netip.ParsePrefix(raw)
+		if e != nil {
+			addr, e2 := netip.ParseAddr(raw)
+			if e2 != nil {
+				return nil, d.Fail("CONSOLE_CONFIGURATION_REQUIRED", 503)
+			}
+			prefix = netip.PrefixFrom(addr.Unmap(), addr.Unmap().BitLen())
+		}
+		out = append(out, prefix.Masked())
+	}
+	return out, nil
+}
 func (p Profile) Validate() error {
+	if _, e := p.Peers(); e != nil || p.FixtureOnly && len(p.TrustedPeers) > 0 {
+		return d.Fail("CONSOLE_CONFIGURATION_REQUIRED", 503)
+	}
 	if p.FixtureOnly {
 		ip := net.ParseIP(p.Host)
 		if ip == nil || !ip.IsLoopback() {

@@ -55,7 +55,7 @@ func TestActualNativeLowerReadsPrivacyAndIndependentFailure(t *testing.T) {
 	if len(beforeP1.Fills.Keys()) == 0 {
 		t.Fatal("actual SIM did not fill")
 	}
-	for _, view := range []string{"overview", "market", "events", "event", "evidence", "sentiment", "decisions", "execution", "cases", "learning", "operations", "reports", "audit"} {
+	for _, view := range []string{"overview", "market", "events", "event", "evidence", "sentiment", "decisions", "execution", "cases", "learning", "operations", "reports", "audit", "dynamic"} {
 		t.Run(view, func(t *testing.T) {
 			id := ""
 			if view == "event" {
@@ -65,7 +65,7 @@ func TestActualNativeLowerReadsPrivacyAndIndependentFailure(t *testing.T) {
 				id = "evidence-fixture"
 			}
 			f := app.Filter{}
-			if view == "market" {
+			if view == "market" || view == "dynamic" {
 				f.Interval = "1m"
 				f.Start = "2026-01-05T00:00:00Z"
 				f.End = "2026-01-05T00:10:00Z"
@@ -92,7 +92,7 @@ func TestActualNativeLowerReadsPrivacyAndIndependentFailure(t *testing.T) {
 			if e := schema.Validate(payload); e != nil {
 				t.Fatal("published console contract", e)
 			}
-			for _, secret := range []string{"input_snapshot", "command_payload", "password_hash", "Bearer ", "fixture-p1-read", "fixture-p2-read", "principal_id", "\"detail\""} {
+			for _, secret := range []string{"input_snapshot", "command_payload", "password_hash", "Bearer ", "fixture-p1-read", "fixture-p2-read", "principal_id", "\"detail\"", "PRIVATE RAW", "private.invalid"} {
 				if bytes.Contains(raw, []byte(secret)) {
 					t.Fatalf("private field %s", secret)
 				}
