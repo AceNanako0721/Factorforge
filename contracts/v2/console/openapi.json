@@ -6000,6 +6000,36 @@
                               "title": "Aggregate Version",
                               "type": "integer"
                             },
+                            "chain": {
+                              "anyOf": [
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "batch_ids": {
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "type": "array"
+                                    },
+                                    "direction": {
+                                      "type": "integer"
+                                    },
+                                    "loss_r": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "batch_ids",
+                                    "direction",
+                                    "loss_r"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
                             "core_direction": {
                               "maximum": 1,
                               "minimum": -1,
@@ -6139,6 +6169,12 @@
                               "title": "Pending Quantity",
                               "type": "string"
                             },
+                            "pre_event_applied": {
+                              "items": {
+                                "type": "string"
+                              },
+                              "type": "array"
+                            },
                             "price_proxy_binding": {
                               "maxLength": 160,
                               "minLength": 1,
@@ -6149,6 +6185,38 @@
                               "default": "RECOVERY_CHECK",
                               "title": "Recovery State",
                               "type": "string"
+                            },
+                            "reentry": {
+                              "anyOf": [
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "batch_id": {
+                                      "type": "string"
+                                    },
+                                    "direction": {
+                                      "type": "integer"
+                                    },
+                                    "opened": {
+                                      "type": "boolean"
+                                    },
+                                    "stopped_at": {
+                                      "format": "date-time",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "batch_id",
+                                    "direction",
+                                    "opened",
+                                    "stopped_at"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
                             },
                             "regime_binding": {
                               "maxLength": 160,
@@ -6176,6 +6244,62 @@
                                   "required": [
                                     "direction",
                                     "since"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "risk_unit": {
+                              "anyOf": [
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "allowance": {
+                                      "type": "string"
+                                    },
+                                    "batch_id": {
+                                      "type": "string"
+                                    },
+                                    "budget": {
+                                      "type": "string"
+                                    },
+                                    "direction": {
+                                      "type": "integer"
+                                    },
+                                    "directive_id": {
+                                      "type": "string"
+                                    },
+                                    "distance": {
+                                      "type": "string"
+                                    },
+                                    "filled": {
+                                      "type": "boolean"
+                                    },
+                                    "opened_at": {
+                                      "format": "date-time",
+                                      "type": "string"
+                                    },
+                                    "truncated": {
+                                      "type": "boolean"
+                                    },
+                                    "unit_quantity": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "allowance",
+                                    "batch_id",
+                                    "budget",
+                                    "direction",
+                                    "directive_id",
+                                    "distance",
+                                    "filled",
+                                    "opened_at",
+                                    "truncated",
+                                    "unit_quantity"
                                   ],
                                   "type": "object"
                                 },
@@ -7393,6 +7517,9 @@
                                   "quality": {
                                     "title": "Quality",
                                     "type": "string"
+                                  },
+                                  "realization_disabled": {
+                                    "type": "boolean"
                                   },
                                   "reference_benchmark": {
                                     "anyOf": [
@@ -10414,6 +10541,26 @@
                                       "directive": {
                                         "additionalProperties": false,
                                         "properties": {
+                                          "close_stop_distance": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "close_stop_price": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
                                           "directive_id": {
                                             "maxLength": 128,
                                             "minLength": 1,
@@ -10481,6 +10628,16 @@
                                             "maxItems": 32,
                                             "minItems": 1,
                                             "type": "array"
+                                          },
+                                          "risk_fraction": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
                                           },
                                           "source_module": {
                                             "maxLength": 128,

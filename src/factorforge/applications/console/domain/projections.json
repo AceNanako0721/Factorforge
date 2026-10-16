@@ -2366,6 +2366,255 @@
           ],
           "type": "object"
         },
+        "BaselineTransfer": {
+          "additionalProperties": false,
+          "properties": {
+            "contribution_ids": {
+              "items": {
+                "maxLength": 160,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_.:-]+$",
+                "type": "string"
+              },
+              "maxItems": 64,
+              "minItems": 1,
+              "type": "array"
+            },
+            "factor_id": {
+              "maxLength": 160,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "object_id": {
+              "maxLength": 160,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "observation": {
+              "$ref": "#/components/schemas/TransferObservation"
+            },
+            "transfer_key": {
+              "maxLength": 160,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "contribution_ids",
+            "factor_id",
+            "object_id",
+            "observation",
+            "transfer_key"
+          ],
+          "type": "object"
+        },
+        "BaselineTransferCommand": {
+          "additionalProperties": false,
+          "properties": {
+            "contribution_ids": {
+              "items": {
+                "maxLength": 160,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_.:-]+$",
+                "type": "string"
+              },
+              "maxItems": 64,
+              "minItems": 1,
+              "type": "array"
+            },
+            "expected_version": {
+              "ge": "0",
+              "minimum": 0,
+              "title": "Expected Version",
+              "type": "integer"
+            },
+            "factor_id": {
+              "maxLength": 160,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "idempotency_key": {
+              "maxLength": 160,
+              "minLength": 1,
+              "title": "Idempotency Key",
+              "type": "string"
+            },
+            "object_id": {
+              "maxLength": 160,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "observation": {
+              "$ref": "#/components/schemas/TransferObservation"
+            },
+            "reason": {
+              "maxLength": 500,
+              "minLength": 1,
+              "title": "Reason",
+              "type": "string"
+            },
+            "request_id": {
+              "maxLength": 160,
+              "minLength": 1,
+              "title": "Request Id",
+              "type": "string"
+            },
+            "schema_version": {
+              "const": "strategy-2.0",
+              "title": "Schema Version",
+              "type": "string"
+            },
+            "transfer_key": {
+              "maxLength": 160,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "contribution_ids",
+            "expected_version",
+            "factor_id",
+            "idempotency_key",
+            "object_id",
+            "observation",
+            "reason",
+            "request_id",
+            "schema_version",
+            "transfer_key"
+          ],
+          "type": "object",
+          "x-error-codes": [
+            "WORKLOAD_IDENTITY_REQUIRED",
+            "OBJECT_NOT_FOUND",
+            "TRANSFER_NOT_REGISTERED",
+            "TRANSFER_CONTRIBUTION_INVALID",
+            "TRANSFER_CHANGES_POSITION",
+            "TRANSFER_CONFLICT",
+            "FACTOR_VALUE_OUT_OF_RANGE",
+            "FACTOR_OBSERVATION_CONFLICT",
+            "FACTOR_OBSERVATION_TIME_INVALID"
+          ]
+        },
+        "BaselineTransferRecord": {
+          "additionalProperties": false,
+          "properties": {
+            "amounts": {
+              "additionalProperties": {
+                "type": "string",
+                "x-decimal": true
+              },
+              "type": "object"
+            },
+            "at": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "combined_from": {
+              "type": "string",
+              "x-decimal": true
+            },
+            "combined_to": {
+              "type": "string",
+              "x-decimal": true
+            },
+            "content_hash": {
+              "type": "string"
+            },
+            "observation_at": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "principal_id": {
+              "type": "string"
+            },
+            "transfer": {
+              "$ref": "#/components/schemas/BaselineTransfer"
+            },
+            "transfer_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "amounts",
+            "at",
+            "combined_from",
+            "combined_to",
+            "content_hash",
+            "observation_at",
+            "principal_id",
+            "transfer",
+            "transfer_id"
+          ],
+          "type": "object"
+        },
+        "BatchRecord": {
+          "additionalProperties": false,
+          "properties": {
+            "batch_id": {
+              "type": "string"
+            },
+            "budget": {
+              "type": "string",
+              "x-decimal": true
+            },
+            "case_id": {
+              "type": "string"
+            },
+            "closed_at": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "direction": {
+              "type": "integer"
+            },
+            "exit_kind": {
+              "type": "string"
+            },
+            "net_pnl": {
+              "type": "string",
+              "x-decimal": true
+            },
+            "object_id": {
+              "type": "string"
+            },
+            "opened_at": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "r": {
+              "type": "string",
+              "x-decimal": true
+            },
+            "truncated": {
+              "type": "boolean"
+            },
+            "unit_quantity": {
+              "type": "string",
+              "x-decimal": true
+            }
+          },
+          "required": [
+            "batch_id",
+            "budget",
+            "case_id",
+            "closed_at",
+            "direction",
+            "exit_kind",
+            "net_pnl",
+            "object_id",
+            "opened_at",
+            "r",
+            "truncated",
+            "unit_quantity"
+          ],
+          "type": "object"
+        },
         "CaseRecord": {
           "additionalProperties": false,
           "properties": {
@@ -2557,6 +2806,47 @@
             "label_status"
           ],
           "title": "CaseRecord",
+          "type": "object"
+        },
+        "ChainLossRule": {
+          "additionalProperties": false,
+          "properties": {
+            "max_loss_r": {
+              "type": "string",
+              "x-decimal": true
+            },
+            "profit_offsets": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "max_loss_r",
+            "profit_offsets"
+          ],
+          "type": "object"
+        },
+        "ChainState": {
+          "additionalProperties": false,
+          "properties": {
+            "batch_ids": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "direction": {
+              "type": "integer"
+            },
+            "loss_r": {
+              "type": "string",
+              "x-decimal": true
+            }
+          },
+          "required": [
+            "batch_ids",
+            "direction",
+            "loss_r"
+          ],
           "type": "object"
         },
         "Claim": {
@@ -2764,6 +3054,16 @@
               },
               "type": "array"
             },
+            "chain_loss": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ChainLossRule"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "levels": {
               "items": {
                 "$ref": "#/components/schemas/Level"
@@ -2777,11 +3077,47 @@
               ],
               "type": "string"
             },
+            "pre_event": {
+              "items": {
+                "$ref": "#/components/schemas/PreEventRule"
+              },
+              "type": "array"
+            },
             "rebalance": {
               "$ref": "#/components/schemas/RebalanceRule"
             },
+            "reentry": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ReentryRule"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "scheduled": {
               "$ref": "#/components/schemas/LayerCap"
+            },
+            "sizing": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/SizingRule"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "transfer": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/TransferRule"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           },
           "required": [
@@ -2881,6 +3217,9 @@
               "le": 1,
               "title": "Quality",
               "type": "string"
+            },
+            "realization_disabled": {
+              "type": "boolean"
             },
             "reference_benchmark": {
               "anyOf": [
@@ -3349,6 +3688,17 @@
         "EffectiveStrategyStop": {
           "additionalProperties": false,
           "properties": {
+            "close_stop": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "x-decimal": true
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "directive_id": {
               "type": "string"
             },
@@ -3757,6 +4107,229 @@
           "title": "EvidenceRef",
           "type": "object"
         },
+        "ExitRequest": {
+          "additionalProperties": false,
+          "properties": {
+            "bar_close_at": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "bar_interval": {
+              "enum": [
+                300,
+                900
+              ],
+              "type": "integer"
+            },
+            "close_price": {
+              "type": "string",
+              "x-decimal": true
+            },
+            "directive_id": {
+              "maxLength": 160,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "directive_version": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "exit_id": {
+              "maxLength": 160,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "object_id": {
+              "maxLength": 160,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "position_direction": {
+              "enum": [
+                "LONG",
+                "SHORT"
+              ],
+              "type": "string"
+            },
+            "source_module": {
+              "maxLength": 160,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "bar_close_at",
+            "bar_interval",
+            "close_price",
+            "directive_id",
+            "directive_version",
+            "exit_id",
+            "object_id",
+            "position_direction",
+            "source_module"
+          ],
+          "type": "object"
+        },
+        "ExitRequestCommand": {
+          "additionalProperties": false,
+          "properties": {
+            "bar_close_at": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "bar_interval": {
+              "enum": [
+                300,
+                900
+              ],
+              "type": "integer"
+            },
+            "close_price": {
+              "type": "string",
+              "x-decimal": true
+            },
+            "directive_id": {
+              "maxLength": 160,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "directive_version": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "exit_id": {
+              "maxLength": 160,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "expected_version": {
+              "ge": "0",
+              "minimum": 0,
+              "title": "Expected Version",
+              "type": "integer"
+            },
+            "idempotency_key": {
+              "maxLength": 160,
+              "minLength": 1,
+              "title": "Idempotency Key",
+              "type": "string"
+            },
+            "object_id": {
+              "maxLength": 160,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "position_direction": {
+              "enum": [
+                "LONG",
+                "SHORT"
+              ],
+              "type": "string"
+            },
+            "reason": {
+              "maxLength": 500,
+              "minLength": 1,
+              "title": "Reason",
+              "type": "string"
+            },
+            "request_id": {
+              "maxLength": 160,
+              "minLength": 1,
+              "title": "Request Id",
+              "type": "string"
+            },
+            "schema_version": {
+              "const": "strategy-2.0",
+              "title": "Schema Version",
+              "type": "string"
+            },
+            "source_module": {
+              "maxLength": 160,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "bar_close_at",
+            "bar_interval",
+            "close_price",
+            "directive_id",
+            "directive_version",
+            "exit_id",
+            "expected_version",
+            "idempotency_key",
+            "object_id",
+            "position_direction",
+            "reason",
+            "request_id",
+            "schema_version",
+            "source_module"
+          ],
+          "type": "object",
+          "x-error-codes": [
+            "UNAUTHENTICATED",
+            "STOP_DIRECTIVE_WRITE_FORBIDDEN",
+            "OBJECT_NOT_FOUND",
+            "EXIT_REQUEST_INVALID",
+            "EXIT_REQUEST_CONFLICT",
+            "EXIT_DIRECTION_MISMATCH",
+            "EXIT_NO_CLOSE_STOP",
+            "EXIT_BAR_INCOMPLETE",
+            "EXIT_PRICE_MISMATCH",
+            "EXIT_NOT_TRIGGERED",
+            "STOP_DIRECTIVE_PRICE_UNUSABLE"
+          ]
+        },
+        "ExitRequestRecord": {
+          "additionalProperties": false,
+          "properties": {
+            "accepted_at": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "batch_id": {
+              "type": "string"
+            },
+            "close_stop_price": {
+              "type": "string",
+              "x-decimal": true
+            },
+            "content_hash": {
+              "type": "string"
+            },
+            "decision_id": {
+              "type": "string"
+            },
+            "principal_id": {
+              "type": "string"
+            },
+            "request": {
+              "$ref": "#/components/schemas/ExitRequest"
+            },
+            "state": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "accepted_at",
+            "batch_id",
+            "close_stop_price",
+            "content_hash",
+            "decision_id",
+            "principal_id",
+            "request",
+            "state"
+          ],
+          "type": "object"
+        },
         "FactorDefinition": {
           "additionalProperties": false,
           "properties": {
@@ -3829,6 +4402,12 @@
               "maxLength": 160,
               "minLength": 1,
               "type": "string"
+            },
+            "reason_code": {
+              "type": "string"
+            },
+            "reconfirm": {
+              "type": "boolean"
             },
             "referenced": {
               "type": "boolean"
@@ -3908,6 +4487,12 @@
               "minLength": 1,
               "title": "Reason",
               "type": "string"
+            },
+            "reason_code": {
+              "type": "string"
+            },
+            "reconfirm": {
+              "type": "boolean"
             },
             "request_id": {
               "maxLength": 160,
@@ -4398,6 +4983,16 @@
               "title": "Aggregate Version",
               "type": "integer"
             },
+            "chain": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ChainState"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "core_direction": {
               "maximum": 1,
               "minimum": -1,
@@ -4509,6 +5104,12 @@
               "title": "Pending Quantity",
               "type": "string"
             },
+            "pre_event_applied": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
             "price_proxy_binding": {
               "maxLength": 160,
               "minLength": 1,
@@ -4520,6 +5121,16 @@
               "title": "Recovery State",
               "type": "string"
             },
+            "reentry": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ReentryState"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "regime_binding": {
               "maxLength": 160,
               "minLength": 1,
@@ -4530,6 +5141,16 @@
               "anyOf": [
                 {
                   "$ref": "#/components/schemas/ReverseCandidate"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "risk_unit": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/RiskUnitState"
                 },
                 {
                   "type": "null"
@@ -4715,6 +5336,19 @@
               "title": "Claim Weights",
               "type": "object"
             },
+            "cleanup_fraction_of_initial": {
+              "anyOf": [
+                {
+                  "gt": "0",
+                  "lt": "1",
+                  "type": "string",
+                  "x-decimal": true
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "cleanup_threshold": {
               "title": "Cleanup Threshold",
               "type": "string"
@@ -4755,6 +5389,12 @@
               "exclusiveMinimum": 0,
               "title": "Event Ttl Seconds",
               "type": "integer"
+            },
+            "experiment_calibrations": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
             },
             "family_cap": {
               "title": "Family Cap",
@@ -4797,6 +5437,12 @@
               "title": "Half Life Bounds",
               "type": "array"
             },
+            "judgment_event_types": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
             "label_cost_band": {
               "title": "Label Cost Band",
               "type": "string"
@@ -4809,6 +5455,13 @@
               "exclusiveMinimum": 0,
               "title": "Label Seconds",
               "type": "integer"
+            },
+            "learning_mode": {
+              "enum": [
+                "ACTIVE",
+                "FROZEN"
+              ],
+              "type": "string"
             },
             "levels": {
               "items": {
@@ -4911,6 +5564,16 @@
               "title": "Portfolio Stress Limit",
               "type": "string"
             },
+            "prepricing_modes": {
+              "additionalProperties": {
+                "enum": [
+                  "ASSESSED",
+                  "NOT_ASSESSED"
+                ],
+                "type": "string"
+              },
+              "type": "object"
+            },
             "quality_state": {
               "enum": [
                 "VALIDATED",
@@ -4919,6 +5582,12 @@
               ],
               "title": "Quality State",
               "type": "string"
+            },
+            "realization_disabled_types": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
             },
             "regime_confirmations": {
               "exclusiveMinimum": 0,
@@ -5157,6 +5826,39 @@
             "quality"
           ],
           "title": "PoolView",
+          "type": "object"
+        },
+        "PreEventRule": {
+          "additionalProperties": false,
+          "properties": {
+            "after_seconds": {
+              "type": "integer"
+            },
+            "before_seconds": {
+              "type": "integer"
+            },
+            "certainty_required": {
+              "enum": [
+                "CONFIRMED",
+                "ESTIMATED"
+              ],
+              "type": "string"
+            },
+            "event_type": {
+              "type": "string"
+            },
+            "reduce_factor": {
+              "type": "string",
+              "x-decimal": true
+            }
+          },
+          "required": [
+            "after_seconds",
+            "before_seconds",
+            "certainty_required",
+            "event_type",
+            "reduce_factor"
+          ],
           "type": "object"
         },
         "Problem": {
@@ -5713,13 +6415,26 @@
           "additionalProperties": false,
           "properties": {
             "adjust_interval_seconds": {
-              "minimum": 1,
+              "minimum": 0,
               "type": "integer"
             },
             "band_floor": {
               "ge": "0",
               "type": "string",
               "x-decimal": true
+            },
+            "band_ratio_of_unit": {
+              "anyOf": [
+                {
+                  "ge": "0",
+                  "lt": "1",
+                  "type": "string",
+                  "x-decimal": true
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "expected_hold_seconds": {
               "minimum": 1,
@@ -5743,6 +6458,50 @@
           ],
           "type": "object"
         },
+        "ReentryRule": {
+          "additionalProperties": false,
+          "properties": {
+            "cooldown_seconds": {
+              "type": "integer"
+            },
+            "qualifying_inputs": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "cooldown_seconds",
+            "qualifying_inputs"
+          ],
+          "type": "object"
+        },
+        "ReentryState": {
+          "additionalProperties": false,
+          "properties": {
+            "batch_id": {
+              "type": "string"
+            },
+            "direction": {
+              "type": "integer"
+            },
+            "opened": {
+              "type": "boolean"
+            },
+            "stopped_at": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          "required": [
+            "batch_id",
+            "direction",
+            "opened",
+            "stopped_at"
+          ],
+          "type": "object"
+        },
         "ReverseCandidate": {
           "additionalProperties": false,
           "properties": {
@@ -5761,6 +6520,59 @@
           "required": [
             "direction",
             "since"
+          ],
+          "type": "object"
+        },
+        "RiskUnitState": {
+          "additionalProperties": false,
+          "properties": {
+            "allowance": {
+              "type": "string",
+              "x-decimal": true
+            },
+            "batch_id": {
+              "type": "string"
+            },
+            "budget": {
+              "type": "string",
+              "x-decimal": true
+            },
+            "direction": {
+              "type": "integer"
+            },
+            "directive_id": {
+              "type": "string"
+            },
+            "distance": {
+              "type": "string",
+              "x-decimal": true
+            },
+            "filled": {
+              "type": "boolean"
+            },
+            "opened_at": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "truncated": {
+              "type": "boolean"
+            },
+            "unit_quantity": {
+              "type": "string",
+              "x-decimal": true
+            }
+          },
+          "required": [
+            "allowance",
+            "batch_id",
+            "budget",
+            "direction",
+            "directive_id",
+            "distance",
+            "filled",
+            "opened_at",
+            "truncated",
+            "unit_quantity"
           ],
           "type": "object"
         },
@@ -6630,6 +7442,30 @@
           ],
           "type": "object"
         },
+        "SizingRule": {
+          "additionalProperties": false,
+          "properties": {
+            "max_risk_fraction": {
+              "type": "string",
+              "x-decimal": true
+            },
+            "mode": {
+              "enum": [
+                "RISK_UNIT"
+              ],
+              "type": "string"
+            },
+            "require_initial_distance": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "max_risk_fraction",
+            "mode",
+            "require_initial_distance"
+          ],
+          "type": "object"
+        },
         "StateCommand": {
           "additionalProperties": false,
           "properties": {
@@ -6685,6 +7521,28 @@
         "StopDirective": {
           "additionalProperties": false,
           "properties": {
+            "close_stop_distance": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "x-decimal": true
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "close_stop_price": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "x-decimal": true
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "directive_id": {
               "maxLength": 128,
               "minLength": 1,
@@ -6755,6 +7613,17 @@
               "minItems": 1,
               "type": "array"
             },
+            "risk_fraction": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "x-decimal": true
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "source_module": {
               "maxLength": 128,
               "minLength": 1,
@@ -6803,6 +7672,28 @@
         "StopDirectiveCommand": {
           "additionalProperties": false,
           "properties": {
+            "close_stop_distance": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "x-decimal": true
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "close_stop_price": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "x-decimal": true
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "directive_id": {
               "maxLength": 128,
               "minLength": 1,
@@ -6897,6 +7788,17 @@
               "title": "Request Id",
               "type": "string"
             },
+            "risk_fraction": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "x-decimal": true
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "schema_version": {
               "const": "strategy-2.0",
               "title": "Schema Version",
@@ -6967,7 +7869,8 @@
             "STOP_DIRECTIVE_PRICE_UNUSABLE",
             "P1_LOWER_COMPAT_REQUIRED",
             "STRATEGY_NOT_TIGHTER_THAN_INSURANCE",
-            "MANAGED_STOP_OUTSIDE_INSURANCE"
+            "MANAGED_STOP_OUTSIDE_INSURANCE",
+            "STOP_DIRECTIVE_CLOSE_STOP_INVALID"
           ]
         },
         "StopDirectivePage": {
@@ -7492,6 +8395,44 @@
             "object_id",
             "plans",
             "snapshot_version"
+          ],
+          "type": "object"
+        },
+        "TransferObservation": {
+          "additionalProperties": false,
+          "properties": {
+            "observation_id": {
+              "type": "string"
+            },
+            "reason_code": {
+              "type": "string"
+            },
+            "value": {
+              "type": "string",
+              "x-decimal": true
+            }
+          },
+          "required": [
+            "observation_id",
+            "reason_code",
+            "value"
+          ],
+          "type": "object"
+        },
+        "TransferRule": {
+          "additionalProperties": false,
+          "properties": {
+            "combined_tolerance": {
+              "type": "string",
+              "x-decimal": true
+            },
+            "factor_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "combined_tolerance",
+            "factor_id"
           ],
           "type": "object"
         },
