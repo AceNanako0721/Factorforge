@@ -218,6 +218,15 @@ cursor_key = ""
 users = []
 trusted_peers = []
 bindings = []
+
+[console.live_market]
+enabled = false
+url = ""
+interval = ""
+stale_seconds = 0
+heartbeat_seconds = 0
+idle_seconds = 0
+max_streams = 0
 `
 const expectedPrompts = `{
   "schema_version": 1,

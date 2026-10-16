@@ -90,6 +90,15 @@ users = []
 trusted_peers = []
 bindings = []
 
+[console.live_market]
+enabled = false
+url = ""
+interval = ""
+stale_seconds = 0
+heartbeat_seconds = 0
+idle_seconds = 0
+max_streams = 0
+
 [[application.pipeline.search_backends]]
 id = ""
 kind = ""

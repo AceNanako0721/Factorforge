@@ -1,10 +1,12 @@
 import { useEffect, useRef } from "react";
+import type { LiveKline } from "./live-market";
 import {
   createChart,
   createSeriesMarkers,
   CandlestickSeries,
   LineStyle,
   type CandlestickData,
+  type ISeriesApi,
   type SeriesMarker,
   type UTCTimestamp,
 } from "lightweight-charts";
@@ -55,12 +57,18 @@ export function MarketChart({
   candles,
   lines = [],
   markers = [],
+  live = null,
 }: {
   candles: Json[];
   lines?: PriceLine[];
   markers?: TimeMarker[];
+  live?: LiveKline | null;
 }) {
   const div = useRef<HTMLDivElement>(null);
+  const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const lastFinal = useRef(0);
+  const liveRef = useRef<LiveKline | null>(live);
+  liveRef.current = live;
   useEffect(() => {
     if (!div.current) return;
     const chart = createChart(div.current, {
@@ -118,8 +126,17 @@ export function MarketChart({
       createSeriesMarkers(series, placed);
     }
     chart.timeScale().fitContent();
-    return () => chart.remove();
+    seriesRef.current = series;
+    lastFinal.current = data.length > 0 ? Number(data[data.length - 1].time) : 0;
+    drawLive(series, liveRef.current, lastFinal.current);
+    return () => {
+      seriesRef.current = null;
+      chart.remove();
+    };
   }, [candles, lines, markers]);
+  useEffect(() => {
+    if (seriesRef.current) drawLive(seriesRef.current, live, lastFinal.current);
+  }, [live]);
   return (
     <div>
       <div
@@ -137,4 +154,33 @@ export function MarketChart({
       </p>
     </div>
   );
+}
+
+// S4-019: the forming bar from the venue push, drawn translucent after the
+// last recorded final bar; it is replaced once P1 records the final bar.
+function drawLive(
+  series: ISeriesApi<"Candlestick">,
+  live: LiveKline | null,
+  lastFinal: number,
+) {
+  if (!live) return;
+  const at = Date.parse(live.open_at) / 1000;
+  const values = [live.open, live.high, live.low, live.close].map(Number);
+  if (!Number.isInteger(at) || at <= lastFinal || values.some((x) => !Number.isFinite(x) || x <= 0)) return;
+  const up = values[3] >= values[0];
+  const color = up ? "rgba(38, 123, 89, 0.45)" : "rgba(177, 84, 71, 0.45)";
+  try {
+    series.update({
+      time: at as UTCTimestamp,
+      open: values[0],
+      high: values[1],
+      low: values[2],
+      close: values[3],
+      color,
+      wickColor: color,
+      borderColor: color,
+    });
+  } catch {
+    // An older bar than the series tail cannot be updated; skip it.
+  }
 }

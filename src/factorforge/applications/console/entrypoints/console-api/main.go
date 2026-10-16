@@ -44,7 +44,13 @@ func main() {
 	if e != nil {
 		fail()
 	}
-	handler, e := api.New(api.Options{TrustedPeers: peers, Sessions: sessions, Registry: registry, Query: app.ReadQuery{Client: client, Registry: registry, Policy: p.Policy(), Now: time.Now}, Origin: p.Origin, StaticDir: p.StaticDir, FixtureOnly: p.FixtureOnly, RefreshSeconds: p.RefreshSeconds, MaxRetries: p.MaxRetries})
+	var live *app.LiveHub
+	heartbeat := time.Duration(0)
+	if l := p.LiveMarket; l.Enabled {
+		live = &app.LiveHub{Venue: "BINANCE", Product: "LINEAR_PERPETUAL", Source: adapters.MarketStream{URL: l.URL, Origin: p.Origin, ReadTimeout: 30 * time.Second}, Interval: l.Interval, Stale: time.Duration(l.StaleSeconds) * time.Second, Idle: time.Duration(l.IdleSeconds) * time.Second, MaxStreams: l.MaxStreams, MaxAge: 23 * time.Hour}
+		heartbeat = time.Duration(l.HeartbeatSeconds) * time.Second
+	}
+	handler, e := api.New(api.Options{Live: live, LiveHeartbeat: heartbeat, TrustedPeers: peers, Sessions: sessions, Registry: registry, Query: app.ReadQuery{Client: client, Registry: registry, Policy: p.Policy(), Now: time.Now}, Origin: p.Origin, StaticDir: p.StaticDir, FixtureOnly: p.FixtureOnly, RefreshSeconds: p.RefreshSeconds, MaxRetries: p.MaxRetries})
 	if e != nil {
 		fail()
 	}

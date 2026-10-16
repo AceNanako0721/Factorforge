@@ -997,3 +997,16 @@ tbody tr:hover {
 .chart-host tr:hover {
   background: transparent;
 }
+
+/* v2.11.0 S4-019 实时参考行情 */
+@media (min-width: 1001px) {
+  .dynamic .summary-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.live-card {
+  border-left: 3px solid #2f5d8a;
+}
+.live-card.live-stale strong {
+  color: #9ba58d;
+}

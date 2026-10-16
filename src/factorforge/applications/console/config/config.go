@@ -10,8 +10,10 @@ import (
 	"math"
 	"net"
 	"net/netip"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -65,6 +67,37 @@ type Profile struct {
 	Bindings          []Binding `toml:"bindings" json:"bindings"`
 	// v2.10.0 (S4-018): tunnel hosts allowed besides loopback, as IP or CIDR.
 	TrustedPeers []string `toml:"trusted_peers" json:"trusted_peers"`
+	// v2.11.0 (S4-019): venue public push for the reference layer; absent
+	// or disabled keeps the v2.10.0 behaviour.
+	LiveMarket LiveMarket `toml:"live_market" json:"live_market"`
+}
+
+// LiveMarket configures the reference push (P4 design 17.4).
+type LiveMarket struct {
+	Enabled          bool   `toml:"enabled" json:"enabled"`
+	URL              string `toml:"url" json:"url"`
+	Interval         string `toml:"interval" json:"interval"`
+	StaleSeconds     int64  `toml:"stale_seconds" json:"stale_seconds"`
+	HeartbeatSeconds int64  `toml:"heartbeat_seconds" json:"heartbeat_seconds"`
+	IdleSeconds      int64  `toml:"idle_seconds" json:"idle_seconds"`
+	MaxStreams       int    `toml:"max_streams" json:"max_streams"`
+}
+
+// Valid checks an enabled block; a disabled block is always valid.
+func (l LiveMarket) Valid() bool {
+	if !l.Enabled {
+		return true
+	}
+	u, e := url.Parse(l.URL)
+	if e != nil || u.Scheme != "wss" || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || strings.Trim(u.Path, "/") != "" {
+		return false
+	}
+	for _, n := range []int64{l.StaleSeconds, l.HeartbeatSeconds, l.IdleSeconds} {
+		if n < 1 || n > 3600 {
+			return false
+		}
+	}
+	return d.Has([]string{"1m", "3m", "5m", "15m", "30m", "1h"}, l.Interval) && l.MaxStreams >= 1 && l.MaxStreams <= 1024
 }
 
 // User's runtime JSON omits secrets by design; profiles require separate private
@@ -104,7 +137,7 @@ func (p Profile) Peers() ([]netip.Prefix, error) {
 	return out, nil
 }
 func (p Profile) Validate() error {
-	if _, e := p.Peers(); e != nil || p.FixtureOnly && len(p.TrustedPeers) > 0 {
+	if _, e := p.Peers(); e != nil || p.FixtureOnly && (len(p.TrustedPeers) > 0 || p.LiveMarket.Enabled) || !p.LiveMarket.Valid() {
 		return d.Fail("CONSOLE_CONFIGURATION_REQUIRED", 503)
 	}
 	if p.FixtureOnly {
