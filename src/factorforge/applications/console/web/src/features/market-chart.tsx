@@ -122,7 +122,13 @@ export function MarketChart({
   }, [candles, lines, markers]);
   return (
     <div>
-      <div ref={div} aria-label="已记录最终K线" role="img" />
+      <div
+        ref={div}
+        aria-label="已记录最终K线"
+        role="img"
+        className="chart-host"
+        style={{ height: 320, position: "relative" }}
+      />
       <p className="muted">
         仅显示产品实际记录的最终 K 线；坐标为近似值，表格保留金额原值。图表：
         <a href="https://www.tradingview.com/" target="_blank" rel="noreferrer">

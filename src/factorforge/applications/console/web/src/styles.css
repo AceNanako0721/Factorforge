@@ -976,3 +976,24 @@ tbody tr:hover {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Lightweight Charts lays out with an internal table; the global table rules
+   (cell max-width, padding, sticky headers) must not reach it. */
+.chart-host table {
+  width: auto;
+  font-size: inherit;
+  white-space: normal;
+  border-collapse: separate;
+}
+.chart-host td,
+.chart-host th {
+  padding: 0;
+  border: 0;
+  max-width: none;
+  vertical-align: initial;
+  position: static;
+  background: transparent;
+}
+.chart-host tr:hover {
+  background: transparent;
+}
