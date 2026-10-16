@@ -50,7 +50,7 @@ func (h HTTPRead) Get(ctx context.Context, s d.Selection, resource, id string, f
 		if s.ObjectID == "" && resource != "strategy.health" {
 			return nil, d.Fail("READ_NOT_APPLICABLE", 422)
 		}
-	case "instances":
+	case "instances", "dynamic":
 		cfg = registered.Instance
 	}
 	base, e := url.Parse(cfg.URL)

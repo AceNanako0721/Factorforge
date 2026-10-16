@@ -179,7 +179,10 @@ func New(root string) (*World, error) {
 	if e = store.snapshot.Validate(); e != nil {
 		return nil, e
 	}
-	ih, e := ia.New(ia.Options{Query: iope.QueryService{Store: store, Clock: clock, Policy: iope.ReadPolicy{DefaultLimit: 2, MaxLimit: 20, MaxRecords: 1000, MaxSnapshotBytes: 1 << 20, MaxOriginalBytes: 4096, CursorAge: time.Minute, CursorKey: []byte("synthetic-console-instance-query-key")}}, Tokens: map[string]id.ReadPrincipal{"fixture-p3-read": {PrincipalID: "fixture-console", Binding: binding, Read: true, OriginalSources: []string{"fixture-source"}, AuthorizationVersion: "fixture-auth"}}})
+	instancePolicy := iope.ReadPolicy{DefaultLimit: 2, MaxLimit: 20, MaxRecords: 1000, MaxSnapshotBytes: 1 << 20, MaxOriginalBytes: 4096, CursorAge: time.Minute, CursorKey: []byte("synthetic-console-instance-query-key")}
+	// Dynamic records are recent so the page's rolling window shows them.
+	dynamic := &iope.DynamicQuery{Store: newDynamicStore(binding, time.Now().UTC().Add(-30*time.Minute).Truncate(time.Second)), Clock: wallClock{}, Policy: instancePolicy}
+	ih, e := ia.New(ia.Options{Query: iope.QueryService{Store: store, Clock: clock, Policy: instancePolicy}, Tokens: map[string]id.ReadPrincipal{"fixture-p3-read": {PrincipalID: "fixture-console", Binding: binding, Read: true, OriginalSources: []string{"fixture-source"}, AuthorizationVersion: "fixture-auth"}}, Dynamic: dynamic})
 	if e != nil {
 		return nil, e
 	}
@@ -294,4 +297,61 @@ func value(s string) dec.Value {
 		panic(e)
 	}
 	return v
+}
+
+type wallClock struct{}
+
+func (wallClock) Now() time.Time { return time.Now().UTC() }
+
+// dynamicStore is a synthetic v2.9.0 record set behind the real P3 read API
+// (P4 design 16.5). It has no write method, like DYNAMIC_READ.
+type dynamicStore struct {
+	binding id.Binding
+	at      time.Time
+	states  map[string]json.RawMessage
+	records []id.DynamicRecord
+	news    map[string]json.RawMessage
+}
+
+func newDynamicStore(b id.Binding, at time.Time) *dynamicStore {
+	raw := func(v any) json.RawMessage { x, _ := json.Marshal(v); return x }
+	batch := map[string]any{"cycle_id": "fixture-cycle", "direction": -1, "entry": 107.8, "opened_at": at.Add(-time.Hour), "geometry": map[string]any{"tier": 72, "session": "OVERNIGHT", "r": 0.16, "buffer": 0.017, "trail": 0.16, "requested_tier": 72}, "budget": 40, "best_close": 103, "last_bar_at": at, "close_stop": 125.2, "trailing": false, "transferred": false}
+	return &dynamicStore{binding: b, at: at,
+		states: map[string]json.RawMessage{
+			"POSITION":     raw(map[string]any{"noise_id": "fixture-noise", "noise_at": at.Add(-2 * time.Hour), "batch": batch, "baseline": map[string]any{"phase": "", "started_at": "0001-01-01T00:00:00Z", "suspended_at": "0001-01-01T00:00:00Z"}, "equity_peak": 4010}),
+			"INJECTION":    raw(map[string]any{"active": map[string]any{"direction": "SHORT", "confidence": 3, "event_ids": []string{"e1"}, "chain_id": "fixture-chain", "since": at.Add(-2 * time.Hour)}, "last_judgment": "fixture-judgment"}),
+			"NEWS_SOURCES": raw(map[string]any{"fixture-feed": map[string]any{"failing": false, "last_success": at}}),
+		},
+		records: []id.DynamicRecord{
+			{DynamicRecordKey: id.DynamicRecordKey{At: at.Add(-time.Hour), Kind: "STOP_EVENT", ID: "open-fixture-cycle"}, Payload: raw(map[string]any{"kind": "OPEN", "batch": batch})},
+			{DynamicRecordKey: id.DynamicRecordKey{At: at.Add(-2 * time.Hour), Kind: "JUDGMENT", ID: "fixture-judgment"}, Payload: raw(map[string]any{"judgment_id": "fixture-judgment", "at": at.Add(-2 * time.Hour), "ok": true, "provider": "gpt", "model": "fixture", "raw": "PRIVATE RAW", "input_ids": []string{"fixture-news"}, "output": map[string]any{"direction": "SHORT", "confidence": 3, "horizon_hours": 48, "thesis": "synthetic thesis", "key_item_ids": []string{"fixture-news"}, "invalidation": "synthetic"}})},
+			{DynamicRecordKey: id.DynamicRecordKey{At: at.Add(-2 * time.Hour), Kind: "ACTION", ID: "fixture-inject"}, Payload: raw(map[string]any{"kind": "INJECT", "reason": "FIRST_DIRECTION", "direction": "SHORT", "confidence": 3, "chain_id": "fixture-chain", "event_id": "e1"})},
+		},
+		news: map[string]json.RawMessage{"fixture-news": raw(map[string]any{"source": "fixture-feed", "title": "Synthetic headline", "published_at": at.Add(-3 * time.Hour), "license_scope": "PUBLIC", "link": "https://private.invalid"})},
+	}
+}
+func (s *dynamicStore) Binding() id.Binding { return s.binding }
+func (s *dynamicStore) StateWithVersion(_ context.Context, key string) (json.RawMessage, int64, time.Time, error) {
+	if v, ok := s.states[key]; ok {
+		return v, 1, s.at, nil
+	}
+	return nil, 0, time.Time{}, nil
+}
+func (s *dynamicStore) RecordPage(_ context.Context, kinds []string, since, until time.Time, before *id.DynamicRecordKey, _ bool, limit int) ([]id.DynamicRecord, error) {
+	out := []id.DynamicRecord{}
+	for _, r := range s.records {
+		if id.Has(kinds, r.Kind) && !r.At.Before(since) && r.At.Before(until) && (before == nil || r.At.Before(before.At)) && len(out) < limit {
+			out = append(out, r)
+		}
+	}
+	return out, nil
+}
+func (s *dynamicStore) RecordsByID(_ context.Context, _ string, ids []string) (map[string]json.RawMessage, error) {
+	out := map[string]json.RawMessage{}
+	for _, i := range ids {
+		if v, ok := s.news[i]; ok {
+			out[i] = v
+		}
+	}
+	return out, nil
 }

@@ -902,3 +902,77 @@ tbody tr:hover {
     transition: none !important;
   }
 }
+
+/* v2.10.0 S4-017 研判与止损页 */
+.dynamic {
+  display: grid;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+.dynamic-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+.table-scroll {
+  overflow-x: auto;
+}
+.ladder {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.ladder th,
+.ladder td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 640px;
+  overflow-y: auto;
+}
+.timeline > li {
+  border-left: 3px solid var(--olive);
+  padding: 8px 0 8px 12px;
+  margin-bottom: 10px;
+}
+.timeline > li.failed {
+  border-left-color: #b15447;
+}
+.timeline-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.timeline p {
+  margin: 6px 0;
+  overflow-wrap: anywhere;
+}
+.sources {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.sources li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+@media (max-width: 900px) {
+  .dynamic-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

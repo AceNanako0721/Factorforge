@@ -169,6 +169,10 @@ func ProjectBound(service, path string, raw []byte, allowOriginal bool, objectID
 	return projectBound(service, path, raw, allowOriginal, objectID)
 }
 func projectBound(service, path string, raw []byte, allowOriginal bool, objectID string) (SafeDTO, error) {
+	if service == "dynamic" {
+		// The dynamic routes are published in the instance contract.
+		service = "instances"
+	}
 	shapeOnce.Do(loadShapes)
 	if shapeErr != nil {
 		return SafeDTO{}, Fail("READ_SCHEMA_UNAVAILABLE", 503)

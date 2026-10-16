@@ -123,6 +123,825 @@
           ],
           "type": "object"
         },
+        "DynamicActionView": {
+          "additionalProperties": false,
+          "properties": {
+            "action_id": {
+              "type": "string"
+            },
+            "at": {
+              "format": "date-time",
+              "pattern": "Z$",
+              "type": "string"
+            },
+            "best": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "chain_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "close": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "close_stop": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "confidence": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "cycle_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "direction": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "entry": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "event_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "horizon_hours": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "kind": {
+              "type": "string"
+            },
+            "reason": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "reconfirm": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "source": {
+              "type": "string"
+            },
+            "stopped": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "targets": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "value": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "action_id",
+            "at",
+            "source",
+            "kind",
+            "reason",
+            "direction",
+            "confidence",
+            "horizon_hours",
+            "chain_id",
+            "event_id",
+            "targets",
+            "cycle_id",
+            "entry",
+            "close",
+            "close_stop",
+            "best",
+            "value",
+            "stopped",
+            "reconfirm"
+          ],
+          "type": "object"
+        },
+        "DynamicJudgmentView": {
+          "additionalProperties": false,
+          "properties": {
+            "at": {
+              "format": "date-time",
+              "pattern": "Z$",
+              "type": "string"
+            },
+            "confidence": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "counter_points": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "direction": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "error_codes": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "horizon_hours": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "input_count": {
+              "type": "integer"
+            },
+            "invalidation": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "invalidation_items": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "item_id": {
+                    "type": "string"
+                  },
+                  "license_scope": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "published_at": {
+                    "anyOf": [
+                      {
+                        "format": "date-time",
+                        "pattern": "Z$",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "source": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "title": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "item_id",
+                  "source",
+                  "title",
+                  "published_at",
+                  "license_scope"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "judgment_id": {
+              "type": "string"
+            },
+            "key_items": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "item_id": {
+                    "type": "string"
+                  },
+                  "license_scope": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "published_at": {
+                    "anyOf": [
+                      {
+                        "format": "date-time",
+                        "pattern": "Z$",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "source": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "title": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "item_id",
+                  "source",
+                  "title",
+                  "published_at",
+                  "license_scope"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "model": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "ok": {
+              "type": "boolean"
+            },
+            "previous_invalidated": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "provider": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "reason": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "thesis": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "judgment_id",
+            "at",
+            "ok",
+            "reason",
+            "provider",
+            "model",
+            "input_count",
+            "direction",
+            "confidence",
+            "horizon_hours",
+            "thesis",
+            "counter_points",
+            "invalidation",
+            "previous_invalidated",
+            "key_items",
+            "invalidation_items",
+            "error_codes"
+          ],
+          "type": "object"
+        },
+        "DynamicStatusView": {
+          "additionalProperties": false,
+          "properties": {
+            "baseline": {
+              "additionalProperties": false,
+              "properties": {
+                "direction": {
+                  "type": "string"
+                },
+                "phase": {
+                  "type": "string"
+                },
+                "source_chain": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "started_at": {
+                  "anyOf": [
+                    {
+                      "format": "date-time",
+                      "pattern": "Z$",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "suspended_at": {
+                  "anyOf": [
+                    {
+                      "format": "date-time",
+                      "pattern": "Z$",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "value": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "phase",
+                "direction",
+                "value",
+                "started_at",
+                "suspended_at",
+                "source_chain"
+              ],
+              "type": "object"
+            },
+            "batch": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "best_close": {
+                      "type": "string"
+                    },
+                    "budget": {
+                      "type": "string"
+                    },
+                    "buffer": {
+                      "type": "string"
+                    },
+                    "close_stop": {
+                      "type": "string"
+                    },
+                    "cycle_id": {
+                      "type": "string"
+                    },
+                    "direction": {
+                      "type": "string"
+                    },
+                    "entry": {
+                      "type": "string"
+                    },
+                    "last_bar_at": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "pattern": "Z$",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "opened_at": {
+                      "format": "date-time",
+                      "pattern": "Z$",
+                      "type": "string"
+                    },
+                    "r": {
+                      "type": "string"
+                    },
+                    "requested_tier_hours": {
+                      "type": "integer"
+                    },
+                    "session": {
+                      "type": "string"
+                    },
+                    "tier_hours": {
+                      "type": "integer"
+                    },
+                    "trail": {
+                      "type": "string"
+                    },
+                    "trail_trigger": {
+                      "type": "string"
+                    },
+                    "trailing": {
+                      "type": "boolean"
+                    },
+                    "transferred": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "cycle_id",
+                    "direction",
+                    "entry",
+                    "opened_at",
+                    "tier_hours",
+                    "requested_tier_hours",
+                    "session",
+                    "r",
+                    "buffer",
+                    "trail",
+                    "budget",
+                    "best_close",
+                    "last_bar_at",
+                    "close_stop",
+                    "trailing",
+                    "transferred",
+                    "trail_trigger"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "chain": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "chain_id": {
+                      "type": "string"
+                    },
+                    "confidence": {
+                      "type": "integer"
+                    },
+                    "direction": {
+                      "type": "string"
+                    },
+                    "judgment_count": {
+                      "type": "integer"
+                    },
+                    "since": {
+                      "format": "date-time",
+                      "pattern": "Z$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "chain_id",
+                    "direction",
+                    "confidence",
+                    "since",
+                    "judgment_count"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "equity_peak": {
+              "type": "string"
+            },
+            "last_judgment_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "next_entry": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "close_distance": {
+                      "type": "string"
+                    },
+                    "direction": {
+                      "type": "string"
+                    },
+                    "directive_id": {
+                      "type": "string"
+                    },
+                    "distance": {
+                      "type": "string"
+                    },
+                    "equity": {
+                      "type": "string"
+                    },
+                    "planned_at": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "pattern": "Z$",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "price": {
+                      "type": "string"
+                    },
+                    "risk_fraction": {
+                      "type": "string"
+                    },
+                    "session": {
+                      "type": "string"
+                    },
+                    "tier_hours": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "direction",
+                    "price",
+                    "distance",
+                    "close_distance",
+                    "risk_fraction",
+                    "equity",
+                    "tier_hours",
+                    "session",
+                    "directive_id",
+                    "planned_at"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "noise": {
+              "additionalProperties": false,
+              "properties": {
+                "generated_at": {
+                  "anyOf": [
+                    {
+                      "format": "date-time",
+                      "pattern": "Z$",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "noise_id": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "noise_id",
+                "generated_at"
+              ],
+              "type": "object"
+            },
+            "outcomes": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "closed_at": {
+                    "type": "string"
+                  },
+                  "r": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "r",
+                  "closed_at"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "sources": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "failing": {
+                    "type": "boolean"
+                  },
+                  "last_success": {
+                    "anyOf": [
+                      {
+                        "format": "date-time",
+                        "pattern": "Z$",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "source_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "source_id",
+                  "failing",
+                  "last_success"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "batch",
+            "next_entry",
+            "baseline",
+            "chain",
+            "noise",
+            "sources",
+            "outcomes",
+            "last_judgment_id",
+            "equity_peak"
+          ],
+          "type": "object"
+        },
         "EvidenceView": {
           "additionalProperties": false,
           "properties": {
@@ -1420,6 +2239,184 @@
               "$ref": "#/components/schemas/BudgetView"
             },
             "type": "array"
+          },
+          "environment": {
+            "enum": [
+              "SIM",
+              "LIVE"
+            ],
+            "type": "string"
+          },
+          "instance_id": {
+            "type": "string"
+          },
+          "observed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "pattern": "Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "schema_version": {
+            "const": "instance-2.0",
+            "type": "string"
+          },
+          "snapshot_version": {
+            "type": "string"
+          },
+          "source_version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "environment",
+          "instance_id",
+          "source_version",
+          "observed_at",
+          "snapshot_version",
+          "data"
+        ],
+        "type": "object"
+      },
+      "/api/v2/instances/{instance_id}/dynamic/actions": {
+        "additionalProperties": false,
+        "properties": {
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "environment": {
+            "enum": [
+              "SIM",
+              "LIVE"
+            ],
+            "type": "string"
+          },
+          "instance_id": {
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DynamicActionView"
+            },
+            "type": "array"
+          },
+          "observed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "pattern": "Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "schema_version": {
+            "const": "instance-2.0",
+            "type": "string"
+          },
+          "snapshot_version": {
+            "type": "string"
+          },
+          "source_version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "environment",
+          "instance_id",
+          "source_version",
+          "observed_at",
+          "snapshot_version",
+          "items",
+          "cursor"
+        ],
+        "type": "object"
+      },
+      "/api/v2/instances/{instance_id}/dynamic/judgments": {
+        "additionalProperties": false,
+        "properties": {
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "environment": {
+            "enum": [
+              "SIM",
+              "LIVE"
+            ],
+            "type": "string"
+          },
+          "instance_id": {
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DynamicJudgmentView"
+            },
+            "type": "array"
+          },
+          "observed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "pattern": "Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "schema_version": {
+            "const": "instance-2.0",
+            "type": "string"
+          },
+          "snapshot_version": {
+            "type": "string"
+          },
+          "source_version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "environment",
+          "instance_id",
+          "source_version",
+          "observed_at",
+          "snapshot_version",
+          "items",
+          "cursor"
+        ],
+        "type": "object"
+      },
+      "/api/v2/instances/{instance_id}/dynamic/status": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DynamicStatusView"
           },
           "environment": {
             "enum": [

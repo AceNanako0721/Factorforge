@@ -162,6 +162,14 @@ func Validate(ctx context.Context, c ports.ReadClient, s d.Selection, service st
 		if v["object_id"] != s.ObjectID || v["instance_id"] != s.InstanceID || v["environment"] != s.Environment || v["owner_id"] != s.OwnerID || !same(v["trading_run_key"], s.TradingRunKey) || !same(v["instrument_key"], s.InstrumentKey) {
 			return d.Fail("BINDING_MISMATCH", 409)
 		}
+	case "dynamic":
+		v, e := read("dynamic.status")
+		if e != nil {
+			return e
+		}
+		if v["schema_version"] != "instance-2.0" || v["environment"] != s.Environment || v["instance_id"] != s.InstanceID {
+			return d.Fail("BINDING_MISMATCH", 409)
+		}
 	case "instances":
 		v, e := read("instance.health")
 		if e != nil {

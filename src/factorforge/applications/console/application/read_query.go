@@ -25,6 +25,8 @@ var Views = map[string][]string{
 	"learning":   {"parameters", "learning", "activations", "validation"},
 	"operations": {"trading.operations", "alerts", "object", "instance.health", "sources", "jobs", "budgets"},
 	"reports":    {"reports"}, "audit": {"trading.audit", "strategy.audit", "instance.audit"},
+	// v2.10.0 (S4-017): judgment, stop and baseline page.
+	"dynamic": {"dynamic.status", "dynamic.judgments", "dynamic.actions", "account", "positions", "protections", "object", "candles"},
 }
 
 type Filter struct {
@@ -116,7 +118,7 @@ func (q ReadQuery) Read(ctx context.Context, u d.User, selection, view, id strin
 	if f.Limit < 1 || f.Limit > q.Policy.MaxLimit {
 		return Response{}, d.Fail("QUERY_LIMIT_INVALID", 422)
 	}
-	if view == "market" && (f.Interval == "" || f.Start == "" || f.End == "") {
+	if (view == "market" || view == "dynamic") && (f.Interval == "" || f.Start == "" || f.End == "") {
 		return Response{}, d.Fail("QUERY_RANGE_REQUIRED", 422)
 	}
 	out := Response{SchemaVersion: d.SchemaVersion, Selection: s, GeneratedAt: q.Now().UTC(), Panels: []Panel{}}
@@ -160,6 +162,11 @@ func (q ReadQuery) Read(ctx context.Context, u d.User, selection, view, id strin
 		go func(index int, resource string) {
 			defer wg.Done()
 			p := Panel{Source: resource, FetchedAt: q.Now().UTC(), State: "AVAILABLE"}
+			window := f.Limit
+			if view == "dynamic" && resource == "candles" {
+				// The chart needs the whole requested range (P4 design 16.3).
+				window = q.Policy.MaxLimit
+			}
 			route := d.Routes[resource]
 			if err := services[route.Service]; err != nil {
 				p.RetryAt = retryAt(err, q.Now())
@@ -275,7 +282,7 @@ func (q ReadQuery) Read(ctx context.Context, u d.User, selection, view, id strin
 									}
 								}
 								if err == nil {
-									end := offset + f.Limit
+									end := offset + window
 									if end > len(rows) {
 										end = len(rows)
 									}
@@ -297,7 +304,7 @@ func (q ReadQuery) Read(ctx context.Context, u d.User, selection, view, id strin
 									if view == "case" && resource == "cases" {
 										caseID = id
 									}
-									value, e = value.Window(offset, f.Limit, caseID)
+									value, e = value.Window(offset, window, caseID)
 									err = e
 								}
 							}

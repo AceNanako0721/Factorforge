@@ -40,7 +40,11 @@ func main() {
 		fail()
 	}
 	client := adapters.HTTPRead{Bindings: bindings, Timeout: p.Policy().RequestTimeout, MaxBytes: p.MaxBytes}
-	handler, e := api.New(api.Options{Sessions: sessions, Registry: registry, Query: app.ReadQuery{Client: client, Registry: registry, Policy: p.Policy(), Now: time.Now}, Origin: p.Origin, StaticDir: p.StaticDir, FixtureOnly: p.FixtureOnly, RefreshSeconds: p.RefreshSeconds, MaxRetries: p.MaxRetries})
+	peers, e := p.Peers()
+	if e != nil {
+		fail()
+	}
+	handler, e := api.New(api.Options{TrustedPeers: peers, Sessions: sessions, Registry: registry, Query: app.ReadQuery{Client: client, Registry: registry, Policy: p.Policy(), Now: time.Now}, Origin: p.Origin, StaticDir: p.StaticDir, FixtureOnly: p.FixtureOnly, RefreshSeconds: p.RefreshSeconds, MaxRetries: p.MaxRetries})
 	if e != nil {
 		fail()
 	}

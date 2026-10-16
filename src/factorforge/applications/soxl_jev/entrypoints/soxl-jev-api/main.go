@@ -40,7 +40,18 @@ func run() error {
 	}
 	defer store.Close()
 	query := operations.QueryService{Store: store, Clock: systemClock{}, Policy: c.Policy()}
-	handler, err := api.New(api.Options{Query: query, Tokens: map[string]d.ReadPrincipal{c.Token: c.Principal()}})
+	var dynamic *operations.DynamicQuery
+	if c.DynamicDatabaseURL != "" {
+		connect, stop := context.WithTimeout(ctx, timeout)
+		reader, err := pg.OpenPipeline(connect, c.DynamicDatabaseURL, c.Binding(), "DYNAMIC_READ", c.QueryMaxSnapshotBytes)
+		stop()
+		if err != nil {
+			return err
+		}
+		defer reader.Close()
+		dynamic = &operations.DynamicQuery{Store: reader, Clock: systemClock{}, Policy: c.Policy()}
+	}
+	handler, err := api.New(api.Options{Query: query, Tokens: map[string]d.ReadPrincipal{c.Token: c.Principal()}, Dynamic: dynamic})
 	if err != nil {
 		return err
 	}

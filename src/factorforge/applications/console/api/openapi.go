@@ -95,7 +95,7 @@ func OpenAPI() []byte {
 		pages[page] = str
 	}
 	add("/capabilities", "get", object(map[string]any{"schema_version": str, "pages": object(pages), "refresh_seconds": integer, "max_retries": integer}, "schema_version", "pages", "refresh_seconds", "max_retries"), true, []any{param("selection_id", false, id)}, nil, "200")
-	for _, path := range []string{"overview", "market", "events", "events/{event_id}", "evidence/{evidence_id}", "sentiment", "decisions", "execution", "cases", "cases/{case_id}", "learning", "operations", "reports", "audit", "export"} {
+	for _, path := range []string{"overview", "market", "events", "events/{event_id}", "evidence/{evidence_id}", "sentiment", "decisions", "execution", "cases", "cases/{case_id}", "learning", "operations", "reports", "audit", "dynamic", "export"} {
 		params := []any{param("selection_id", true, id), param("source", false, str), param("cursor", false, str), param("limit", false, map[string]any{"type": "integer", "minimum": 1})}
 		if strings.Contains(path, "{") {
 			name := strings.TrimSuffix(strings.Split(path, "{")[1], "}")
@@ -105,6 +105,8 @@ func OpenAPI() []byte {
 		switch path {
 		case "market":
 			extras = []string{"interval", "start", "end"}
+		case "dynamic":
+			extras = []string{"interval", "start", "end", "from", "to"}
 		case "events", "reports", "audit", "learning":
 			extras = []string{"from", "to"}
 		case "events/{event_id}":

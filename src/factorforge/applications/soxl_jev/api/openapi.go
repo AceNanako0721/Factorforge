@@ -66,14 +66,14 @@ func shape(t reflect.Type) map[string]any {
 	}
 }
 func OpenAPI() []byte {
-	schemas := map[string]any{"InstanceHealth": shape(reflect.TypeFor[InstanceHealth]()), "SourceView": shape(reflect.TypeFor[SourceView]()), "JobView": shape(reflect.TypeFor[JobView]()), "EvidenceView": shape(reflect.TypeFor[EvidenceView]()), "BudgetView": shape(reflect.TypeFor[BudgetView]()), "ReportView": shape(reflect.TypeFor[ReportView]()), "InstanceAuditView": shape(reflect.TypeFor[InstanceAuditView]()), "Problem": shape(reflect.TypeFor[Problem]())}
+	schemas := map[string]any{"InstanceHealth": shape(reflect.TypeFor[InstanceHealth]()), "SourceView": shape(reflect.TypeFor[SourceView]()), "JobView": shape(reflect.TypeFor[JobView]()), "EvidenceView": shape(reflect.TypeFor[EvidenceView]()), "BudgetView": shape(reflect.TypeFor[BudgetView]()), "ReportView": shape(reflect.TypeFor[ReportView]()), "InstanceAuditView": shape(reflect.TypeFor[InstanceAuditView]()), "DynamicStatusView": shape(reflect.TypeFor[DynamicStatusView]()), "DynamicJudgmentView": shape(reflect.TypeFor[DynamicJudgmentView]()), "DynamicActionView": shape(reflect.TypeFor[DynamicActionView]()), "Problem": shape(reflect.TypeFor[Problem]())}
 	ref := func(name string) map[string]any { return map[string]any{"$ref": "#/components/schemas/" + name} }
 	paths := map[string]any{}
 	for _, r := range []struct {
 		path, view string
 		page       bool
 		query      []string
-	}{{"/health", "InstanceHealth", false, nil}, {"/sources", "SourceView", true, []string{"cursor", "limit"}}, {"/analysis-jobs", "JobView", true, []string{"queue_kind", "state", "cursor", "limit"}}, {"/analysis-jobs/{job_id}", "JobView", false, nil}, {"/evidence/{evidence_id}", "EvidenceView", false, nil}, {"/budgets", "BudgetView", false, nil}, {"/reports", "ReportView", true, []string{"from", "to", "cursor", "limit"}}, {"/audit", "InstanceAuditView", true, []string{"from", "to", "cursor", "limit"}}} {
+	}{{"/health", "InstanceHealth", false, nil}, {"/sources", "SourceView", true, []string{"cursor", "limit"}}, {"/analysis-jobs", "JobView", true, []string{"queue_kind", "state", "cursor", "limit"}}, {"/analysis-jobs/{job_id}", "JobView", false, nil}, {"/evidence/{evidence_id}", "EvidenceView", false, nil}, {"/budgets", "BudgetView", false, nil}, {"/reports", "ReportView", true, []string{"from", "to", "cursor", "limit"}}, {"/audit", "InstanceAuditView", true, []string{"from", "to", "cursor", "limit"}}, {"/dynamic/status", "DynamicStatusView", false, nil}, {"/dynamic/judgments", "DynamicJudgmentView", true, []string{"from", "to", "cursor", "limit"}}, {"/dynamic/actions", "DynamicActionView", true, []string{"from", "to", "cursor", "limit"}}} {
 		wrapped := shape(reflect.TypeFor[operations.Metadata]())
 		props := wrapped["properties"].(map[string]any)
 		required := wrapped["required"].([]string)

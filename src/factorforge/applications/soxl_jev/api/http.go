@@ -3,6 +3,7 @@
 package api
 
 import (
+	"context"
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
@@ -17,6 +18,9 @@ const Prefix = "/api/v2/instances/{instance_id}"
 type Options struct {
 	Query  operations.QueryService
 	Tokens map[string]d.ReadPrincipal
+	// Dynamic serves the v2.10.0 /dynamic routes; nil answers
+	// DYNAMIC_READ_NOT_CONFIGURED (P3 design 29.2).
+	Dynamic *operations.DynamicQuery
 }
 type Problem struct {
 	Code      string `json:"code"`
@@ -61,7 +65,7 @@ func New(o Options) (http.Handler, error) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write(OpenAPI())
 	})
-	for _, route := range []struct{ path, resource, id string }{{"/health", "health", ""}, {"/sources", "sources", ""}, {"/analysis-jobs", "analysis-jobs", ""}, {"/analysis-jobs/{job_id}", "analysis-job", "job_id"}, {"/evidence/{evidence_id}", "evidence", "evidence_id"}, {"/budgets", "budgets", ""}, {"/reports", "reports", ""}, {"/audit", "audit", ""}} {
+	for _, route := range []struct{ path, resource, id string }{{"/dynamic/status", "dynamic-status", ""}, {"/dynamic/judgments", "dynamic-judgments", ""}, {"/dynamic/actions", "dynamic-actions", ""}, {"/health", "health", ""}, {"/sources", "sources", ""}, {"/analysis-jobs", "analysis-jobs", ""}, {"/analysis-jobs/{job_id}", "analysis-job", "job_id"}, {"/evidence/{evidence_id}", "evidence", "evidence_id"}, {"/budgets", "budgets", ""}, {"/reports", "reports", ""}, {"/audit", "audit", ""}} {
 		mux.HandleFunc("GET "+Prefix+route.path, func(w http.ResponseWriter, r *http.Request) {
 			var p *d.ReadPrincipal
 			scheme, credential, found := strings.Cut(r.Header.Get("Authorization"), " ")
@@ -92,7 +96,12 @@ func New(o Options) (http.Handler, error) {
 				reject(w, err)
 				return
 			}
-			value, err := o.Query.Read(r.Context(), *p, route.resource, id, filter)
+			var value any
+			if strings.HasPrefix(route.resource, "dynamic-") {
+				value, err = readDynamic(r.Context(), o.Dynamic, *p, route.resource, filter)
+			} else {
+				value, err = o.Query.Read(r.Context(), *p, route.resource, id, filter)
+			}
 			if err != nil {
 				reject(w, err)
 				return
@@ -101,4 +110,18 @@ func New(o Options) (http.Handler, error) {
 		})
 	}
 	return mux, nil
+}
+
+func readDynamic(ctx context.Context, q *operations.DynamicQuery, p d.ReadPrincipal, resource string, f operations.Filter) (any, error) {
+	if q == nil {
+		return nil, d.Fail("DYNAMIC_READ_NOT_CONFIGURED", 503)
+	}
+	switch resource {
+	case "dynamic-status":
+		return q.Status(ctx, p)
+	case "dynamic-judgments":
+		return q.Judgments(ctx, p, f)
+	default:
+		return q.Actions(ctx, p, f)
+	}
 }

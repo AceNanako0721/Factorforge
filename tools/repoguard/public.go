@@ -97,6 +97,27 @@ func TemplateIssue(name string, data []byte, historical bool) string {
 		if !equalJSON(actual["services"], services) && !(historical && equalJSON(actual["services"], oldServices)) {
 			return "nonempty-template-service-settings"
 		}
+		if historical {
+			// Pre-v2.10.0 templates lack the two empty v2.10.0 fields; treat
+			// their absence as the empty value so older shapes stay exact.
+			actual = cloneMap(actual)
+			application := cloneMap(asMap(actual["application"]))
+			if read, ok := application["read_api"].(map[string]any); ok {
+				if _, has := read["dynamic_database_url"]; !has {
+					read = cloneMap(read)
+					read["dynamic_database_url"] = ""
+					application["read_api"] = read
+					actual["application"] = application
+				}
+			}
+			if console, ok := actual["console"].(map[string]any); ok {
+				if _, has := console["trusted_peers"]; !has {
+					console = cloneMap(console)
+					console["trusted_peers"] = []any{}
+					actual["console"] = console
+				}
+			}
+		}
 		if equalJSON(actual, expected) {
 			return ""
 		}
