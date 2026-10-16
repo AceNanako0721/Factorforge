@@ -52,7 +52,8 @@ func settle(t *testing.T, store *adapters.MemoryStore, instance string) {
 	if err := store.Transaction(context.Background(), instance, func(s *sd.StrategyState) error {
 		for _, row := range s.Outbox.Values() {
 			if row.State == "PENDING" || row.State == "DELIVERY_UNKNOWN" {
-				row.State = "ACK"
+				// As Dispatch does on acknowledgement.
+				row.State, row.AcceptedAt = "ACK", sd.Ptr(row.Decision.AvailableCutoff)
 			}
 		}
 		return nil
@@ -494,5 +495,31 @@ func TestT237DynamicShapesAdmitAndLegacyHashesStable(t *testing.T) {
 	legacy := sd.StopDirective{DirectiveID: "d", ObjectID: "o", Version: 1, Kind: "POSITION_STOP", PositionDirection: "LONG", TriggerPrice: sd.Ptr(sd.Int(95)), TriggerKind: "MARK", EffectiveAt: at, ValidForSeconds: 60, SourceModule: "stops", ReasonCodes: []string{"X"}, Mode: "VENUE"}
 	if _, ok := sd.Map(legacy)["risk_fraction"]; ok {
 		t.Fatal("optional field leaked into legacy hash")
+	}
+}
+
+// An adjustment-driven batch whose opening was delayed by a gate opens once
+// the gate clears, even though the composed level did not change.
+func TestT228RiskUnitOpensAfterGateWithUnchangedLevel(t *testing.T) {
+	s, o, p, snap, id, at := riskUnitFixture(t)
+	p.Composition.Baseline = []sd.BaselineFactor{}
+	p.Composition.Adjustment.EventOnlyCap = sd.One()
+	s.Events.Set("judgment-1", &sd.Event{EventID: "judgment-1", FamilyID: "judgment-1", FactVersion: 1, Relation: "NEW", SubjectID: "SOXL", EventType: "NEWS_JUDGMENT", OccurredAt: at, FirstPublicAt: at, EvidenceRefs: []sd.EvidenceRef{}, Claims: []sd.Claim{}, ObjectIDs: []string{o.ObjectID}, State: "VERIFIED", Novelty: sd.One()})
+	c := &sd.Contribution{ContributionID: "contribution-j1", ObjectID: o.ObjectID, EventID: "judgment-1", FamilyID: "judgment-1", Direction: 1, InitialAmount: compDecimal("0.9"), EffectiveAt: at, LastUpdatedAt: at, HalfLife: sd.Int(864000), Eta: sd.One(), ReferencePrice: sd.Int(100), FrozenParameterVersion: o.ParameterVersion, ScoreID: "score-j1", Quality: sd.One(), State: "ACTIVE", RealizationDisabled: true}
+	s.Contributions.Set(c.ContributionID, c)
+	if err := s.Append(c, sd.LedgerEntry{At: at, Reason: "INJECTION", Injection: compDecimal("0.9")}); err != nil {
+		t.Fatal(err)
+	}
+	store, clock := adapters.NewMemory(s), adapters.NewReplay(at)
+	service := app.Service{Store: store, Clock: clock, Trading: &compositionTrading{snap: snap}}
+	if d := tick(t, store, clock, snap, id); d.TargetQuantity.Sign() != 0 || !sd.Has(d.ReasonCodes, "RISK_UNIT_DIRECTIVE_MISSING") {
+		t.Fatal("gate", d.ReasonCodes)
+	}
+	settle(t, store, s.InstanceID)
+	clock.Advance(at.Add(10 * time.Minute))
+	move(snap, o, clock.Now())
+	submitInitial(t, service, s, o, id, clock.Now(), "LONG", 1, nil)
+	if d := tick(t, store, clock, snap, id); d.TargetQuantity.Sign() <= 0 {
+		t.Fatal("delayed batch must open at the unchanged level", d.TargetQuantity, d.ReasonCodes)
 	}
 }
