@@ -39,6 +39,7 @@ func StopDirectiveSchemas() map[string]any {
 		typ := reflect.TypeOf(model)
 		props := map[string]any{}
 		required := []string{}
+		optional := []string{}
 		var add func(reflect.Type)
 		add = func(t reflect.Type) {
 			for i := 0; i < t.NumField(); i++ {
@@ -49,6 +50,10 @@ func StopDirectiveSchemas() map[string]any {
 				}
 				key := strings.Split(f.Tag.Get("json"), ",")[0]
 				props[key] = field(f.Type)
+				if strings.Contains(f.Tag.Get("json"), "omitempty") {
+					optional = append(optional, key)
+					continue
+				}
 				required = append(required, key)
 			}
 		}
@@ -76,7 +81,7 @@ func StopDirectiveSchemas() map[string]any {
 				_ = i
 			}
 			for k := range props {
-				if !Has([]string{"mode", "overshoot_allowance"}, k) {
+				if !Has(append([]string{"mode", "overshoot_allowance"}, optional...), k) {
 					required = append(required, k)
 				}
 			}

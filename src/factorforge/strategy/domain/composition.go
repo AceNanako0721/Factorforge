@@ -31,11 +31,12 @@ type AdjustmentRule struct {
 	EventOnlyCap Decimal `json:"event_only_cap"`
 }
 type RebalanceRule struct {
-	BandFloor             Decimal `json:"band_floor"`
-	ExpectedHoldSeconds   int     `json:"expected_hold_seconds"`
-	FundingFallbackAnnual Decimal `json:"funding_fallback_annual"`
-	AdjustIntervalSeconds int     `json:"adjust_interval_seconds"`
-	ReverseConfirmSeconds int     `json:"reverse_confirm_seconds"`
+	BandFloor             Decimal  `json:"band_floor"`
+	ExpectedHoldSeconds   int      `json:"expected_hold_seconds"`
+	FundingFallbackAnnual Decimal  `json:"funding_fallback_annual"`
+	AdjustIntervalSeconds int      `json:"adjust_interval_seconds"`
+	ReverseConfirmSeconds int      `json:"reverse_confirm_seconds"`
+	BandRatioOfUnit       *Decimal `json:"band_ratio_of_unit,omitempty"`
 }
 type Composition struct {
 	Baseline           []BaselineFactor  `json:"baseline"`
@@ -46,6 +47,11 @@ type Composition struct {
 	Adjustment         AdjustmentRule    `json:"adjustment"`
 	Levels             []Level           `json:"levels"`
 	Rebalance          RebalanceRule     `json:"rebalance"`
+	Sizing             *SizingRule       `json:"sizing,omitempty"`
+	Reentry            *ReentryRule      `json:"reentry,omitempty"`
+	ChainLoss          *ChainLossRule    `json:"chain_loss,omitempty"`
+	PreEvent           []PreEventRule    `json:"pre_event,omitempty"`
+	Transfer           *TransferRule     `json:"transfer,omitempty"`
 }
 type FactorDefinition struct {
 	FactorID       string  `json:"factor_id"`
@@ -64,6 +70,8 @@ type FactorObservation struct {
 	EvidenceRef   string    `json:"evidence_ref"`
 	Supersedes    *string   `json:"supersedes"`
 	Referenced    bool      `json:"referenced,omitempty"`
+	Reconfirm     bool      `json:"reconfirm,omitempty"`
+	ReasonCode    string    `json:"reason_code,omitempty"`
 }
 type FactorSeries struct {
 	Definition   FactorDefinition    `json:"definition"`
@@ -119,7 +127,7 @@ func (c Composition) Validate() error {
 	m := Math()
 	sum := Zero()
 	seen := map[string]bool{}
-	if !Has([]string{"ZERO", "HOLD_REDUCE_ONLY"}, c.MissingPolicy) || !validLayerState(c.Scheduled.State) || !unit(c.Scheduled.Cap) || !validLayerState(c.Adjustment.State) || !unit(c.Adjustment.Cap) || !unit(c.Adjustment.EventOnlyCap) || c.Adjustment.EventOnlyCap.Cmp(c.Adjustment.Cap) > 0 || c.Adjustment.Scale.Sign() <= 0 || len(c.Levels) == 0 || c.Rebalance.BandFloor.Sign() < 0 || c.Rebalance.ExpectedHoldSeconds <= 0 || c.Rebalance.AdjustIntervalSeconds <= 0 || c.Rebalance.ReverseConfirmSeconds < 0 {
+	if !Has([]string{"ZERO", "HOLD_REDUCE_ONLY"}, c.MissingPolicy) || !validLayerState(c.Scheduled.State) || !unit(c.Scheduled.Cap) || !validLayerState(c.Adjustment.State) || !unit(c.Adjustment.Cap) || !unit(c.Adjustment.EventOnlyCap) || c.Adjustment.EventOnlyCap.Cmp(c.Adjustment.Cap) > 0 || c.Adjustment.Scale.Sign() <= 0 || len(c.Levels) == 0 || c.Rebalance.BandFloor.Sign() < 0 || c.Rebalance.ExpectedHoldSeconds <= 0 || c.Rebalance.AdjustIntervalSeconds < 0 || c.Rebalance.ReverseConfirmSeconds < 0 || !c.validDynamic() {
 		return invalid()
 	}
 	for _, f := range c.Baseline {

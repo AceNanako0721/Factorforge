@@ -317,7 +317,7 @@ func (e *ExposureRisk) UnmarshalJSON(b []byte) error {
 }
 
 func (p Policy) Numerical() NumericalPolicy {
-	return NumericalPolicy{Levels: p.Levels, CleanupThreshold: p.CleanupThreshold, NumericalTolerance: p.NumericalTolerance, Epsilon: p.Epsilon, SigmaRef: p.SigmaRef, LiquidityBudget: p.LiquidityBudget, ObjectLossBudget: p.ObjectLossBudget, PortfolioGrossLimit: p.PortfolioGrossLimit, PortfolioNetLimit: p.PortfolioNetLimit, PortfolioStressLimit: p.PortfolioStressLimit, GroupLimits: p.GroupLimits, MicroDistance: p.MicroDistance, MaxStopFraction: p.MaxStopFraction, FeeRate: p.FeeRate, SlippageFraction: p.SlippageFraction, GapFraction: p.GapFraction, NoiseQuantile: p.NoiseQuantile, MaxNoiseFraction: p.MaxNoiseFraction, Beta: p.Beta, NoiseWindow: p.NoiseWindow, MaxBarGapSeconds: p.MaxBarGapSeconds, EventTTLSeconds: p.EventTTLSeconds, AbsolutePriceProxyValidated: p.AbsolutePriceProxyValidated}
+	return NumericalPolicy{Levels: p.Levels, CleanupThreshold: p.CleanupThreshold, NumericalTolerance: p.NumericalTolerance, Epsilon: p.Epsilon, SigmaRef: p.SigmaRef, LiquidityBudget: p.LiquidityBudget, ObjectLossBudget: p.ObjectLossBudget, PortfolioGrossLimit: p.PortfolioGrossLimit, PortfolioNetLimit: p.PortfolioNetLimit, PortfolioStressLimit: p.PortfolioStressLimit, GroupLimits: p.GroupLimits, MicroDistance: p.MicroDistance, MaxStopFraction: p.MaxStopFraction, FeeRate: p.FeeRate, SlippageFraction: p.SlippageFraction, GapFraction: p.GapFraction, NoiseQuantile: p.NoiseQuantile, MaxNoiseFraction: p.MaxNoiseFraction, Beta: p.Beta, NoiseWindow: p.NoiseWindow, MaxBarGapSeconds: p.MaxBarGapSeconds, EventTTLSeconds: p.EventTTLSeconds, AbsolutePriceProxyValidated: p.AbsolutePriceProxyValidated, CleanupFractionOfInitial: p.CleanupFractionOfInitial, RealizationDisabledTypes: p.RealizationDisabledTypes}
 }
 func (s *StrategyState) Sentiment() SentimentState {
 	v := SentimentState{Contributions: []Contribution{}, Ledger: s.Ledger}
@@ -439,6 +439,9 @@ func walkValidate(v reflect.Value) error {
 			if err := x.Composition.Validate(); err != nil {
 				return err
 			}
+		}
+		if err := ValidateJudgmentPolicy(&x); err != nil {
+			return invalid()
 		}
 		if x.TrendWindowSeconds != nil && (*x.TrendWindowSeconds < x.CycleSeconds || *x.TrendWindowSeconds > 604800) {
 			return invalid()

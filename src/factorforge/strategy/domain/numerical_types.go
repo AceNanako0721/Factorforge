@@ -29,6 +29,8 @@ type NumericalPolicy struct {
 	NoiseQuantile, MaxNoiseFraction, Beta                                          Decimal
 	NoiseWindow, MaxBarGapSeconds, EventTTLSeconds                                 int
 	AbsolutePriceProxyValidated                                                    bool
+	CleanupFractionOfInitial                                                       *Decimal
+	RealizationDisabledTypes                                                       []string
 }
 type Contribution struct {
 	ContributionID         string             `json:"contribution_id"`
@@ -51,6 +53,7 @@ type Contribution struct {
 	PriceConsumed          Decimal            `json:"price_consumed"`
 	State                  string             `json:"state"`
 	FactWeights            map[string]Decimal `json:"fact_weights"`
+	RealizationDisabled    bool               `json:"realization_disabled,omitempty"`
 }
 type LedgerEntry struct {
 	Sequence         int       `json:"sequence"`

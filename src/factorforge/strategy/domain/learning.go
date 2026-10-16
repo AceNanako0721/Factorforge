@@ -260,6 +260,16 @@ func Activate(s *StrategyState, obj *ObservedObject, at time.Time) error {
 			if Text(c["object_id"]) != obj.ObjectID || Text(c["state"]) != "APPROVED" || !At(c["approved_at"]).Before(at) {
 				continue
 			}
+			// S2-041: a frozen forward test records the candidate without applying it;
+			// unfreezing never replays these records.
+			if s.Policies.Value(obj.TimePolicyVersion).LearningFrozen() {
+				c["state"] = "RECORDED_FROZEN"
+				c["reason"] = "LEARNING_FROZEN"
+				frozen := Clone(c)
+				frozen["frozen_at"] = ISO(at)
+				s.FrozenCandidates.Set(Text(c["candidate_id"]), frozen)
+				continue
+			}
 			if Text(c["parent_version"]) != obj.ParameterVersion {
 				c["state"] = "REJECTED"
 				c["reason"] = "PARAMETER_VERSION_CONFLICT"

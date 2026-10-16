@@ -17,6 +17,9 @@ type StopDirective struct {
 	ReasonCodes         []string  `json:"reason_codes"`
 	Mode                string    `json:"mode"`
 	OvershootAllowance  *Decimal  `json:"overshoot_allowance"`
+	RiskFraction        *Decimal  `json:"risk_fraction,omitempty"`
+	CloseStopPrice      *Decimal  `json:"close_stop_price,omitempty"`
+	CloseStopDistance   *Decimal  `json:"close_stop_distance,omitempty"`
 }
 type StopDirectiveCommand struct {
 	Command
@@ -67,6 +70,7 @@ type EffectiveStrategyStop struct {
 	ProtectionID      *string   `json:"protection_id"`
 	Plan              StopPlan  `json:"plan"`
 	VerifiedAt        time.Time `json:"verified_at"`
+	CloseStop         *Decimal  `json:"close_stop,omitempty"`
 }
 
 func StopDirectiveKey(d StopDirective, principal string, research bool) string {
@@ -130,6 +134,20 @@ func ValidateStopDirective(v StopDirective) error {
 	}
 	if v.Kind == "POSITION_STOP" && (v.TriggerPrice == nil || v.TriggerPrice.Sign() <= 0 || v.InitialStopDistance != nil) || v.Kind == "INITIAL_DISTANCE" && (v.InitialStopDistance == nil || v.InitialStopDistance.Sign() <= 0 || v.TriggerPrice != nil) {
 		return &Error{"STOP_DIRECTIVE_INVALID", 422}
+	}
+	// v2.9.0 S2-033/S2-034 optional fields.
+	if v.RiskFraction != nil && (v.Kind != "INITIAL_DISTANCE" || v.RiskFraction.Sign() <= 0 || v.RiskFraction.Cmp(One()) > 0) {
+		return &Error{"STOP_DIRECTIVE_INVALID", 422}
+	}
+	if v.CloseStopPrice != nil {
+		if v.Kind != "POSITION_STOP" || v.Mode != "VENUE" || v.CloseStopPrice.Sign() <= 0 || v.PositionDirection == "LONG" && v.CloseStopPrice.Cmp(*v.TriggerPrice) <= 0 || v.PositionDirection == "SHORT" && v.CloseStopPrice.Cmp(*v.TriggerPrice) >= 0 {
+			return &Error{"STOP_DIRECTIVE_CLOSE_STOP_INVALID", 422}
+		}
+	}
+	if v.CloseStopDistance != nil {
+		if v.Kind != "INITIAL_DISTANCE" || v.Mode != "VENUE" || v.CloseStopDistance.Sign() <= 0 || v.CloseStopDistance.Cmp(*v.InitialStopDistance) >= 0 {
+			return &Error{"STOP_DIRECTIVE_CLOSE_STOP_INVALID", 422}
+		}
 	}
 	return nil
 }

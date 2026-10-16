@@ -232,9 +232,9 @@ func AdvanceScheduled(s *StrategyState, obj *ObservedObject, at time.Time, p *Po
 			end := PriceAt(s.Samples.Value(obj.ObjectID), w.End)
 			if w.StartPrice != nil && w.StartPrice.Sign() > 0 && end != nil && end.Price.Sign() > 0 {
 				r := m.Ln(m.Div(end.Price, *w.StartPrice))
-				if err := t.Observe(r); err != nil {
-					return err
-				}
+				// v2.9.0 S2-042: window returns are recorded for audit but no
+				// longer update template direction or size (no historical-price
+				// inference). Estimate keeps using the registered prior only.
 				record.Status = "MATURE"
 				record.Direction = r.Sign()
 				record.LabelStatus = "NEUTRAL"

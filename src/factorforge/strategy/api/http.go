@@ -256,6 +256,22 @@ func New(options Options) (http.Handler, error) {
 		v, e := service.UpsertScheduledEvent(r.Context(), p, body)
 		return v, 201, e
 	})
+	register("POST", "/exit-requests", func(_ http.ResponseWriter, r *http.Request, p d.Identity) (any, int, error) {
+		var body d.ExitRequestCommand
+		if e := d.Decode(r.Body, &body); e != nil {
+			return nil, 0, &d.Error{Code: "EXIT_REQUEST_INVALID", Status: 422}
+		}
+		v, e := service.SubmitCloseExit(r.Context(), p, body)
+		return v, 200, e
+	})
+	register("POST", "/baseline-transfers", func(_ http.ResponseWriter, r *http.Request, p d.Identity) (any, int, error) {
+		var body d.BaselineTransferCommand
+		if e := d.Decode(r.Body, &body); e != nil {
+			return nil, 0, e
+		}
+		v, e := service.TransferToBaseline(r.Context(), p, body)
+		return v, 200, e
+	})
 	register("GET", "/objects/{object_id}", func(_ http.ResponseWriter, r *http.Request, p d.Identity) (any, int, error) {
 		s, e := query(r, p, r.PathValue("object_id"))
 		if e != nil {

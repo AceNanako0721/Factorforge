@@ -340,12 +340,20 @@ func (s Service) Submit(ctx context.Context, identity d.Identity, request d.Scor
 		case !d.Has(p.Calibrations, score.CalibrationVersion) || !d.Has(p.Rubrics, score.RubricVersion):
 			status = "QUARANTINED"
 			reasons = []string{"UNCALIBRATED_SCORE"}
+		case state.Environment == "LIVE" && d.Has(p.ExperimentCalibrations, score.CalibrationVersion):
+			status = "QUARANTINED"
+			reasons = []string{"EXPERIMENT_CALIBRATION_LIVE"}
 		case v.ExpectedHalfLife.Cmp(p.HalfLifeBounds[0]) < 0 || v.ExpectedHalfLife.Cmp(p.HalfLifeBounds[1]) > 0:
 			status = "QUARANTINED"
 			reasons = []string{"HALF_LIFE_NOT_VALIDATED"}
 		case !d.RiskQuality(state.Environment, p.QualityState) || !d.RiskQuality(state.Environment, params.QualityState):
 			status = "RESEARCH_ONLY"
 			reasons = []string{"PARAMETERS_UNVALIDATED"}
+		case p.PrepricingNotAssessed(event.EventType):
+			// S2-039: judgment inputs contain no prices, so no pre-pricing is claimed.
+			status = "READY_PENDING_PRICE"
+			state.PrepricingAssessments.Set(score.SubmissionID, map[string]any{"fraction": "0", "mode": "NOT_ASSESSED", "reason": "PREPRICING_NOT_ASSESSED"})
+			reasons = []string{"PREPRICING_NOT_ASSESSED"}
 		default:
 			assessment, reason := d.AssessPrepricing(&score, state.FactorManifests.Value("prepricing:"+score.InputManifestHash), p, s.Clock.Now())
 			if reason != "" {

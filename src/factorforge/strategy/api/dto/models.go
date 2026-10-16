@@ -48,3 +48,22 @@ func Decode(reader io.Reader, target any) error { return d.Decode(reader, target
 type StopDirectiveCommand = d.StopDirectiveCommand
 type StopDirective = d.StopDirective
 type StopDirectiveReceipt = d.StopDirectiveReceipt
+
+// v2.9.0 (S2-033～042) value contract.
+type SizingRule = d.SizingRule
+type ReentryRule = d.ReentryRule
+type ChainLossRule = d.ChainLossRule
+type PreEventRule = d.PreEventRule
+type TransferRule = d.TransferRule
+type ExitRequest = d.ExitRequest
+type ExitRequestCommand = d.ExitRequestCommand
+type ExitRequestRecord = d.ExitRequestRecord
+type BaselineTransfer = d.BaselineTransfer
+type BaselineTransferCommand = d.BaselineTransferCommand
+type BaselineTransferRecord = d.BaselineTransferRecord
+type TransferObservation = d.TransferObservation
+type RiskUnitState = d.RiskUnitState
+type ReentryState = d.ReentryState
+type ChainState = d.ChainState
+type BatchRecord = d.BatchRecord
+type EffectiveStrategyStop = d.EffectiveStrategyStop

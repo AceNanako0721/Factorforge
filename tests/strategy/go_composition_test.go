@@ -253,7 +253,7 @@ func TestCompositionTemplateWindowsRevisionCancelAndCalibration(t *testing.T) {
 	if err = sd.AdvanceScheduled(s, o, end.AvailableAt, p); err != nil {
 		t.Fatal(err)
 	}
-	if event.WindowsState["post"] != "CLOSED" || s.Cases.Len() != 1 || s.Templates.Value("earnings/post").Stats.N != 1 {
+	if event.WindowsState["post"] != "CLOSED" || s.Cases.Len() != 1 || s.Templates.Value("earnings/post").Stats.N != 0 { // v2.9.0 S2-042: returns no longer update templates
 		t.Fatal("closure", event, s.Cases.Len())
 	}
 	if err = sd.AdvanceScheduled(s, o, end.AvailableAt, p); err != nil || s.Cases.Len() != 1 {
@@ -308,7 +308,7 @@ func TestCompositionTemplateWindowsRevisionCancelAndCalibration(t *testing.T) {
 	s.Samples.Set(o.ObjectID, nil)
 	sd.AdvanceScheduled(s, o, req.ExpectedAt.Add(time.Minute), p)
 	last := s.Cases.Values()[s.Cases.Len()-1]
-	if last.Status != "CENSORED" || s.Templates.Value("earnings/post").Stats.N != 1 {
+	if last.Status != "CENSORED" || s.Templates.Value("earnings/post").Stats.N != 0 { // v2.9.0 S2-042: returns no longer update templates
 		t.Fatal("missing price was learned")
 	}
 	t0 := templateFixture()
