@@ -5,6 +5,7 @@ import {
   createSeriesMarkers,
   CandlestickSeries,
   LineStyle,
+  type AutoscaleInfo,
   type CandlestickData,
   type ISeriesApi,
   type SeriesMarker,
@@ -91,6 +92,22 @@ export function MarketChart({
       borderVisible: false,
       wickUpColor: "#267b59",
       wickDownColor: "#b15447",
+      // The price axis spans the drawn lines too, so stops far from the
+      // recent bars stay on screen instead of being clipped.
+      autoscaleInfoProvider: (base: () => AutoscaleInfo | null) => {
+        const info = base();
+        const prices = lines
+          .map((l) => l.price)
+          .filter((p) => Number.isFinite(p) && p > 0);
+        if (!info?.priceRange || prices.length === 0) return info;
+        return {
+          ...info,
+          priceRange: {
+            minValue: Math.min(info.priceRange.minValue, ...prices),
+            maxValue: Math.max(info.priceRange.maxValue, ...prices),
+          },
+        };
+      },
     });
     const data = candleData(candles);
     series.setData(data);
