@@ -361,7 +361,7 @@ export function DynamicView({
           <MarketChart candles={candles} lines={lines} markers={markers} live={live.kline} />
         </Suspense>
         <p className="muted">
-          箭头为研判时刻（空/多 + 信心），横线为入场价与各止损位；半透明的最后一根是交易所推送的未完成 K 线（参考），收盘后以 P1 最终 K 线为准；不画预测。
+          箭头为研判时刻（空/多 + 信心），横线为入场价与各止损位（纵轴放宽到包含全部横线）；半透明的最后一根是交易所推送的未完成 K 线（参考），收盘后以 P1 最终 K 线为准；不画预测。
         </p>
       </section>
 
