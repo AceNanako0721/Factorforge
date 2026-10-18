@@ -99,6 +99,37 @@ func TestCompactDecisionInputReferencesSourceDecisions(t *testing.T) {
 	}
 }
 
+func TestCompactDecisionInputDropsSpentContributionsAndClosedProtections(t *testing.T) {
+	contributions := []any{map[string]any{"family_id": "live", "remaining_amount": "0.5", "state": "ACTIVE"}}
+	protections := []any{map[string]any{"protection_id": "p-live", "state": "ACTIVE_VERIFIED"}}
+	for i := 0; i < 500; i++ {
+		contributions = append(contributions, map[string]any{"family_id": fmt.Sprintf("spent-%d", i), "remaining_amount": "0", "state": "INVALID"})
+		protections = append(protections, map[string]any{"protection_id": fmt.Sprintf("p-%d", i), "state": "CLOSED"})
+	}
+	inputs := map[string]any{"pool": map[string]any{"net": "-1", "contributions": contributions}, "snapshot": map[string]any{"bars": map[string]any{}, "protections": map[string]any{"obj": protections}}}
+	hash := sd.Digest(inputs)
+	compact := sd.CompactDecisionInput(inputs)
+	if sd.Digest(inputs) != hash {
+		t.Fatal("compaction mutated the hashed inputs")
+	}
+	pool := sd.Object(compact["pool"])
+	live := sd.Rows(pool["contributions"])
+	if len(live) != 1 || live[0]["family_id"] != "live" || pool["net"] != "-1" || sd.Number(sd.Object(pool["spent_contributions_ref"])["count"]) != 500 {
+		t.Fatal("pool compaction", pool)
+	}
+	snapshot := sd.Object(compact["snapshot"])
+	kept := sd.Rows(sd.Object(snapshot["protections"])["obj"])
+	if len(kept) != 1 || kept[0]["protection_id"] != "p-live" || sd.Number(sd.Object(sd.Object(snapshot["closed_protections_ref"])["obj"])["count"]) != 500 {
+		t.Fatal("protection compaction", snapshot)
+	}
+	if raw, _ := json.Marshal(compact); len(raw) > 1500 {
+		t.Fatal("compacted input too large", len(raw))
+	}
+	if sd.Digest(sd.CompactDecisionInput(compact)) != sd.Digest(compact) {
+		t.Fatal("compaction is not idempotent")
+	}
+}
+
 func TestArchivableDecisionsRequiresEveryCondition(t *testing.T) {
 	base, template, outbox := retentionBase(t)
 	t0 := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
