@@ -16,8 +16,9 @@ func TargetDecision(decision *DecisionView) DecisionView {
 	return copy
 }
 
-// CompactDecisionInput replaces snapshot.bars with per-object references and
-// snapshot.source_decisions with a count and digest. The
+// CompactDecisionInput replaces snapshot.bars with per-object references,
+// snapshot.source_decisions, closed protections and spent pool contributions
+// with counts and digests. The
 // caller hashes the complete inputs first; P1 keeps the bars themselves.
 func CompactDecisionInput(inputs map[string]any) map[string]any {
 	result := map[string]any{}
@@ -50,7 +51,46 @@ func CompactDecisionInput(inputs map[string]any) map[string]any {
 		delete(compact, "source_decisions")
 		compact["source_decisions_ref"] = map[string]any{"count": len(Strings(ids)), "digest": Digest(ids)}
 	}
+	// Closed protections only accumulate; the decision keeps the live ones.
+	if all, ok := snapshot["protections"].(map[string]any); ok {
+		live, closed := map[string]any{}, map[string]any{}
+		for object, rows := range all {
+			kept, dropped := []map[string]any{}, []map[string]any{}
+			for _, p := range Rows(rows) {
+				if Text(p["state"]) == "CLOSED" {
+					dropped = append(dropped, p)
+				} else {
+					kept = append(kept, p)
+				}
+			}
+			live[object] = kept
+			if len(dropped) > 0 {
+				closed[object] = map[string]any{"count": len(dropped), "digest": Digest(dropped)}
+			}
+		}
+		compact["protections"], compact["closed_protections_ref"] = live, closed
+	}
 	result["snapshot"] = compact
+	// Spent contributions grow with every judgment; a case only opens from
+	// those with a remaining amount, so only their size and digest stay.
+	if pool, ok := inputs["pool"].(map[string]any); ok {
+		if rows, ok := pool["contributions"]; ok {
+			compactPool, live, spent := map[string]any{}, []map[string]any{}, []map[string]any{}
+			for k, v := range pool {
+				compactPool[k] = v
+			}
+			for _, c := range Rows(rows) {
+				if Amount(c["remaining_amount"]).Sign() > 0 {
+					live = append(live, c)
+				} else {
+					spent = append(spent, c)
+				}
+			}
+			compactPool["contributions"] = live
+			compactPool["spent_contributions_ref"] = map[string]any{"count": len(spent), "digest": Digest(spent)}
+			result["pool"] = compactPool
+		}
+	}
 	return result
 }
 
