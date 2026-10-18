@@ -72,6 +72,33 @@ func TestCompactDecisionInputKeepsHashAndDropsBars(t *testing.T) {
 	}
 }
 
+// The delivered-decision list in the trading snapshot only grows; a decision
+// keeps its count and digest so 72 retained decisions stay small (E15 stall
+// of 2026-10-18 at 4 MiB).
+func TestCompactDecisionInputReferencesSourceDecisions(t *testing.T) {
+	ids := []any{}
+	for i := 0; i < 5000; i++ {
+		ids = append(ids, fmt.Sprintf("decision-%024d", i))
+	}
+	inputs := map[string]any{"snapshot": map[string]any{"version": 3, "bars": map[string]any{}, "source_decisions": ids}}
+	hash := sd.Digest(inputs)
+	compact := sd.CompactDecisionInput(inputs)
+	if sd.Digest(inputs) != hash || len(sd.Strings(sd.Object(inputs["snapshot"])["source_decisions"])) != 5000 {
+		t.Fatal("compaction mutated the hashed inputs")
+	}
+	snapshot := sd.Object(compact["snapshot"])
+	ref := sd.Object(snapshot["source_decisions_ref"])
+	if _, present := snapshot["source_decisions"]; present || sd.Number(ref["count"]) != 5000 || ref["digest"] != sd.Digest(ids) {
+		t.Fatal("source decision reference", ref)
+	}
+	if raw, _ := json.Marshal(compact); len(raw) > 1000 {
+		t.Fatal("compacted input too large", len(raw))
+	}
+	if sd.Digest(sd.CompactDecisionInput(compact)) != sd.Digest(compact) {
+		t.Fatal("compaction is not idempotent")
+	}
+}
+
 func TestArchivableDecisionsRequiresEveryCondition(t *testing.T) {
 	base, template, outbox := retentionBase(t)
 	t0 := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
@@ -265,5 +292,33 @@ func TestNativeP2DecisionArchiveIsTransactional(t *testing.T) {
 	assertStrategyCode(t, reenter, "STORE_STATE_INVALID")
 	if _, err = adminConn.Exec(ctx, "DELETE FROM strategy_sim.decision_archive WHERE instance_id=$1", id); err == nil {
 		t.Fatal("archive is mutable")
+	}
+}
+
+// A stored state above the request-body limit still loads, so retention can
+// shrink it; request bodies keep the 4 MiB bound.
+func TestDecodeStateLoadsAboveRequestLimit(t *testing.T) {
+	base, template, outbox := retentionBase(t)
+	s := sd.Clone(base)
+	t0 := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
+	pad := make([]any, 0, 60000)
+	for i := 0; i < 60000; i++ {
+		pad = append(pad, fmt.Sprintf("decision-%024d", i))
+	}
+	big := sd.Clone(template)
+	big.InputSnapshot = map[string]any{"pad": pad}
+	for i := 0; i < 3; i++ {
+		addDecision(s, big, outbox, fmt.Sprintf("decision-big-%d", i), t0.Add(time.Duration(i)*time.Minute), "ACK")
+	}
+	raw, _ := json.Marshal(sd.JSONValue(s))
+	if len(raw) <= 4<<20 {
+		t.Fatal("fixture below the request limit", len(raw))
+	}
+	var viaRequest, viaStore sd.StrategyState
+	if sd.DecodeJSON(raw, &viaRequest) == nil {
+		t.Fatal("request decoding accepted more than 4 MiB")
+	}
+	if err := sd.DecodeState(raw, &viaStore); err != nil || viaStore.Decisions.Len() != s.Decisions.Len() {
+		t.Fatal("stored state above 4 MiB did not load", err)
 	}
 }

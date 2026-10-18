@@ -247,7 +247,7 @@ func (s *Store) load(ctx context.Context, tx pgx.Tx, id string, lock bool) (*d.S
 		return nil, err
 	}
 	state := &d.StrategyState{}
-	if d.DecodeJSON(raw, state) != nil {
+	if d.DecodeState(raw, state) != nil {
 		return nil, failure("STORE_STATE_INVALID", 503)
 	}
 	if state.InstanceID != id || state.Environment != s.environment {
