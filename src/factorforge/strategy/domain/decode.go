@@ -30,9 +30,17 @@ func invalid() error { return &Error{Code: "INVALID_REQUEST", Status: 422} }
 // Decode validates presence and nullability before Go can replace either with
 // zero values. It rejects duplicate/unknown keys at every nested model and
 // applies only the frozen default factories, never production calibration.
-func Decode(reader io.Reader, target any) error {
-	data, err := io.ReadAll(io.LimitReader(reader, 4<<20+1))
-	if err != nil || len(data) > 4<<20 {
+func Decode(reader io.Reader, target any) error { return decode(reader, target, 4<<20) }
+
+// DecodeState reads a stored aggregate. It is bounded separately from request
+// bodies: the store warns at 2 MiB and must still load a state that grew past
+// the request limit so retention can shrink it.
+func DecodeState(data []byte, target any) error {
+	return decode(bytes.NewReader(data), target, 16<<20)
+}
+func decode(reader io.Reader, target any, limit int64) error {
+	data, err := io.ReadAll(io.LimitReader(reader, limit+1))
+	if err != nil || int64(len(data)) > limit {
 		return invalid()
 	}
 	t := reflect.TypeOf(target)

@@ -16,7 +16,8 @@ func TargetDecision(decision *DecisionView) DecisionView {
 	return copy
 }
 
-// CompactDecisionInput replaces snapshot.bars with per-object references. The
+// CompactDecisionInput replaces snapshot.bars with per-object references and
+// snapshot.source_decisions with a count and digest. The
 // caller hashes the complete inputs first; P1 keeps the bars themselves.
 func CompactDecisionInput(inputs map[string]any) map[string]any {
 	result := map[string]any{}
@@ -43,6 +44,12 @@ func CompactDecisionInput(inputs map[string]any) map[string]any {
 		refs[object] = ref
 	}
 	compact["bars_ref"] = refs
+	// The delivered-decision list grows with every target P1 ever accepted;
+	// only its size and digest stay in the decision (P1 keeps the list).
+	if ids, ok := snapshot["source_decisions"]; ok {
+		delete(compact, "source_decisions")
+		compact["source_decisions_ref"] = map[string]any{"count": len(Strings(ids)), "digest": Digest(ids)}
+	}
 	result["snapshot"] = compact
 	return result
 }
