@@ -353,3 +353,20 @@ func TestDecodeStateLoadsAboveRequestLimit(t *testing.T) {
 		t.Fatal("stored state above 4 MiB did not load", err)
 	}
 }
+
+func TestDecodeStateReusesAdmissionOnlyForIdenticalBytes(t *testing.T) {
+	base, _, _ := retentionBase(t)
+	raw, _ := json.Marshal(sd.JSONValue(base))
+	var first, second sd.StrategyState
+	if sd.DecodeState(raw, &first) != nil || sd.DecodeState(raw, &second) != nil || sd.Digest(sd.JSONValue(&first)) != sd.Digest(sd.JSONValue(&second)) {
+		t.Fatal("repeated decode of identical state differs")
+	}
+	tampered := append([]byte(`{"unknown_field":1,`), raw[1:]...)
+	var rejected sd.StrategyState
+	if sd.DecodeState(tampered, &rejected) == nil {
+		t.Fatal("changed bytes reused a previous admission")
+	}
+	if sd.DecodeState(raw, &second) != nil {
+		t.Fatal("valid state rejected after a rejected one")
+	}
+}

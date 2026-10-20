@@ -7,6 +7,7 @@ import (
 	"io"
 	"reflect"
 	"regexp"
+	"sync"
 	"time"
 	"unicode/utf8"
 )
@@ -35,33 +36,63 @@ func Decode(reader io.Reader, target any) error { return decode(reader, target, 
 // DecodeState reads a stored aggregate. It is bounded separately from request
 // bodies: the store warns at 2 MiB and must still load a state that grew past
 // the request limit so retention can shrink it.
+// The stored aggregate is re-read several times per tick while unchanged;
+// admit is a pure function of the bytes and schema, so its normalized output
+// is reused for identical bytes and only the decode and Validate repeat.
 func DecodeState(data []byte, target any) error {
-	return decode(bytes.NewReader(data), target, 16<<20)
+	if int64(len(data)) > 16<<20 {
+		return invalid()
+	}
+	return decodeBytes(data, target, true)
 }
 func decode(reader io.Reader, target any, limit int64) error {
 	data, err := io.ReadAll(io.LimitReader(reader, limit+1))
 	if err != nil || int64(len(data)) > limit {
 		return invalid()
 	}
+	return decodeBytes(data, target, false)
+}
+
+type admitted struct{ raw, normalized []byte }
+
+var (
+	admittedMu    sync.Mutex
+	admittedState = map[string]admitted{}
+)
+
+func decodeBytes(data []byte, target any, memo bool) error {
 	t := reflect.TypeOf(target)
 	if t == nil || t.Kind() != reflect.Pointer {
 		return invalid()
 	}
-	schema, ok := shapes[t.Elem().Name()]
+	name := t.Elem().Name()
+	schema, ok := shapes[name]
 	if !ok {
 		return invalid()
 	}
-	normalized, err := admit(data, schema)
-	if err != nil {
-		return invalid()
+	var normalized []byte
+	if memo {
+		admittedMu.Lock()
+		if last, ok := admittedState[name]; ok && bytes.Equal(last.raw, data) {
+			normalized = last.normalized
+		}
+		admittedMu.Unlock()
+	}
+	if normalized == nil {
+		var err error
+		if normalized, err = admit(data, schema); err != nil {
+			return invalid()
+		}
+		if memo {
+			admittedMu.Lock()
+			admittedState[name] = admitted{raw: bytes.Clone(data), normalized: normalized}
+			admittedMu.Unlock()
+		}
 	}
 	decoder := json.NewDecoder(bytes.NewReader(normalized))
 	decoder.DisallowUnknownFields()
 	decoder.UseNumber()
 	if decoder.Decode(target) != nil || Validate(target) != nil {
-		return invalid()
-	}
-	if err := Validate(target); err != nil {
 		return invalid()
 	}
 	return nil
