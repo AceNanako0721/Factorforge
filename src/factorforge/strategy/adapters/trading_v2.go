@@ -13,7 +13,9 @@ import (
 	"net/url"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -23,6 +25,69 @@ type TradingV2 struct {
 	URL, Token, CandleInterval string
 	HistorySeconds             int
 	Client                     *http.Client
+
+	mu     sync.Mutex
+	audits map[string]*auditTargets
+}
+
+// auditTargets caches the TARGET_SET rows of one run's append-only audit and
+// the offset read so far, so a snapshot fetches only the new rows.
+type auditTargets struct {
+	offset int
+	rows   []map[string]any
+}
+
+// AuditPageLimit bounds one audit request well below the 4 MiB response cap.
+const AuditPageLimit = 500
+
+// AuditTargets returns the run's TARGET_SET audit rows and the snapshot
+// version of the last page read. The audit is append-only, so earlier pages
+// are read once per process and only new rows are requested afterwards.
+func (t *TradingV2) AuditTargets(ctx context.Context, query url.Values) (map[string]any, error) {
+	key := query.Encode()
+	t.mu.Lock()
+	cached := auditTargets{}
+	if c := t.audits[key]; c != nil {
+		cached = auditTargets{offset: c.offset, rows: append([]map[string]any{}, c.rows...)}
+	}
+	t.mu.Unlock()
+	var version any
+	for {
+		q := url.Values{}
+		for k, v := range query {
+			q[k] = v
+		}
+		q.Set("cursor", strconv.Itoa(cached.offset))
+		q.Set("limit", strconv.Itoa(AuditPageLimit))
+		page, err := t.Request(ctx, "GET", "/audit", q, nil)
+		if err != nil {
+			return nil, err
+		}
+		version = page["snapshot_version"]
+		items := d.Rows(page["items"])
+		for _, a := range items {
+			if d.Text(a["action"]) == "TARGET_SET" {
+				cached.rows = append(cached.rows, a)
+			}
+		}
+		cached.offset += len(items)
+		if page["cursor"] == nil || len(items) == 0 {
+			break
+		}
+	}
+	t.mu.Lock()
+	if t.audits == nil {
+		t.audits = map[string]*auditTargets{}
+	}
+	if c := t.audits[key]; c == nil || c.offset <= cached.offset {
+		t.audits[key] = &cached
+	}
+	t.mu.Unlock()
+	items := make([]any, len(cached.rows))
+	for i, row := range cached.rows {
+		items[i] = row
+	}
+	return map[string]any{"items": items, "snapshot_version": version}, nil
 }
 
 func NewTradingV2(address, token string, timeout time.Duration, interval string, history int) (*TradingV2, error) {
@@ -109,11 +174,15 @@ func (t *TradingV2) Snapshot(ctx context.Context, objects []*d.ObservedObject) (
 			if e != nil {
 				return e
 			}
-			for _, name := range []string{"instruments", "positions", "orders", "targets", "owners", "protections", "market/points", "fills", "income", "external-facts", "audit"} {
+			for _, name := range []string{"instruments", "positions", "orders", "targets", "owners", "protections", "market/points", "fills", "income", "external-facts"} {
 				pages[name], e = t.Request(ctx, "GET", "/"+name, query, nil)
 				if e != nil {
 					return e
 				}
+			}
+			// Only TARGET_SET rows are used; market snapshots dominate the audit.
+			if pages["audit"], e = t.AuditTargets(ctx, query); e != nil {
+				return e
 			}
 			end, e := t.Request(ctx, "GET", "/runs/"+url.PathEscape(binding.RunID), runQuery, nil)
 			if e != nil {
