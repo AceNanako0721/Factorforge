@@ -353,3 +353,33 @@ func TestDecodeStateLoadsAboveRequestLimit(t *testing.T) {
 		t.Fatal("stored state above 4 MiB did not load", err)
 	}
 }
+
+func TestDecodeStateReusesAdmissionOnlyForUnchangedFields(t *testing.T) {
+	base, _, _ := retentionBase(t)
+	raw, _ := json.Marshal(sd.JSONValue(base))
+	var first, second sd.StrategyState
+	if sd.DecodeState(raw, &first) != nil || sd.DecodeState(raw, &second) != nil || sd.Digest(sd.JSONValue(&first)) != sd.Digest(sd.JSONValue(&second)) {
+		t.Fatal("repeated decode of identical state differs")
+	}
+	tampered := append([]byte(`{"unknown_field":1,`), raw[1:]...)
+	var rejected sd.StrategyState
+	if sd.DecodeState(tampered, &rejected) == nil {
+		t.Fatal("changed bytes reused a previous admission")
+	}
+	if sd.DecodeState(raw, &second) != nil {
+		t.Fatal("valid state rejected after a rejected one")
+	}
+	// One changed field is admitted again; the others reuse their result.
+	fields := map[string]json.RawMessage{}
+	json.Unmarshal(raw, &fields)
+	fields["instance_id"] = json.RawMessage(`""`)
+	changed, _ := json.Marshal(fields)
+	var invalidField sd.StrategyState
+	if sd.DecodeState(changed, &invalidField) == nil {
+		t.Fatal("changed invalid field reused a previous admission")
+	}
+	var third sd.StrategyState
+	if sd.DecodeState(raw, &third) != nil || sd.Digest(sd.JSONValue(&third)) != sd.Digest(sd.JSONValue(&first)) {
+		t.Fatal("state after a changed field differs")
+	}
+}

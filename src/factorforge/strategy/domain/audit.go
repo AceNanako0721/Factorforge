@@ -6,10 +6,33 @@ type AuditRecord struct {
 	Payload  map[string]any
 }
 
+// CloneState deep-copies the aggregate except the append-only sentiment
+// ledger, whose entries are never modified once appended: the copy gets its
+// own slice of the same entries, so SameLedgerPrefix can compare them by value.
 func CloneState(s *StrategyState) *StrategyState {
-	copy := Clone(s)
+	shallow := *s
+	shallow.Ledger = nil
+	copy := Clone(&shallow)
 	copy.AuditCount = s.AuditCount
+	if s.Ledger != nil {
+		copy.Ledger = append(make([]LedgerEntry, 0, len(s.Ledger)), s.Ledger...)
+	}
 	return copy
+}
+
+// SameLedgerPrefix reports whether ledger starts with prefix unchanged.
+// Entries copied by CloneState compare equal directly; any other entry falls
+// back to its canonical digest.
+func SameLedgerPrefix(prefix, ledger []LedgerEntry) bool {
+	if len(ledger) < len(prefix) {
+		return false
+	}
+	for i := range prefix {
+		if prefix[i] != ledger[i] && Digest(prefix[i]) != Digest(ledger[i]) {
+			return false
+		}
+	}
+	return true
 }
 
 // AppendAudit buffers only the rows added by the current transaction.
