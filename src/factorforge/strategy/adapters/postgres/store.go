@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"os"
 	"strings"
+	"sync"
 )
 
 //go:embed migrations/*.sql
@@ -24,6 +25,17 @@ var publicFields = []string{"research_stop_versions", "research_stop_directives"
 type Store struct {
 	pool                      *pgxpool.Pool
 	environment, kind, schema string
+
+	mu      sync.Mutex
+	ledgers map[string]ledgerRows
+}
+
+// ledgerRows caches the decoded prefix of one instance's append-only
+// sentiment_entry rows; last is the stored payload of the final cached row,
+// compared on every load so a replaced table is read again from the start.
+type ledgerRows struct {
+	entries []d.LedgerEntry
+	last    []byte
 }
 
 func failure(code string, status int) error { return &d.Error{Code: code, Status: status} }
@@ -264,31 +276,65 @@ func (s *Store) load(ctx context.Context, tx pgx.Tx, id string, lock bool) (*d.S
 		return nil, failure("STORE_STATE_INVALID", 503)
 	}
 	state.Audit = nil
-	for _, name := range []string{"sentiment_entry"} {
-		rows, err := tx.Query(ctx, "SELECT payload FROM "+s.table(name)+" WHERE instance_id=$1 ORDER BY sequence", id)
-		if err != nil {
-			return nil, err
-		}
-		for rows.Next() {
-			var raw []byte
-			if err = rows.Scan(&raw); err != nil {
-				rows.Close()
-				return nil, err
-			}
-			var v d.LedgerEntry
-			if d.DecodeJSON(raw, &v) != nil {
-				rows.Close()
-				return nil, failure("STORE_STATE_INVALID", 503)
-			}
-			state.Ledger = append(state.Ledger, v)
-		}
-		err = rows.Err()
-		rows.Close()
-		if err != nil {
-			return nil, err
-		}
+	if state.Ledger, err = s.ledger(ctx, tx, id); err != nil {
+		return nil, err
 	}
 	return state, nil
+}
+
+// ledger returns the instance's sentiment ledger, decoding only rows after
+// the cached prefix. The returned slice is a fresh copy the caller may append to.
+func (s *Store) ledger(ctx context.Context, tx pgx.Tx, id string) ([]d.LedgerEntry, error) {
+	key := s.table("sentiment_entry") + "/" + id
+	s.mu.Lock()
+	cached := s.ledgers[key]
+	s.mu.Unlock()
+	if n := len(cached.entries); n > 0 {
+		var last []byte
+		err := tx.QueryRow(ctx, "SELECT payload FROM "+s.table("sentiment_entry")+" WHERE instance_id=$1 AND sequence=$2", id, n).Scan(&last)
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return nil, err
+		}
+		if err != nil || !bytes.Equal(last, cached.last) {
+			cached = ledgerRows{}
+		}
+	}
+	entries := append(make([]d.LedgerEntry, 0, len(cached.entries)+64), cached.entries...)
+	last := cached.last
+	rows, err := tx.Query(ctx, "SELECT payload FROM "+s.table("sentiment_entry")+" WHERE instance_id=$1 AND sequence>$2 ORDER BY sequence", id, len(cached.entries))
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var raw []byte
+		if err = rows.Scan(&raw); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		var v d.LedgerEntry
+		if d.DecodeJSON(raw, &v) != nil {
+			rows.Close()
+			return nil, failure("STORE_STATE_INVALID", 503)
+		}
+		entries = append(entries, v)
+		last = raw
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return nil, err
+	}
+	if len(entries) > len(cached.entries) {
+		s.mu.Lock()
+		if s.ledgers == nil {
+			s.ledgers = map[string]ledgerRows{}
+		}
+		if len(entries) >= len(s.ledgers[key].entries) {
+			s.ledgers[key] = ledgerRows{entries: append([]d.LedgerEntry(nil), entries...), last: last}
+		}
+		s.mu.Unlock()
+	}
+	return entries, nil
 }
 func (s *Store) Create(ctx context.Context, state *d.StrategyState) error {
 	if state.Environment != s.environment || s.kind != "worker" {
@@ -394,7 +440,7 @@ func (s *Store) appendRows(ctx context.Context, tx pgx.Tx, id string, before, af
 		return err
 	}
 	oldLedger, newLedger := before.Ledger, after.Ledger
-	if len(newLedger) < len(oldLedger) || d.Digest(newLedger[:len(oldLedger)]) != d.Digest(oldLedger) {
+	if !d.SameLedgerPrefix(oldLedger, newLedger) {
 		return failure("APPEND_ONLY_MUTATION_FORBIDDEN", 503)
 	}
 	for index, row := range after.Audit {
@@ -474,7 +520,7 @@ func (s *Store) Transaction(ctx context.Context, id string, fn func(*d.StrategyS
 		if err != nil {
 			return dbError(err)
 		}
-		if !bytes.Equal(internal, oldInternal) || d.Digest(state.Ledger) != d.Digest(before.Ledger) {
+		if !bytes.Equal(internal, oldInternal) || len(state.Ledger) != len(before.Ledger) || !d.SameLedgerPrefix(before.Ledger, state.Ledger) {
 			return failure("PUBLIC_INTERNAL_STATE_FORBIDDEN", 403)
 		}
 	} else {

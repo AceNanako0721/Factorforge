@@ -36,9 +36,10 @@ func Decode(reader io.Reader, target any) error { return decode(reader, target, 
 // DecodeState reads a stored aggregate. It is bounded separately from request
 // bodies: the store warns at 2 MiB and must still load a state that grew past
 // the request limit so retention can shrink it.
-// The stored aggregate is re-read several times per tick while unchanged;
-// admit is a pure function of the bytes and schema, so its normalized output
-// is reused for identical bytes and only the decode and Validate repeat.
+// The stored aggregate is re-read several times per tick and most top-level
+// fields are unchanged between reads; admit is a pure function of the bytes
+// and schema, so each field's normalized output is reused while its bytes are
+// identical. JSON decoding and Validate still run on every read.
 func DecodeState(data []byte, target any) error {
 	if int64(len(data)) > 16<<20 {
 		return invalid()
@@ -57,7 +58,7 @@ type admitted struct{ raw, normalized []byte }
 
 var (
 	admittedMu    sync.Mutex
-	admittedState = map[string]admitted{}
+	admittedState = map[string]map[string]admitted{}
 )
 
 func decodeBytes(data []byte, target any, memo bool) error {
@@ -71,23 +72,20 @@ func decodeBytes(data []byte, target any, memo bool) error {
 		return invalid()
 	}
 	var normalized []byte
+	var err error
 	if memo {
 		admittedMu.Lock()
-		if last, ok := admittedState[name]; ok && bytes.Equal(last.raw, data) {
-			normalized = last.normalized
-		}
+		previous := admittedState[name]
 		admittedMu.Unlock()
-	}
-	if normalized == nil {
-		var err error
-		if normalized, err = admit(data, schema); err != nil {
+		var next map[string]admitted
+		if normalized, next, err = admitFields(data, schema, previous); err != nil {
 			return invalid()
 		}
-		if memo {
-			admittedMu.Lock()
-			admittedState[name] = admitted{raw: bytes.Clone(data), normalized: normalized}
-			admittedMu.Unlock()
-		}
+		admittedMu.Lock()
+		admittedState[name] = next
+		admittedMu.Unlock()
+	} else if normalized, err = admit(data, schema); err != nil {
+		return invalid()
 	}
 	decoder := json.NewDecoder(bytes.NewReader(normalized))
 	decoder.DisallowUnknownFields()
@@ -326,4 +324,64 @@ func admit(data []byte, s shape) ([]byte, error) {
 		}
 	}
 	return data, nil
+}
+
+// admitFields is admit's object case for a top-level aggregate, reusing the
+// previous normalized value of every field whose bytes did not change.
+func admitFields(data []byte, s shape, previous map[string]admitted) ([]byte, map[string]admitted, error) {
+	if ref := s["$ref"]; ref != nil {
+		var name string
+		json.Unmarshal(ref, &name)
+		s = shapes[name[len("#/$defs/"):]]
+	}
+	var kind string
+	json.Unmarshal(s["type"], &kind)
+	var properties map[string]shape
+	json.Unmarshal(s["properties"], &properties)
+	if kind != "object" || properties == nil {
+		v, err := admit(data, s)
+		return v, nil, err
+	}
+	var fields Ordered[json.RawMessage]
+	if json.Unmarshal(bytes.TrimSpace(data), &fields) != nil {
+		return nil, nil, invalid()
+	}
+	var required []string
+	json.Unmarshal(s["required"], &required)
+	next := map[string]admitted{}
+	for _, key := range fields.Keys() {
+		child, ok := properties[key]
+		if !ok {
+			return nil, nil, invalid()
+		}
+		raw := fields.Value(key)
+		v := []byte(nil)
+		if last, ok := previous[key]; ok && bytes.Equal(last.raw, raw) {
+			v = last.normalized
+		} else {
+			var err error
+			if v, err = admit(raw, child); err != nil {
+				return nil, nil, err
+			}
+		}
+		next[key] = admitted{raw: bytes.Clone(raw), normalized: v}
+		fields.Set(key, v)
+	}
+	for key, child := range properties {
+		if _, exists := fields.Get(key); exists {
+			continue
+		}
+		if Has(required, key) {
+			return nil, nil, invalid()
+		}
+		if value, ok := child["default"]; ok {
+			v, err := admit(value, child)
+			if err != nil {
+				return nil, nil, err
+			}
+			fields.Set(key, v)
+		}
+	}
+	out, err := json.Marshal(fields)
+	return out, next, err
 }
