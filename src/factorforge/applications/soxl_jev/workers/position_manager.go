@@ -67,6 +67,7 @@ type BatchState struct {
 	Trailing    bool           `json:"trailing"`
 	Transferred bool           `json:"transferred"`
 	ExitID      string         `json:"exit_id,omitempty"`
+	CloseFrozen bool           `json:"close_frozen,omitempty"`
 }
 type InitialPlan struct {
 	Direction   int            `json:"direction"`
@@ -359,6 +360,7 @@ func (m *PositionManager) manage(ctx context.Context, st *PositionState, p *subm
 		if st.Initial != nil && st.Initial.Direction == direction {
 			b.Geometry, b.Budget = st.Initial.Geometry, st.Initial.Fraction*st.Initial.Equity
 			b.CloseStop = entry - float64(direction)*st.Initial.CloseDist
+			b.CloseFrozen = true
 		}
 		st.Batch = b
 		if err := m.Store.AppendRecord(ctx, "STOP_EVENT", "open-"+p.PositionCycleID, now, map[string]any{"kind": "OPEN", "batch": b}); err != nil {
@@ -368,9 +370,25 @@ func (m *PositionManager) manage(ctx context.Context, st *PositionState, p *subm
 	if b.Geometry.R == 0 {
 		return nil // no recorded geometry: leave the framework's stops untouched
 	}
+	// The close stop is frozen at entry − close distance of the opening plan;
+	// only a verified POSITION_STOP moves it, and only favourably. Refreshed
+	// INITIAL_DISTANCE directives size later levels, never this batch's stop.
+	if !b.CloseFrozen {
+		if v := m.openedCloseStop(ctx, b); v != 0 && !b.Trailing {
+			b.CloseStop = v
+		}
+		b.CloseFrozen = b.CloseStop != 0
+	}
 	effective := m.effectiveStop(ctx, p)
 	if effective != nil && effective.close != 0 {
-		b.CloseStop = effective.close
+		switch {
+		case effective.position:
+			if b.CloseStop == 0 || float64(direction)*(effective.close-b.CloseStop) > 0 {
+				b.CloseStop = effective.close
+			}
+		case b.CloseStop == 0:
+			b.CloseStop, b.CloseFrozen = effective.close, true
+		}
 	}
 	// Completed 5-minute closes since the last processed bar.
 	for _, bar := range bars {
@@ -424,9 +442,29 @@ func (m *PositionManager) manage(ctx context.Context, st *PositionState, p *subm
 }
 
 type effectiveDirective struct {
-	id      string
-	version int
-	close   float64
+	id       string
+	version  int
+	close    float64
+	position bool // a POSITION_STOP close price, not derived from INITIAL_DISTANCE
+}
+
+// openedCloseStop reads the close stop recorded when the batch opened
+// (batches saved before close stops were frozen).
+func (m *PositionManager) openedCloseStop(ctx context.Context, b *BatchState) float64 {
+	rows, err := m.Store.Records(ctx, "STOP_EVENT", b.OpenedAt.Add(-time.Second), b.OpenedAt.Add(time.Second), 50)
+	if err != nil {
+		return 0
+	}
+	for _, raw := range rows {
+		var r struct {
+			Kind  string     `json:"kind"`
+			Batch BatchState `json:"batch"`
+		}
+		if json.Unmarshal(raw, &r) == nil && r.Kind == "OPEN" && r.Batch.CycleID == b.CycleID {
+			return r.Batch.CloseStop
+		}
+	}
+	return 0
 }
 
 // effectiveStop finds the verified directive for the current cycle and the
@@ -455,6 +493,7 @@ func (m *PositionManager) effectiveStop(ctx context.Context, p *submission.Posit
 	out := &effectiveDirective{id: best.Directive.DirectiveID, version: best.Directive.Version}
 	if v := best.Directive.CloseStopPrice; v != nil {
 		out.close, _ = strconv.ParseFloat(v.String(), 64)
+		out.position = best.Directive.Kind == "POSITION_STOP"
 	} else if best.Directive.Kind == "INITIAL_DISTANCE" && best.Directive.CloseStopDistance != nil {
 		protections, err := m.Trading.Protections(ctx)
 		if err != nil {
