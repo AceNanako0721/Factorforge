@@ -775,7 +775,7 @@ figure{margin:24px 0;border:1px solid var(--line);border-radius:10px;padding:16p
 </section>
 <section id="close-stop-frozen-design"><h2>30 v2.11.3 收盘止损的冻结与单向移动</h2>
 <p>对应 S3-027～S3-029 与 28 章“移动止损”“收盘止损”，业务式样不变。28 章规定移动止损“只向有利方向移动”，但没有写明移动止损启动前 close_stop 从哪里来。原实现（workers/position_manager.go manage）每轮都用 effectiveStop 的结果覆盖 close_stop：最新已核验指令是 INITIAL_DISTANCE 时，close = 交易所策略止损触发价 ± (initial_stop_distance − close_stop_distance)。</p>
-<p>问题在于：初始距离指令在持仓期间也每 15 分钟按最新噪声表与价格续报（供加档定量），交易所止损却仍是开仓时的价格，二者组合出的 close_stop 随续报漂移，可能向不利方向放宽。影子 E15 第三批多单（2026-10-21 22:20 JST 开仓，入场 103.4717）的收盘止损由开仓时的 90.634 漂到 90.134（放宽约 0.5，约 0.04R）。另外，开仓当轮按开仓计划算出的 entry − close_distance，会被这一推算值立即覆盖，两种算法本来就不相等。</p>
+<p>问题在于：初始距离指令在持仓期间也每 15 分钟按最新噪声表与价格续报（供加档定量），交易所止损却仍是开仓时的价格，二者组合出的 close_stop 随续报漂移，可能向不利方向放宽。开仓当轮按开仓计划算出的 entry − close_distance 也会被这一推算值立即覆盖，两种算法本来就不相等。影子 E15 实例：第三批多单（2026-10-21 22:20 JST 开仓，入场 103.4717）按开仓计划应为 90.748，开仓当轮被覆盖为 90.634，之后随续报漂到 90.134（共放宽约 0.61，约 0.04R）；第二批空单（入场 102.049）开仓计划为 116.734，实际一直使用 117.076（放宽 0.34）。</p>
 <h3 id="close-stop-rule">30.1 规则</h3>
 <ul>
 <li>开仓时 close_stop = entry − dir × close_distance（开仓所用初始计划），写入批次并标记 close_frozen = true；开仓记录（STOP_EVENT kind = OPEN）照旧保存该值。</li>
@@ -784,7 +784,7 @@ figure{margin:24px 0;border:1px solid var(--line);border-radius:10px;padding:16p
 <li>收盘止损退出、转基线判断与移动止损的保本下限照旧读取 close_stop 与生效指令，逻辑不变。</li>
 </ul>
 <h3 id="close-stop-legacy">30.2 已有批次</h3>
-<p>批次状态没有 close_frozen 标记时（本版之前保存），若尚未启动移动止损，从该周期的 OPEN 开仓记录读回开仓时的 close_stop 并冻结；找不到记录时保留当前值并冻结。E15 第三批部署后恢复为 90.634。</p>
+<p>批次状态没有 close_frozen 标记时（本版之前保存），若尚未启动移动止损，从该周期的 OPEN 开仓记录读回开仓时的 close_stop 并冻结；找不到记录时保留当前值并冻结。E15 第三批部署后恢复为开仓记录中的 90.748。</p>
 <h3 id="close-stop-tests">30.3 验证</h3>
 <div class="table-wrap"><table><thead><tr><th>式样 / 验收</th><th>测试（tests/applications/soxl_jev/close_stop_frozen_test.go）</th></tr></thead><tbody>
 <tr><td>S3-028</td><td>TestCloseStopFrozenAgainstInitialRefresh：多单入场 100、close_distance 6，close_stop = 94；之后两次续报（放宽与收紧各一次）都不改变它。</td></tr>
