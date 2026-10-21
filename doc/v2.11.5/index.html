@@ -63,7 +63,7 @@ figure{margin:24px 0;border:1px solid var(--line);border-radius:10px;padding:16p
 </section>
 <section id="revision-v2115">
 <h2>v2.11.5 当前设计修订</h2>
-<p>2026-10-22，Change-Type: design，代码在同一 PR 中实现。业务式样不变。P3 仓位管理器每轮只读最近 40 分钟 K 线，停机超过 40 分钟时停机期间的收盘价不进入 best_close，移动止损与转基线会被错过（E15 2026-10-18 停摆）。P3 设计第 31 章规定：有持仓批次时从 last_bar_at 起补读（最多 7 天），逐根按原规则处理。另：P2 止损指令改为按读到快照的时刻校验价格（#124，code-only，符合既有设计“缺失或陈旧才拒绝”）。</p>
+<p>2026-10-22，Change-Type: design，代码在同一 PR 中实现。业务式样不变。P3 仓位管理器每轮只读最近 40 分钟 K 线，停机超过 40 分钟时停机期间的收盘价不进入 best_close，移动止损与转基线会被错过（E15 2026-10-18 停摆）。P3 设计第 31 章规定：有持仓批次时从 last_bar_at 起补读（最多 7 天），逐根按原规则处理。另：P2 止损指令改为按读到快照的时刻校验价格（#124，code-only，符合既有设计“缺失或陈旧才拒绝”）。另：标签 v2.11.5 于 2026-10-22 误打在 45a44db（#124 合并提交，比本版文档早一个提交），版本标签按仓库规则不可删除或移动；v2.11.5 文档基线以本版合并到 main 的提交为准，见同名 Release 说明。</p>
 <p><a href="03_SOXLUSDT_JEV应用实例设计书.html#recovery-bars-design">P3 设计第 31 章</a> · <a href="开发规划书.html">同步阶段规划</a> · <a href="../v2.11.4/index.html">上一冻结基线 v2.11.4</a>。</p>
 </section>
 
