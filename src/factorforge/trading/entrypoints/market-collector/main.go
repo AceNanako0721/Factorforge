@@ -50,10 +50,20 @@ func run() error {
 	for {
 		end := time.Now().UTC()
 		points, bars, err := collector.Collect(ctx, *instrument, *interval, end.Add(-time.Duration(*lookback)*time.Second), end)
-		if err != nil {
+		if err != nil && *once {
 			return err
 		}
-		fmt.Printf("Collected %d points and %d completed candles\n", points, bars)
+		if err != nil {
+			// One failed round (venue or P1 unavailable, conflicts beyond the
+			// retry bound) waits for the next poll instead of restarting.
+			status := 0
+			if e, ok := err.(*d.Error); ok {
+				status = e.Status
+			}
+			fmt.Printf("COLLECT_FAILED %s %d\n", err.Error(), status)
+		} else {
+			fmt.Printf("Collected %d points and %d completed candles\n", points, bars)
+		}
 		if *once || !r.Pause(ctx, time.Duration(*poll*float64(time.Second))) {
 			return nil
 		}

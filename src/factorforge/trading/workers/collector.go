@@ -47,6 +47,26 @@ func (c *Collector) command(ctx context.Context, id string, at time.Time) (d.Com
 	}
 	return d.Command{SchemaVersion: "trading-2.0", RequestID: id, IdempotencyKey: id, RunKey: c.Key, ExpectedVersion: run.Version, Reason: "public market collection", ExpiresAtUTC: at.Add(time.Minute)}, nil
 }
+// CollectorConflictAttempts bounds re-reads of the run version when another
+// writer (P2 targets, the executor) commits between the GET and the POST.
+const CollectorConflictAttempts = 3
+
+// post submits one command, retrying with a fresh expected version on 409.
+// The request id is kept: a version conflict is rejected before dedup.
+func (c *Collector) post(ctx context.Context, id string, at time.Time, path string, build func(d.Command) any) error {
+	var err error
+	for attempt := 0; attempt < CollectorConflictAttempts; attempt++ {
+		var command d.Command
+		if command, err = c.command(ctx, id, at); err != nil {
+			return err
+		}
+		_, err = c.Client.Call(ctx, "POST", path, nil, build(command))
+		if e, ok := err.(*d.Error); !ok || e.Status != 409 {
+			return err
+		}
+	}
+	return err
+}
 func observationID(prefix, version string, at time.Time) string {
 	hash := sha256.Sum256([]byte(version + d.PythonTime(at)))
 	return prefix + hex.EncodeToString(hash[:])[:24]
@@ -96,11 +116,9 @@ func (c *Collector) Collect(ctx context.Context, instrument, interval string, st
 	}
 	at := c.now()
 	if !registered {
-		command, err := c.command(ctx, observationID("rules-", spec.Version, at), at)
-		if err != nil {
-			return 0, 0, err
-		}
-		if _, err = c.Client.Call(ctx, "POST", "/api/v2/trading/instruments", nil, d.RegisterSpec{Command: command, Spec: *spec}); err != nil {
+		if err = c.post(ctx, observationID("rules-", spec.Version, at), at, "/api/v2/trading/instruments", func(command d.Command) any {
+			return d.RegisterSpec{Command: command, Spec: *spec}
+		}); err != nil {
 			return 0, 0, err
 		}
 	}
@@ -146,11 +164,10 @@ func (c *Collector) Collect(ctx context.Context, instrument, interval string, st
 		body.InstrumentKey = &key
 		body.Funding = funding
 	}
-	body.Command, err = c.command(ctx, observationID("market-", spec.Version, at), at)
-	if err != nil {
-		return 0, 0, err
-	}
-	if _, err = c.Client.Call(ctx, "POST", "/api/v2/trading/market/snapshots", nil, body); err != nil {
+	if err = c.post(ctx, observationID("market-", spec.Version, at), at, "/api/v2/trading/market/snapshots", func(command d.Command) any {
+		body.Command = command
+		return body
+	}); err != nil {
 		return 0, 0, err
 	}
 	if c.SimFrames {
@@ -179,11 +196,9 @@ func (c *Collector) frame(ctx context.Context, spec *d.InstrumentSpec, body d.Ma
 			frame.Candle = &candle
 		}
 	}
-	command, err := c.command(ctx, observationID("frame-", spec.Version, at), at)
-	if err != nil {
-		return err
-	}
-	if _, err = c.Client.Call(ctx, "POST", "/api/v2/trading/simulation/frames", nil, d.AdvanceReplay{Command: command, Frame: frame}); err != nil {
+	if err := c.post(ctx, observationID("frame-", spec.Version, at), at, "/api/v2/trading/simulation/frames", func(command d.Command) any {
+		return d.AdvanceReplay{Command: command, Frame: frame}
+	}); err != nil {
 		return err
 	}
 	c.lastFrame = body.At
