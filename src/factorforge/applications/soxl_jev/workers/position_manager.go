@@ -54,6 +54,10 @@ type PositionSettings struct {
 }
 
 // BatchState is the instance view of one position cycle (S3-027～029).
+// RecoveryLookback bounds the closes re-read after an outage (P1 keeps seven
+// days of candles in the run).
+const RecoveryLookback = 7 * 24 * time.Hour
+
 type BatchState struct {
 	CycleID     string         `json:"cycle_id"`
 	Direction   int            `json:"direction"`
@@ -132,7 +136,16 @@ func (m *PositionManager) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	bars, err := m.Trading.Candles(ctx, s.Venue, s.InstrumentID, "5m", now.Add(-40*time.Minute), now)
+	// An open batch reads every close since the last one it processed, so an
+	// outage does not drop closes from best_close and the trailing stop.
+	start := now.Add(-40 * time.Minute)
+	if b := st.Batch; b != nil && b.LastBarAt.Before(start) {
+		start = b.LastBarAt
+		if floor := now.Add(-RecoveryLookback); start.Before(floor) {
+			start = floor
+		}
+	}
+	bars, err := m.Trading.Candles(ctx, s.Venue, s.InstrumentID, "5m", start, now)
 	if err != nil {
 		return err
 	}
