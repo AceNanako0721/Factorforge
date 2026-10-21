@@ -128,7 +128,13 @@ func (s Service) SubmitStopDirective(ctx context.Context, identity d.Identity, r
 			if err != nil {
 				return nil, err
 			}
-			if err = ValidateDirectiveSnapshot(request.StopDirective, obj, snap, state.Policies.Value(obj.TimePolicyVersion), now); err != nil {
+			// Prices are checked when the snapshot was read: a frame committed
+			// while the request waited is fresh, not unusable.
+			checked := s.Clock.Now()
+			if checked.Before(now) {
+				checked = now
+			}
+			if err = ValidateDirectiveSnapshot(request.StopDirective, obj, snap, state.Policies.Value(obj.TimePolicyVersion), checked); err != nil {
 				return nil, err
 			}
 		}
