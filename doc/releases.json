@@ -606,6 +606,21 @@
         "04_Web管理台",
         "05_模型接入模块"
       ]
+    },
+    {
+      "version": "2.11.3",
+      "directory": "doc/v2.11.3",
+      "change_kind": "design",
+      "date": "2026-10-21",
+      "reason": "新增 P3 设计第 30 章：收盘止损的冻结与单向移动（开仓时按 entry − close_distance 冻结，只由已核验的 POSITION_STOP 向有利方向推进，续报的 INITIAL_DISTANCE 不再改写；旧批次从开仓记录恢复），修正 E15 收盘止损漂移；代码同 PR 实现，业务式样不变。",
+      "format": "html",
+      "document_pairs": [
+        "01_交易系统层",
+        "02_策略化框架层",
+        "03_SOXLUSDT_JEV应用实例",
+        "04_Web管理台",
+        "05_模型接入模块"
+      ]
     }
   ]
 }
