@@ -199,6 +199,9 @@ func SettleLayers(s *StrategyState, obj *ObservedObject, snap *TradingSnapshot, 
 	if !ok || sample.Quality != "VALID" || sample.AvailableAt.After(at) || sample.Price.Sign() <= 0 || snap.Equity.Sign() <= 0 {
 		return nil
 	}
+	// The block is re-derived on every settlement; only a persisting imbalance
+	// (checked above) or a fact that still cannot be settled keeps it.
+	obj.LayerLedgerBlocked = false
 	spec := snap.Specs[obj.ObjectID]
 	mult := Amount(spec["contract_multiplier"])
 	funding, err := FundingAnnual(snap, obj.ObjectID, p)
@@ -359,7 +362,46 @@ func SettleLayers(s *StrategyState, obj *ObservedObject, snap *TradingSnapshot, 
 			}
 		}
 		if f.at.Before(st.At) {
-			obj.LayerLedgerBlocked = true
+			// Visible only after its interval was settled (P1 stamps facts at
+			// transaction start; feedback settles up to its own clock). Book it
+			// at st.At and correct the interval it missed.
+			row, e := layerDay(s, obj.ObjectID, st.At)
+			if e != nil {
+				obj.LayerLedgerBlocked = true
+				return nil
+			}
+			if f.kind == "FILL" {
+				if Text(f.value["fee_currency"]) != Text(spec["settlement_currency"]) {
+					obj.LayerLedgerBlocked = true
+					continue
+				}
+				signed := Amount(f.value["quantity"])
+				if Text(f.value["side"]) != "BUY" {
+					signed = signed.Neg()
+				}
+				c := st.Components
+				if origin := s.Decisions.Value(Text(f.value["source_decision_id"])); origin != nil && origin.Components != nil {
+					c = origin.Components
+				}
+				price := Amount(f.value["price"])
+				pnl := m.Mul(m.Mul(signed, m.Sub(st.Price, price)), mult)
+				exposure := m.Mul(m.Div(m.Mul(m.Mul(signed, price), mult), st.Equity), Seconds(st.At.Sub(f.at)))
+				err = AllocateLayers(row, c, pnl, Amount(f.value["fee"]), Zero(), exposure, p.NumericalTolerance)
+				st.Quantity = m.Add(st.Quantity, signed)
+				st.SeenFills[f.id] = f.at
+			} else {
+				if Text(f.value["currency"]) != Text(spec["settlement_currency"]) {
+					obj.LayerLedgerBlocked = true
+					continue
+				}
+				err = AllocateLayers(row, st.Components, Zero(), Zero(), Amount(f.value["amount"]).Neg(), Zero(), p.NumericalTolerance)
+				st.SeenIncomes[f.id] = f.at
+			}
+			if err != nil {
+				obj.LayerLedgerBlocked = true
+				return nil
+			}
+			s.AppendAudit(map[string]any{"action": "LAYER_FACT_LATE", "object_id": obj.ObjectID, "kind": f.kind, "fact_id": f.id, "happened_at": ISO(f.at), "settled_at": ISO(st.At)})
 			continue
 		}
 		price := st.Price
@@ -428,7 +470,11 @@ func SettleLayers(s *StrategyState, obj *ObservedObject, snap *TradingSnapshot, 
 		return nil
 	}
 	st.Equity = snap.Equity
-	if st.Quantity.Cmp(snap.Actual[obj.ObjectID]) != 0 {
+	if actual := snap.Actual[obj.ObjectID]; st.Quantity.Cmp(actual) != 0 {
+		// A change no visible fill explains: adopt P1's quantity, hold new
+		// risk for this cycle, and leave the gap in the audit.
+		s.AppendAudit(map[string]any{"action": "LAYER_QUANTITY_RECONCILED", "object_id": obj.ObjectID, "at": ISO(at), "ledger_quantity": st.Quantity, "actual_quantity": actual, "difference": m.Sub(actual, st.Quantity)})
+		st.Quantity = actual
 		obj.LayerLedgerBlocked = true
 	}
 	RetainLayerLedger(s, obj.ObjectID, at)

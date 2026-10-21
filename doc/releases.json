@@ -591,6 +591,21 @@
         "04_Web管理台",
         "05_模型接入模块"
       ]
+    },
+    {
+      "version": "2.11.2",
+      "directory": "doc/v2.11.2",
+      "change_kind": "design",
+      "date": "2026-10-21",
+      "reason": "新增 P2 设计第 17 章：分层账本的迟到成交与数量对账（迟到的成交与资金费在上次结算时刻补记并审计 LAYER_FACT_LATE；数量与 P1 不一致时采用 P1 数量、审计 LAYER_QUANTITY_RECONCILED 并只冻结当轮；冻结增险每次结算重新判定），修正影子 E15 第三次中断；代码同 PR 实现，业务式样不变。",
+      "format": "html",
+      "document_pairs": [
+        "01_交易系统层",
+        "02_策略化框架层",
+        "03_SOXLUSDT_JEV应用实例",
+        "04_Web管理台",
+        "05_模型接入模块"
+      ]
     }
   ]
 }
