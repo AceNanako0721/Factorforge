@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="ff:version" content="2.11.4"><meta name="ff:kind" content="specification"><meta name="ff:pair" content="02_策略化框架层设计书.html"><title>02_策略化框架层式样书 · Factorforge v2.11.4</title><style>
+:root{--ink:#172d40;--muted:#587083;--accent:#006e82;--line:#cfdee5;--paper:#fff;--bg:#edf3f6}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.8 system-ui,'Microsoft YaHei',sans-serif}
+a{color:var(--accent);text-underline-offset:3px;overflow-wrap:anywhere}header{background:#15384a;color:white;padding:28px max(24px,calc((100vw - 1320px)/2));border-bottom:5px solid #2eb6ad}
+header p{margin:0}header strong{font-size:23px}header a{color:#a9eee9}.shell{display:grid;grid-template-columns:245px minmax(0,1fr);gap:26px;max-width:1320px;margin:28px auto;padding:0 24px}
+nav{position:sticky;top:16px;align-self:start;max-height:calc(100vh - 32px);overflow:auto;padding:18px;background:var(--paper);border:1px solid var(--line);border-radius:12px;font-size:14px}
+nav a{display:block;padding:6px 0;text-decoration:none}main{overflow-wrap:anywhere;min-width:0;background:var(--paper);padding:30px 38px;border:1px solid var(--line);border-radius:12px}
+h1{font-size:30px;line-height:1.35;margin:0 0 18px}h2{font-size:23px;border-bottom:2px solid var(--line);padding:10px 0;margin:34px 0 18px;scroll-margin-top:20px}h3{font-size:18px;margin:25px 0 10px;scroll-margin-top:20px}p{margin:12px 0}
+.meta,.note{background:#eef7f8;border-left:4px solid var(--accent);padding:12px 16px;margin:18px 0;color:#294c60}.warning{background:#fff7e9;border-color:#d09b39}.table-wrap{overflow:auto;margin:18px 0}
+table{width:100%;border-collapse:collapse;font-size:14px}th{background:#e8f1f4;text-align:left}th,td{padding:11px 13px;border:1px solid var(--line);vertical-align:top;overflow-wrap:anywhere}td code{white-space:normal;overflow-wrap:anywhere}
+pre{padding:16px;background:#102d3d;color:#d8f2ed;border-radius:8px;overflow:auto;font:13px/1.7 Consolas,monospace}code{overflow-wrap:anywhere;font-family:Consolas,monospace;font-size:.9em;background:#edf3f6;padding:1px 4px;border-radius:3px}pre code{background:none;color:inherit;padding:0}
+figure{margin:24px 0;border:1px solid var(--line);border-radius:10px;padding:16px;background:#f8fbfc;overflow:auto}figure svg{display:block;width:100%;height:auto;min-width:520px}figcaption{font-size:14px;color:var(--muted);margin-top:12px}details{margin:12px 0}footer{color:var(--muted);font-size:13px;margin-top:28px;border-top:1px solid var(--line);padding-top:15px}li{margin:5px 0}.badge{display:inline-block;background:#d6eee8;color:#15564b;border-radius:5px;padding:0 7px;font-size:13px}
+@media(max-width:900px){.shell{display:block;padding:0 12px;margin:16px auto}nav{position:static;max-height:220px;margin-bottom:16px}main{padding:22px 18px}h1{font-size:25px}}
+@media print{body{background:white;font-size:11pt}.shell{display:block;margin:0;padding:0;max-width:none}nav,header{display:none}main{padding:0;border:0}h2,h3{break-after:avoid}figure,tr{break-inside:avoid}figure svg{min-width:0}pre{white-space:pre-wrap;overflow-wrap:anywhere}a{color:inherit}table{font-size:9pt}}
+</style></head><body><header><strong>Factorforge / 文档基线</strong><p>v2.11.4 · 2026-10-21 · 三层架构 · HTML 正文</p></header><div class="shell"><nav aria-label="文档目录"><a href="index.html">版本索引</a><a href="#section-1">1 功能边界</a><a href="#section-2">2 对象、事件与评分</a><a href="#section-3">S2-001 观测对象与隔离</a><a href="#section-4">S2-002 创建与关联事件</a><a href="#section-5">S2-003 接收矢量评分</a><a href="#section-6">S2-004 去重与事实修订</a><a href="#section-7">S2-005 新颖度与提前计价</a><a href="#section-8">3 情绪与目标仓位</a><a href="#section-9">S2-006 情绪账本</a><a href="#section-10">S2-007 时间衰减</a><a href="#section-11">S2-008 价格兑现</a><a href="#section-12">S2-009 失效、缺数与守恒</a><a href="#section-13">S2-010 时基自动决策</a><a href="#section-14">S2-011 市场状态与辅助因子</a><a href="#section-15">S2-012 自动计算应持仓位</a><a href="#section-16">S2-013 目标与实际执行闭环</a><a href="#section-17">S2-014 波动止损与风险批次</a><a href="#section-18">S2-015 通用交易时段政策</a><a href="#section-19">4 案例、归因与负反馈</a><a href="#section-20">S2-016 完整案例与退出观察</a><a href="#section-21">S2-017 分层归因与未知</a><a href="#section-22">S2-018 多事件与反事实</a><a href="#section-23">S2-019 受限参数学习</a><a href="#section-24">S2-020 防错误学习</a><a href="#section-25">S2-021 自动生效、监测与回滚</a><a href="#section-26">S2-022 研究验证与分项评价</a><a href="#section-27">S2-023 资格、恢复与可解释性</a><a href="#section-28">5 验收效果</a><a href="#section-29">6 配置边界</a><a href="#section-30">7 v2.1.0 追加：通用只读追溯</a><a href="#section-31">S2-024 查询对象、事件、评分与学习链</a>
+<a href="#baseline-composition">8 v2.6.0 行情基线与有界调整</a><a href="#withdraw-kline-spec">9 v2.7.0 修订</a><a href="#lower-compat-spec">10 v2.8.0 下层兼容</a><a href="#s2-032">S2-032 上层管理模式与余量</a><a href="#dynamic-stop-spec">11 v2.9.0 风险单位与退出</a><a href="#s2-033">S2-033 风险单位仓位</a><a href="#s2-034">S2-034 收盘止损退出</a><a href="#s2-035">S2-035 止损后再入场门</a><a href="#s2-036">S2-036 判断链亏损上限</a><a href="#s2-037">S2-037 预排事件前降险</a><a href="#s2-038">S2-038 贡献转入基线</a><a href="#s2-039">S2-039 判断型事件类型</a><a href="#s2-040">S2-040 相对无交易带</a><a href="#s2-041">S2-041 学习冻结</a><a href="#s2-042">S2-042 停用模板在线标定</a></nav><main><div class="meta">02_策略化框架层式样书 · <a href="02_策略化框架层设计书.html">对应设计书</a></div><div class="note">本页继承 v2.0.0 正文，除本版明确追加的条款外，业务规则保持。继承正文中的历史交付说明不代表当前实现状态；既有 P1/P2、P3 与 Web 管理台实现见进度记录；v2.8.0 下层兼容已由代码 PR #101 实施，v2.9.0 第 11 章尚待代码 PR。</div><article id="document-body"><p class="note">历史 K 线方向判断边界见 <a href="#withdraw-kline-spec">v2.7.0 撤回修订</a>；继承章节中涉及历史 K 线行情判断、波动/状态仓位乘数、历史先验和旧前向启用安排的条款按本次修订取代。</p><div data-source-sha256="bdd71574cc92e1f44adb773de8bf5b820e127f438f3492485640b53538879f58" data-source-document="02_策略化框架层式样书.md"><h1>策略化框架层式样书</h1>
+<p>版本：2.11.4；日期：2026年10月21日。对应设计书：02_策略化框架层设计书。需求编号 S2；验收编号 T2。</p>
+<h2 id="section-1">1 功能边界</h2>
+<p>本层实现通用的事件情绪量化策略。依赖交易系统层提供市场、账户和执行能力，接收外部指定的观测对象、事件及有来源的评分，自动计算剩余情绪、应持仓位和交易后的受限反馈。</p>
+<p>观测哪个对象、怎样捕捉消息、由哪个模型或人工评分由使用者决定。本层不内置联网搜索、模型调用或具体交易对象。没有应用实例时，手工或固定夹具仍可驱动完整量化流程。评分服务暂时没有新输入时，旧事件的可靠衰减、持仓管理及风险处理继续运行。</p>
+<h2 id="section-2">2 对象、事件与评分</h2>
+<h3 id="section-3">S2-001 观测对象与隔离</h3>
+<p>能够创建、查询、暂停、归档多个观测对象，并绑定交易对象、模拟/实盘环境及参数。每个对象的情绪池、决策、案例及参数分别保存。相同交易对象的多个策略运行须有明确持仓归属；观测对象暂停后仍处理既有仓位、案例和保护，不能静默删除状态。</p>
+<h3 id="section-4">S2-002 创建与关联事件</h3>
+<p>能够创建新的经济事件，关联一个或多个观测对象，记录事实、证据、来源时间、类型和修订关系。创建事件只表示事实已登记，不自动形成情绪或订单。事件类型可扩展，每种类型具有独立的评分量表、生命周期和历史效果记录。</p>
+<h3 id="section-5">S2-003 接收矢量评分</h3>
+<p>使用者可以给新事件或已创建事件提交对特定观测对象的评分，至少包含方向和影响程度。完整可交易评分还包括可信度、相关程度、新颖度、未预期程度、影响期限、证据及版本。方向为正、负或中性；影响程度为非负值。未知、缺失、超界或矛盾评分要保留原因并隔离，不当作中性或零风险。</p>
+<h3 id="section-6">S2-004 去重与事实修订</h3>
+<p>同一经济事实的转载、翻译和多媒体报道只补充来源，不重复完整注入情绪。新事实、官方确认、金额修订和撤销分别记录。纯可信度修订只改变当前剩余影响，不能重置事件年龄或再次消费已兑现价格；真正新增事实可建立关联贡献。所有差额及拒收量可查。</p>
+<h3 id="section-7">S2-005 新颖度与提前计价</h3>
+<p>按新事实比例降低重复信息影响，并结合事前预期和评分可用前的价格反应评估尚未被市场计入的部分。相同证据不能被重复扣减。缺乏可靠预期或价格时保留不确定区间，用可信下界限制新增风险；无法建立下界时不凭该事件增仓。</p>
+<h2 id="section-8">3 情绪与目标仓位</h2>
+<h3 id="section-9">S2-006 情绪账本</h3>
+<p>每个事件对每个对象的贡献单独保存，汇总正向、负向和净情绪。基础影响经可信度、相关程度、新颖度、未预期程度、事件类型及市场状态修正后注入，并遵守事件、事件族和对象总量上限。反向消息通过负向贡献抵消净值，不删除原正向贡献。</p>
+<h3 id="section-10">S2-007 时间衰减</h3>
+<p>事件剩余影响按所登记半衰期随真实经过时间逐渐减小，包括没有交易和停机期间。不同类型可以有不同期限；不能因为重启、重复评分或更换参数让旧消息恢复年轻状态。衰减不能把正面事件翻成负面事件。</p>
+<h3 id="section-11">S2-008 价格兑现</h3>
+<p>价格向预测方向运动时，消耗尚未兑现的事件影响；回撤后再到旧高位不得重复消耗，反向运动不能自动补回。多个同向事件共享一次价格兑现预算，不能每条消息都把同一涨幅完整归为自己。空仓也计算兑现；实际持仓盈亏不作为兑现量。</p>
+<h3 id="section-12">S2-009 失效、缺数与守恒</h3>
+<p>被证伪、撤销、超过寿命或低于清理阈值的贡献按原因清除；止损本身不能让事件失效。每次变化可解释为注入、修订、衰减、兑现或失效，账差超出登记容差就冻结受影响增险。价格缺失时继续时间衰减，暂停兑现及依赖该价格的新风险，恢复后不回写历史决策。</p>
+<h3 id="section-13">S2-010 时基自动决策</h3>
+<p>按配置周期持续计算，消息可提前处理但不能到达就直接增险。每周期先接收实际成交与保护结果，再处理旧贡献和新评分，形成仓位建议。停机漏掉的周期保留记录而不追补过期订单；止损和执行异常及时处理，不等待主周期。</p>
+<h3 id="section-14">S2-011 市场状态与辅助因子</h3>
+<p>允许趋势、波动、风险偏好、行业强弱和极端异常等多个状态同时存在，切换有确认和滞回。只使用当时已可用数据；未知状态采取登记的保守政策。辅助因子声明用于可信度、仓位、状态还是提前计价，启用前要证明样本外增量效果，不能无限增加复杂度。<strong>（v2.6.0 起由第 8 章修订条款取代。）</strong></p>
+<h3 id="section-15">S2-012 自动计算应持仓位</h3>
+<p>根据剩余净情绪计算方向及有限仓位等级，受波动、流动性、证据质量、正负冲突和风险限制修正。进入某等级需要高于退出该等级的阈值，避免边界附近频繁往返。无充分信号可以保持空仓。方向反转时先确认旧方向已平，再评估新方向。<strong>（v2.6.0 起由第 8 章修订条款取代。）</strong></p>
+<h3 id="section-16">S2-013 目标与实际执行闭环</h3>
+<p>向交易层提交带版本、期限和原因的目标暴露，查询实际与未完成量后再作下一决策；理论目标不被记为成交。卖空、最小订单或资金能力不足时保留理论目标并说明实际为何不同。普通调整有最小变动与冷却，强制减险优先。最终交易层风险拒绝不能被框架绕过。</p>
+<h3 id="section-17">S2-014 波动止损与风险批次</h3>
+<p>用已完成K线估计正常噪声，在噪声之外计算保护距离，并按单笔风险预算降低数量或不交易。该计算独立于情绪强弱。存量风险批次不因亏损或学习扩大止损；新参数只用于以后新风险批次。止损后仍观察旧事件，不直接判定方向失败。</p>
+<h3 id="section-18">S2-015 通用交易时段政策</h3>
+<p>允许使用者定义某些时段的新增风险次数和净亏损案例次数限制，两者独立记录，达到任一则禁止该窗口增险。重试、拆单、部分成交不重复占额；未知受理结果继续占额。止损、减仓及保护不受次数限制。日历和窗口由使用者配置，框架不内置特定市场时段。</p>
+<h2 id="section-19">4 案例、归因与负反馈</h2>
+<h3 id="section-20">S2-016 完整案例与退出观察</h3>
+<p>以实际方向持仓周期建立案例，关联风险批次、事件、评分、情绪变化、目标、成交、成本、止损和退出原因。实际归零后进入入场时已冻结规则的观察期。缺数、未结束或仍持续影响的案例标为未成熟或删失，不能用零结果补齐。</p>
+<h3 id="section-21">S2-017 分层归因与未知</h3>
+<p>先检查数据和执行，再检查外部异常、去重和提前计价，之后评价方向、强度、生命周期、兑现、时机及止损。允许多原因和无法确定。外部提供的解释是候选，必须经客观证据与稳定性核验；模型自述置信度和单笔盈亏不能直接决定参数修正。</p>
+<h3 id="section-22">S2-018 多事件与反事实</h3>
+<p>共同驱动和重叠事件合并独立样本组，无法分离时只做簇级评价。支持不使用策略止损、延迟入场、调整退出和同预算更宽止损等单因素反事实；仍保留硬风险条件。反事实与实际账务分列，不能用事后最佳点制造盈利，也不能单独证明因果。</p>
+<h3 id="section-23">S2-019 受限参数学习</h3>
+<p>只对登记白名单内的类型权重、半衰期、兑现参数及止损偏差提出学习候选。成熟、质量合格的独立证据经置信度、遗忘、重复误差、有效样本量和稳定状态门控后，才可按该参数固定步长小幅调整。硬风险、权限、运行阶段、数据真实性及实例额度不能学习。</p>
+<h3 id="section-24">S2-020 防错误学习</h3>
+<p>单次极端行情、无法归因、执行污染、重复案例和盈利但判断错误的案例不能误导学习。同一证据不能独自重复推动更新；相关参数不能同时无条件修改。参数有上下限、漂移预算、冷却、新证据门槛及反向门槛，证据不足就保持现值。</p>
+<h3 id="section-25">S2-021 自动生效、监测与回滚</h3>
+<p>白名单候选通过独立验证、影子或受控试用及风险门后，在规定周期边界自动生效，不逐次等待人工。失败则拒绝或回滚并冻结。回滚只影响未来，不改历史评分、成交或已消费证据；周期合理性报告不阻塞合格发布。参数停止变化不等于已证明收敛。</p>
+<h3 id="section-26">S2-022 研究验证与分项评价</h3>
+<p>提供按真实可用时间重放、严格时间顺序样本外验证、事件组隔离、未来信息检查及冻结/自适应对照。分别评价事件方向、强度、生命周期、兑现、时机、止损、成本后交易风险和参数稳定性，报告未知比例、独立样本及不确定性。核心假设不支持时停止升级，不能靠增加模型复杂度掩盖失败。</p>
+<h3 id="section-27">S2-023 资格、恢复与可解释性</h3>
+<p>研究评分与可交易评分的资格分离，公共接口使用者不能自行获得实盘信号资格。不同实例及模拟/实盘隔离，合格提交者仍接受数据、参数、时效和风险校验。恢复情绪、决策、目标、观察及学习后先与交易层核验；不能因框架重启解除交易层锁定。每次交易、不交易、更新、不更新均能按当时输入重放原因。</p>
+<h2 id="section-28">5 验收效果</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>编号</th>
+<th>条件</th>
+<th>应达到的效果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>T2-01</td>
+<td>不安装应用层，手工创建两个对象及评分</td>
+<td>完成独立情绪、目标、模拟执行与案例闭环</td>
+</tr>
+<tr>
+<td>T2-02</td>
+<td>新事件未评分，或已有事件收到方向/影响评分</td>
+<td>前者不注入；后者校验后在下一有效周期处理</td>
+</tr>
+<tr>
+<td>T2-03</td>
+<td>转载、纯确认、新事实、撤销及重复请求</td>
+<td>不重复注入，修订不重置年龄，差额可查</td>
+</tr>
+<tr>
+<td>T2-04</td>
+<td>提前计价未知或同证据重复使用</td>
+<td>采用可靠下界或拒绝相关增险</td>
+</tr>
+<tr>
+<td>T2-05</td>
+<td>衰减、兑现、反向及失效叠加</td>
+<td>组成可查、守恒、非负，重复价格不再消耗</td>
+</tr>
+<tr>
+<td>T2-06</td>
+<td>停机、断价、补消息、相同输入重放</td>
+<td>实时衰减，无过期补单或历史回写，结果一致</td>
+</tr>
+<tr>
+<td>T2-07</td>
+<td>边界情绪、冲突、反向及能力不足</td>
+<td>正确滞回和降险，先平后反，目标/实际分开</td>
+</tr>
+<tr>
+<td>T2-08</td>
+<td>止损、学习及新风险批次</td>
+<td>旧保护不放宽，止损不清空事件或立即学习</td>
+</tr>
+<tr>
+<td>T2-09</td>
+<td>指定时段内重试、未知订单和迟到亏损案例</td>
+<td>两计数独立且持久，减险继续</td>
+</tr>
+<tr>
+<td>T2-10</td>
+<td>未成熟、删失、重叠及执行污染案例</td>
+<td>不提前学习，保存未知或簇级结论</td>
+</tr>
+<tr>
+<td>T2-11</td>
+<td>反事实更宽止损或修改退出</td>
+<td>同预算及当时信息，真实损益不混入</td>
+</tr>
+<tr>
+<td>T2-12</td>
+<td>固定步长、证据消费、漂移及相关参数</td>
+<td>门控失败不更新，合格仅改变可识别参数</td>
+</tr>
+<tr>
+<td>T2-13</td>
+<td>用户离线、候选合格或回滚</td>
+<td>自动边界生效，拒绝/回滚可查，历史不改</td>
+</tr>
+<tr>
+<td>T2-14</td>
+<td>泄漏样本、失败试验或误差不可识别</td>
+<td>正确隔离、记录全部尝试，不宣称通过</td>
+</tr>
+<tr>
+<td>T2-15</td>
+<td>公共调用伪造实盘资格、跨实例或异常恢复</td>
+<td>拒绝且留痕，不能解除底层风险锁</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="section-29">6 配置边界</h2>
+<p>类型量表、半衰期、兑现尺度、仓位等级、观察窗、标签、学习门槛和时效均从登记配置读取。缺少关键参数时可以研究记录，不能隐式进入真实交易。通用能力的数学定义和程序流程由对应设计书展开，具体交易对象、模型和实例数值仅由应用实例选择。</p>
+</div><h2 id="section-30">7 v2.1.0 追加：通用只读追溯</h2><h3 id="section-31">S2-024 查询对象、事件、评分与学习链</h3><p>向有query权限的公共身份提供对象目录、事件及事实版本、评分及准入结果、贡献账本、案例归因/反事实、参数激活与审计的只读查询。身份、实例、环境和对象范围继续按原规则核验；接口不创建事件、评分、贡献、决策或学习，不推进时钟，不授予signal资格。保留历史版本、原始时间、来源、真实/研究区别及未知状态。没有保存的记录明确缺失，不能由查询反算或补造。</p><p>长列表采用有界查询和稳定分页，游标与范围及读取快照绑定；授权变化或快照过期时不能继续越权读取。原文、真实Prompt、凭据和任意内部命令载荷不进入公开查询。已有实时pool接口只提供快照，不能宣称历史曲线已存在。</p><table><thead><tr><th>验收</th><th>效果</th></tr></thead><tbody><tr><td>T2-16</td><td>不安装应用，通过公共query身份查询上述追溯数据；修改或跨环境/实例请求拒绝；查前查后业务状态、时钟和outbox不变；游标失效可检测；缺记录不伪造。</td></tr></tbody></table><h2 id="baseline-composition">8 v2.6.0 修订：行情基线与有界调整</h2>
+<p>v2.5.8 之前，应持仓位只由事件情绪决定，市场状态仅作乘数。v2.6.0 改为“行情决定基础方向，事件只做有界调整”：先由市场数据与周期研判形成同方向的基础仓位，财报、宏观发布等预排事件按已标定的模板在窗口内加减，单个事件的情绪只在此之上调整。未声明合成规则的策略保持 v2.5.8 的行为。</p>
+<figure><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 330" role="img" aria-labelledby="comp-title comp-desc"><title id="comp-title">应持仓位的分层合成</title><desc id="comp-desc">行情基线、行情研判与预排事件相加形成核心方向；事件调整叠加在核心之上，与核心反向时最多压到空仓；合成值量化为离散档位，再经波动、流动性与风险约束，最后经过成本感知的无交易带与冷却才形成提交给交易层的目标。</desc>
+<defs><marker id="comp-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#006e82"/></marker></defs>
+<g fill="#eef7f8" stroke="#006e82" stroke-width="2">
+<rect x="15" y="20" width="200" height="52" rx="8"/><rect x="15" y="86" width="200" height="52" rx="8"/><rect x="15" y="152" width="200" height="52" rx="8"/>
+<rect x="15" y="236" width="200" height="60" rx="8"/>
+<rect x="285" y="86" width="170" height="52" rx="8"/><rect x="285" y="236" width="170" height="60" rx="8"/>
+<rect x="525" y="150" width="160" height="60" rx="8"/><rect x="745" y="40" width="140" height="60" rx="8"/><rect x="745" y="150" width="140" height="60" rx="8"/><rect x="745" y="250" width="140" height="60" rx="8"/></g>
+<g fill="#17384a" font-family="sans-serif" font-size="14" text-anchor="middle">
+<text x="115" y="44">L1 行情基线 B</text><text x="115" y="62" font-size="12">按日 · 因子加权 · 可做空开关</text>
+<text x="115" y="110">L2 行情研判 L</text><text x="115" y="128" font-size="12">周期 · 默认 SHADOW</text>
+<text x="115" y="176">L4 预排事件 S</text><text x="115" y="194" font-size="12">日程窗口 · 模板自动标定</text>
+<text x="115" y="262">L3 事件调整 A</text><text x="115" y="282" font-size="12">情绪账本 · |A| ≤ 上限 ≤ 100%</text>
+<text x="370" y="110">核心 C = B+L+S</text><text x="370" y="128" font-size="12">裁剪到 [−1, 1]</text>
+<text x="370" y="260">合成 X = C + A</text><text x="370" y="280" font-size="12">反向只压到 0</text>
+<text x="605" y="176">离散档位 + 滞回</text><text x="605" y="194" font-size="12">0 / 25 / 50 / 100%</text>
+<text x="815" y="66">风险约束</text><text x="815" y="84" font-size="12">波动 · 流动性 · 组合</text>
+<text x="815" y="176">无交易带</text><text x="815" y="194" font-size="12">费用+滑点+资金费</text>
+<text x="815" y="276">目标暴露</text><text x="815" y="294" font-size="12">提交交易层</text></g>
+<g fill="none" stroke="#006e82" stroke-width="2" marker-end="url(#comp-arrow)">
+<path d="M215 46 L285 104"/><path d="M215 112 L285 112"/><path d="M215 178 L285 122"/>
+<path d="M370 138 L370 236"/><path d="M215 266 L285 266"/><path d="M455 260 L525 190"/>
+<path d="M685 170 L745 80"/><path d="M815 100 L815 150"/><path d="M815 210 L815 250"/></g></svg><figcaption>图 S2-R：应持仓位的分层合成。</figcaption></figure>
+<h3 id="s2-011r">S2-011（修订）市场状态、行情基线与研判</h3><p class="note">v2.7.0 起由第 9 章取代。</p>
+<p>原条款的状态维度、确认与滞回、因果可用性、未知状态保守政策和样本外增量要求继续有效。在此之上增加两类方向性输入。行情基线由使用者登记的一个或多个基线因子构成，每个因子按登记周期提交取值在 −1 到 1 之间的观测，框架按登记权重合成基线方向与大小；研判是周期性的综合判断，同样给出方向与大小，并可声明“强制减险”。每个因子与研判各自处于启用、只记录或停用状态：只记录的因子照常计算并保存结果，但不影响仓位。从只记录升为启用，必须引用样本外或前向检验证据（样本区间、成本口径、检验结论），没有证据不能启用。观测超过登记的有效期即视为缺失，按登记的缺失政策处理（默认取零），不沿用过期值。基线做空需单独开启；未开启时负的基线按零处理。</p>
+<h3 id="s2-012r">S2-012（修订）自动计算应持仓位</h3><p class="note">v2.7.0 起由第 9 章取代。</p>
+<p>应持仓位由四个分量合成：基线、研判与预排事件之和构成核心方向，裁剪到满仓范围之内；事件调整来自剩余净情绪，经登记的尺度映射到不超过登记上限的调整量，上限最大为满仓的 100%。合成规则如下：调整与核心同向时相加，仍以满仓为限；与核心反向时最多把仓位压到空仓，不因事件反向开仓；核心为零时，事件单独开仓不得超过登记的单独开仓上限，上限可以为零。只有核心本身转向，仓位才会反向，且反向前先平旧方向，新方向需持续登记的确认期。合成值量化为有限档位，进入某档的阈值高于退出该档的阈值；随后照原条款受波动、流动性、证据质量和风险限制修正。每个决策保存各分量、核心、合成值、档位与最终暴露，只记录分量的假设值一并保存。</p>
+<h3 id="s2-025">S2-025 预排事件与模板标定</h3>
+<p>使用者可以登记已排定日程的事件：类型、对象、预计时刻、时间的确定程度（已确认或预估）及来源，日程变化以新修订登记，取消也要登记。每类事件对应模板，规定相对预计时刻的一个或多个窗口及每个窗口内的调整方向和大小。模板的取值可以来自登记的离线检验证据，也可以从系统积累的案例在线估计：每个窗口结束后，以该窗口内对象的实际收益形成一个案例并更新模板。在线估计必须收缩到登记的先验，并以样本数和统计显著性门控；样本不足时只记录、不影响仓位。日程修订只影响尚未开始的窗口；已执行的决策不追溯。窗口内若日程被取消，剩余窗口作废，已形成的部分不作为完整案例。</p>
+<h3 id="s2-026">S2-026 成本感知调仓</h3>
+<p>目标与当前暴露之差小于无交易带时不调仓，无交易带由往返手续费、滑点与预期持有期内的资金费差构成，并不小于登记的最小变动。各分量各有评估节奏：基线在新观测到达时评估，研判按登记周期，事件调整先在账本中累积，只在使档位变化时执行，且两次由调整引起的调仓之间不短于登记间隔。减仓到零、强制减险、止损与保护不受无交易带、节奏和冷却限制。持仓成本（含资金费，按多空方向分别计）进入评价与无交易带，不作为事件影响。</p>
+<h3 id="s2-027">S2-027 分层归因与权重学习</h3>
+<p>按持仓区间把收益与成本分摊给各分量：收益按分量在合成值中的有向份额分摊，调仓成本归入触发该次调仓的分量，资金费按持仓期间各分量的份额分摊。只记录的分量按其假设暴露计算假设收益与假设成本，与实际账务分列。各分量与因子的权重在登记界限内按 S2-019 至 S2-021 学习：扣除成本后长期为负的分量降低权重，可降为零并自动转为只记录；前向证据满足登记门槛的只记录分量可以自动启用，并受监测与回滚约束。事件可信度权重 w 允许取负值以表示反向来源，界限需登记；从正跨到负（或反之）所需证据门槛为同向调整的两倍，w 为零等同静默该来源。</p>
+<table><thead><tr><th>验收</th><th>效果</th></tr></thead><tbody>
+<tr><td>T2-17</td><td>未声明合成规则的策略，冻结回放结果与 v2.5.8 完全相同；声明后，决策记录含各分量、核心、合成、档位与最终暴露，只记录分量不改变目标。</td></tr>
+<tr><td>T2-18</td><td>核心为多头时，强烈负向事件只把目标压到零而不开空；核心为零且单独开仓上限为零时，事件不开仓；核心转向后先平旧方向、经确认期才开新方向；基线做空未开启时负基线按零处理；过期观测按缺失政策处理。</td></tr>
+<tr><td>T2-19</td><td>预排事件窗口按预计时刻开始和结束，日程修订只影响未开始窗口，取消使剩余窗口作废；窗口结束形成案例并更新模板，样本不足或不显著时只记录；收缩与门控按登记参数计算。</td></tr>
+<tr><td>T2-20</td><td>差额小于无交易带或调整间隔未到时不调仓，减仓到零、强制减险和止损不受限制；无交易带随费用、滑点与资金费变化。</td></tr>
+<tr><td>T2-21</td><td>分层归因对实际持仓的收益与成本加总守恒；只记录分量的假设账务与实际分列；w 可在登记界限内为负，跨零需双倍门槛；权重降为零时分量自动转为只记录，启用受回滚约束。</td></tr>
+</tbody></table>
+<section id="withdraw-kline-spec"><h2>9 v2.7.0 修订</h2><p>依据用户 2026-10-14 决定，本章取代第 8 章 S2-011R/S2-012R 中涉及历史行情判断及波动/状态仓位修正的规定。历史 K 线只允许用于 S2-014 的正常噪声范围和止损距离估计，不用于趋势、牛熊、波动状态或历史价格规律的判断与预测。未声明合成规则的旧路径仅作冻结兼容，不代表本版推荐方法。</p><h3>S2-011（再修订）市场状态与行情基线</h3><p>框架不从历史价格/K 线推断市场状态，也不以状态修正仓位。状态维度与基线因子只来自使用者登记的输入；未知状态不对仓位施加乘数。基线层保留通用机制，本版不提供任何基线因子。新的基线思路由使用者提出，验证后以新因子登记；因果可用性、启用证据、有效期及缺失政策仍须满足既有要求。</p><h3>S2-012（再修订）自动计算应持仓位</h3><p>四分量核心、有界事件调整、离散档位、滞回、反向确认和成本感知调仓保持。合成仓位只受流动性、证据质量、组合风险限制与 S2-014 止损风险预算约束，不再受波动或未知状态乘数修正。只记录分量同样不使用上述乘数。基线为空且研判、预排事件、调整均只记录时，核心和目标暴露为零；基线为空本身不抹除未来依法登记的其他启用核心输入。</p>
+
+<figure class="revision-figure"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 390" role="img" aria-labelledby="s2-v270-title s2-v270-desc"><title id="s2-v270-title">图 S2-R270：修订后的仓位流程</title><desc id="s2-v270-desc">使用者登记的基线 B、研判 L、预排事件 S → 核心 C = clip(B + L + S)，有界事件调整 A → 合成 X → 离散档位与滞回 → 流动性·组合·止损预算 → 成本带与冷却 → P1 目标暴露</desc><rect x="12" y="10" width="656" height="54" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="43" text-anchor="middle" font-size="19" fill="#17384a">使用者登记的基线 B、研判 L、预排事件 S</text><path d="M340 64v20m-5 -6l5 6 5 -6" fill="none" stroke="#006e82"/><rect x="12" y="84" width="656" height="54" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="117" text-anchor="middle" font-size="19" fill="#17384a">核心 C = clip(B + L + S)，有界事件调整 A</text><path d="M340 138v20m-5 -6l5 6 5 -6" fill="none" stroke="#006e82"/><rect x="12" y="158" width="656" height="54" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="191" text-anchor="middle" font-size="19" fill="#17384a">合成 X → 离散档位与滞回</text><path d="M340 212v20m-5 -6l5 6 5 -6" fill="none" stroke="#006e82"/><rect x="12" y="232" width="656" height="54" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="265" text-anchor="middle" font-size="19" fill="#17384a">流动性·组合·止损预算</text><path d="M340 286v20m-5 -6l5 6 5 -6" fill="none" stroke="#006e82"/><rect x="12" y="306" width="656" height="54" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="339" text-anchor="middle" font-size="19" fill="#17384a">成本带与冷却 → P1 目标暴露</text></svg><figcaption>图 S2-R270：修订后的仓位流程</figcaption></figure><div class="table-wrap"><table><tr><th>验收</th><th>效果</th></tr><tr><td>T2-22</td><td>合成路径及 shadow 暴露无 f_vol、无未知状态乘数；σ 缺失不阻止有价格和流动性的合成暴露；本版空基线、所有其他分量只记录时核心及目标为零。价格/流动性缺失、止损噪声不足及组合风险仍按原规则阻断或减险。T2-17 旧路径冻结夹具逐位不变，S2-014 止损测试继续通过。</td></tr></table></div></section>
+<section id="lower-compat-spec"><h2>10 v2.8.0 修订：直接反向目标与止损指令输入</h2>
+<p>依据用户 2026-10-15 决定，S2-028～032 对应 R7～R11，修订 S2-012/013/014、T2-07/08/18 的先平后反及旧批次一律不放宽限制；与第 9 章撤回历史 K 线方向判断的决定并行生效。框架只接收通用输入并调用 P1 公开接口，不实现行情判断或动态止损模块。（v2.9.0 注：本章代码、契约与验收已在 v2.8.0 由 PR #101 实施，contracts/v2 已导出。）</p>
+<h3 id="s2-028">S2-028 确认后直接反向（R7）</h3>
+<p>方向持续满足可配置 ReverseConfirmSeconds 后，直接下发反向目标及新方向上层止损，由 P1 一笔反手；取消 FLATTEN_BEFORE_REVERSE 的强制目标零。确认期允许为 0，负数非法；等待期间保持原执行意图与保护，独立强制减险仍可减仓/归零，不为等待确认主动平仓。候选方向变化或消失重置确认期。即使新目标绝对值小于原仓，反手仍包含新开风险，必须通过预算、时段、权限与交付门控。</p>
+<h3 id="s2-029">S2-029 止损指令输入（R8）</h3>
+<p>P2 提供与因子观测同级的公开止损指令通道。指令含 object_id、持仓方向、触发价、触发价格类型、生效时刻、有效期、来源模块、理由代码、版本，以及 R11 的 mode 与 overshoot_allowance。校验来源有写权限、对象/环境范围、方向与当前实际持仓一致、当前未穿越且在有效期内。不能以正文来源字段自授权限。上层可提交允许收紧或放宽的指令；P1 最终检查其是否比保险止损紧。</p>
+<p>持仓期间每周期读取有效指令；触发价与当前已生效上层止损不同，则下发目标数量不变、只更新保护计划的新版本目标（P1 R3）。触发价格类型、mode 或 overshoot_allowance 变化同样视为保护语义变化；VENUE 覆盖量按当前实际仓位，UPPER_MANAGED 按 S2-032 更新管理声明。保护更新不受无交易带和普通调仓冷却阻断，不消耗新增风险次数；原数量调整仍走其风险门。指令过期不撤止损，保持最后生效的上层止损；未生效指令不能替代最后已核验保护。</p>
+<p>另支持“初始止损距离”指令：仅在开仓/反向新开时使用，按给定初始距离加 overshoot_allowance 倒推可开数量，替代 NormalNoise × k_stop，单笔亏损预算、成本准备与舍入后复核不变。该指令表达拟开方向，不将空仓伪装成当前持仓；持仓期绝对触发价指令仍必须匹配实际方向。无有效指令时沿用现有开仓 NormalNoise × k_stop，持仓期间不主动更新；单纯参数学习不能擅自放宽存量止损。</p>
+<h3 id="s2-030">S2-030 未成交重发保留计划（R9）</h3>
+<p>未成交或部分成交期间，重发相同目标必须携带适合其新开方向的止损计划；目标等于 actual + pending 不能作为清空计划的依据。有效计划沿原意图保存，重复投递复用幂等标识和已冻结正文；结果未知先查回执。价格已穿越或计划失效时阻断增险并说明原因，不发无保护的新开目标；减仓及原持仓保护继续。</p>
+<h3 id="s2-031">S2-031 契约同步（R10）</h3>
+<p>新增指令接口、指令字段/状态/错误码，以及 P1 双层角色与状态变化须进入公开契约。contracts/v2 由后续代码 PR 导出，本版只定义设计，不手改生成契约。公共 API 权限不授予 SIM/LIVE 内部信号资格；新通道沿用独立身份与环境隔离。</p>
+<h3 id="s2-032">S2-032 上层管理模式与余量透传（R11，追加修订 1）</h3>
+<p>止损指令增加 <code>mode=VENUE|UPPER_MANAGED</code> 与价格单位的 <code>overshoot_allowance</code>。P2 将 mode 映射到 P1 保护部分的 strategy_protection_mode，UPPER_MANAGED 的触发价声明映射为 managed_stop_price，并原值传递余量；不把该价转换为交易所 STRATEGY 条件单。</p>
+<p>开仓/反手新开量按“初始距离 + overshoot_allowance”与原亏损预算倒推，再复核管理价及不利余量边界严格在 P1 保险价以内，不合格由 P1 拒绝。UPPER_MANAGED 仅保险有效即正常受保护，P2 不因 STRATEGY 条件单不存在阻断加仓；保险失效及其他风险门继续生效。</p>
+<p>持仓期 mode、管理价或余量变化均形成数量不变的新版目标声明；只有真实减仓/平仓意图改变数量。记录生效值时，VENUE 等待条件单确认，UPPER_MANAGED 核对 P1 已受理的模式、声明版本及有效保险，不等待不存在的上层保护单。指令过期保持最后生效模式/声明。5 或 15 分钟收盘触发由上层模块负责，触发后走目标变更通道提交可验证减仓/平仓，不当作已穿越止损价的新指令更新；P2 不在本版新增自动收盘判断。</p>
+<figure class="revision-figure"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 364" role="img" aria-labelledby="s2-managed280-title s2-managed280-desc" style="min-width:0"><title id="s2-managed280-title">图 S2-M280：模式、余量与目标声明</title><desc id="s2-managed280-desc">指令 mode + 余量 → 既有权限、方向、时效校验；UPPER_MANAGED 管理价与不利余量由上层声明 → 新开：初始距离 + 余量 → 同预算倒推数量；持仓期：同量新版目标 → P1 校验与记录 → P2 透传模式/管理价/余量 → P1 最终保险边界校验；UPPER_MANAGED 回读声明；VENUE 回读条件单 → 上层按 5 或 15 分钟 K 线收盘触发；另发减仓/平仓目标，P1 仍独立维护保险</desc><rect x="12" y="12" width="656" height="62" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="37" text-anchor="middle" font-size="18" fill="#17384a">指令 mode + 余量 → 既有权限、方向、时效校验</text><text x="340" y="60" text-anchor="middle" font-size="18" fill="#17384a">UPPER_MANAGED 管理价与不利余量由上层声明</text><path d="M340 74v24m-5 -6l5 6 5 -6" fill="none" stroke="#006e82"/><rect x="12" y="98" width="656" height="62" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="123" text-anchor="middle" font-size="18" fill="#17384a">新开：初始距离 + 余量 → 同预算倒推数量</text><text x="340" y="146" text-anchor="middle" font-size="18" fill="#17384a">持仓期：同量新版目标 → P1 校验与记录</text><path d="M340 160v24m-5 -6l5 6 5 -6" fill="none" stroke="#006e82"/><rect x="12" y="184" width="656" height="62" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="209" text-anchor="middle" font-size="18" fill="#17384a">P2 透传模式/管理价/余量 → P1 最终保险边界校验</text><text x="340" y="232" text-anchor="middle" font-size="18" fill="#17384a">UPPER_MANAGED 回读声明；VENUE 回读条件单</text><path d="M340 246v24m-5 -6l5 6 5 -6" fill="none" stroke="#006e82"/><rect x="12" y="270" width="656" height="62" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="295" text-anchor="middle" font-size="18" fill="#17384a">上层按 5 或 15 分钟 K 线收盘触发</text><text x="340" y="318" text-anchor="middle" font-size="18" fill="#17384a">另发减仓/平仓目标，P1 仍独立维护保险</text></svg><figcaption>图 S2-M280：模式、余量与目标声明</figcaption></figure>
+<p>对应 <a href="02_策略化框架层设计书.html#upper-managed-design">设计 14.9</a>，并扩展 R8/R10 契约；仅输入、记录与传递，不实现 v2.9.0 动态止损算法。</p>
+<figure class="revision-figure"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 364" role="img" aria-labelledby="s2-flow280-title s2-flow280-desc"><title id="s2-flow280-title">图 S2-R280：指令、目标与执行反馈</title><desc id="s2-flow280-desc">因子观测 / 止损指令 → 各自校验与持久记录；来源写权限、对象、方向、价格与时效门控 → 每周期先读取实际成交和两种保护角色；方向确认完成 → 直接反向目标 + 新开保护 → 有初始距离 → 同预算倒推仓位；无指令 → 噪声法；持仓期声明变化 → 同量目标，按模式维护 → 过期 → 保持最后生效止损；未成交重发 → 带计划；P1 保护与成交反馈核验后，才更新生效记录</desc><rect x="12" y="12" width="656" height="62" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="37" text-anchor="middle" font-size="18" fill="#17384a">因子观测 / 止损指令 → 各自校验与持久记录</text><text x="340" y="60" text-anchor="middle" font-size="18" fill="#17384a">来源写权限、对象、方向、价格与时效门控</text><path d="M340 74v24m-5 -6l5 6 5 -6" fill="none" stroke="#006e82"/><rect x="12" y="98" width="656" height="62" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="123" text-anchor="middle" font-size="18" fill="#17384a">每周期先读取实际成交和两种保护角色</text><text x="340" y="146" text-anchor="middle" font-size="18" fill="#17384a">方向确认完成 → 直接反向目标 + 新开保护</text><path d="M340 160v24m-5 -6l5 6 5 -6" fill="none" stroke="#006e82"/><rect x="12" y="184" width="656" height="62" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="209" text-anchor="middle" font-size="18" fill="#17384a">有初始距离 → 同预算倒推仓位；无指令 → 噪声法</text><text x="340" y="232" text-anchor="middle" font-size="18" fill="#17384a">持仓期声明变化 → 同量目标，按模式维护</text><path d="M340 246v24m-5 -6l5 6 5 -6" fill="none" stroke="#006e82"/><rect x="12" y="270" width="656" height="62" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="295" text-anchor="middle" font-size="18" fill="#17384a">过期 → 保持最后生效止损；未成交重发 → 带计划</text><text x="340" y="318" text-anchor="middle" font-size="18" fill="#17384a">P1 保护与成交反馈核验后，才更新生效记录</text></svg><figcaption>图 S2-R280：指令、目标与执行反馈</figcaption></figure>
+<div class="table-wrap"><table><thead><tr><th>验收</th><th>条件与应达到的效果</th></tr></thead><tbody><tr><td>T2-23 / R7</td><td>确认期为 0/正数、候选改变、确认未结束、多空及等大/更小反向目标；不先发 0，含新开风险即执行所有门控。</td></tr>
+<tr><td>T2-24 / R8</td><td>拒绝越权、跨对象、错方向、穿越、过期；同数量有效指令在 VENUE 只改 STRATEGY，UPPER_MANAGED 只改管理声明；过期保留最后生效；初始距离按同预算缩量，无指令回退旧止损法。</td></tr>
+<tr><td>T2-25 / R9</td><td>未成交及部分成交重发保留正确方向计划，幂等重放与未知先查；失效不无保护增险；P1 不因同量同计划版本重发撤替普通挂单。</td></tr>
+<tr><td>T2-26 / R10</td><td>后续代码 PR 导出 contracts/v2 并验证身份/字段/错误码、P2→公开 HTTP→P1 SIM 闭环；无上层模块仍可用夹具独立验收。</td></tr><tr><td>T2-27 / R11</td><td>mode/余量完整透传、同预算按初始距离+余量缩量；同量管理声明更新无订单；P1 仅保险的 UPPER_MANAGED 不被误判为缺保护/恢复异常；切换中与已生效回执分开，指令过期保持最后模式/声明；收盘退出夹具通过目标变更调用 P1。</td></tr></tbody></table></div><p><a href="02_策略化框架层设计书.html#lower-compat-design">配对设计第 14 章</a>定义 DTO、权限、周期与异常；<a href="开发规划书.html#current">规划</a>记录 v2.8.0 与 v2.9.0 的阶段出口。</p></section>
+<section id="dynamic-stop-spec"><h2>11 v2.9.0 修订：风险单位仓位、收盘止损退出、再入场门与转基线</h2>
+<p>依据用户 2026-10-16 决定，本章为上层“信任判断、吃下猜错成本、抓住猜对机会”的仓位与止损方式提供通用框架能力：仓位由单笔亏损预算和止损距离倒推，判断强弱只按比例缩放；止损后不按价格重新入场；判断被价格证实后可把仓位交给行情基线继续持有。框架仍不实现行情判断或动态止损计算，不从历史 K 线推断方向；具体噪声、距离、比例与判断由应用实例提供并登记。未声明本章模式的策略行为与 v2.8.0 相同。</p>
+<h3 id="s2-033">S2-033 风险单位仓位</h3>
+<p>策略可声明 RISK_UNIT 仓位模式。新风险批次开仓时，框架按“单笔亏损预算 ÷ 每单位亏损”计算该批次的风险单位数量 Q：亏损预算 = 权益 × 上层在初始距离指令中提出的风险比例，不得超过登记的最大风险比例及对象亏损预算；每单位亏损 = 初始距离 + 收盘超出余量 + 退出费用与滑点准备。Q 在批次内冻结，目标数量 = 方向 × Q × 档位比例，档位比例由合成值经原离散档位和滞回得出。因此判断变弱或贡献衰减只按档位比例减少数量，不重新放大止损。</p>
+<p>档位上升带来的加仓仍以同一 Q 为上限，不能因档位上升超过 Q，也不能用新的更小止损距离放大旧批次。缺少有效初始距离指令或风险比例时不开新批次。名义上限、组合风险与 P1 风控仍最终约束。</p>
+<h3 id="s2-034">S2-034 收盘止损退出请求</h3>
+<p>VENUE 模式的止损指令可附带“收盘止损价”：它必须比交易所触发价更紧（多头更高、空头更低），框架只记录、不下发交易所，用于核验退出请求；开仓数量仍按到交易所触发价的距离倒推。UPPER_MANAGED 模式以管理价作为收盘止损价。</p><p>上层可提交收盘止损退出请求，内容包括对象、持仓方向、所依据的已生效收盘止损价与指令版本、K 线周期、该 K 线的收盘时刻与收盘价、来源与版本。框架核验：请求方有写权限；方向与当前实际持仓一致；该 K 线已完成且在请求时已可用；收盘价越过当前生效的收盘止损价。通过后立即下发归零目标，不受无交易带、调仓间隔和冷却限制，并把该批次记为“收盘止损”结束。重复请求幂等；核验失败拒绝并留痕，不当作止损已发生。</p>
+<p>交易所保护单（STRATEGY 或 INSURANCE）成交结束的批次同样记为止损结束。止损结束不令事件失效（S2-009 保持）。</p>
+<h3 id="s2-035">S2-035 止损后同向再入场门</h3>
+<p>批次以止损结束后，同方向的新风险受再入场门约束，同时满足以下两条才放行：距止损已过登记的冷却时间；止损之后出现了新的合格输入。合格输入只有两类：止损后新注入且方向相同的事件贡献，或止损后提交、带“再确认”标记且方向相同的基线因子观测。止损前已有的贡献照常衰减，可以参与合成，但不能单独解除此门。反方向不受此门限制。再入场门只看输入，不看价格走势。</p>
+<h3 id="s2-036">S2-036 同向判断链亏损上限</h3>
+<p>自上次合成方向改变以来，同方向的连续风险批次构成一条判断链。每个已结束批次的实现损益折算为该批次风险单位（实现亏损 ÷ 批次亏损预算），链累计亏损达到登记上限（以 R 计）后，该方向停止新增风险，直到合成方向改变为止。记录持久化，重启和参数变更不重置；盈利批次按登记规则抵扣或不抵扣，默认不抵扣。</p>
+<h3 id="s2-037">S2-037 预排事件前降险</h3>
+<p>使用者可为预排事件类型登记降险窗口（事件预计时刻之前与之后的时长）和缩减比例。窗口内不开新风险；当前上层止损尚未达到批次保本价（入场价加往返成本）的批次，按缩减比例减仓一次；已在保本价以上的批次不动。减仓视为强制减险，不受无交易带和冷却限制。日程修订与取消按 S2-025 处理：窗口未开始的随修订移动，已开始的不追溯。</p>
+<h3 id="s2-038">S2-038 事件贡献转入行情基线</h3>
+<p>具备信号资格的上层可提交“转基线”命令：指定对象、一个或多个事件贡献、目标基线因子及其新观测值。框架在同一事务内清除这些贡献的剩余影响（原因记为“转基线”，作为注入、修订、衰减、兑现、失效之外的第六种账本变化），并写入该基线因子观测，守恒校验把转出量与基线观测关联。命令前后合成方向必须相同，合成值的变化不超过登记容差，否则拒绝，避免借转基线改变仓位。转基线不改变批次的 Q 和已生效保护。</p>
+<p>基线因子观测增加两项可选标记：“再确认”（供 S2-035 使用）与理由代码；基线观测仍受有效期与缺失政策约束，上层须在有效期内续报。事件类型可登记关闭价格兑现（S2-008），用于“兑现转基线”策略；未关闭时兑现照常。</p>
+<figure><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 344" role="img"><title>v2.9.0 风险单位仓位与退出流程</title><desc>v2.9.0 风险单位仓位与退出流程</desc><rect x="12" y="12" width="656" height="62" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="37" text-anchor="middle" font-size="18" fill="#17384a">初始距离 + 余量 + 成本、风险比例 → 冻结风险单位 Q</text><text x="340" y="60" text-anchor="middle" font-size="18" fill="#17384a">目标 = 方向 × Q × 档位比例（判断变弱、衰减只缩量）</text><path d="M340 74v24m-5 -6l5 6 5 -6" fill="none" stroke="#006e82"/><rect x="12" y="98" width="656" height="62" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="123" text-anchor="middle" font-size="18" fill="#17384a">收盘止损退出请求 / 交易所保护成交 → 批次止损结束</text><text x="340" y="146" text-anchor="middle" font-size="18" fill="#17384a">事件不失效；链亏损按 R 累计，达上限停该方向</text><path d="M340 160v24m-5 -6l5 6 5 -6" fill="none" stroke="#006e82"/><rect x="12" y="184" width="656" height="62" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="209" text-anchor="middle" font-size="18" fill="#17384a">再入场门：冷却 + 止损后新合格输入（不看价格）</text><text x="340" y="232" text-anchor="middle" font-size="18" fill="#17384a">新注入的同向贡献，或带再确认标记的基线观测</text><path d="M340 246v24m-5 -6l5 6 5 -6" fill="none" stroke="#006e82"/><rect x="12" y="270" width="656" height="62" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="295" text-anchor="middle" font-size="18" fill="#17384a">转基线：贡献清除与基线观测同一事务、守恒关联</text><text x="340" y="318" text-anchor="middle" font-size="18" fill="#17384a">方向不变、合成值变化在容差内，Q 与保护不变</text></svg><figcaption>图 S2-R290：风险单位、退出、再入场与转基线</figcaption></figure>
+<div class="table-wrap"><table><thead><tr><th>验收</th><th>条件与应达到的效果</th></tr></thead><tbody>
+<tr><td>T2-28 / S2-033</td><td>RISK_UNIT 下 Q 按风险比例、初始距离、余量与成本倒推，超过最大风险比例或对象预算被截断；档位下降按比例缩量，档位上升不超过 Q；缺指令不开新批次；未声明模式的策略冻结回放不变。</td></tr>
+<tr><td>T2-29 / S2-034</td><td>收盘止损价不比交易所触发价更紧的指令被拒绝；未完成 K 线、未来可用时间、方向不符、收盘未越过、越权请求被拒绝；合格请求立即归零且不受带宽与冷却限制，重复请求幂等；交易所保护成交同样记止损结束；事件贡献不被清除。</td></tr>
+<tr><td>T2-30 / S2-035</td><td>止损后冷却未到、只有止损前贡献、或只有价格回到原方向时不放行同向新风险；止损后新注入同向贡献或带再确认的基线观测且冷却已到时放行；反方向不受限；重启后门状态保持。</td></tr>
+<tr><td>T2-31 / S2-036</td><td>链累计亏损按批次 R 计算，达到上限后同向新风险被拒，方向改变后解除；重启、参数变更不重置；默认盈利不抵扣。</td></tr>
+<tr><td>T2-32 / S2-037</td><td>窗口内不开新风险；未到保本的批次按比例减仓一次，保本以上不动；减仓不受带宽与冷却限制；日程改期只影响未开始窗口，取消使未开始窗口作废。</td></tr>
+<tr><td>T2-33 / S2-038</td><td>转基线后贡献剩余为零、原因“转基线”、基线观测写入、守恒关联可查；方向改变或合成值变化超容差的命令被拒绝且无部分写入；Q 与保护不变；关闭兑现的事件类型不消耗兑现预算。</td></tr>
+</tbody></table></div><h3 id="judgment-input-spec">11.2 判断型输入的适用修订</h3>
+<p>以下条款为上层模型研判这类“对一组新闻的整体判断”提供输入路径，修订 S2-003、S2-004、S2-005、S2-007、S2-011、S2-012、S2-019～021、S2-025、S2-026、S2-027 中与之冲突的部分。未登记判断型类型或冻结模式的策略，行为与 v2.8.0 相同。</p>
+<h3 id="s2-039">S2-039 判断型事件类型</h3>
+<p>使用者可将事件类型登记为 JUDGMENT（判断型）。判断型评分来自上层对一组已登记新闻的整体研判，不是对单一事实的逐项评估，按以下规则处理：</p>
+<ul><li><strong>提前计价（修订 S2-005）</strong>：登记 <code>prepricing_mode=NOT_ASSESSED</code>，提前计价比例 p 固定为 0，记录“未评估”及原因，不要求价格证据清单；上层输入不含任何价格信息，因此不能声称已扣除提前计价。</li>
+<li><strong>半衰期（修订 S2-007）</strong>：采用评分向量中的预计半衰期，须落在登记界限内，越界拒绝。</li>
+<li><strong>校准（修订 S2-003）</strong>：信心到影响量的换算是登记的离散映射，以 calibration_version 登记并标为 EXPERIMENT_ONLY，只在 SIM 和影子使用；可信度、相关度、预期覆盖等未由研判评估的字段按登记固定值填写，并在评分记录中注明来源为登记值。</li>
+<li><strong>事件与新颖度（修订 S2-004、S2-005）</strong>：每次注入新建一个事件（独立事件族），证据只列本次新出现的证据编号，新颖度因此为 1；同一事件不修订方向，方向改变时新建事件，原方向的贡献由上层按失效清除。是否“新出现”由上层程序比对，框架只核验证据编号在事件可用时刻之前已登记。</li>
+<li><strong>合成（修订 S2-012）</strong>：登记的单独开仓上限大于 0 时，判断型贡献在核心为零时可单独开仓。核心（含行情基线）与判断反向时，仍只把目标压到零；上层要转向时，先提交基线观测为零，再注入反向贡献。</li>
+<li><strong>启用证据（修订 S2-011、S2-023）</strong>：判断型类型及其转入的基线因子，启用证据可引用已登记的前向检验编号，限 SIM 与 EXPERIMENT_ONLY；检验结论形成前不得用于 LIVE。</li></ul>
+<h3 id="s2-040">S2-040 相对无交易带与调仓间隔</h3>
+<p>RISK_UNIT 模式下，无交易带可登记为批次风险单位 Q 的比例：目标与实际数量之差小于该比例 × Q 时不调仓，避免贡献衰减产生大量小单；仍不小于 S2-026 的成本带。减仓到零、收盘止损退出、强制减险、方向改变与保护更新不受此带限制。调仓间隔允许登记为 0（修订 S2-026 配置下限）。</p>
+<h3 id="s2-041">S2-041 学习冻结</h3>
+<p>策略可登记 <code>learning_mode=FROZEN</code>，用于前向检验期间保持规则不变：S2-019～021 的参数候选与 S2-027 的分量权重、自动降级和自动启用照常计算，作为“冻结期候选”记录，但不生效，不改变参数快照或分量状态。冻结不影响硬风险、判断链上限、再入场门和保险止损。解除冻结时不追溯应用冻结期候选，须重新经 S2-021 门控。</p>
+<h3 id="s2-042">S2-042 停用模板在线标定</h3>
+<p>S2-025 中“以窗口内对象实际收益在线估计模板方向和大小”的规定停用：它从历史价格反应推断方向，与第 9 章冲突。预排事件只保留日程登记、修订、取消和 S2-037 降险窗口；模板调整量固定为 0 或只记录。离线证据形成的模板须由使用者提出并以新因子登记。</p>
+<div class="table-wrap"><table><thead><tr><th>验收</th><th>条件与应达到的效果</th></tr></thead><tbody>
+<tr><td>T2-34 / S2-039</td><td>判断型评分无价格证据清单时不被隔离，p=0 并留痕；半衰期取向量值且越界拒绝；未登记的 calibration_version 仍隔离，EXPERIMENT_ONLY 版本在 LIVE 拒绝；每次注入新建事件、新颖度为 1，证据可用时刻晚于事件时拒绝；核心为零时按单独开仓上限开仓，核心反向时只压到零；非判断型类型的原校验逐位不变。</td></tr>
+<tr><td>T2-35 / S2-040</td><td>差异小于比例 × Q 时不调仓，大于时调仓；归零、收盘退出、强制减险、方向改变绕过；调仓间隔 0 合法。</td></tr>
+<tr><td>T2-36 / S2-041</td><td>冻结期产生候选记录但参数快照与分量状态不变；硬风险门照常；解除冻结后候选不自动生效。</td></tr>
+<tr><td>T2-37 / S2-042</td><td>窗口结束不再更新模板取值；日程修订、取消与降险窗口照常。</td></tr>
+</tbody></table></div>
+<p><a href="02_策略化框架层设计书.html#dynamic-stop-design">配对设计第 15 章</a>（含 15.8 判断型输入）定义数据结构、命令、周期位置与异常；应用侧的判断、噪声与止损计算见 <a href="03_SOXLUSDT_JEV应用实例式样书.html#dynamic-stop-instance">P3 式样第 8 章</a>。</p></section>
+</article><footer>HTML 是本版唯一发布正文。图表为内嵌 SVG，无需联网或运行脚本。文档通过不代表程序实现、交易运行或实盘准入通过。</footer></main></div></body></html>
