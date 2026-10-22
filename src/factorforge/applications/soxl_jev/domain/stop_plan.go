@@ -142,10 +142,24 @@ type BatchOutcome struct {
 	ClosedAt string  `json:"closed_at"`
 }
 
+// ConfidenceFactor maps judgment confidence 1～5 to 0.25/0.5/0.75/1/1
+// (S3-027, v2.11.6). Anything outside 1～5 takes the lowest factor.
+func ConfidenceFactor(confidence int) float64 {
+	switch {
+	case confidence >= 4 && confidence <= 5:
+		return 1
+	case confidence == 3:
+		return 0.75
+	case confidence == 2:
+		return 0.5
+	}
+	return 0.25
+}
+
 // RiskFraction implements S3-027: 1% for the first 30 batches, then quarter
-// Kelly over the last 60; scaled by drawdown (floor 0.25) and capped at 2%.
-// Zero means stop opening.
-func RiskFraction(history []BatchOutcome, drawdown float64) float64 {
+// Kelly over the last 60; scaled by confidence and drawdown (floor 0.25) and
+// capped at 2%. Zero means stop opening.
+func RiskFraction(history []BatchOutcome, drawdown float64, confidence int) float64 {
 	base := 0.01
 	if len(history) >= 30 {
 		recent := history
@@ -181,7 +195,7 @@ func RiskFraction(history []BatchOutcome, drawdown float64) float64 {
 		return 0
 	}
 	dd := math.Max(0.25, 1-drawdown/0.10)
-	return math.Min(0.02, base*dd)
+	return math.Min(0.02, base*ConfidenceFactor(confidence)*dd)
 }
 
 // Trailing implements S3-028 on completed 5-minute closes. It returns the new

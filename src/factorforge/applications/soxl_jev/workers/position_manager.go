@@ -80,6 +80,7 @@ type InitialPlan struct {
 	Distance    float64        `json:"distance"`
 	CloseDist   float64        `json:"close_distance"`
 	Fraction    float64        `json:"risk_fraction"`
+	Confidence  int            `json:"confidence,omitempty"`
 	Equity      float64        `json:"equity"`
 	DirectiveID string         `json:"directive_id"`
 }
@@ -273,7 +274,7 @@ func (m *PositionManager) outcomes(ctx context.Context, st *PositionState) error
 // the framework can open a batch with Q frozen from R + buffer (S3-027).
 func (m *PositionManager) initial(ctx context.Context, st *PositionState, price, equity float64, now time.Time) error {
 	s := m.Settings
-	direction, horizon, err := m.view(ctx, now)
+	direction, horizon, confidence, err := m.view(ctx, now)
 	if err != nil || direction == 0 {
 		return err
 	}
@@ -286,7 +287,7 @@ func (m *PositionManager) initial(ctx context.Context, st *PositionState, price,
 	if st.EquityPeak > 0 {
 		drawdown = (st.EquityPeak - equity) / st.EquityPeak
 	}
-	fraction := d.RiskFraction(st.Outcomes, drawdown)
+	fraction := d.RiskFraction(st.Outcomes, drawdown, confidence)
 	if fraction <= 0 {
 		m.alert(ctx, "RISK_FRACTION_ZERO", "")
 		return nil
@@ -296,14 +297,14 @@ func (m *PositionManager) initial(ctx context.Context, st *PositionState, price,
 		m.alert(ctx, "HARD_STOP_BEYOND_INSURANCE", strconv.Itoa(horizon))
 		return nil
 	}
-	if st.Initial != nil && st.Initial.Direction == direction && st.Initial.Geometry == g && now.Sub(lastDirectiveAt(st.Initial.DirectiveID)) < s.DirectiveTTL/2 {
+	if st.Initial != nil && st.Initial.Direction == direction && st.Initial.Geometry == g && st.Initial.Fraction == fraction && now.Sub(lastDirectiveAt(st.Initial.DirectiveID)) < s.DirectiveTTL/2 {
 		return nil
 	}
 	st.Versions["INITIAL_DISTANCE"]++
 	v := st.Versions["INITIAL_DISTANCE"]
 	id := "initial-" + now.Format("20060102T150405Z")
-	plan := InitialPlan{Direction: direction, Geometry: g, Price: price, Distance: (g.R + g.Buffer) * price, CloseDist: g.R * price, Fraction: fraction, Equity: equity, DirectiveID: id}
-	directive := dto.StopDirective{DirectiveID: id, ObjectID: s.ObjectID, Version: v, Kind: "INITIAL_DISTANCE", PositionDirection: sideName(direction), TriggerKind: s.TriggerKind, InitialStopDistance: dec(plan.Distance), EffectiveAt: now, ValidForSeconds: int(s.DirectiveTTL.Seconds()), SourceModule: s.SourceModule, ReasonCodes: []string{"DYNAMIC_STOP_INITIAL", "TIER_" + strconv.Itoa(g.Tier) + "H"}, Mode: "VENUE", RiskFraction: dec(fraction), CloseStopDistance: dec(plan.CloseDist)}
+	plan := InitialPlan{Direction: direction, Geometry: g, Price: price, Distance: (g.R + g.Buffer) * price, CloseDist: g.R * price, Fraction: fraction, Confidence: confidence, Equity: equity, DirectiveID: id}
+	directive := dto.StopDirective{DirectiveID: id, ObjectID: s.ObjectID, Version: v, Kind: "INITIAL_DISTANCE", PositionDirection: sideName(direction), TriggerKind: s.TriggerKind, InitialStopDistance: dec(plan.Distance), EffectiveAt: now, ValidForSeconds: int(s.DirectiveTTL.Seconds()), SourceModule: s.SourceModule, ReasonCodes: []string{"DYNAMIC_STOP_INITIAL", "TIER_" + strconv.Itoa(g.Tier) + "H", "CONFIDENCE_" + strconv.Itoa(confidence)}, Mode: "VENUE", RiskFraction: dec(fraction), CloseStopDistance: dec(plan.CloseDist)}
 	if _, err = m.Framework.SubmitStopDirective(ctx, directive); err != nil {
 		return err
 	}
@@ -321,23 +322,39 @@ func lastDirectiveAt(id string) time.Time {
 
 // view returns the direction the framework composes now and the horizon of
 // the newest valid judgment (decision first, judgment as fallback).
-func (m *PositionManager) view(ctx context.Context, now time.Time) (int, int, error) {
+func (m *PositionManager) view(ctx context.Context, now time.Time) (int, int, int, error) {
 	decision, err := m.Framework.LatestDecision(ctx, m.Settings.ObjectID)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, 0, err
 	}
-	last, err := m.judgments(ctx, now, 1)
+	recent, err := m.judgments(ctx, now, ConfidenceLookback)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, 0, err
 	}
 	direction, horizon := 0, 24
-	if len(last) == 1 && last[0].Output != nil {
-		direction, horizon = d.DirectionSign(last[0].Output.Direction), last[0].Output.HorizonHours
+	if n := len(recent); n > 0 {
+		direction, horizon = d.DirectionSign(recent[n-1].Output.Direction), recent[n-1].Output.HorizonHours
 	}
 	if decision != nil && decision.Components != nil && decision.Components.Combined.Sign() != 0 {
 		direction = decision.Components.Combined.Sign()
 	}
-	return direction, horizon, nil
+	return direction, horizon, viewConfidence(recent, direction), nil
+}
+
+// ConfidenceLookback is how many recent judgments are searched for the
+// confidence behind the position direction (twelve = six hours at :01/:31).
+const ConfidenceLookback = 12
+
+// viewConfidence is the confidence of the latest judgment that points the
+// same way as the position (S3-027, v2.11.6); 0 when none does, which
+// ConfidenceFactor sizes at its lowest step.
+func viewConfidence(recent []d.Judgment, direction int) int {
+	for i := len(recent) - 1; i >= 0; i-- {
+		if direction != 0 && d.DirectionSign(recent[i].Output.Direction) == direction {
+			return recent[i].Output.Confidence
+		}
+	}
+	return 0
 }
 
 func (m *PositionManager) judgments(ctx context.Context, now time.Time, n int) ([]d.Judgment, error) {
