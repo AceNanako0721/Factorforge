@@ -51,6 +51,7 @@ type PositionSettings struct {
 	NoiseConfig                            d.NoiseConfig
 	EventTypes                             []string
 	PriceTick                              float64
+	LadderStep                             float64 // S3-033; 0 keeps S3-028 only
 }
 
 // BatchState is the instance view of one position cycle (S3-027～029).
@@ -447,16 +448,22 @@ func (m *PositionManager) manage(ctx context.Context, st *PositionState, p *subm
 		return nil
 	}
 	m1, moved := d.Trailing(direction, b.Entry, b.BestClose, b.Geometry.R, b.Geometry.Trail, s.RoundTripCost*b.Entry, b.CloseStop)
+	reason := "DYNAMIC_STOP_TRAIL"
+	// S3-033 ladder (v2.13.0, off when LadderStep is 0): the more favourable of
+	// the two candidate stops is issued through the same POSITION_STOP channel.
+	if m2, stepped := d.Ladder(direction, b.Entry, b.BestClose, s.LadderStep, s.RoundTripCost*b.Entry, b.CloseStop); stepped && (!moved || float64(direction)*(m2-m1) > 0) {
+		m1, moved, reason = m2, true, "DYNAMIC_STOP_LADDER"
+	}
 	if moved && math.Abs(m1-b.CloseStop) >= s.PriceTick {
 		trigger := roundTick(m1-float64(direction)*b.Geometry.Buffer*b.Entry, s.PriceTick, direction)
 		st.Versions["POSITION_STOP"]++
 		id := safeID("trail-" + p.PositionCycleID + "-" + strconv.Itoa(st.Versions["POSITION_STOP"]))
-		directive := dto.StopDirective{DirectiveID: id, ObjectID: s.ObjectID, Version: st.Versions["POSITION_STOP"], Kind: "POSITION_STOP", PositionDirection: sideName(direction), TriggerPrice: dec(trigger), TriggerKind: s.TriggerKind, EffectiveAt: now, ValidForSeconds: int((72 * time.Hour).Seconds()), SourceModule: s.SourceModule, ReasonCodes: []string{"DYNAMIC_STOP_TRAIL"}, Mode: "VENUE", CloseStopPrice: dec(m1)}
+		directive := dto.StopDirective{DirectiveID: id, ObjectID: s.ObjectID, Version: st.Versions["POSITION_STOP"], Kind: "POSITION_STOP", PositionDirection: sideName(direction), TriggerPrice: dec(trigger), TriggerKind: s.TriggerKind, EffectiveAt: now, ValidForSeconds: int((72 * time.Hour).Seconds()), SourceModule: s.SourceModule, ReasonCodes: []string{reason}, Mode: "VENUE", CloseStopPrice: dec(m1)}
 		if _, err := m.Framework.SubmitStopDirective(ctx, directive); err != nil {
 			m.alert(ctx, "TRAIL_REJECTED", errCode(err))
 		} else {
 			b.Trailing = true
-			if err = m.Store.AppendRecord(ctx, "STOP_EVENT", id, now, map[string]any{"kind": "TRAIL", "close_stop": m1, "trigger": trigger, "best": b.BestClose}); err != nil {
+			if err = m.Store.AppendRecord(ctx, "STOP_EVENT", id, now, map[string]any{"kind": "TRAIL", "close_stop": m1, "trigger": trigger, "best": b.BestClose, "reason": reason}); err != nil {
 				return err
 			}
 		}

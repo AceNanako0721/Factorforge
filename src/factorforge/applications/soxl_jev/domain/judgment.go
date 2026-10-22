@@ -248,3 +248,12 @@ func itoa(v int) string {
 	}
 	return s
 }
+
+// SourcedJudgment is one judgment read from another instance's read API in
+// follower mode (S3-034, v2.13.0) with the news items it cites. Items carry
+// only what the read API publishes (no summary or link); ReceivedAt is the
+// judgment time, the latest moment the source can have held them.
+type SourcedJudgment struct {
+	Judgment Judgment
+	Items    []NewsItem
+}

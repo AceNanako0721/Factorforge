@@ -39,6 +39,11 @@ type JudgmentFramework interface {
 	RegisterEvent(ctx context.Context, request dto.EventCommand, revision bool) (dto.Event, error)
 	Submit(ctx context.Context, request dto.ScoreCommand) (dto.AdmissionReceipt, error)
 }
+// JudgmentSource reads another instance's judgments in follower mode
+// (S3-034): strictly after since, oldest first.
+type JudgmentSource interface {
+	After(ctx context.Context, since time.Time) ([]d.SourcedJudgment, error)
+}
 type Alerter interface {
 	Alert(ctx context.Context, code, detail string)
 }
@@ -71,6 +76,81 @@ type JudgmentWorker struct {
 	Clock     func() time.Time
 	Alerts    Alerter
 	Settings  JudgmentSettings
+	// Source and FollowSince select follower mode (S3-034, v2.13.0): Follow
+	// replaces Collect and Judge; no feed is polled and no model is called.
+	Source      JudgmentSource
+	FollowSince time.Time
+}
+
+// FollowState is the follower's cursor: the newest source judgment copied.
+type FollowState struct {
+	LastAt time.Time `json:"last_at"`
+	LastID string    `json:"last_id"`
+}
+
+// Follow copies each new source judgment and the news it cites into this
+// instance's records, then applies it exactly as Judge would (S3-025):
+// stale-news rounds are only recorded, everything else goes through apply.
+func (w *JudgmentWorker) Follow(ctx context.Context) error {
+	if w.Source == nil || w.FollowSince.IsZero() {
+		return d.Fail("JUDGMENT_SOURCE_CONFIGURATION_REQUIRED", 503)
+	}
+	var cursor FollowState
+	cv, err := w.Store.LoadState(ctx, "FOLLOW", &cursor)
+	if err != nil {
+		return err
+	}
+	since := cursor.LastAt
+	if since.Before(w.FollowSince) {
+		since = w.FollowSince
+	}
+	var state d.InjectionState
+	version, err := w.Store.LoadState(ctx, "INJECTION", &state)
+	if err != nil {
+		return err
+	}
+	// A crash between copying and applying leaves the newest copy unapplied.
+	if err = w.resume(ctx, &state, &version); err != nil {
+		return err
+	}
+	rows, err := w.Source.After(ctx, since)
+	if err != nil {
+		return err
+	}
+	for _, row := range rows {
+		j := row.Judgment
+		for _, item := range row.Items {
+			if err := w.Store.AppendRecord(ctx, "NEWS", item.ItemID, item.ReceivedAt, item); err != nil {
+				var known *d.Error
+				if !errors.As(err, &known) || known.Code != "DYNAMIC_RECORD_CONFLICT" {
+					return err
+				}
+			}
+		}
+		if err = w.Store.AppendRecord(ctx, "JUDGMENT", j.JudgmentID, j.At, j); err != nil {
+			return err
+		}
+		if j.Reason != "NEWS_STALE" && j.JudgmentID > state.LastJudgment {
+			recent, older, _, err := w.inputs(ctx, j.At)
+			if err != nil {
+				return err
+			}
+			if err = w.apply(ctx, &state, version, j, recent, older); err != nil {
+				return err
+			}
+			if version, err = w.Store.LoadState(ctx, "INJECTION", &state); err != nil {
+				return err
+			}
+		}
+		next := FollowState{LastAt: j.At, LastID: j.JudgmentID}
+		if err = w.Store.SaveState(ctx, "FOLLOW", cv, j.At, next); err != nil {
+			return err
+		}
+		if cv, err = w.Store.LoadState(ctx, "FOLLOW", &cursor); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Collect polls every registered feed once and records new items.

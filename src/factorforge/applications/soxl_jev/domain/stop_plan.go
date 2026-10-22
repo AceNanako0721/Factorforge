@@ -217,6 +217,30 @@ func Trailing(direction int, entry, best, r, trail, cost, current float64) (floa
 	return m, true
 }
 
+// Ladder implements S3-033 (v2.13.0): each full step of favourable move of the
+// best close over entry raises the close stop one level; the first level is
+// break-even plus round-trip cost, level k locks (k-1) steps. It returns
+// ok=false while the move is below one step or step is zero (rule off). Like
+// Trailing, M never moves against the position.
+func Ladder(direction int, entry, best, step, cost, current float64) (float64, bool) {
+	d := float64(direction)
+	if step <= 0 || entry <= 0 {
+		return current, false
+	}
+	k := math.Floor(d*(best-entry)/entry/step + 1e-9)
+	if k < 1 {
+		return current, false
+	}
+	m := entry * (1 + d*step*(k-1))
+	if breakEven := entry + d*cost; d*(m-breakEven) < 0 {
+		m = breakEven
+	}
+	if current != 0 && d*(m-current) < 0 {
+		m = current
+	}
+	return m, true
+}
+
 // CloseCrossed reports a completed close at or beyond the close stop.
 func CloseCrossed(direction int, close, stop float64) bool {
 	if direction > 0 {
