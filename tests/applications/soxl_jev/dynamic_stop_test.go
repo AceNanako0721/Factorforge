@@ -709,3 +709,77 @@ func TestP3DynamicStorePostgresAppendCASAndIsolation(t *testing.T) {
 		t.Fatal("ingest wrote dynamic records")
 	}
 }
+
+// ---------- v2.13.0 ladder (S3-033) ----------
+
+func TestT329LadderStepsFromBreakEven(t *testing.T) {
+	if _, ok := d.Ladder(1, 100, 110, 0, 0.18, 95); ok {
+		t.Fatal("step 0 must leave the rule off")
+	}
+	if _, ok := d.Ladder(1, 100, 103.9, 0.04, 0.18, 95); ok {
+		t.Fatal("below one step")
+	}
+	if m, ok := d.Ladder(1, 100, 104, 0.04, 0.18, 95); !ok || math.Abs(m-100.18) > 1e-9 {
+		t.Fatal("first level is break-even plus cost", m)
+	}
+	if m, _ := d.Ladder(1, 100, 108.2, 0.04, 0.18, 100.18); math.Abs(m-104) > 1e-9 {
+		t.Fatal("second level locks one step", m)
+	}
+	if m, _ := d.Ladder(1, 100, 108.2, 0.04, 0.18, 106); m != 106 {
+		t.Fatal("must not loosen", m)
+	}
+	if m, ok := d.Ladder(-1, 100, 91.9, 0.04, 0.18, 110); !ok || math.Abs(m-96) > 1e-9 {
+		t.Fatal("short second level", m)
+	}
+}
+
+func TestT329PositionManagerLadderStop(t *testing.T) {
+	at := time.Date(2026, 10, 15, 15, 0, 5, 0, time.UTC)
+	m, store, fw, tr, _ := positionManager(at)
+	m.Settings.LadderStep = 0.04
+	clock := at
+	m.Clock = func() time.Time { return clock }
+	tr.bars = []submission.CandleRead{bar(at.Truncate(time.Minute), "100")}
+	_ = store.AppendRecord(context.Background(), "JUDGMENT", "j1", at.Add(-time.Minute), judgment("j1", at.Add(-time.Minute), "LONG", 3, []string{"n1"}, false))
+	if err := m.Run(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	initial := fw.directives[0]
+	tr.qty, tr.entry, tr.cycle = "10", "100", "cycle-1"
+	tr.protections = []submission.ProtectionRead{{Role: "STRATEGY", State: "ACTIVE_VERIFIED", PositionDirection: "LONG", PositionCycleID: "cycle-1", Plan: map[string]any{"trigger_price": "93.2"}}}
+	verified := at.Add(time.Minute)
+	fw.records = []dto.StopDirectiveRecord{{Directive: initial, Receipt: dto.StopDirectiveReceipt{DirectiveID: initial.DirectiveID, Version: initial.Version, ApplicationState: "VERIFIED", VerifiedAt: &verified}}}
+	// The batch opens on the next run; closes after that are processed.
+	clock = at.Add(5 * time.Minute)
+	if err := m.Run(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	// +4% (below R = 6%): the ladder alone moves the close stop to break-even.
+	clock = at.Add(10 * time.Minute)
+	tr.bars = []submission.CandleRead{bar(at.Truncate(5*time.Minute).Add(10*time.Minute), "104")}
+	if err := m.Run(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	stops := ofKind(fw.directives, "POSITION_STOP")
+	if len(stops) != 1 || stops[0].ReasonCodes[0] != "DYNAMIC_STOP_LADDER" {
+		t.Fatal("ladder directive", stops)
+	}
+	be, _ := tdto.ParseDecimal("100.0")
+	if stops[0].CloseStopPrice.Cmp(be) <= 0 || stops[0].TriggerPrice.Cmp(*stops[0].CloseStopPrice) >= 0 {
+		t.Fatal("ladder prices", stops[0].CloseStopPrice, stops[0].TriggerPrice)
+	}
+	if len(fw.transfers) != 0 {
+		t.Fatal("break-even below +1R must not transfer", fw.transfers)
+	}
+	// +8.2%: the second level (104) is tighter than the trailing stop.
+	clock = at.Add(15 * time.Minute)
+	tr.bars = []submission.CandleRead{bar(at.Truncate(5*time.Minute).Add(15*time.Minute), "108.2")}
+	if err := m.Run(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	stops = ofKind(fw.directives, "POSITION_STOP")
+	lvl, _ := tdto.ParseDecimal("104")
+	if len(stops) != 2 || stops[1].CloseStopPrice.Cmp(lvl) < 0 {
+		t.Fatal("second level", stops)
+	}
+}

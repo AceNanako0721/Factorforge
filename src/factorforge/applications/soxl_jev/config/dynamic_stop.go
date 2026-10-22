@@ -67,6 +67,14 @@ type DynamicProfile struct {
 		MinHalfLifeHours   int       `toml:"min_half_life_hours"`
 		MaxHalfLifeHours   int       `toml:"max_half_life_hours"`
 	} `toml:"judgment"`
+	// Follow selects follower mode (S3-034, v2.13.0): judgments are read from
+	// the source instance's read API instead of being generated here.
+	Follow struct {
+		SourceURL        string    `toml:"source_url"`
+		SourceToken      string    `toml:"source_token"`
+		SourceInstanceID string    `toml:"source_instance_id"`
+		Since            time.Time `toml:"since"`
+	} `toml:"follow"`
 	Position struct {
 		OwnerID             string   `toml:"owner_id"`
 		Venue               string   `toml:"venue"`
@@ -87,6 +95,7 @@ type DynamicProfile struct {
 		BaselineRenewMin    int      `toml:"baseline_renew_minutes"`
 		RoundTripCost       float64  `toml:"round_trip_cost"`
 		PriceTick           float64  `toml:"price_tick"`
+		LadderStep          float64  `toml:"ladder_step"` // S3-033 (v2.13.0); 0 or absent = off
 		NoiseMaxAgeHours    int      `toml:"noise_max_age_hours"`
 		NoiseLookbackDays   int      `toml:"noise_lookback_days"`
 		NoiseSymbol         string   `toml:"noise_symbol"`
@@ -114,7 +123,12 @@ func LoadDynamic(path string) (DynamicProfile, error) {
 }
 
 func (p DynamicProfile) Validate() error {
-	bad := !d.ValidID(p.InstanceID) || !d.Has([]string{"SIM", "LIVE"}, p.Environment) || !d.ValidID(p.ObjectID) || p.TimeoutSeconds <= 0 || p.MaxBytes <= 0 || len(p.Models) == 0
+	following := p.Following()
+	bad := !d.ValidID(p.InstanceID) || !d.Has([]string{"SIM", "LIVE"}, p.Environment) || !d.ValidID(p.ObjectID) || p.TimeoutSeconds <= 0 || p.MaxBytes <= 0 || len(p.Models) == 0 && !following
+	if following {
+		parsed, err := url.Parse(p.Follow.SourceURL)
+		bad = bad || err != nil || parsed.Host == "" || p.Follow.SourceToken == "" || !d.ValidID(p.Follow.SourceInstanceID) || p.Follow.SourceInstanceID == p.InstanceID || p.Follow.Since.IsZero()
+	}
 	for _, u := range []string{p.Access.FrameworkURL, p.Access.TradingReadURL} {
 		parsed, err := url.Parse(u)
 		bad = bad || err != nil || parsed.Host == ""
@@ -125,15 +139,18 @@ func (p DynamicProfile) Validate() error {
 		bad = bad || f.SourceID == "" || f.LicenseScope == "SIM_ONLY" && p.Environment == "LIVE"
 	}
 	pos := p.Position
-	bad = bad || pos.CloseMinutes != 5 && pos.CloseMinutes != 15 || pos.InsuranceFraction <= 0 || pos.InsuranceFraction >= 1 || pos.WickMultiplier <= 0 || pos.BaselineMaxShare <= 0 || pos.BaselineMaxShare > 1 || pos.DirectiveTTLMinutes <= 0 || pos.NoiseLookbackDays <= 0 || pos.PriceTick <= 0
+	bad = bad || pos.CloseMinutes != 5 && pos.CloseMinutes != 15 || pos.InsuranceFraction <= 0 || pos.InsuranceFraction >= 1 || pos.WickMultiplier <= 0 || pos.BaselineMaxShare <= 0 || pos.BaselineMaxShare > 1 || pos.DirectiveTTLMinutes <= 0 || pos.NoiseLookbackDays <= 0 || pos.PriceTick <= 0 || pos.LadderStep < 0 || pos.LadderStep >= 1
 	for _, v := range p.Judgment.ImpactByConfidence {
 		bad = bad || v == ""
 	}
-	bad = bad || p.Judgment.MinHalfLifeHours < 1 || p.Judgment.MaxHalfLifeHours < p.Judgment.MinHalfLifeHours || len(p.News.JudgeMinutes) == 0
+	bad = bad || p.Judgment.MinHalfLifeHours < 1 || p.Judgment.MaxHalfLifeHours < p.Judgment.MinHalfLifeHours || len(p.News.JudgeMinutes) == 0 && !following
 	if bad {
 		return d.Fail("DYNAMIC_PROFILE_INVALID", 503)
 	}
 	return nil
 }
+
+// Following reports follower mode (S3-034).
+func (p DynamicProfile) Following() bool { return p.Follow.SourceURL != "" }
 
 func (p DynamicProfile) Timeout() time.Duration { return time.Duration(p.TimeoutSeconds) * time.Second }

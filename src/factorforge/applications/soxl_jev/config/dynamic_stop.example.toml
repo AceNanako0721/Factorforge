@@ -54,6 +54,13 @@ licence = ""
 min_half_life_hours = 0
 max_half_life_hours = 0
 
+# Follower mode (S3-034, v2.13.0) only: read judgments from another instance.
+# [follow]
+# source_url = ""
+# source_token = ""
+# source_instance_id = ""
+# since = 1970-01-01T00:00:00Z
+
 [position]
 owner_id = ""
 venue = ""
@@ -74,6 +81,8 @@ baseline_max_share = 0.0
 baseline_renew_minutes = 0
 round_trip_cost = 0.0
 price_tick = 0.0
+# S3-033 ladder step (v2.13.0); 0 keeps S3-028 only.
+ladder_step = 0.0
 noise_max_age_hours = 0
 noise_lookback_days = 0
 noise_symbol = ""
