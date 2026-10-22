@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"net/url"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -173,14 +174,22 @@ func TestT323StopGeometryTierInsuranceAndRiskFraction(t *testing.T) {
 	if d.HoldTier(1) != 4 || d.HoldTier(5) != 24 || d.HoldTier(500) != 72 {
 		t.Fatal("hold tier")
 	}
-	if f := d.RiskFraction(nil, 0); f != 0.01 {
+	if f := d.RiskFraction(nil, 0, 4); f != 0.01 {
 		t.Fatal("first batches", f)
 	}
-	if f := d.RiskFraction(nil, 0.05); math.Abs(f-0.005) > 1e-12 {
+	if f := d.RiskFraction(nil, 0.05, 4); math.Abs(f-0.005) > 1e-12 {
 		t.Fatal("drawdown scaling", f)
 	}
-	if f := d.RiskFraction(nil, 0.5); math.Abs(f-0.0025) > 1e-12 {
+	if f := d.RiskFraction(nil, 0.5, 4); math.Abs(f-0.0025) > 1e-12 {
 		t.Fatal("drawdown floor", f)
+	}
+	for c, want := range map[int]float64{0: 0.0025, 1: 0.0025, 2: 0.005, 3: 0.0075, 4: 0.01, 5: 0.01, 6: 0.0025} {
+		if f := d.RiskFraction(nil, 0, c); math.Abs(f-want) > 1e-12 {
+			t.Fatal("confidence factor", c, f)
+		}
+	}
+	if f := d.RiskFraction(nil, 0.05, 3); math.Abs(f-0.00375) > 1e-12 {
+		t.Fatal("confidence × drawdown", f)
 	}
 	losing := []d.BatchOutcome{}
 	for i := 0; i < 40; i++ {
@@ -190,7 +199,7 @@ func TestT323StopGeometryTierInsuranceAndRiskFraction(t *testing.T) {
 		}
 		losing = append(losing, d.BatchOutcome{R: r})
 	}
-	if d.RiskFraction(losing, 0) != 0 {
+	if d.RiskFraction(losing, 0, 4) != 0 {
 		t.Fatal("negative kelly must stop opening")
 	}
 	winning := []d.BatchOutcome{}
@@ -201,7 +210,7 @@ func TestT323StopGeometryTierInsuranceAndRiskFraction(t *testing.T) {
 		}
 		winning = append(winning, d.BatchOutcome{R: r})
 	}
-	if f := d.RiskFraction(winning, 0); f <= 0 || f > 0.02 {
+	if f := d.RiskFraction(winning, 0, 4); f <= 0 || f > 0.02 {
 		t.Fatal("kelly cap", f)
 	}
 }
@@ -517,12 +526,24 @@ func TestT323PositionManagerInitialDirective(t *testing.T) {
 	}
 	v := fw.directives[0]
 	// 24h tier at US regular: R 6%, buffer 2×0.4% → distance 6.8, close distance 6.
-	if v.Kind != "INITIAL_DISTANCE" || v.PositionDirection != "SHORT" || v.InitialStopDistance.String() != "6.8" || v.CloseStopDistance.String() != "6" || v.RiskFraction.String() != "0.01" || v.Mode != "VENUE" {
+	// Confidence 3 sizes the 1% base at 0.75 (S3-027, v2.11.6).
+	if v.Kind != "INITIAL_DISTANCE" || v.PositionDirection != "SHORT" || v.InitialStopDistance.String() != "6.8" || v.CloseStopDistance.String() != "6" || v.RiskFraction.String() != "0.0075" || v.Mode != "VENUE" || !slices.Contains(v.ReasonCodes, "CONFIDENCE_3") {
 		t.Fatal("initial shape", v.InitialStopDistance, v.CloseStopDistance, v.RiskFraction)
 	}
 	// Within half the TTL an unchanged plan is not resubmitted.
 	if err := m.Run(context.Background()); err != nil || len(fw.directives) != 1 {
 		t.Fatal("refresh too early", len(fw.directives), err)
+	}
+	// A FLAT judgment keeps the confidence of the last same-direction one.
+	_ = store.AppendRecord(context.Background(), "JUDGMENT", "j2", at.Add(-30*time.Second), judgment("j2", at.Add(-30*time.Second), "FLAT", 5, []string{"n2"}, false))
+	if err := m.Run(context.Background()); err != nil || len(fw.directives) != 1 {
+		t.Fatal("flat judgment changed the plan", len(fw.directives), err)
+	}
+	// Higher same-direction confidence changes the fraction: resubmitted at once.
+	_ = store.AppendRecord(context.Background(), "JUDGMENT", "j3", at.Add(-10*time.Second), judgment("j3", at.Add(-10*time.Second), "SHORT", 5, []string{"n3"}, false))
+	m.Clock = func() time.Time { return at.Add(time.Minute) }
+	if err := m.Run(context.Background()); err != nil || len(fw.directives) != 2 || fw.directives[1].RiskFraction.String() != "0.01" {
+		t.Fatal("confidence refresh", len(fw.directives), err)
 	}
 }
 
