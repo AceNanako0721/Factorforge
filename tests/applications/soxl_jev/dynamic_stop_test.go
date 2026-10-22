@@ -534,6 +534,13 @@ func TestT323PositionManagerInitialDirective(t *testing.T) {
 	if err := m.Run(context.Background()); err != nil || len(fw.directives) != 1 {
 		t.Fatal("refresh too early", len(fw.directives), err)
 	}
+	// Equity drift moves only the drawdown factor: no resubmission before
+	// half the TTL (S3-027, v2.12.1 P3 design 33).
+	tr.equity = "9800"
+	if err := m.Run(context.Background()); err != nil || len(fw.directives) != 1 {
+		t.Fatal("drawdown drift resubmitted", len(fw.directives), err)
+	}
+	tr.equity = "10000"
 	// A FLAT judgment keeps the confidence of the last same-direction one.
 	_ = store.AppendRecord(context.Background(), "JUDGMENT", "j2", at.Add(-30*time.Second), judgment("j2", at.Add(-30*time.Second), "FLAT", 5, []string{"n2"}, false))
 	if err := m.Run(context.Background()); err != nil || len(fw.directives) != 1 {

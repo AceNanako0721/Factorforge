@@ -297,7 +297,7 @@ func (m *PositionManager) initial(ctx context.Context, st *PositionState, price,
 		m.alert(ctx, "HARD_STOP_BEYOND_INSURANCE", strconv.Itoa(horizon))
 		return nil
 	}
-	if st.Initial != nil && st.Initial.Direction == direction && st.Initial.Geometry == g && st.Initial.Fraction == fraction && now.Sub(lastDirectiveAt(st.Initial.DirectiveID)) < s.DirectiveTTL/2 {
+	if st.Initial != nil && st.Initial.Direction == direction && st.Initial.Geometry == g && st.Initial.Confidence == confidence && now.Sub(lastDirectiveAt(st.Initial.DirectiveID)) < s.DirectiveTTL/2 {
 		return nil
 	}
 	st.Versions["INITIAL_DISTANCE"]++
