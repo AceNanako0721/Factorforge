@@ -1,6 +1,7 @@
 package soxl_jev_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/domain"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/submission"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/workers"
+	dto "github.com/AceNanako0721/Factorforge/src/factorforge/strategy/api/dto"
 )
 
 // ---------- v2.13.0 judgment follower (S3-034) ----------
@@ -171,5 +173,42 @@ func TestT330FollowerProfileValidation(t *testing.T) {
 		if p.Validate() == nil {
 			t.Fatal("accepted", name)
 		}
+	}
+}
+
+// v2.14.4: a followed directional judgment carries no rendered prompt, so the
+// score's input manifest hash was empty and P2 refused it (INVALID_REQUEST).
+// The score built from a judgment read over HTTP must pass P2's wire schema.
+func TestT330FollowedScorePassesFrameworkSchema(t *testing.T) {
+	at := time.Date(2026, 10, 23, 20, 1, 13, 0, time.UTC)
+	ref := map[string]any{"item_id": "item0000000001", "source": "cnbc-tech", "title": "Chipmaker cuts guidance", "published_at": at.Add(-time.Hour), "license_scope": "RESEARCH_SIM"}
+	view := func(id string, at time.Time) map[string]any {
+		return map[string]any{"judgment_id": id, "at": at, "ok": true, "direction": "SHORT", "confidence": 3, "horizon_hours": 48, "previous_invalidated": false, "thesis": "t", "key_items": []any{ref}, "invalidation_items": []any{}, "error_codes": []string{}}
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{"instance_id": "soxl-e15", "items": []any{view("j-20261023T200113Z", at), view("j-20261023T203101Z", at.Add(30*time.Minute))}, "cursor": nil})
+	}))
+	defer server.Close()
+	src, err := submission.NewJudgmentSource(submission.JudgmentSourceOptions{BaseURL: server.URL, Token: "read-token", InstanceID: "soxl-e15", Client: &http.Client{Timeout: time.Second}, MaxResponseBytes: 1 << 20, MaxPages: 4})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err := src.After(context.Background(), at.Add(-time.Hour))
+	if err != nil || len(rows) != 2 || len(rows[0].Judgment.InputHash) != 64 || rows[0].Judgment.InputHash == rows[1].Judgment.InputHash {
+		t.Fatal("input hash", rows, err)
+	}
+	w, _, fw, _ := judgmentWorker(at, fakeModel{err: d.Fail("MODEL_ACCESS_FAILED", 503)}, nil)
+	w.Models, w.News = nil, nil
+	w.Source, w.FollowSince = src, at.Add(-time.Minute)
+	if err = w.Follow(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(fw.scores) != 1 {
+		t.Fatal("scores", len(fw.scores))
+	}
+	raw, _ := json.Marshal(fw.scores[0])
+	var admitted dto.ScoreCommand
+	if err = dto.Decode(bytes.NewReader(raw), &admitted); err != nil {
+		t.Fatal("P2 refuses followed score", err, string(raw))
 	}
 }
