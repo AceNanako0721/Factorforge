@@ -163,6 +163,11 @@ func Main(environment string) error {
 	if policy.PriorityReserve <= 0 || policy.PollSeconds <= 0 {
 		return failure("EXECUTION_CAPACITY_POLICY_REQUIRED")
 	}
+	// LIVE readiness already requires an operational policy; the demo account
+	// has no readiness gate, so the lease policy is checked here explicitly.
+	if snapshot.Policy.Operational == nil || snapshot.Policy.Operational.LeaseSeconds <= 0 {
+		return failure("EXECUTION_OPERATIONAL_POLICY_REQUIRED")
+	}
 	var epoch int64
 	err = store.Transaction(ctx, key, func(run *d.Aggregate) error {
 		var err error
