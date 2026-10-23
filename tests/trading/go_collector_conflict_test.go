@@ -25,11 +25,17 @@ type conflictOnce struct {
 	path  string
 	fail  int
 	posts int
+	// clock (v2.14.2) moves the run clock before the first POST, as the
+	// venue executor's account sync does on a demo run.
+	clock func(context.Context)
 }
 
 func (c *conflictOnce) Call(ctx context.Context, method, path string, query map[string][]string, body any) (json.RawMessage, error) {
 	if method == "POST" && path == c.path {
 		c.posts++
+		if c.clock != nil && c.posts == 1 {
+			c.clock(ctx)
+		}
 		if c.posts <= c.fail {
 			// Send it to P1 with a stale expected version: a real conflict,
 			// so a later retry with the same request id meets P1's dedup.
@@ -44,6 +50,11 @@ func (c *conflictOnce) Call(ctx context.Context, method, path string, query map[
 }
 
 func conflictCollector(t *testing.T, path string, fail int) (*workers.Collector, *conflictOnce) {
+	c, client, _ := clockCollector(t, path, fail)
+	return c, client
+}
+
+func clockCollector(t *testing.T, path string, fail int) (*workers.Collector, *conflictOnce, *memory.Store) {
 	t.Helper()
 	ctx := context.Background()
 	run, p, _, _ := serviceBase(t)
@@ -80,7 +91,7 @@ func conflictCollector(t *testing.T, path string, fail int) (*workers.Collector,
 	t.Cleanup(server.Close)
 	client := &conflictOnce{inner: &httptrading.Client{HTTP: server.Client(), Endpoint: server.URL, Token: "synthetic"}, path: path, fail: fail}
 	market := &binance.Market{Client: public.Client(), Endpoint: public.URL, Multipliers: map[string]string{"TESTUSD": "1"}, Now: func() time.Time { return now }}
-	return &workers.Collector{Market: market, Client: client, Key: run.RunKey, TradeLimit: 10, Now: func() time.Time { return now }}, client
+	return &workers.Collector{Market: market, Client: client, Key: run.RunKey, TradeLimit: 10, Now: func() time.Time { return now }}, client, store
 }
 
 func TestCollectorRetriesVersionConflict(t *testing.T) {
@@ -96,5 +107,35 @@ func TestCollectorGivesUpAfterRepeatedConflicts(t *testing.T) {
 	_, _, err := c.Collect(context.Background(), "TESTUSD", "1m", time.Time{}, time.Now())
 	if e, ok := err.(*d.Error); !ok || e.Status != 409 || client.posts != workers.CollectorConflictAttempts {
 		t.Fatal("bounded retry", err, client.posts)
+	}
+}
+
+func TestCollectorRestampsSnapshotBehindVenueClock(t *testing.T) {
+	c, client, store := clockCollector(t, "/api/v2/trading/market/snapshots", 0)
+	stamp := c.Now()
+	ahead := stamp.Add(500 * time.Millisecond)
+	later := stamp.Add(time.Second)
+	client.clock = func(ctx context.Context) {
+		_ = store.Transaction(ctx, c.Key, func(run *d.Aggregate) error { run.Clock = ahead; return nil })
+		c.Now = func() time.Time { return later }
+	}
+	points, bars, err := c.Collect(context.Background(), "TESTUSD", "1m", time.Time{}, time.Now())
+	if err != nil || points != 5 || bars != 1 {
+		t.Fatal("snapshot behind the venue clock not re-stamped", points, bars, err, client.posts)
+	}
+	run, err := store.Read(context.Background(), c.Key)
+	if err != nil || !run.Clock.Equal(later) {
+		t.Fatal("clock", run.Clock, err)
+	}
+}
+
+func TestCollectorReportsClockProblemWithoutFreshTime(t *testing.T) {
+	c, client, store := clockCollector(t, "/api/v2/trading/market/snapshots", 0)
+	client.clock = func(ctx context.Context) {
+		_ = store.Transaction(ctx, c.Key, func(run *d.Aggregate) error { run.Clock = c.Now().Add(time.Second); return nil })
+	}
+	_, _, err := c.Collect(context.Background(), "TESTUSD", "1m", time.Time{}, time.Now())
+	if e, ok := err.(*d.Error); !ok || e.Code != "MARKET_CLOCK_INVALID" || e.Status != 422 {
+		t.Fatal("problem code", err, client.posts)
 	}
 }

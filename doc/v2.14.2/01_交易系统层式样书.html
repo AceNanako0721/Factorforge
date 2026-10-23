@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="ff:version" content="2.14.2"><meta name="ff:kind" content="specification"><meta name="ff:pair" content="01_交易系统层设计书.html"><title>01_交易系统层式样书 · Factorforge v2.14.2</title><style>
+:root{--ink:#172d40;--muted:#587083;--accent:#006e82;--line:#cfdee5;--paper:#fff;--bg:#edf3f6}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.8 system-ui,'Microsoft YaHei',sans-serif}
+a{color:var(--accent);text-underline-offset:3px;overflow-wrap:anywhere}header{background:#15384a;color:white;padding:28px max(24px,calc((100vw - 1320px)/2));border-bottom:5px solid #2eb6ad}
+header p{margin:0}header strong{font-size:23px}header a{color:#a9eee9}.shell{display:grid;grid-template-columns:245px minmax(0,1fr);gap:26px;max-width:1320px;margin:28px auto;padding:0 24px}
+nav{position:sticky;top:16px;align-self:start;max-height:calc(100vh - 32px);overflow:auto;padding:18px;background:var(--paper);border:1px solid var(--line);border-radius:12px;font-size:14px}
+nav a{display:block;padding:6px 0;text-decoration:none}main{overflow-wrap:anywhere;min-width:0;background:var(--paper);padding:30px 38px;border:1px solid var(--line);border-radius:12px}
+h1{font-size:30px;line-height:1.35;margin:0 0 18px}h2{font-size:23px;border-bottom:2px solid var(--line);padding:10px 0;margin:34px 0 18px;scroll-margin-top:20px}h3{font-size:18px;margin:25px 0 10px;scroll-margin-top:20px}p{margin:12px 0}
+.meta,.note{background:#eef7f8;border-left:4px solid var(--accent);padding:12px 16px;margin:18px 0;color:#294c60}.warning{background:#fff7e9;border-color:#d09b39}.table-wrap{overflow:auto;margin:18px 0}
+table{width:100%;border-collapse:collapse;font-size:14px}th{background:#e8f1f4;text-align:left}th,td{padding:11px 13px;border:1px solid var(--line);vertical-align:top;overflow-wrap:anywhere}td code{white-space:normal;overflow-wrap:anywhere}
+pre{padding:16px;background:#102d3d;color:#d8f2ed;border-radius:8px;overflow:auto;font:13px/1.7 Consolas,monospace}code{overflow-wrap:anywhere;font-family:Consolas,monospace;font-size:.9em;background:#edf3f6;padding:1px 4px;border-radius:3px}pre code{background:none;color:inherit;padding:0}
+figure{margin:24px 0;border:1px solid var(--line);border-radius:10px;padding:16px;background:#f8fbfc;overflow:auto}figure svg{display:block;width:100%;height:auto;min-width:520px}figcaption{font-size:14px;color:var(--muted);margin-top:12px}details{margin:12px 0}footer{color:var(--muted);font-size:13px;margin-top:28px;border-top:1px solid var(--line);padding-top:15px}li{margin:5px 0}.badge{display:inline-block;background:#d6eee8;color:#15564b;border-radius:5px;padding:0 7px;font-size:13px}
+@media(max-width:900px){.shell{display:block;padding:0 12px;margin:16px auto}nav{position:static;max-height:220px;margin-bottom:16px}main{padding:22px 18px}h1{font-size:25px}}
+@media print{body{background:white;font-size:11pt}.shell{display:block;margin:0;padding:0;max-width:none}nav,header{display:none}main{padding:0;border:0}h2,h3{break-after:avoid}figure,tr{break-inside:avoid}figure svg{min-width:0}pre{white-space:pre-wrap;overflow-wrap:anywhere}a{color:inherit}table{font-size:9pt}}
+</style></head><body><header><strong>Factorforge / 文档基线</strong><p>v2.14.2 · 2026-10-23 · 三层架构 · HTML 正文</p></header><div class="shell"><nav aria-label="文档目录"><a href="index.html">版本索引</a><a href="#section-1">1 功能边界</a><a href="#section-2">2 功能要求</a><a href="#section-3">S1-001 独立运行与通用能力</a><a href="#section-4">S1-002 模拟盘与实盘隔离</a><a href="#section-5">S1-003 行情与K线</a><a href="#section-6">S1-004 交易规则与经济核算</a><a href="#section-7">S1-005 挂单、成交与撤单</a><a href="#section-8">S1-006 持仓调整与归属</a><a href="#section-9">S1-007 独立止损保护</a><a href="#section-10">S1-008 最终风险检查</a><a href="#section-11">S1-009 观察与执行两种账户保护模式</a><a href="#section-12">S1-010 资金、费用和风险日</a><a href="#section-13">S1-011 重复请求与结果未知</a><a href="#section-14">S1-012 对账、重启与外部变更</a><a href="#section-15">S1-013 异常与紧急处置</a><a href="#section-16">S1-014 可重放模拟</a><a href="#section-17">S1-015 权限、记录与运行质量</a><a href="#section-18">3 验收效果</a><a href="#section-19">4 配置与待确认事项</a><a href="#lower-compat-spec">5 v2.8.0 下层兼容</a><a href="#s1-022">S1-022 上层自行管理止损</a><a href="#run-modes">6 v2.14.0 模拟盘与实盘</a><a href="#s1-023">S1-023 模拟盘与实盘</a></nav><main><div class="meta">01_交易系统层式样书 · <a href="01_交易系统层设计书.html">对应设计书</a></div><div class="note">本页继承 v2.0.0 正文，除本版明确追加的条款外，业务规则保持。继承正文中的历史交付说明不代表当前实现状态；既有 P1/P2、P3 与 Web 管理台实现见进度记录，v2.8.0 下层兼容已由代码 PR #101、#102 实施，测试网完整套件于 2026-10-16 通过；v2.9.0 不修订 P1 业务条款。</div><article id="document-body"><div data-source-sha256="2bf57a3c5fe6adc80e9a926af018b9800e22db655c49c30e83eddb3beeebe56c" data-source-document="01_交易系统层式样书.md"><h1>交易系统层式样书</h1>
+<p>版本：2.14.2；日期：2026年10月23日。对应设计书：01_交易系统层设计书。需求编号 S1；验收编号 T1。</p>
+<h2 id="section-1">1 功能边界</h2>
+<p>本层提供与具体策略无关的交易服务，支持模拟盘与实盘。使用者指定交易对象、订单或希望达到的持仓及保护条件，本层负责检查交易能力、控制账户风险、执行、记录事实并恢复一致状态。订单由外部给定时，本层也应能独立工作。</p>
+<p>本层不负责发现市场事件、评价情绪、选择模型或学习策略参数。止损位置可以由用户直接指定或由上层计算，本层负责执行和维护保护；不会根据情绪决定应否交易。</p>
+<h2 id="section-2">2 功能要求</h2>
+<h3 id="section-3">S1-001 独立运行与通用能力</h3>
+<p>只启动本层时，用户能够创建模拟运行、读取行情、提交订单、设置止损、撤单、查询订单及账户并重启恢复。接入新交易对象或渠道时应使用相同业务能力；某项交易能力不支持时明确返回原因，不假装支持。通用标识区分渠道、产品和交易对象，避免同名代码混淆。</p>
+<h3 id="section-4">S1-002 模拟盘与实盘隔离</h3>
+<p>模拟盘与实盘的账户、资金、订单、仓位、保护和审计必须隔离。模拟操作不能到达实盘执行路径。开启真实交易需要显式绑定账户、有效规则及授权；未准备好时仍可运行离线模拟。（v2.14.0：模拟盘指交易所模拟账户，内部撮合只作测试与回放工具，见 S1-023。）</p>
+<h3 id="section-5">S1-003 行情与K线</h3>
+<p>能够获取历史和实时K线、成交及买卖报价，并按需要获取指数、标记、参考资产和汇率价格。每份数据可查来源、时间、用途和是否已完成；不能将未完成K线当作已完成历史。断流、过期、缺口和价格不一致应清楚显示，并限制受影响的新风险。</p>
+<h3 id="section-6">S1-004 交易规则与经济核算</h3>
+<p>按生效规则处理价格步长、数量步长、最小订单、合约单位、交易时段、卖空能力、保证金和费用。金额、数量、价格及币种不混用；按真实产品计算双向损益。产品规则缺失或不明时禁止增险。规则变化和公司行动不得静默改变历史账务。</p>
+<h3 id="section-7">S1-005 挂单、成交与撤单</h3>
+<p>支持能力范围内的限价单、市价单、撤单和订单查询。状态必须区分待处理、已受理、部分成交、全部成交、撤销、拒绝和结果未知；提交成功不能被展示为已成交。撤单请求发出后，未确认前仍考虑该单可能成交。修改或替换订单也遵守此规则。</p>
+<h3 id="section-8">S1-006 持仓调整与归属</h3>
+<p>可以接收带归属标识的目标持仓，由本层计算仍需交易的差额，也可以提交具体订单。两种入口经过相同账户检查。实际持仓、目标持仓和未完成订单分别显示。多个使用者共享账户时，不能各自重复使用同一资金或把净额相抵当成没有风险；外部改仓不得被自动补回。</p>
+<h3 id="section-9">S1-007 独立止损保护</h3>
+<p>能为真实已成交持仓建立、查询、更新和撤销保护，普通订单和条件保护分别管理。保护必须覆盖实际数量及残仓；保护建立失败、触发却未完全退出或保护状态不明时禁止继续增险并告警。已有保护不能因替换失败而出现无记录的空档。止损不保证按触发价成交。</p>
+<h3 id="section-10">S1-008 最终风险检查</h3>
+<p>名义敞口、保证金、单笔风险、账户损失及允许的组合约束优先于任何交易请求。检查包括实际仓位和最不利可能成交订单。超限拒绝增险；保护维护和可验证的减险继续可用。缺少可靠价格、净值、规则或退出风险估计时，不允许新增风险。被动超限须禁止继续增险并按已登记政策处理。</p>
+<h3 id="section-11">S1-009 观察与执行两种账户保护模式</h3>
+<p>账户级日亏损、回撤和连续亏损可以分别设置为只观察或实际执行。只观察时仍计算和记录触发情况，不暂停主试验，也不通过风险预算间接将其目标归零；订单真实性、保证金、名义上限和单笔保护继续生效。实盘须启用已批准账户保护。阈值及触限后现有仓位处置由使用者配置，缺失时不允许相应实盘准入。</p>
+<h3 id="section-12">S1-010 资金、费用和风险日</h3>
+<p>分别记录成交损益、浮动损益、手续费、常规和特殊资金费及外部资金流。日损益从固定风险日开始净值计算，不能因转账、平仓或重启重置亏损额度。未知损失不能填零。模拟资金不足时按仿真规则拒单或清算，不能自动补造资金。</p>
+<h3 id="section-13">S1-011 重复请求与结果未知</h3>
+<p>同一业务请求重试不能重复增险。超时或连接中断后的订单先核实实际状态，未核清前不能盲目再发。重复和乱序成交回报不能重复记账；不能只靠本地请求状态认定交易所事实。</p>
+<h3 id="section-14">S1-012 对账、重启与外部变更</h3>
+<p>重启后先恢复实际订单、成交、仓位、保护、资金及风险锁，再允许新交易。人工改仓、强平、自动减仓和特殊结算作为外部事实记录，并通知使用者重新核验目标；不因目标尚未改变就自动恢复旧风险。</p>
+<h3 id="section-15">S1-013 异常与紧急处置</h3>
+<p>提供紧急停止、停止增险、撤销增险单及按已登记政策减险的能力。用户紧急停止不能自动解除。本层不可用而有实盘残仓时，使用事前准备的官方交易渠道人工预案；恢复后导入人工事实并对账，不能直接继续增险。单机失效时不能承诺本地保护仍在线。</p>
+<h3 id="section-16">S1-014 可重放模拟</h3>
+<p>模拟与实盘使用相同订单、风险和状态语义，模拟成交遵守可用时间、费用、延迟、流动性和资金规则。只有K线时，对同根内顺序不明的触发采用保守路径或报告区间。模型与模拟成交规则有版本，不能把理想成交当真实执行证据。（v2.14.0：本条规定的内部撮合只用于测试与回放，不作为运行方式，见 S1-023。）</p>
+<h3 id="section-17">S1-015 权限、记录与运行质量</h3>
+<p>每次请求、拒绝、成交、风险动作和恢复均可追踪到使用者、环境、配置和原因；更正只追加记录。交易凭据只有执行组件可使用，观察和策略使用者不能读取它。公开调用权限不能替代内部信号权限。日志、磁盘、时钟或审计异常影响可靠性时禁止增险；时效、容量、恢复和保留要求按登记配置验收。</p>
+<h2 id="section-18">3 验收效果</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>编号</th>
+<th>条件</th>
+<th>应达到的效果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>T1-01</td>
+<td>上两层均未安装</td>
+<td>完成行情、模拟挂撤单、止损及重启对账</td>
+</tr>
+<tr>
+<td>T1-02</td>
+<td>交叉使用模拟/实盘账户</td>
+<td>请求被拒绝，实盘没有模拟订单</td>
+</tr>
+<tr>
+<td>T1-03</td>
+<td>过期价格、未完成K线或规则变化</td>
+<td>正确标记数据状态，受影响增险被拒绝</td>
+</tr>
+<tr>
+<td>T1-04</td>
+<td>重试、超时、部分成交及撤单竞态</td>
+<td>无重复订单或记账，未核实风险仍计入</td>
+</tr>
+<tr>
+<td>T1-05</td>
+<td>成交后保护失败或有残仓</td>
+<td>持仓事实可见，禁止增险，持续保护/减险告警</td>
+</tr>
+<tr>
+<td>T1-06</td>
+<td>多使用者同时占用预算</td>
+<td>合并风险不突破限额，外部改仓不被补回</td>
+</tr>
+<tr>
+<td>T1-07</td>
+<td>同亏损路径切换保护模式</td>
+<td>观察模式继续主试验；执行模式锁定并按政策处置</td>
+</tr>
+<tr>
+<td>T1-08</td>
+<td>转账、特殊资金费、重启跨风险日</td>
+<td>账务分项一致，锁定与日亏损不被重置</td>
+</tr>
+<tr>
+<td>T1-09</td>
+<td>断网、执行崩溃、数据库或主机失效</td>
+<td>无盲目重发；外部保护和人工预案可核验</td>
+</tr>
+<tr>
+<td>T1-10</td>
+<td>人工改仓、强平或恢复导入</td>
+<td>去重对账，保留恢复核验，授权后才恢复增险</td>
+</tr>
+<tr>
+<td>T1-11</td>
+<td>同根K线同时满足多种触发</td>
+<td>使用登记的保守成交假设或区间</td>
+</tr>
+<tr>
+<td>T1-12</td>
+<td>越权、审计失败及未就绪实盘设置</td>
+<td>拒绝并留痕，不能由普通权限绕过保护</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="section-19">4 配置与待确认事项</h2>
+<p>本层不设置任何特定实例的名义上限或具体风险阈值。交易产品及账户能力、报价与保护口径、账户触限政策、风险日、恢复预案、运行预算均须在使用前登记。只需要某项离线模拟功能时，不要求先完成无关的实盘能力验证。</p>
+</div>
+<section id="lower-compat-spec"><h2>5 v2.8.0 修订：一笔反手、双层止损与持仓期更新</h2>
+<p>依据用户 2026-10-15 决定。本章 S1-016～022（任务 R1～R6、R11）修订 S1-006/007/008/012/014；涉及先平后反、存量保护一律不放宽和单层保护的旧条款以本章为准。三层职责保持；P1 独立管理执行和最终风险，不依赖行情判断、动态止损或模型模块。本版仅形成文档，代码与运行验收待后续 PR。（v2.9.0 注：v2.8.0 代码已由 PR #101、#102 实施，测试网完整套件 31 项于 2026-10-16 通过；文中“待后续 PR”等为当时状态。）</p>
+<h3 id="s1-016">S1-016 一笔反手（R1）</h3>
+<p>目标与实际持仓异号时，下一笔为非 reduce-only 订单；数量为 |目标 − 实际|，按数量步长向零取整，方向取差额符号，取代先平仓、下一轮开仓。反手的新方向开仓部分为 |目标|；TradeLossLimit、开仓名义及保证金只按该部分授权，必须附上层保护计划。原持仓与未知/未终态订单仍计入账户最不利风险，不能把平仓部分重复视为新增风险，也不能用净额隐藏既有风险。</p>
+<p>反手未成交或失败时，旧方向保护保持有效。每次全部或部分成交后，以实际持仓符号决定保护：仍为原方向，保留原方向计划并按实际数量重设；为零，撤全部保护；已为新方向，撤全部旧方向保护，按该方向声明的模式建立保护：VENUE 挂保险及上层止损，UPPER_MANAGED 只挂保险并记录管理声明。不得以目标方向计划保护原方向残仓。目标、订单受理和实际成交继续分列，结果未知先核验。</p>
+<h3 id="s1-017">S1-017 双层保护（R2）</h3>
+<p>保险止损角色为 <code>INSURANCE</code>，由 P1 自有并维护；持仓非零时必须存在。多头触发价为平均开仓价 × (1 − insurance_stop_fraction)，空头为平均开仓价 × (1 + insurance_stop_fraction)；按价格步长向远离持仓的方向取整（多向下、空向上）。比例为 P1 风控策略参数，须满足 0 &lt; f &lt; 1；生产值未标定，本版不赋值。上层不能修改。数量或平均开仓价变化由 P1 自行替换并核验。</p>
+<p>VENUE 模式的上层止损角色为 <code>STRATEGY</code>，来自目标请求保护计划，允许收紧和放宽；不再受 <code>PROTECTION_CANNOT_LOOSEN</code> 限制。须严格比保险止损紧（多：上层价 &gt; 保险价；空：上层价 &lt; 保险价），未穿越其触发价格类型的当前价格，且覆盖量等于实际持仓绝对值。替换先挂新单并确认，再撤旧单；替换期间至少保险止损有效，替换失败保留已有有效保护。</p>
+<p>VENUE 模式上层止损缺失或失效而保险止损有效，持仓标为“仅保险保护”（<code>INSURANCE_ONLY</code>），运行降级、禁止加仓、允许减仓和保护维护；保险止损也缺失则沿用 <code>UNPROTECTED</code> + <code>DEGRADED</code>。VENUE 开仓仍须有效上层条件保护计划；UPPER_MANAGED 改按 S1-022 的管理价与余量检查 TradeLossLimit。止损成交价格不受保证。</p>
+<h3 id="s1-018">S1-018 持仓期只更新上层止损（R3）</h3>
+<p>目标数量不变，仅保护计划变化且 target_version 递增时，VENUE 只替换上层止损；UPPER_MANAGED 只校验、记录声明，均不产生普通交易订单。数量与计划都未变的重发不应撤替仍有效的执行订单。无计划不解释为撤销现有保护；待成交新方向计划不能覆盖当前原方向持仓的保护。</p>
+<h3 id="s1-019">S1-019 平仓后清理（R4）</h3>
+<p>实际持仓变为零，主动撤销本运行在该品种上建立的全部条件单（按 Factorforge 客户端条件单标识识别），包含两种角色与替换遗留单；不能假定交易所自动撤销。对账发现的非本运行条件单不自动撤销，按外部订单异常处理：告警、禁止该品种增险，等待人工处置。逐单确认终态并重新查询至空；失败或未知须保留清理任务、降级并禁止该品种重新增险，不能仅把本地状态改成 CLOSED。</p>
+<h3 id="s1-020">S1-020 SIM 行为一致（R5）</h3>
+<p>SIM 同步支持一笔反手、双层保护、持仓期上层止损更新和归零清理。VENUE 两张保护中先触发者成交，另一张随后撤销；部分退出仍按实际残仓维护保险保护，不重复消耗同一帧流动性，不因双保护反向开仓。同根顺序不明仍按登记的保守路径或歧义政策处理。</p>
+<h3 id="s1-021">S1-021 Binance 适配与验收（R6）</h3>
+<p>在已核验的单向持仓能力范围内，VENUE 以两张 reduceOnly STOP_MARKET 条件单实现两种角色；UPPER_MANAGED 只保留 INSURANCE 条件单，按 S1-022 记录管理声明，客户端条件单标识区分角色。对账与 verify 须识别角色、方向、覆盖量、替换遗留和归零遗留；未核清不能宣称双层保护有效。testnet-acceptance 增加双层保护、上层止损放宽、一笔反手后旧止损被撤、平仓后条件单全撤四场景，名义金额 ≤100，真实执行另行授权。</p>
+
+<h3 id="s1-022">S1-022 上层自行管理止损（R11，追加修订 1）</h3>
+<p>用户 2026-10-15 已确定，上层动态止损按 5 分钟或 15 分钟 K 线收盘判断触发。目标保护可声明 <code>strategy_protection_mode=VENUE|UPPER_MANAGED</code>：VENUE 沿前述交易所上层条件单；UPPER_MANAGED 由上层判断触发后，通过目标变更减仓或平仓，交易所只挂 P1 保险止损。本版只提供兼容通道，收盘判断与动态止损模块仍在 v2.9.0。</p>
+<p>UPPER_MANAGED 已生效且保险止损有效时，持仓为“受保护”（ACTIVE_VERIFIED），运行不因缺少 STRATEGY 条件单降级，允许通过其他风险门的新开/加仓；保险失效则 UNPROTECTED + DEGRADED。两张交易所条件单不是该模式的要求。保险位置仍由 P1 的 insurance_stop_fraction 决定，上层不能改变；生产比例未标定，SIM/测试网使用显式标记的实验值。</p>
+<p>管理声明必填 <code>managed_stop_price</code>（管理止损价，正数）与 <code>overshoot_allowance</code>（收盘触发超出余量，非负数），均以该品种报价价格为单位。开仓 TradeLossLimit 以管理止损距离加余量及原有费用/滑点准备计算；反手仍仅计新开部分。上层必须保证管理价和加上不利余量后的价格都严格比保险价紧：多头 M &gt; I 且 M−O &gt; I，空头 M &lt; I 且 M+O &lt; I；等于保险价也拒绝。余量不是收益保证，实际跳空仍可能超过声明值。</p>
+<p>声明随 target_version 更新。数量不变、同为 UPPER_MANAGED、只改管理价或余量时，P1 仅校验和记录，不下普通单或新条件单；不得由 P1 按管理价自动触发退出。管理价已穿越时，上层触发后的可验证减仓/平仓不要求一份新的未穿越管理声明；保护声明校验不得阻断该减险目标。原方向残仓只沿用其原周期模式/声明，不接收反手新方向的管理价。已受理模式/声明不因指令过期而被撤销。</p>
+<p>VENUE→UPPER_MANAGED：校验声明及保险后，撤销并核实全部上层 STRATEGY 条件单，保险保留；UPPER_MANAGED→VENUE：先挂上层条件单并确认有效，再更新生效模式。失败或结果未知保留原生效模式及切换待办，不能假报完成；切回 VENUE 挂单失败时，原 UPPER_MANAGED 仍由有效保险维持受保护。</p>
+<figure class="revision-figure"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 364" role="img" aria-labelledby="s1-managed280-title s1-managed280-desc" style="min-width:0"><title id="s1-managed280-title">图 S1-M280：两种上层保护模式</title><desc id="s1-managed280-desc">上层声明模式与管理参数 → P1 风险/保险边界校验；保险始终由 P1 维护；不合格声明拒绝 → VENUE：保险 + STRATEGY 条件单；UPPER_MANAGED：仅保险；上层收盘触发后改目标 → 同量管理价更新 → P1 仅校验、记录；有效保险使 UPPER_MANAGED 正常受保护 → 切上层管理：撤 STRATEGY；切 VENUE：先挂并确认；保险失效 → UNPROTECTED + DEGRADED</desc><rect x="12" y="12" width="656" height="62" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="37" text-anchor="middle" font-size="18" fill="#17384a">上层声明模式与管理参数 → P1 风险/保险边界校验</text><text x="340" y="60" text-anchor="middle" font-size="18" fill="#17384a">保险始终由 P1 维护；不合格声明拒绝</text><path d="M340 74v24m-5 -6l5 6 5 -6" fill="none" stroke="#006e82"/><rect x="12" y="98" width="656" height="62" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="123" text-anchor="middle" font-size="18" fill="#17384a">VENUE：保险 + STRATEGY 条件单</text><text x="340" y="146" text-anchor="middle" font-size="18" fill="#17384a">UPPER_MANAGED：仅保险；上层收盘触发后改目标</text><path d="M340 160v24m-5 -6l5 6 5 -6" fill="none" stroke="#006e82"/><rect x="12" y="184" width="656" height="62" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="209" text-anchor="middle" font-size="18" fill="#17384a">同量管理价更新 → P1 仅校验、记录</text><text x="340" y="232" text-anchor="middle" font-size="18" fill="#17384a">有效保险使 UPPER_MANAGED 正常受保护</text><path d="M340 246v24m-5 -6l5 6 5 -6" fill="none" stroke="#006e82"/><rect x="12" y="270" width="656" height="62" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="295" text-anchor="middle" font-size="18" fill="#17384a">切上层管理：撤 STRATEGY；切 VENUE：先挂并确认</text><text x="340" y="318" text-anchor="middle" font-size="18" fill="#17384a">保险失效 → UNPROTECTED + DEGRADED</text></svg><figcaption>图 S1-M280：两种上层保护模式</figcaption></figure>
+<p>对应 <a href="01_交易系统层设计书.html#upper-managed-design">设计 18.9</a>；T1-19 覆盖状态、风险、更新与模式切换。</p>
+<figure class="revision-figure"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 364" role="img" aria-labelledby="s1-flow280-title s1-flow280-desc"><title id="s1-flow280-title">图 S1-R280：按成交后实际持仓维护保护</title><desc id="s1-flow280-desc">反向目标 + 新方向保护 → 开仓部分风险授权；旧方向保护保留 → 一笔非 reduce-only 反手 → 每次成交或核验 → 读取实际持仓符号与数量；仍为原方向：用旧方向计划重设，禁止混用目标计划 → 实际归零：撤该品种全部条件单并核验空集合；实际转向：撤旧保护，按新方向模式建保护 → 同量更新：VENUE 换上层单，管理模式只记录；先挂新并确认 → 撤旧；保险有效才可称受保护</desc><rect x="12" y="12" width="656" height="62" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="37" text-anchor="middle" font-size="18" fill="#17384a">反向目标 + 新方向保护 → 开仓部分风险授权</text><text x="340" y="60" text-anchor="middle" font-size="18" fill="#17384a">旧方向保护保留 → 一笔非 reduce-only 反手</text><path d="M340 74v24m-5 -6l5 6 5 -6" fill="none" stroke="#006e82"/><rect x="12" y="98" width="656" height="62" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="123" text-anchor="middle" font-size="18" fill="#17384a">每次成交或核验 → 读取实际持仓符号与数量</text><text x="340" y="146" text-anchor="middle" font-size="18" fill="#17384a">仍为原方向：用旧方向计划重设，禁止混用目标计划</text><path d="M340 160v24m-5 -6l5 6 5 -6" fill="none" stroke="#006e82"/><rect x="12" y="184" width="656" height="62" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="209" text-anchor="middle" font-size="18" fill="#17384a">实际归零：撤该品种全部条件单并核验空集合</text><text x="340" y="232" text-anchor="middle" font-size="18" fill="#17384a">实际转向：撤旧保护，按新方向模式建保护</text><path d="M340 246v24m-5 -6l5 6 5 -6" fill="none" stroke="#006e82"/><rect x="12" y="270" width="656" height="62" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="295" text-anchor="middle" font-size="18" fill="#17384a">同量更新：VENUE 换上层单，管理模式只记录</text><text x="340" y="318" text-anchor="middle" font-size="18" fill="#17384a">先挂新并确认 → 撤旧；保险有效才可称受保护</text></svg><figcaption>图 S1-R280：按成交后实际持仓维护保护</figcaption></figure>
+<div class="table-wrap"><table><thead><tr><th>验收</th><th>条件与应达到的效果</th></tr></thead><tbody><tr><td>T1-13 / R1</td><td>多空对称的一笔反手；含失败、未成交、原向残仓、恰好归零、跨零残仓与全部成交；只对新开部分计预算，旧方向计划不混用。</td></tr>
+<tr><td>T1-14 / R2</td><td>保险价多向下/空向上取步长；拒绝未标定生产参数、越权改保险、相等/更宽/已穿越的上层价及覆盖不足；允许合规放宽；替换失败保留保险，正确区分 INSURANCE_ONLY 与 UNPROTECTED。</td></tr>
+<tr><td>T1-15 / R3</td><td>目标量不变、仅计划更新，无新增或撤替交易订单；重复请求幂等，无计划不撤保护。</td></tr>
+<tr><td>T1-16 / R4</td><td>普通平仓、止损、反手经过零和外部归零均清理本运行的全部条件单，非本运行条件单只告警并阻断增险；取消失败/未知及重启后可续接，空集合确认前不恢复增险。</td></tr>
+<tr><td>T1-17 / R5</td><td>SIM 双层先触发者成交、另一张随后撤销，部分退出与同帧/同根歧义无重复账务或反向开仓；反手及归零清理可重放。</td></tr>
+<tr><td>T1-18 / R6</td><td>四个新增测试网场景分别保存前后仓位、条件单角色/状态与成交证据，名义 ≤100；本次文档或有限探针不计为该验收通过。（v2.9.0 注：2026-10-16 测试网完整套件 31 项含四个新增场景全部通过，证据见进度记录。）</td></tr><tr><td>T1-19 / R11</td><td>多空管理价与余量边界、字段/模式校验；仅保险有效时正常受保护并可按风险门加仓，保险失效则 UNPROTECTED + DEGRADED；同量管理价更新无任何下单；两向模式切换含失败/未知/重启，保险不中断且不虚构 STRATEGY 条件单；开仓及一笔反手按新开部分加余量核算。</td></tr></tbody></table></div><p>配对实现与契约：<a href="01_交易系统层设计书.html#lower-compat-design">设计第 18 章</a>。上层模块留至 v2.9.0（见 P2 式样第 11 章、P3 式样第 8 章）；执行订单类型待盘口成本实验另定。</p></section>
+<section id="run-modes-spec"><h2 id="run-modes">6 v2.14.0 运行方式：模拟盘与实盘</h2>
+<p>依据用户 2026-10-23 的决定：系统只有两种运行方式——<b>模拟盘</b>（交易所提供的模拟账户，订单真实发往交易所模拟环境，无真实资金）与<b>实盘</b>（真实资金）。此前的“系统内部模拟撮合”不再作为运行方式，只保留为测试与回放工具。模拟盘的执行路径尽量与实盘一致。</p>
+<h3 id="s1-023">S1-023 模拟盘与实盘</h3>
+<p>环境仍为 SIM 与 LIVE 两种：SIM 指模拟盘，LIVE 指实盘。两者使用同一个交易所执行器、同一套下单、成交读取、对账、保护单、恢复与租约规则，系统按交易所回报的成交、费用、资金费和账户余额记账；起始资金取模拟账户的实际余额。模拟盘执行器只能连接交易所的模拟盘地址，该地址固定在程序中，配置成其他地址或开启实盘开关即拒绝启动，连接层再次检查；实盘执行器不接受模拟盘地址。两者的差别只有：实盘须通过真实交易的准入（S1-002 的显式绑定与授权、上线条件），模拟盘不要求，只在配置了上线条件时逐项检查并记录未满足的项目而不阻止；模拟账户中预置的非保证金资产（单资产保证金模式下不计入保证金）不计入资金并留痕，实盘仍要求账户中只有结算币种；交易对的条件止损、只减仓与做空能力在模拟盘按 2026-10-16 模拟盘验收结果声明，实盘仍须另行准入。</p>
+<p>内部撮合（REPLAY 回放、SHADOW 不撮合）只用于自动化测试、历史回放与框架的反事实计算，不用于运行实验。交易所执行器不处理内部撮合的运行，内部撮合工具也不处理模拟盘或实盘的运行。v2.14.0 之前已开始的内部撮合实验按原版本运行至结束，不改动。</p>
+<div class="table-wrap"><table><thead><tr><th>验收</th><th>效果</th></tr></thead><tbody>
+<tr><td>T1-20 / S1-023</td><td>模拟盘运行的保护单与实盘相同，要等交易所确认才生效，内部撮合则立即生效；模拟盘工作进程同实盘一样要求租约；交易所执行器拒绝内部撮合运行，内部撮合工具与回放帧拒绝模拟盘运行；模拟盘只接受固定的模拟盘地址（含相似域名、开启实盘开关、实盘配置在内均拒绝），连接层拒绝其他地址且不发出请求，实盘拒绝模拟盘地址；模拟盘起始资金只取结算币种余额并列出被忽略的资产，实盘遇到其他资产拒绝；模拟盘 API 配置可声明 binance；交易对的条件止损、只减仓与做空能力按模拟盘实测声明，只用于模拟盘运行。</td></tr>
+</tbody></table></div><p>配对实现：<a href="01_交易系统层设计书.html#run-modes-design">设计第 20 章</a>。</p></section>
+</article><footer>HTML 是本版唯一发布正文。图表为内嵌 SVG，无需联网或运行脚本。文档通过不代表程序实现、交易运行或实盘准入通过。</footer></main></div></body></html>

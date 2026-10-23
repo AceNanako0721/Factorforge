@@ -164,10 +164,25 @@ func (c *Collector) Collect(ctx context.Context, instrument, interval string, st
 		body.InstrumentKey = &key
 		body.Funding = funding
 	}
-	if err = c.post(ctx, observationID("market-", spec.Version, at), at, "/api/v2/trading/market/snapshots", func(command d.Command) any {
-		body.Command = command
-		return body
-	}); err != nil {
+	snapshot := func() error {
+		return c.post(ctx, observationID("market-", spec.Version, at), at, "/api/v2/trading/market/snapshots", func(command d.Command) any {
+			body.Command = command
+			return body
+		})
+	}
+	err = snapshot()
+	// v2.14.2: on venue-backed runs the executor advances the run clock with
+	// account and fill observations; one landing between this round's stamp
+	// and its POST makes the snapshot older than the clock. Everything in the
+	// body was available at the old stamp, so it is re-stamped once.
+	if e, ok := err.(*d.Error); ok && e.Code == "MARKET_CLOCK_INVALID" {
+		if fresh := c.now(); fresh.After(at) {
+			at = fresh
+			body.At = at
+			err = snapshot()
+		}
+	}
+	if err != nil {
 		return 0, 0, err
 	}
 	if c.SimFrames {
