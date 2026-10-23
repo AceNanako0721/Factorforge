@@ -14,6 +14,9 @@ type Feedback struct {
 	Store     ports.Store
 	Broker    ports.Broker
 	Tolerance decimal.Value
+	// Failed, when set, receives the cause code of a feedback failure before
+	// the run returns to RECOVERY_CHECK (operator log only; state unchanged).
+	Failed func(code string)
 }
 
 func (w *Feedback) Tick(ctx context.Context, key d.RunKey) (bool, error) {
@@ -27,6 +30,13 @@ func (w *Feedback) Tick(ctx context.Context, key d.RunKey) (bool, error) {
 	}
 	if errors.As(err, &failure) && failure.Code == "EXECUTOR_ENVIRONMENT_MISMATCH" {
 		return false, err
+	}
+	if w.Failed != nil {
+		cause := "VENUE_OUTCOME_UNKNOWN"
+		if errors.As(err, &failure) {
+			cause = failure.Code
+		}
+		w.Failed(cause)
 	}
 	err = w.Store.Transaction(ctx, key, func(run *d.Aggregate) error {
 		run.State = "RECOVERY_CHECK"
