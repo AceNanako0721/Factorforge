@@ -68,6 +68,8 @@ type sourcePage struct {
 
 // After returns the source's judgments recorded strictly after since, oldest
 // first. The read API pages newest first; every page of the window is read.
+// It reports times to the second, so the judgment at the cursor itself comes
+// back again; entries not after since are skipped as that boundary (v2.14.1).
 func (c *JudgmentSourceHTTP) After(ctx context.Context, since time.Time) ([]d.SourcedJudgment, error) {
 	o := c.options
 	from := since.UTC().Add(time.Nanosecond).Format(time.RFC3339Nano)
@@ -110,8 +112,11 @@ func (c *JudgmentSourceHTTP) After(ctx context.Context, since time.Time) ([]d.So
 	}
 	out := make([]d.SourcedJudgment, 0, len(rows))
 	for _, r := range rows {
-		if !d.ValidID(r.JudgmentID) || !r.At.After(since) {
+		if !d.ValidID(r.JudgmentID) {
 			return nil, d.Fail("JUDGMENT_SOURCE_RESPONSE_INVALID", 502)
+		}
+		if !r.At.After(since) {
+			continue
 		}
 		at := r.At.UTC()
 		j := d.Judgment{JudgmentID: r.JudgmentID, At: at, OK: r.OK, Reason: optText(r.Reason), Provider: optText(r.Provider), Model: optText(r.Model), InputIDs: []string{}, Errors: r.ErrorCodes}
