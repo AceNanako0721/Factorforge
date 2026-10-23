@@ -269,7 +269,7 @@ func (e *Engine) queueProtection(key InstrumentKey, plan ProtectionPlan, role st
 		p.SourceTargetVersion = &v
 	}
 	p.ClientAlgoID = ConditionalClientID(run.RunKey, p)
-	if run.RunKey.Environment == "SIM" {
+	if !run.VenueBacked() {
 		at := run.Clock
 		p.State = "ACTIVE_VERIFIED"
 		p.VerifiedAt = &at
@@ -343,12 +343,12 @@ func (e *Engine) RequestConditionalCleanup(key InstrumentKey) {
 			} else {
 				p.State = "CANCEL_PENDING"
 			}
-			if run.RunKey.Environment == "SIM" {
+			if !run.VenueBacked() {
 				p.State = "CLOSED"
 			}
 		}
 	}
-	if run.RunKey.Environment == "SIM" {
+	if !run.VenueBacked() {
 		run.ConditionalCleanups.Value(key.Code()).State = "CONFIRMED"
 	}
 }
@@ -386,7 +386,7 @@ func (e *Engine) ReconcileStrategyMode(key InstrumentKey) {
 		e.RefreshProtectionState(key)
 		return
 	}
-	if insurance && (mode == "VENUE" && strategy || mode == "UPPER_MANAGED" && !remainingStrategy && (pos.EffectiveMode == "UPPER_MANAGED" || pos.ModeCleanupVerified || run.RunKey.Environment == "SIM")) {
+	if insurance && (mode == "VENUE" && strategy || mode == "UPPER_MANAGED" && !remainingStrategy && (pos.EffectiveMode == "UPPER_MANAGED" || pos.ModeCleanupVerified || !run.VenueBacked())) {
 		pos.EffectiveMode = mode
 		pos.StrategyProtectionMode = mode
 		pos.TransitionState = "STABLE"
@@ -439,7 +439,7 @@ func (e *Engine) ProtectActualPosition(order *Order) {
 			} else {
 				old.State = "CANCEL_PENDING"
 			}
-			if run.RunKey.Environment == "SIM" {
+			if !run.VenueBacked() {
 				old.State = "CLOSED"
 			}
 		}
@@ -502,7 +502,7 @@ func (e *Engine) ProtectActualPosition(order *Order) {
 					if p.InstrumentKey == key && p.Role == "STRATEGY" && CurrentProtection(p, pos) && p.State != "CLOSED" {
 						p.CancelRequested = true
 						p.State = "CANCEL_PENDING"
-						if run.RunKey.Environment == "SIM" {
+						if !run.VenueBacked() {
 							p.State = "CLOSED"
 						}
 					}

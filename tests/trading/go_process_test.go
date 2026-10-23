@@ -35,7 +35,7 @@ func (b *processLog) Reset()         { b.Lock(); defer b.Unlock(); b.buffer.Rese
 
 func TestNativeP1ProcessesWithoutPython(t *testing.T) {
 	apiBinary := buildNative(t, "./src/factorforge/trading/entrypoints/trading-api", "trading-api")
-	workerBinary := buildNative(t, "./src/factorforge/trading/entrypoints/execution-sim", "execution-sim")
+	workerBinary := buildNative(t, "./src/factorforge/trading/entrypoints/replay-executor", "replay-executor")
 	cliBinary := buildNative(t, "./src/factorforge/trading/entrypoints/trading-cli", "trading-cli")
 	ctx := context.Background()
 	database, err := postgres.StartTemporary(ctx, t.TempDir(), nativePostgresBin(t))

@@ -14,12 +14,21 @@ type Broker struct {
 	Transport Transport
 	Verified  map[string]any
 	Admitted  bool
+	// Demo binds the broker to the SIM environment: orders go to the
+	// exchange demo account through a DemoOnly transport (S1-002, v2.14.0).
+	Demo bool
 }
 
-func (b *Broker) Environment() string     { return "LIVE" }
+func (b *Broker) Environment() string {
+	if b.Demo {
+		return "SIM"
+	}
+	return "LIVE"
+}
+func (b *Broker) Venue() bool             { return true }
 func (b *Broker) ExecutionAdmitted() bool { return b.Admitted }
 func (b *Broker) Capabilities() map[string]any {
-	result := map[string]any{"environment": "LIVE", "live_ready": false, "overlapping_protections": false, "atomic_protection_modify": false}
+	result := map[string]any{"environment": b.Environment(), "live_ready": false, "overlapping_protections": false, "atomic_protection_modify": false}
 	for k, v := range b.Verified {
 		result[k] = v
 	}

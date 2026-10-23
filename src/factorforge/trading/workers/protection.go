@@ -252,7 +252,7 @@ func (w *Protection) Tick(ctx context.Context, key d.RunKey) (bool, error) {
 	if w.Store.Environment() != w.Broker.Environment() {
 		return false, fail("EXECUTOR_ENVIRONMENT_MISMATCH", 403)
 	}
-	if w.Broker.Environment() == "LIVE" && (w.ExecutorID == "" || w.LeaseEpoch <= 0 || w.Now == nil || !w.Broker.ExecutionAdmitted()) {
+	if venue(w.Broker) && (w.ExecutorID == "" || w.LeaseEpoch <= 0 || w.Now == nil || !w.Broker.ExecutionAdmitted()) {
 		return false, fail("EXECUTOR_FENCE_REQUIRED", 423)
 	}
 	run, err := w.Store.Read(ctx, key)

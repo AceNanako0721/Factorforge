@@ -68,3 +68,11 @@ func (run *Aggregate) applyLease(l ExecutorLease) {
 		run.Outbox[i].ExecutorEpoch = l.Outbox[i].ExecutorEpoch
 	}
 }
+
+// VenueBacked reports a run whose orders go to a real venue account: every LIVE
+// run and, since v2.14.0 (S1-002), a SIM run on the exchange demo account. Both
+// are created by the venue executor with execution mode LIVE. Internal matching
+// (REPLAY/SHADOW) remains only as a test and replay tool.
+func (run *Aggregate) VenueBacked() bool {
+	return run.RunKey.Environment == "LIVE" || run.ExecutionMode == "LIVE"
+}

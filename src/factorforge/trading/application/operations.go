@@ -109,7 +109,7 @@ func (s *Service) CancelProtection(ctx context.Context, p d.Principal, command C
 			return problem("PROTECTION_STILL_REQUIRED", 423)
 		}
 		protection.State = "CLOSED"
-		if run.RunKey.Environment == "LIVE" {
+		if run.VenueBacked() {
 			protection.State = "CANCEL_PENDING"
 			protection.CancelRequested = true
 		}
@@ -198,7 +198,7 @@ func (s *Service) RunAction(ctx context.Context, p d.Principal, command CommandI
 				return err
 			}
 		case "resume":
-			if run.RunKey.Environment == "LIVE" && (run.VenueReconciledVersion == nil || *run.VenueReconciledVersion != c.ExpectedVersion) {
+			if run.VenueBacked() && (run.VenueReconciledVersion == nil || *run.VenueReconciledVersion != c.ExpectedVersion) {
 				return problem("VENUE_RECOVERY_REQUIRED", 423)
 			}
 			if len(run.RecoveryIssues) > 0 || len(run.RiskLocks) > 0 {

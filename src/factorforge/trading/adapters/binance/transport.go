@@ -35,6 +35,7 @@ type SignedTransport struct {
 	Secrets                             func() (string, string)
 	Now                                 func() time.Time
 	Fence                               func(context.Context) error
+	DemoOnly                            bool // SIM demo account: every request must go to TestnetURL (S1-002)
 	RecvWindow, Budget, PriorityReserve int
 	Window                              time.Duration
 	Weights                             map[string]int
@@ -85,6 +86,9 @@ func (t *SignedTransport) reserve(method, path string, priority bool) error {
 func (t *SignedTransport) Request(ctx context.Context, method, path string, params Params, write bool) (any, error) {
 	if !strings.HasPrefix(path, "/fapi/") || strings.ContainsAny(path, "?#") {
 		return nil, reject("VENUE_PATH_FORBIDDEN", 403)
+	}
+	if t.DemoOnly && strings.TrimRight(t.Endpoint, "/") != TestnetURL {
+		return nil, reject("DEMO_ENDPOINT_REQUIRED", 403)
 	}
 	if write {
 		if t.Fence == nil {

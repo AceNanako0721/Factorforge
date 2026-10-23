@@ -7,7 +7,7 @@ import (
 )
 
 func AdvanceLiveClock(e *d.Engine, at time.Time) error {
-	if e.Run.RunKey.Environment != "LIVE" || !at.After(e.Run.Clock) {
+	if !e.Run.VenueBacked() || !at.After(e.Run.Clock) {
 		return nil
 	}
 	return boundary(e, at)
