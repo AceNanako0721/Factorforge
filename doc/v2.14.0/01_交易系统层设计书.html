@@ -471,7 +471,7 @@ figure{margin:24px 0;border:1px solid var(--line);border-radius:10px;padding:16p
 <li>工作进程（workers/executor.go、protection.go）：交易所券商（LIVE 或实现 Venue()）一律要求准入与租约；券商是否为交易所与运行的 VenueBacked() 不一致时返回 EXECUTOR_ENVIRONMENT_MISMATCH。</li>
 <li>执行器：原 execution-live 主体移入 <code>entrypoints/venueexec</code>（<code>Bind</code>、<code>Main</code>、<code>AccountCash</code>）。<code>execution-sim</code> = <code>venueexec.Main("SIM")</code>，<code>execution-live</code> = <code>venueexec.Main("LIVE")</code>，参数、启动顺序、初始化、恢复、租约、对账循环完全相同。原内部撮合执行器改名 <code>replay-executor</code>，只供测试与回放。</li>
 <li><code>Bind</code>：SIM 要求 environment=SIM、adapter=binance、exchange_api_url 通过 <code>OfficialTestnet</code> 严格校验、allow_live=false，否则 DEMO_ENDPOINT_REQUIRED（或 SIM_CONFIGURATION_NOT_ISOLATED），实际使用的地址为常量 TestnetURL；LIVE 要求 https 且不是模拟盘地址（LIVE_ENDPOINT_UNVERIFIED）。</li>
-<li>准入：LIVE 照旧要求 allow_live 与 live_readiness（Readiness.Require 在启动与每次写请求前执行）。SIM 不要求；若配置了 live_readiness，启动时执行同一个 Require 并打印 LIVE_READINESS_OBSERVED（ready 或未满足的错误码），不阻止。</li>
+<li>准入：LIVE 照旧要求 allow_live 与 live_readiness（Readiness.Require 在启动与每次写请求前执行）。SIM 不要求；若配置了 live_readiness，启动时执行同一个 Require 并打印 LIVE_READINESS_OBSERVED（ready 或未满足的错误码），不阻止。两者取租约前都要求账户政策含 operational 且 lease_seconds &gt; 0，否则 EXECUTION_OPERATIONAL_POLICY_REQUIRED（LIVE 原由准入保证）。</li>
 <li>初始化（-initialize-run）：两者都要求无挂单、无条件单、无持仓、单向持仓且单资产保证金（RequireAccountConfiguration）。<code>AccountCash</code> 取结算币种 walletBalance；其他非零资产在 LIVE 返回 LIVE_ACCOUNT_CURRENCY_UNVERIFIED，在 SIM 忽略并写入 VENUE_BALANCE_BOOTSTRAP 审计的 ignored_non_margin_assets。</li>
 <li>API 配置（adapters/configuration）：SIM 的 adapter 可为 binance（模拟盘）或 mock（测试工具）；LIVE 仍只能为 binance。执行器启动前先读取运行，非 VenueBacked 运行返回 EXECUTOR_ENVIRONMENT_MISMATCH，不读取交易所事实。</li>
 </ul>
