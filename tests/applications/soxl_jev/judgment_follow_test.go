@@ -194,8 +194,8 @@ func TestT330FollowedScorePassesFrameworkSchema(t *testing.T) {
 		t.Fatal(err)
 	}
 	rows, err := src.After(context.Background(), at.Add(-time.Hour))
-	if err != nil || len(rows) != 2 || len(rows[0].Judgment.InputHash) != 64 || rows[0].Judgment.InputHash == rows[1].Judgment.InputHash {
-		t.Fatal("input hash", rows, err)
+	if err != nil || len(rows) != 2 {
+		t.Fatal("rows", rows, err)
 	}
 	w, _, fw, _ := judgmentWorker(at, fakeModel{err: d.Fail("MODEL_ACCESS_FAILED", 503)}, nil)
 	w.Models, w.News = nil, nil
@@ -206,9 +206,26 @@ func TestT330FollowedScorePassesFrameworkSchema(t *testing.T) {
 	if len(fw.scores) != 1 {
 		t.Fatal("scores", len(fw.scores))
 	}
-	raw, _ := json.Marshal(fw.scores[0])
-	var admitted dto.ScoreCommand
-	if err = dto.Decode(bytes.NewReader(raw), &admitted); err != nil {
-		t.Fatal("P2 refuses followed score", err, string(raw))
+	admit := func(c dto.ScoreCommand) {
+		raw, _ := json.Marshal(c)
+		var admitted dto.ScoreCommand
+		if err := dto.Decode(bytes.NewReader(raw), &admitted); err != nil {
+			t.Fatal("P2 refuses followed score", err, string(raw))
+		}
 	}
+	admit(fw.scores[0])
+	// A follower stopped by the old behaviour holds the copied judgment
+	// unapplied; on restart resume() replays that stored copy unchanged.
+	stuck, store, fw2, _ := judgmentWorker(at.Add(time.Hour), fakeModel{err: d.Fail("MODEL_ACCESS_FAILED", 503)}, nil)
+	stuck.Models, stuck.News = nil, nil
+	stuck.Source, stuck.FollowSince = &fakeSource{}, at.Add(-time.Minute)
+	item := d.NewsItem{ItemID: "item0000000001", Source: "cnbc-tech", Title: "Chipmaker cuts guidance", PublishedAt: at.Add(-time.Hour), ReceivedAt: at, LicenseScope: "RESEARCH_SIM"}
+	copied := judgment("j-20261023T200113Z", at, "SHORT", 3, []string{item.ItemID}, false)
+	if store.AppendRecord(context.Background(), "NEWS", item.ItemID, item.ReceivedAt, item) != nil || store.AppendRecord(context.Background(), "JUDGMENT", copied.JudgmentID, copied.At, copied) != nil {
+		t.Fatal("fixture")
+	}
+	if err = stuck.Follow(context.Background()); err != nil || len(fw2.scores) != 1 {
+		t.Fatal("resume", err, len(fw2.scores))
+	}
+	admit(fw2.scores[0])
 }

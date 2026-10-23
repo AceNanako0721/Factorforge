@@ -1,8 +1,6 @@
 package submission
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"context"
 	"encoding/json"
 	"io"
@@ -122,15 +120,6 @@ func (c *JudgmentSourceHTTP) After(ctx context.Context, since time.Time) ([]d.So
 		}
 		at := r.At.UTC()
 		j := d.Judgment{JudgmentID: r.JudgmentID, At: at, OK: r.OK, Reason: optText(r.Reason), Provider: optText(r.Provider), Model: optText(r.Model), InputIDs: []string{}, Errors: r.ErrorCodes}
-		// v2.14.4 (P3 design 36): a follower's input is the source judgment
-		// it read, not a rendered prompt; the score's input manifest hash
-		// (P2 requires 64 hex digits) digests that view and its source.
-		manifest, _ := json.Marshal(struct {
-			Source   string         `json:"source_instance_id"`
-			Judgment sourceJudgment `json:"judgment"`
-		}{o.InstanceID, r})
-		sum := sha256.Sum256(manifest)
-		j.InputHash = hex.EncodeToString(sum[:])
 		items := []d.NewsItem{}
 		ids := func(list []sourceNewsRef) []string {
 			out := []string{}

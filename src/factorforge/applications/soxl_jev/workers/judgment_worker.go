@@ -357,7 +357,16 @@ func (w *JudgmentWorker) score(id, event string, version int, previous *string, 
 		kind = "REVISION"
 	}
 	sort.Strings(evidence)
-	return dto.ScoreSubmission{SubmissionID: id, EventID: event, FactVersion: 1, ObjectID: s.ObjectID, ScoreVersion: version, PreviousScoreID: previous, RevisionKind: kind, Vector: dto.ScoreVector{Direction: direction, ImpactPoints: impact, Credibility: cred, Relevance: rel, Novelty: one, ExpectationCoverage: zero, PrepricingFraction: zero, ExpectedHalfLife: half, QualityScore: quality, UnknownFields: []string{}}, EvidenceRefs: evidence, ProducerID: s.ProducerID, ProducerVersion: s.ProducerVersion, RubricVersion: s.Rubric, CalibrationVersion: s.Calibration, CompletedAt: j.At, InputManifestHash: j.InputHash}, nil
+	// v2.14.4 (P3 design 36): a followed judgment is copied without the
+	// source's rendered prompt, so it has no input hash; P2 requires 64 hex
+	// digits. Its input is the copied judgment record itself.
+	manifest := j.InputHash
+	if manifest == "" {
+		raw, _ := json.Marshal(j)
+		sum := sha256.Sum256(raw)
+		manifest = hex.EncodeToString(sum[:])
+	}
+	return dto.ScoreSubmission{SubmissionID: id, EventID: event, FactVersion: 1, ObjectID: s.ObjectID, ScoreVersion: version, PreviousScoreID: previous, RevisionKind: kind, Vector: dto.ScoreVector{Direction: direction, ImpactPoints: impact, Credibility: cred, Relevance: rel, Novelty: one, ExpectationCoverage: zero, PrepricingFraction: zero, ExpectedHalfLife: half, QualityScore: quality, UnknownFields: []string{}}, EvidenceRefs: evidence, ProducerID: s.ProducerID, ProducerVersion: s.ProducerVersion, RubricVersion: s.Rubric, CalibrationVersion: s.Calibration, CompletedAt: j.At, InputManifestHash: manifest}, nil
 }
 
 func (w *JudgmentWorker) retract(ctx context.Context, state *d.InjectionState, j d.Judgment, a d.InjectionAction) error {

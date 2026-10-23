@@ -871,10 +871,10 @@ figure{margin:24px 0;border:1px solid var(--line);border-radius:10px;padding:16p
 <section id="follower-input-hash"><h2>36 v2.14.4 跟随研判的输入清单哈希</h2>
 <p>对应 S3-025 与 S3-034，业务式样不变。生成研判时，输入清单哈希取渲染后提示词的摘要（Judge），评分以它作为 input_manifest_hash 提交；P2 线上 schema 要求该字段为 64 位小写十六进制。跟随模式（第 34 章）从源实例读 API 复制研判，读 API 不含提示词与其摘要，复制出的研判 InputHash 为空。FLAT 不注入、不提交评分，所以 E20/E21/E22 启动后的 FLAT 研判都正常；10-24 05:01 JST 第一条方向研判（SHORT/3/48h）出来后，事件登记成功、评分被 P2 以 INVALID_REQUEST（422）拒绝，跟随每分钟重试仍失败，三个跟随实例停在该研判、未建仓（E15 本身不受影响）。</p>
 <h3 id="follower-input-hash-change">36.1 处理</h3>
-<p>submission/judgment_source.go：跟随者把“源实例编号 + 读到的这条研判视图”序列化后取 SHA-256，作为复制研判的 InputHash。跟随者的输入就是它读到的源研判，摘要随研判内容确定、可复现，不同研判的摘要不同。生成路径不变。修复部署后，跟随者从停住的研判起按顺序重放：事件登记按同一幂等键重放，评分补交，随后的研判依次应用。</p>
+<p>workers/judgment_worker.go 的评分构造：研判带有 InputHash（生成路径）时照旧使用；没有时（跟随复制的研判）以这条研判记录本身的 JSON 的 SHA-256 作为 input_manifest_hash。跟随者的输入就是它复制的源研判，摘要由记录内容确定、可复现。复制下来的研判记录保持原样不改，因此按旧行为停住的跟随者重启后，resume 重放已存的副本即可补交评分，不需要改数据；事件登记按同一幂等键重放，随后的研判依次应用。</p>
 <h3 id="follower-input-hash-tests">36.2 验证</h3>
 <div class="table-wrap"><table><thead><tr><th>式样 / 验收</th><th>测试（tests/applications/soxl_jev/judgment_follow_test.go）</th></tr></thead><tbody>
-<tr><td>S3-025 / S3-034</td><td>TestT330FollowedScorePassesFrameworkSchema：经 HTTP 读到的 SHORT 研判带 64 位摘要且两条研判不同；跟随产生的评分命令通过 P2 线上 schema 解码。对照：不含本修正时摘要为空；去掉摘要断言后评分解码以 INVALID_REQUEST 失败，与线上一致。</td></tr>
+<tr><td>S3-025 / S3-034</td><td>TestT330FollowedScorePassesFrameworkSchema：经 HTTP 读到的 SHORT 研判跟随注入后，评分命令通过 P2 线上 schema 解码；已存但未应用的无摘要副本经 resume 重放后，评分同样通过。对照：不含本修正时评分解码以 INVALID_REQUEST 失败，与线上一致。</td></tr>
 <tr><td>S3-034</td><td>原有 T330 跟随测试照旧通过。</td></tr>
 </tbody></table></div>
 <p>没有新增依赖，公开契约与数据库结构不变；交易参数不变。</p></section>
