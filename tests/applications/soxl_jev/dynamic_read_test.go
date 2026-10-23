@@ -63,6 +63,11 @@ func TestT328DynamicReadAPI(t *testing.T) {
 		t.Fatal("open read", err)
 	}
 	defer reader.Close()
+	// Initializing another instance after a DYNAMIC_READ grant exists replays
+	// every migration on the shared schema; 007 must not reject that row.
+	if err = pg.InitializePipeline(ctx, server.AdminDSN, d.Binding{InstanceID: "soxl-e20", Environment: "SIM"}); err != nil {
+		t.Fatal("re-initialize with DYNAMIC_READ grant", err)
+	}
 	// Cross-instance and cross-environment opens are refused.
 	if _, err = pg.OpenPipeline(ctx, readDSN, other, "DYNAMIC_READ", 100000); err == nil {
 		t.Fatal("cross-instance read opened")

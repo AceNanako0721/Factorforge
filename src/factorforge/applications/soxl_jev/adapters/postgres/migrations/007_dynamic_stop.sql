@@ -2,7 +2,9 @@
 -- One DYNAMIC worker identity per instance; records are append-only, state
 -- rows advance only by version compare-and-set.
 ALTER TABLE __SCHEMA__.worker_grant DROP CONSTRAINT IF EXISTS worker_grant_worker_kind_check;
-ALTER TABLE __SCHEMA__.worker_grant ADD CONSTRAINT worker_grant_worker_kind_check CHECK(worker_kind IN ('INGEST','RESEARCH','TRADING','DYNAMIC'));
+-- NOT VALID: on re-initialization DYNAMIC_READ rows (008) already exist; 008
+-- replaces this constraint with the full validated one in the same transaction.
+ALTER TABLE __SCHEMA__.worker_grant ADD CONSTRAINT worker_grant_worker_kind_check CHECK(worker_kind IN ('INGEST','RESEARCH','TRADING','DYNAMIC')) NOT VALID;
 CREATE TABLE IF NOT EXISTS __SCHEMA__.dynamic_record (
  instance_id text NOT NULL,record_kind text NOT NULL CHECK(record_kind IN ('NEWS','JUDGMENT','ACTION','NOISE','STOP_EVENT','VARIANT')),
  record_id text NOT NULL,recorded_at timestamptz NOT NULL,payload jsonb NOT NULL,
