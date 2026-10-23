@@ -192,7 +192,7 @@ func Main(environment string) error {
 	broker.Verified = map[string]any{"ordinary_and_conditional_verified": true, "overlapping_protections": readiness.OverlappingProtections, "atomic_protection_modify": readiness.AtomicProtectionModify}
 	probeHealth := &health.Probe{StoragePath: config.Trading.StoragePath, ClockOffset: health.ClockProbe(client, bound.Endpoint+"/fapi/v1/time", time.Now)}
 	protection := &workers.Protection{Store: store, Broker: broker, ExecutorID: *holder, LeaseEpoch: epoch, Now: time.Now}
-	feedback := &workers.Feedback{Store: store, Broker: broker, Tolerance: tolerance}
+	feedback := &workers.Feedback{Store: store, Broker: broker, Tolerance: tolerance, Failed: func(code string) { fmt.Fprintln(os.Stderr, "VENUE_FEEDBACK_UNAVAILABLE", code) }}
 	executor := &workers.Executor{Store: store, Broker: broker, ExecutorID: *holder, LeaseEpoch: epoch, Now: time.Now, Health: probeHealth}
 	if *once {
 		if _, err = protection.Tick(ctx, key); err != nil {

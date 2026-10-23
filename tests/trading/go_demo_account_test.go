@@ -178,3 +178,29 @@ func TestT120DemoBootstrapUsesMarginCurrencyOnly(t *testing.T) {
 		t.Fatal("LIVE mock adapter accepted")
 	}
 }
+
+// Feedback failures report their cause to the operator log without changing
+// the recorded state (frozen oracles stay identical).
+func TestFeedbackFailureCauseIsReported(t *testing.T) {
+	run := demoRun()
+	store := memory.New("SIM")
+	if err := store.Create(context.Background(), run); err != nil {
+		t.Fatal(err)
+	}
+	failing := failingVenue{demoVenue{&compatVenue{facts: map[string]*d.Protection{}}}}
+	got := ""
+	w := &workers.Feedback{Store: store, Broker: failing, Failed: func(code string) { got = code }}
+	if ok, _ := w.Tick(context.Background(), run.RunKey); ok || got != "VENUE_RATE_LIMITED" {
+		t.Fatal("cause", ok, got)
+	}
+	after, _ := store.Read(context.Background(), run.RunKey)
+	if after.State != "RECOVERY_CHECK" {
+		t.Fatal(after.State)
+	}
+}
+
+type failingVenue struct{ demoVenue }
+
+func (failingVenue) ListOpenOrders(context.Context, *d.Aggregate) ([]*d.Order, error) {
+	return nil, &d.Error{Code: "VENUE_RATE_LIMITED", Status: 429}
+}
