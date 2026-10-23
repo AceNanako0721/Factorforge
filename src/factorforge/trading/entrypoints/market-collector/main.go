@@ -27,6 +27,7 @@ func run() error {
 	once := flag.Bool("once", false, "one acquisition")
 	simCapabilities := flag.Bool("sim-capabilities", false, "declare simulator protection/short capabilities (REPLAY runs only)")
 	simFrames := flag.Bool("sim-frames", false, "submit a simulation frame after each snapshot (SIM with --sim-capabilities only)")
+	demoCapabilities := flag.Bool("demo-capabilities", false, "declare demo-account protection/short capabilities (SIM demo runs only)")
 	flag.Parse()
 	multiplier, err := decimal.Parse(*multiple)
 	if err != nil || multiplier.Sign() <= 0 || *poll <= 0 || *lookback <= 0 || *delay < 0 || *limit < 1 || *limit > 1000 || *id == "" || *instrument == "" || *interval == "" {
@@ -42,9 +43,12 @@ func run() error {
 	if *simFrames && (!*simCapabilities || config.Runtime.Environment != "SIM") {
 		return &d.Error{Code: "COLLECTOR_POLICY_INVALID", Status: 422}
 	}
+	if *demoCapabilities && (*simCapabilities || config.Runtime.Environment != "SIM" || !c.OfficialTestnet(config.Services.ExchangeAPIURL)) {
+		return &d.Error{Code: "COLLECTOR_POLICY_INVALID", Status: 422}
+	}
 	ctx, cancel := r.Context()
 	defer cancel()
-	market := &binance.Market{Client: r.Client(10 * time.Second), Endpoint: config.Services.ExchangeAPIURL, Multipliers: map[string]string{*instrument: *multiple}, PublicationDelay: time.Duration(*delay) * time.Millisecond, SimCapabilities: *simCapabilities}
+	market := &binance.Market{Client: r.Client(10 * time.Second), Endpoint: config.Services.ExchangeAPIURL, Multipliers: map[string]string{*instrument: *multiple}, PublicationDelay: time.Duration(*delay) * time.Millisecond, SimCapabilities: *simCapabilities, DemoCapabilities: *demoCapabilities}
 	client := &httptrading.Client{HTTP: r.Client(15 * time.Second), Endpoint: config.Services.TradingAPIURL, Token: config.Credentials.TradingAPIToken}
 	collector := &workers.Collector{Market: market, Client: client, Key: d.RunKey{Environment: config.Runtime.Environment, AccountID: config.Trading.AccountID, RunID: *id}, TradeLimit: *limit, SimFrames: *simFrames}
 	for {

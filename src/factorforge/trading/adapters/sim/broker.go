@@ -20,7 +20,7 @@ func checkEnvironment(run *d.Aggregate) error {
 	if err := d.Validate(run); err != nil {
 		return err
 	}
-	if run.RunKey.Environment != "SIM" {
+	if run.RunKey.Environment != "SIM" || run.VenueBacked() {
 		return &d.Error{Code: "ENVIRONMENT_MISMATCH", Status: 403}
 	}
 	return nil

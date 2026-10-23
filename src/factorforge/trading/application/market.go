@@ -126,6 +126,10 @@ func (s *Service) AdvanceReplay(ctx context.Context, p d.Principal, command Comm
 	}
 	return s.Command(ctx, p, command, "REPLAY_FRAME", frame, "sim:write", func(e *d.Engine, r Response) error {
 		run := e.Run
+		if run.VenueBacked() {
+			// A demo-account run is priced and filled by the venue (S1-002).
+			return problem("SIM_ENDPOINT_FORBIDDEN", 403)
+		}
 		if !frame.At.After(run.Clock) {
 			return problem("CLOCK_MUST_ADVANCE")
 		}

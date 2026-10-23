@@ -287,7 +287,7 @@ func (e *Engine) ApplyIncome(income Income) bool {
 		}
 		return false
 	}
-	if income.Kind == "TRANSFER" && run.RunKey.Environment == "SIM" {
+	if income.Kind == "TRANSFER" && !run.VenueBacked() {
 		e.Fail("SIM_CAPITAL_IS_FIXED")
 		return false
 	}

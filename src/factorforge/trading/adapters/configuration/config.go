@@ -79,11 +79,9 @@ func (c Config) ValidateAPI() error {
 	if environment == "LIVE" && len(c.Trading.LiveReadiness) == 0 {
 		return invalid("LIVE_CAPABILITIES_UNVERIFIED", 423)
 	}
-	adapter := "mock"
-	if environment == "LIVE" {
-		adapter = "binance"
-	}
-	if c.Trading.Adapter != adapter {
+	// SIM declares "binance" for a demo-account run (S1-002) or "mock" for the
+	// internal-matching test tool; LIVE is always "binance".
+	if !d.Has([]string{"mock", "binance"}, c.Trading.Adapter) || environment == "LIVE" && c.Trading.Adapter != "binance" {
 		return invalid("EXECUTION_ADAPTER_UNVERIFIED", 423)
 	}
 	if c.Services.DatabaseURL == "" || c.Credentials.TradingAPIToken == "" {

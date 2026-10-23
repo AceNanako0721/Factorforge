@@ -21,11 +21,18 @@ type Executor struct {
 }
 
 func fail(code string, status int) error { return &d.Error{Code: code, Status: status} }
+
+// venue reports a broker that writes to a real venue account (LIVE or the SIM
+// demo account); such executors always need admission and a lease fence.
+func venue(b ports.Broker) bool {
+	v, ok := b.(interface{ Venue() bool })
+	return b.Environment() == "LIVE" || ok && v.Venue()
+}
 func (w *Executor) Verify() error {
 	if w.Store.Environment() != w.Broker.Environment() {
 		return fail("EXECUTOR_ENVIRONMENT_MISMATCH", 403)
 	}
-	if w.Broker.Environment() == "LIVE" {
+	if venue(w.Broker) {
 		if !w.Broker.ExecutionAdmitted() {
 			return fail("LIVE_CAPABILITIES_UNVERIFIED", 423)
 		}
@@ -36,6 +43,11 @@ func (w *Executor) Verify() error {
 	return nil
 }
 func (w *Executor) fence(run *d.Aggregate) error {
+	if venue(w.Broker) != run.VenueBacked() {
+		// A venue executor never drives an internal-matching run, and the
+		// internal adapter never drives a venue run (S1-002).
+		return fail("EXECUTOR_ENVIRONMENT_MISMATCH", 403)
+	}
 	if run.LeaseHolder != nil && *run.LeaseHolder != "" && w.ExecutorID == "" {
 		return fail("EXECUTOR_FENCE_REQUIRED", 423)
 	}

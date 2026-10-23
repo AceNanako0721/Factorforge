@@ -26,9 +26,13 @@ type Market struct {
 	// SimCapabilities declares simulator-provided protection, reduce-only and
 	// short for SIM (REPLAY) runs; the rule version gets a -sim suffix (v2.6.3).
 	SimCapabilities bool
-	Now             func() time.Time
-	mu              sync.Mutex
-	specs           map[string]*d.InstrumentSpec
+	// DemoCapabilities declares the same three capabilities for a SIM run on
+	// the exchange demo account, verified there by the testnet acceptance
+	// suite (T1-18, 2026-10-16); the rule version gets a -demo suffix (v2.14.0).
+	DemoCapabilities bool
+	Now              func() time.Time
+	mu               sync.Mutex
+	specs            map[string]*d.InstrumentSpec
 }
 
 func (m *Market) now() time.Time {
@@ -196,6 +200,9 @@ func (m *Market) InstrumentSpecs(ctx context.Context) ([]*d.InstrumentSpec, erro
 		if m.SimCapabilities && stopMarket {
 			capabilities = append(capabilities, "CONDITIONAL_PROTECTION", "REDUCE_ONLY", "SHORT")
 			version += "-sim"
+		} else if m.DemoCapabilities && stopMarket {
+			capabilities = append(capabilities, "CONDITIONAL_PROTECTION", "REDUCE_ONLY", "SHORT")
+			version += "-demo"
 		}
 		spec := &d.InstrumentSpec{Key: d.InstrumentKey{Venue: "BINANCE", Product: "LINEAR_PERPETUAL", InstrumentID: text(item["symbol"])}, Version: version, ValidFrom: observed, PriceTick: tick, QuantityStep: step, ContractMultiplier: multiple, QuoteCurrency: text(item["quoteAsset"]), SettlementCurrency: text(item["marginAsset"]), MinNotional: notional, Halted: text(item["status"]) != "TRADING", Capabilities: capabilities, PriceRoles: []string{"BID", "ASK", "MARK", "LAST", "INDEX"}, MarginTiers: [][2]decimal.Value{}}
 		if d.Validate(spec) != nil {

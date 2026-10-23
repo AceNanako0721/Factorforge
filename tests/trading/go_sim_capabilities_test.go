@@ -24,15 +24,20 @@ func TestSimCapabilitiesCollector(t *testing.T) {
 	for _, test := range []struct {
 		name      string
 		sim       bool
+		demo      bool
 		orders    []string
 		mode      string
 		wantCaps  []string
 		wantError string
 	}{
-		{"public", false, []string{"MARKET", "LIMIT", "STOP_MARKET"}, "REPLAY", []string{"LIMIT", "MARKET"}, ""},
-		{"sim", true, []string{"MARKET", "LIMIT", "STOP_MARKET"}, "REPLAY", []string{"CONDITIONAL_PROTECTION", "LIMIT", "MARKET", "REDUCE_ONLY", "SHORT"}, ""},
-		{"sim-without-stop", true, []string{"MARKET", "LIMIT"}, "REPLAY", []string{"LIMIT", "MARKET"}, ""},
-		{"sim-on-shadow-run", true, []string{"MARKET", "LIMIT", "STOP_MARKET"}, "SHADOW", nil, "SIM_CAPABILITIES_FORBIDDEN"},
+		{"public", false, false, []string{"MARKET", "LIMIT", "STOP_MARKET"}, "REPLAY", []string{"LIMIT", "MARKET"}, ""},
+		{"sim", true, false, []string{"MARKET", "LIMIT", "STOP_MARKET"}, "REPLAY", []string{"CONDITIONAL_PROTECTION", "LIMIT", "MARKET", "REDUCE_ONLY", "SHORT"}, ""},
+		{"sim-without-stop", true, false, []string{"MARKET", "LIMIT"}, "REPLAY", []string{"LIMIT", "MARKET"}, ""},
+		{"sim-on-shadow-run", true, false, []string{"MARKET", "LIMIT", "STOP_MARKET"}, "SHADOW", nil, "SIM_CAPABILITIES_FORBIDDEN"},
+		// v2.14.0 (S1-023): the demo account declares the same capabilities
+		// under a -demo version, accepted only by a SIM demo-account run.
+		{"demo", false, true, []string{"MARKET", "LIMIT", "STOP_MARKET"}, "LIVE", []string{"CONDITIONAL_PROTECTION", "LIMIT", "MARKET", "REDUCE_ONLY", "SHORT"}, ""},
+		{"demo-on-replay-run", false, true, []string{"MARKET", "LIMIT", "STOP_MARKET"}, "REPLAY", nil, "DEMO_CAPABILITIES_FORBIDDEN"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := context.Background()
@@ -58,7 +63,7 @@ func TestSimCapabilitiesCollector(t *testing.T) {
 				json.NewEncoder(w).Encode(reply)
 			}))
 			defer public.Close()
-			market := &binance.Market{Client: public.Client(), Endpoint: public.URL, Multipliers: map[string]string{"TESTUSD": "1"}, SimCapabilities: test.sim, Now: func() time.Time { return now }}
+			market := &binance.Market{Client: public.Client(), Endpoint: public.URL, Multipliers: map[string]string{"TESTUSD": "1"}, SimCapabilities: test.sim, DemoCapabilities: test.demo, Now: func() time.Time { return now }}
 			store := memory.New("SIM")
 			if err := store.Create(ctx, run); err != nil {
 				t.Fatal(err)
@@ -72,8 +77,8 @@ func TestSimCapabilitiesCollector(t *testing.T) {
 				// not have accepted the -sim rules.
 				after, _ := store.Read(ctx, run.RunKey)
 				for _, spec := range after.Specs.Values() {
-					if strings.HasSuffix(spec.Version, "-sim") {
-						t.Fatal("non-REPLAY run accepted -sim rules")
+					if strings.HasSuffix(spec.Version, "-sim") || strings.HasSuffix(spec.Version, "-demo") {
+						t.Fatal("run accepted capability rules of another mode")
 					}
 				}
 				if err == nil {
@@ -87,7 +92,7 @@ func TestSimCapabilitiesCollector(t *testing.T) {
 			after, _ := store.Read(ctx, run.RunKey)
 			spec := after.Specs.Value(d.InstrumentKey{Venue: "BINANCE", Product: "LINEAR_PERPETUAL", InstrumentID: "TESTUSD"}.Code())
 			got := append([]string(nil), spec.Capabilities...)
-			if strings.Join(sortedStrings(got), ",") != strings.Join(test.wantCaps, ",") || strings.HasSuffix(spec.Version, "-sim") != (len(test.wantCaps) > 2) {
+			if strings.Join(sortedStrings(got), ",") != strings.Join(test.wantCaps, ",") || strings.HasSuffix(spec.Version, "-sim") != (test.sim && len(test.wantCaps) > 2) || strings.HasSuffix(spec.Version, "-demo") != (test.demo && len(test.wantCaps) > 2) {
 				t.Fatal(spec.Version, spec.Capabilities)
 			}
 		})

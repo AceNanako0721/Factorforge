@@ -34,7 +34,7 @@ func run() error {
 	if err = os.MkdirAll(destination, 0700); err != nil {
 		return err
 	}
-	for _, name := range []string{"trading-api", "execution-sim", "execution-live", "market-collector", "trading-cli", "testnet-acceptance"} {
+	for _, name := range []string{"trading-api", "execution-sim", "replay-executor", "execution-live", "market-collector", "trading-cli", "testnet-acceptance"} {
 		source := "./src/factorforge/trading/entrypoints/" + name
 		inspect := exec.Command("go", "list", "-deps", source)
 		data, err := inspect.Output()
