@@ -5,13 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"net/url"
+	"time"
 
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/domain"
 	dto "github.com/AceNanako0721/Factorforge/src/factorforge/strategy/api/dto"
 )
 
 // v2.9.0 workload writes (S3-024～030). Each command reads the aggregate
-// version first and retries once on a CAS conflict; idempotency keys are
+// version first and retries a CAS or P1 snapshot conflict (v2.14.3); idempotency keys are
 // derived from the business identifier so a replay never duplicates.
 
 func (c *HTTPClient) command(ctx context.Context, path, key, reason string, payload func(dto.Command) any, target any) error {
@@ -22,7 +23,14 @@ func (c *HTTPClient) command(ctx context.Context, path, key, reason string, payl
 		return d.Fail("FRAMEWORK_REQUEST_INVALID", 422)
 	}
 	var err error
-	for attempt := 0; attempt < 2; attempt++ {
+	for attempt := 0; attempt < commandAttempts; attempt++ {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(time.Duration(attempt) * commandBackoff):
+			}
+		}
 		var version int
 		if version, err = c.Version(ctx, ""); err != nil {
 			return err
@@ -30,12 +38,19 @@ func (c *HTTPClient) command(ctx context.Context, path, key, reason string, payl
 		cmd := dto.Command{SchemaVersion: "strategy-2.0", RequestID: key, IdempotencyKey: key, ExpectedVersion: version, Reason: reason}
 		err = c.call(ctx, "POST", path, nil, payload(cmd), target)
 		var known *d.Error
-		if err == nil || !errors.As(err, &known) || known.Code != "FRAMEWORK_AGGREGATE_VERSION_CONFLICT" {
+		if err == nil || !errors.As(err, &known) || !d.Has([]string{"FRAMEWORK_AGGREGATE_VERSION_CONFLICT", "FRAMEWORK_TRADING_SNAPSHOT_CONFLICT"}, known.Code) {
 			return err
 		}
 	}
 	return err
 }
+
+// v2.14.3 (P3 design chapter 35): a command competes with P2's decision cycle
+// and P1's collector at the same 5-minute boundary, so one retry was not
+// always enough; three attempts with a short growing pause clear the burst.
+const commandAttempts = 3
+
+var commandBackoff = 500 * time.Millisecond
 
 func (c *HTTPClient) SubmitStopDirective(ctx context.Context, v dto.StopDirective) (dto.StopDirectiveReceipt, error) {
 	var receipt dto.StopDirectiveReceipt
