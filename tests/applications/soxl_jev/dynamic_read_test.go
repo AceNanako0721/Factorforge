@@ -130,7 +130,9 @@ func TestT328DynamicReadAPI(t *testing.T) {
 	position := map[string]any{"noise_id": "noise-1", "noise_at": at.Add(-time.Hour), "versions": map[string]int{}, "batch": batch,
 		"initial":  map[string]any{"direction": -1, "geometry": map[string]any{"tier": 72, "session": "OVERNIGHT", "r": 0.16}, "price": 107.26, "distance": 19.11, "close_distance": 17.2, "risk_fraction": 0.01, "equity": 4001.03, "directive_id": "initial-20261016T072005Z"},
 		"baseline": map[string]any{"phase": "", "value": 0, "direction": 0, "started_at": "0001-01-01T00:00:00Z", "source_chain": "", "suspended_at": "0001-01-01T00:00:00Z"}, "baseline_at": at, "equity_peak": 4003.7, "outcomes": nil, "seen_cases": nil}
-	for key, value := range map[string]any{"POSITION": position, "INJECTION": map[string]any{"seen": []string{"news-a"}, "active": map[string]any{"direction": "SHORT", "confidence": 3, "event_ids": []string{"e1", "e2"}, "chain_id": "chain-1", "since": at}, "sequence": 2, "last_judgment": "j-3"}, "NEWS_SOURCES": map[string]any{"wscn-us": map[string]any{"failing": false, "last_success": at}, "cnbc-tech": map[string]any{"failing": true, "last_success": at.Add(-time.Hour)}}} {
+	for key, value := range map[string]any{"POSITION": position, "INJECTION": map[string]any{"seen": []string{"news-a"}, "active": map[string]any{"direction": "SHORT", "confidence": 3, "event_ids": []string{"e1", "e2"}, "chain_id": "chain-1", "since": at}, "sequence": 2, "last_judgment": "j-3"}, "NEWS_SOURCES": map[string]any{"wscn-us": map[string]any{"failing": false, "last_success": at}, "cnbc-tech": map[string]any{"failing": true, "last_success": at.Add(-time.Hour)}},
+		// v2.13.0 S3-034: the follower cursor is stored under FOLLOW (migration 009).
+		"FOLLOW": map[string]any{"last_at": at, "last_id": "j-3"}} {
 		if err = writer.SaveState(ctx, key, 0, at.Add(2*time.Hour), value); err != nil {
 			t.Fatal(err)
 		}

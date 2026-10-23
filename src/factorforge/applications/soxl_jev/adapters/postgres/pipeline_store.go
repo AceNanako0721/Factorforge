@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-//go:embed migrations/002_pipeline.sql migrations/003_operations.sql migrations/004_search.sql migrations/006_watch_state.sql migrations/007_dynamic_stop.sql migrations/008_dynamic_read.sql
+//go:embed migrations/002_pipeline.sql migrations/003_operations.sql migrations/004_search.sql migrations/006_watch_state.sql migrations/007_dynamic_stop.sql migrations/008_dynamic_read.sql migrations/009_follow_state.sql
 var pipelineFiles embed.FS
 
 type QueueBudget struct {
@@ -58,7 +58,7 @@ func InitializePipeline(ctx context.Context, dsn string, b d.Binding) error {
 		return safe(err)
 	}
 	defer tx.Rollback(ctx)
-	for _, file := range []string{"migrations/002_pipeline.sql", "migrations/003_operations.sql", "migrations/004_search.sql", "migrations/006_watch_state.sql", "migrations/007_dynamic_stop.sql", "migrations/008_dynamic_read.sql"} {
+	for _, file := range []string{"migrations/002_pipeline.sql", "migrations/003_operations.sql", "migrations/004_search.sql", "migrations/006_watch_state.sql", "migrations/007_dynamic_stop.sql", "migrations/008_dynamic_read.sql", "migrations/009_follow_state.sql"} {
 		raw, e := pipelineFiles.ReadFile(file)
 		if e != nil {
 			return d.Fail("MIGRATION_UNAVAILABLE", 503)
