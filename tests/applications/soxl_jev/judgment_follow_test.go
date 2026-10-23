@@ -126,6 +126,12 @@ func TestT330JudgmentSourceReadsAllPagesOldestFirst(t *testing.T) {
 	if rows[0].Judgment.Output.KeyItemIDs[0] != "item0000000001" || len(rows[0].Items) != 1 || !rows[0].Items[0].ReceivedAt.Equal(at) {
 		t.Fatal("items", rows[0])
 	}
+	// v2.14.1: the read API reports seconds, so the judgment at the cursor
+	// comes back; it is skipped as the boundary, not a reason to refuse.
+	rows, err = src.After(context.Background(), at)
+	if err != nil || len(rows) != 1 || rows[0].Judgment.JudgmentID != "j-2" {
+		t.Fatal("boundary", rows, err)
+	}
 	// A response for another instance is refused.
 	instance = "soxl-e20"
 	if _, err = src.After(context.Background(), at.Add(-time.Hour)); err == nil {
