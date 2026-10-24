@@ -229,3 +229,42 @@ func TestT330FollowedScorePassesFrameworkSchema(t *testing.T) {
 	}
 	admit(fw2.scores[0])
 }
+
+// v2.14.4: quick news has no headline. The read API reports its title as
+// null; the follower used to drop the cited item and then stop on
+// JUDGMENT_ITEM_UNAVAILABLE at every retry (E20-E22, 10-24 07:31 JST).
+func TestT330FollowerKeepsUntitledCitedItem(t *testing.T) {
+	at := time.Date(2026, 10, 23, 22, 31, 8, 0, time.UTC)
+	titled := map[string]any{"item_id": "item0000000001", "source": "wscn-us", "title": "Tanker hit near Hormuz", "published_at": at.Add(-time.Hour), "license_scope": "SIM_ONLY"}
+	untitled := map[string]any{"item_id": "item0000000002", "source": "wscn-us", "title": nil, "published_at": at.Add(-10 * time.Minute), "license_scope": "SIM_ONLY"}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		view := map[string]any{"judgment_id": "j-20261023T223108Z", "at": at, "ok": true, "direction": "SHORT", "confidence": 3, "horizon_hours": 60, "previous_invalidated": false, "thesis": "t", "key_items": []any{titled, untitled}, "invalidation_items": []any{}, "error_codes": []string{}}
+		_ = json.NewEncoder(w).Encode(map[string]any{"instance_id": "soxl-e15", "items": []any{view}, "cursor": nil})
+	}))
+	defer server.Close()
+	src, err := submission.NewJudgmentSource(submission.JudgmentSourceOptions{BaseURL: server.URL, Token: "read-token", InstanceID: "soxl-e15", Client: &http.Client{Timeout: time.Second}, MaxResponseBytes: 1 << 20, MaxPages: 4})
+	if err != nil {
+		t.Fatal(err)
+	}
+	w, _, fw, _ := judgmentWorker(at, fakeModel{err: d.Fail("MODEL_ACCESS_FAILED", 503)}, nil)
+	w.Models, w.News = nil, nil
+	w.Source, w.FollowSince = src, at.Add(-time.Minute)
+	if err = w.Follow(context.Background()); err != nil || len(fw.events) != 1 || len(fw.events[0].Event.EvidenceRefs) != 2 || len(fw.scores) != 1 {
+		t.Fatal("untitled item", err, len(fw.events), len(fw.scores))
+	}
+	// A follower stopped by the old behaviour holds the copy and only the
+	// titled item; the next poll stores the untitled item before resume.
+	stuck, store, fw2, _ := judgmentWorker(at.Add(time.Hour), fakeModel{err: d.Fail("MODEL_ACCESS_FAILED", 503)}, nil)
+	stuck.Models, stuck.News = nil, nil
+	stuck.Source, stuck.FollowSince = src, at.Add(-time.Minute)
+	rows, err := src.After(context.Background(), at.Add(-time.Minute))
+	if err != nil || len(rows) != 1 || len(rows[0].Items) != 2 {
+		t.Fatal("rows", rows, err)
+	}
+	if store.AppendRecord(context.Background(), "NEWS", rows[0].Items[0].ItemID, at, rows[0].Items[0]) != nil || store.AppendRecord(context.Background(), "JUDGMENT", rows[0].Judgment.JudgmentID, at, rows[0].Judgment) != nil {
+		t.Fatal("fixture")
+	}
+	if err = stuck.Follow(context.Background()); err != nil || len(fw2.scores) != 1 {
+		t.Fatal("resume", err, len(fw2.scores))
+	}
+}

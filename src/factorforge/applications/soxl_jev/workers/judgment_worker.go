@@ -109,16 +109,13 @@ func (w *JudgmentWorker) Follow(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	// A crash between copying and applying leaves the newest copy unapplied.
-	if err = w.resume(ctx, &state, &version); err != nil {
-		return err
-	}
 	rows, err := w.Source.After(ctx, since)
 	if err != nil {
 		return err
 	}
+	// Cited items are stored before resume, so a copy left unapplied for want
+	// of an item recovers once the source serves it (v2.14.4).
 	for _, row := range rows {
-		j := row.Judgment
 		for _, item := range row.Items {
 			if err := w.Store.AppendRecord(ctx, "NEWS", item.ItemID, item.ReceivedAt, item); err != nil {
 				var known *d.Error
@@ -127,6 +124,13 @@ func (w *JudgmentWorker) Follow(ctx context.Context) error {
 				}
 			}
 		}
+	}
+	// A crash between copying and applying leaves the newest copy unapplied.
+	if err = w.resume(ctx, &state, &version); err != nil {
+		return err
+	}
+	for _, row := range rows {
+		j := row.Judgment
 		if err = w.Store.AppendRecord(ctx, "JUDGMENT", j.JudgmentID, j.At, j); err != nil {
 			return err
 		}

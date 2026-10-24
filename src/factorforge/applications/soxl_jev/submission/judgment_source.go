@@ -130,7 +130,8 @@ func (c *JudgmentSourceHTTP) After(ctx context.Context, since time.Time) ([]d.So
 					x.PublishedAt = n.PublishedAt.UTC()
 				}
 				// A cited item the source no longer holds cannot back evidence.
-				if x.Source != "" && x.Title != "" && !x.PublishedAt.IsZero() {
+				// Quick news carries no headline, so the title may be empty (v2.14.4).
+				if x.Source != "" && !x.PublishedAt.IsZero() {
 					items = append(items, x)
 				}
 			}
