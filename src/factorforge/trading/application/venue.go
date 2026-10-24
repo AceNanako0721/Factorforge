@@ -127,8 +127,9 @@ func Synchronize(ctx context.Context, store ports.Store, key d.RunKey, broker po
 	if err != nil {
 		return nil, err
 	}
-	equity, err := venueAmount(account["equity"])
-	if err != nil {
+	// The venue's own equity is checked for format only; it is marked at the
+	// venue's price and is not compared (v2.14.5).
+	if _, err := venueAmount(account["equity"]); err != nil {
 		return nil, problem("VENUE_ACCOUNT_FORMAT_INVALID", 503)
 	}
 	cash, err := venueAmount(account["cash"])
@@ -309,7 +310,25 @@ func Synchronize(ctx context.Context, store ports.Store, key d.RunKey, broker po
 				}
 			}
 		}
-		if e.Math.Abs(e.Math.Sub(e.Equity(), equity)).Cmp(tolerance) > 0 || e.Math.Abs(e.Math.Sub(run.Cash, cash)).Cmp(tolerance) > 0 {
+		// The venue marks its equity at its own mark price, which differs from
+		// the run's collected mark by a few ticks. Equity is compared with the
+		// venue's positions revalued at the run's mark, so only wallet balance,
+		// quantity and entry price have to agree (v2.14.5).
+		venueEquity, priced := cash, true
+		for _, code := range codes {
+			p := remote[code]
+			if p == nil || p.Quantity.Sign() == 0 {
+				continue
+			}
+			spec := run.Specs.Value(code)
+			local := run.Positions.Value(code)
+			if spec == nil || p.AverageEntry == nil || local == nil || local.Quantity.Sign() == 0 {
+				priced = false
+				continue
+			}
+			venueEquity = e.Math.Add(venueEquity, e.Convert(e.Math.Mul(e.Math.Mul(p.Quantity, spec.ContractMultiplier), e.Math.Sub(e.Mark(code), *p.AverageEntry)), spec.SettlementCurrency))
+		}
+		if !priced || e.Math.Abs(e.Math.Sub(e.Equity(), venueEquity)).Cmp(tolerance) > 0 || e.Math.Abs(e.Math.Sub(run.Cash, cash)).Cmp(tolerance) > 0 {
 			run.RecoveryIssues = append(run.RecoveryIssues, "EXTERNAL_ACCOUNT_DIFFERENCE")
 		}
 		for code, facts := range conditionalFacts {
