@@ -103,6 +103,12 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 	if err != nil {
 		return nil, err
 	}
+	// A venue-backed run's clock follows the executor's account sync, which
+	// may commit while the snapshot is read. An unrequested cycle is stamped
+	// once the read is done, so everything it read was available (v2.14.6).
+	if requested == nil {
+		at = c.Clock.Now()
+	}
 	for _, snap := range snapshots {
 		if snap.At.After(at) {
 			return nil, &d.Error{Code: "FUTURE_TRADING_SNAPSHOT", Status: 422}
