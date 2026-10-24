@@ -109,16 +109,13 @@ func (w *JudgmentWorker) Follow(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	// A crash between copying and applying leaves the newest copy unapplied.
-	if err = w.resume(ctx, &state, &version); err != nil {
-		return err
-	}
 	rows, err := w.Source.After(ctx, since)
 	if err != nil {
 		return err
 	}
+	// Cited items are stored before resume, so a copy left unapplied for want
+	// of an item recovers once the source serves it (v2.14.4).
 	for _, row := range rows {
-		j := row.Judgment
 		for _, item := range row.Items {
 			if err := w.Store.AppendRecord(ctx, "NEWS", item.ItemID, item.ReceivedAt, item); err != nil {
 				var known *d.Error
@@ -127,6 +124,13 @@ func (w *JudgmentWorker) Follow(ctx context.Context) error {
 				}
 			}
 		}
+	}
+	// A crash between copying and applying leaves the newest copy unapplied.
+	if err = w.resume(ctx, &state, &version); err != nil {
+		return err
+	}
+	for _, row := range rows {
+		j := row.Judgment
 		if err = w.Store.AppendRecord(ctx, "JUDGMENT", j.JudgmentID, j.At, j); err != nil {
 			return err
 		}
@@ -357,7 +361,16 @@ func (w *JudgmentWorker) score(id, event string, version int, previous *string, 
 		kind = "REVISION"
 	}
 	sort.Strings(evidence)
-	return dto.ScoreSubmission{SubmissionID: id, EventID: event, FactVersion: 1, ObjectID: s.ObjectID, ScoreVersion: version, PreviousScoreID: previous, RevisionKind: kind, Vector: dto.ScoreVector{Direction: direction, ImpactPoints: impact, Credibility: cred, Relevance: rel, Novelty: one, ExpectationCoverage: zero, PrepricingFraction: zero, ExpectedHalfLife: half, QualityScore: quality, UnknownFields: []string{}}, EvidenceRefs: evidence, ProducerID: s.ProducerID, ProducerVersion: s.ProducerVersion, RubricVersion: s.Rubric, CalibrationVersion: s.Calibration, CompletedAt: j.At, InputManifestHash: j.InputHash}, nil
+	// v2.14.4 (P3 design 36): a followed judgment is copied without the
+	// source's rendered prompt, so it has no input hash; P2 requires 64 hex
+	// digits. Its input is the copied judgment record itself.
+	manifest := j.InputHash
+	if manifest == "" {
+		raw, _ := json.Marshal(j)
+		sum := sha256.Sum256(raw)
+		manifest = hex.EncodeToString(sum[:])
+	}
+	return dto.ScoreSubmission{SubmissionID: id, EventID: event, FactVersion: 1, ObjectID: s.ObjectID, ScoreVersion: version, PreviousScoreID: previous, RevisionKind: kind, Vector: dto.ScoreVector{Direction: direction, ImpactPoints: impact, Credibility: cred, Relevance: rel, Novelty: one, ExpectationCoverage: zero, PrepricingFraction: zero, ExpectedHalfLife: half, QualityScore: quality, UnknownFields: []string{}}, EvidenceRefs: evidence, ProducerID: s.ProducerID, ProducerVersion: s.ProducerVersion, RubricVersion: s.Rubric, CalibrationVersion: s.Calibration, CompletedAt: j.At, InputManifestHash: manifest}, nil
 }
 
 func (w *JudgmentWorker) retract(ctx context.Context, state *d.InjectionState, j d.Judgment, a d.InjectionAction) error {
