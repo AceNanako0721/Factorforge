@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/adapters/memory"
+	a "github.com/AceNanako0721/Factorforge/src/factorforge/trading/application"
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/trading/domain"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/entrypoints/venueexec"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/workers"
@@ -97,11 +98,17 @@ func TestT122LiveCapabilitiesStillFromReadiness(t *testing.T) {
 	}
 }
 
-// A replacement whose post-submit query was ambiguous is left UNKNOWN; the
-// venue sync then verifies it before the protection worker queries it again.
-// E20 kept both 2.13 stops beside the 2.85 ones: retiring the replaced
-// generation happened only on the worker's own confirmation path.
-func TestT122ReplacementVerifiedBySyncRetiresOld(t *testing.T) {
+// After the 2.85 stops were verified the worker marked both 2.13 stops
+// CANCEL_PENDING; the venue sync then queried them, found them still live and
+// wrote them back ACTIVE_VERIFIED with the cancellation still requested. The
+// worker only picks CANCEL_PENDING, so both stayed on the venue (23.2).
+type syncVenue struct{ markedVenue }
+
+func (v syncVenue) Capabilities() map[string]any {
+	return venueexec.Capabilities("SIM", d.Readiness{})
+}
+
+func TestT122SyncKeepsRequestedCancellation(t *testing.T) {
 	run := demoRun()
 	compatPosition(t, run, "BUY", "1")
 	epoch, err := run.AcquireLease("demo-worker", run.Clock, time.Hour)
@@ -112,33 +119,35 @@ func TestT122ReplacementVerifiedBySyncRetiresOld(t *testing.T) {
 	if err = store.Create(context.Background(), run); err != nil {
 		t.Fatal(err)
 	}
-	venue := capVenue{&compatVenue{facts: map[string]*d.Protection{}}, venueexec.Capabilities("SIM", d.Readiness{})}
+	venue := syncVenue{markedVenue{demoVenue: demoVenue{&compatVenue{facts: map[string]*d.Protection{}}}, at: run.Clock.Add(time.Second), cash: "10000", entry: "100", equity: "10000"}}
 	w := &workers.Protection{Store: store, Broker: venue, ExecutorID: "demo-worker", LeaseEpoch: epoch, Now: func() time.Time { return run.Clock }}
 	drainProtection(t, w, run.RunKey, 2)
 	before, _ := store.Read(context.Background(), run.RunKey)
-	old := map[string]string{"STRATEGY": activeRole(before, "STRATEGY").ProtectionID, "INSURANCE": activeRole(before, "INSURANCE").ProtectionID}
+	old := activeRole(before, "INSURANCE").ProtectionID
 	if err = store.Transaction(context.Background(), run.RunKey, func(r *d.Aggregate) error {
 		o := compatOrder(r, "add", "BUY", "1", compatPlan("2", "95"))
 		compatFill(t, r, o, "add-fill", "1", "100", "0")
-		// What Synchronize records for a replacement it found live on the venue.
-		for _, p := range r.Protections.Values() {
-			if p.ReplacesID != nil && p.State == "PENDING" {
-				p.State = "ACTIVE_VERIFIED"
-			}
-		}
-		d.NewEngine(r).RefreshProtectionState(r.Specs.Values()[0].Key)
 		return nil
 	}); err != nil {
 		t.Fatal(err)
 	}
+	drainProtection(t, w, run.RunKey, 1) // new insurance verified, old marked
+	if p, _ := store.Read(context.Background(), run.RunKey); p.Protections.Value(old).State != "CANCEL_PENDING" {
+		t.Fatal("setup: old insurance", p.Protections.Value(old).State)
+	}
+	if _, err = a.Synchronize(context.Background(), store, run.RunKey, venue, cv("0.00000001"), false); err != nil {
+		t.Fatal(err)
+	}
+	synced, _ := store.Read(context.Background(), run.RunKey)
+	if p := synced.Protections.Value(old); p.State != "CANCEL_PENDING" || !p.CancelRequested {
+		t.Fatal("sync reverted a requested cancellation", p.State, p.CancelRequested)
+	}
 	drainProtection(t, w, run.RunKey, 6)
 	current, _ := store.Read(context.Background(), run.RunKey)
-	for role, id := range old {
-		if p := current.Protections.Value(id); p.State != "CLOSED" {
-			t.Fatal(role, "replaced generation still", p.State)
-		}
-		if p := activeRole(current, role); p == nil || p.Plan.CoveredQuantity.Cmp(cv("2")) != 0 {
-			t.Fatal(role, "replacement lost", p)
-		}
+	if current.Protections.Value(old).State != "CLOSED" {
+		t.Fatal("old insurance left on the venue", current.Protections.Value(old).State)
+	}
+	if p := activeRole(current, "INSURANCE"); p == nil || p.Plan.CoveredQuantity.Cmp(cv("2")) != 0 {
+		t.Fatal("replacement lost", p)
 	}
 }

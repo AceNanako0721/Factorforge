@@ -174,6 +174,12 @@ func Synchronize(ctx context.Context, store ports.Store, key d.RunKey, broker po
 				return problem("VENUE_PROTECTION_ID_CONFLICT", 423)
 			}
 			oldExit := prior.ExitOrderID
+			// The query reports the order still live; a requested cancellation
+			// stays pending for the protection worker (P1 design 23.2, v2.14.7).
+			if prior.CancelRequested && p.State == "ACTIVE_VERIFIED" {
+				p.CancelRequested = true
+				p.State = "CANCEL_PENDING"
+			}
 			run.Protections.Set(p.ProtectionID, p)
 			if p.ExitOrderID != nil {
 				hash := sha256.Sum256([]byte(p.InstrumentKey.Code() + *p.ExitOrderID))
