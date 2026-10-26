@@ -189,7 +189,7 @@ func Main(environment string) error {
 		return admit(run)
 	}
 	broker.Admitted = true
-	broker.Verified = map[string]any{"ordinary_and_conditional_verified": true, "overlapping_protections": readiness.OverlappingProtections, "atomic_protection_modify": readiness.AtomicProtectionModify}
+	broker.Verified = Capabilities(bound.Environment, readiness)
 	probeHealth := &health.Probe{StoragePath: config.Trading.StoragePath, ClockOffset: health.ClockProbe(client, bound.Endpoint+"/fapi/v1/time", time.Now)}
 	protection := &workers.Protection{Store: store, Broker: broker, ExecutorID: *holder, LeaseEpoch: epoch, Now: time.Now}
 	feedback := &workers.Feedback{Store: store, Broker: broker, Tolerance: tolerance, Failed: func(code string) { fmt.Fprintln(os.Stderr, "VENUE_FEEDBACK_UNAVAILABLE", code) }}
@@ -260,6 +260,19 @@ func Main(environment string) error {
 // the demo account carries preset non-USDT assets; single-asset margin
 // (verified by RequireAccountConfiguration) means only the account currency
 // is margin, so other assets are ignored and reported.
+// Capabilities is what the venue executor declares to the protection worker.
+// LIVE takes the reviewed readiness record. The demo account has no readiness
+// gate; the venue fact verified on Binance (design ch. 18: several reduceOnly
+// STOP_MARKET algo orders coexist on one position) lets a replacement be placed
+// before the old one is cancelled (P1 design ch. 23, v2.14.7).
+func Capabilities(environment string, readiness d.Readiness) map[string]any {
+	verified := map[string]any{"ordinary_and_conditional_verified": true, "overlapping_protections": readiness.OverlappingProtections, "atomic_protection_modify": readiness.AtomicProtectionModify}
+	if environment == "SIM" {
+		verified["overlapping_protections"] = true
+	}
+	return verified
+}
+
 func AccountCash(raw any, currency, environment string) (decimal.Value, []string, error) {
 	code := environment + "_ACCOUNT_CURRENCY_UNVERIFIED"
 	object, ok := raw.(map[string]any)
