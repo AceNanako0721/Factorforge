@@ -180,6 +180,11 @@ func Synchronize(ctx context.Context, store ports.Store, key d.RunKey, broker po
 				p.CancelRequested = true
 				p.State = "CANCEL_PENDING"
 			}
+			// A generation the worker has not confirmed stays with the worker,
+			// whose confirmation cancels the generation it replaces (23.4, v2.14.10).
+			if (prior.State == "UNKNOWN" || prior.State == "DISPATCHING") && p.State == "ACTIVE_VERIFIED" {
+				p.State = prior.State
+			}
 			run.Protections.Set(p.ProtectionID, p)
 			if p.ExitOrderID != nil {
 				hash := sha256.Sum256([]byte(p.InstrumentKey.Code() + *p.ExitOrderID))
