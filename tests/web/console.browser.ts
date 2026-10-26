@@ -158,6 +158,10 @@ test("S4-017 judgment and stop page on desktop and phone width", async ({
   await page.mouse.move(box.x + box.width - 20, box.y + box.height / 2);
   await page.mouse.wheel(0, -300);
   expect(await page.evaluate(() => window.scrollY)).toBe(before);
+  await page.mouse.move(box.x + box.width / 3, box.y + box.height / 3);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 8 });
+  await page.mouse.up();
   await page.getByLabel("纵轴包含全部止损线").check();
   await page.getByRole("button", { name: "纵轴自动" }).click();
   await page.getByLabel("纵轴包含全部止损线").uncheck();
