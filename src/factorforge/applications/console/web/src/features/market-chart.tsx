@@ -81,6 +81,14 @@ export function zoomRange(range: IRange<number>, anchor: number, deltaY: number)
   if (!Number.isFinite(from) || !Number.isFinite(to) || to - from <= 1e-9) return null;
   return { from, to };
 }
+// v2.14.9: dragging inside the chart pans prices with the cursor; the
+// content follows the mouse, so dragging down shows higher prices.
+export function panRange(range: IRange<number>, dy: number, paneHeight: number): IRange<number> | null {
+  if (!(paneHeight > 1)) return null;
+  const delta = (dy * (range.to - range.from)) / (paneHeight - 1);
+  if (!Number.isFinite(delta)) return null;
+  return { from: range.from + delta, to: range.to + delta };
+}
 // Lines outside the bars' high/low are listed under the chart so a far stop is
 // never silently off screen.
 export function offChart(lines: PriceLine[], data: CandlestickData<UTCTimestamp>[]): PriceLine[] {
@@ -158,11 +166,54 @@ export function MarketChart({
       scale.setVisibleRange(next);
     };
     host.addEventListener("wheel", onWheel, { passive: false, capture: true });
+    // The library pans prices only while auto scale is off, and decides that
+    // when the drag starts. A drag that begins in auto scale turns it off once
+    // it moves 4 px vertically and then shifts the range itself.
+    let drag: { y: number; range: IRange<number> | null } | null = null;
+    const onDown = (e: MouseEvent) => {
+      const scale = chart.priceScale("right");
+      const rect = host.getBoundingClientRect();
+      const inPane =
+        e.clientX < rect.right - scale.width() && e.clientY < rect.bottom - chart.timeScale().height();
+      drag = e.button === 0 && inPane && scale.options().autoScale ? { y: e.clientY, range: null } : null;
+    };
+    const onMove = (e: MouseEvent) => {
+      if (!drag) return;
+      if ((e.buttons & 1) === 0) {
+        drag = null;
+        return;
+      }
+      const scale = chart.priceScale("right");
+      if (drag.range === null) {
+        if (Math.abs(e.clientY - drag.y) < 4) return;
+        drag.range = scale.getVisibleRange();
+        if (!drag.range) {
+          drag = null;
+          return;
+        }
+        scale.setAutoScale(false);
+      }
+      const next = panRange(
+        drag.range,
+        e.clientY - drag.y,
+        host.getBoundingClientRect().height - chart.timeScale().height(),
+      );
+      if (next) scale.setVisibleRange(next);
+    };
+    const onUp = () => {
+      drag = null;
+    };
+    host.addEventListener("mousedown", onDown, { capture: true });
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
     chartRef.current = chart;
     seriesRef.current = series;
     markerRef.current = createSeriesMarkers(series, []);
     return () => {
       host.removeEventListener("wheel", onWheel, { capture: true });
+      host.removeEventListener("mousedown", onDown, { capture: true });
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
       chartRef.current = null;
       seriesRef.current = null;
       markerRef.current = null;
@@ -259,7 +310,7 @@ export function MarketChart({
         </p>
       )}
       <p className="muted">
-        滚轮在图内缩放时间，在右侧价格轴上缩放纵轴；拖动价格轴也可缩放纵轴，双击价格轴或点“纵轴自动”恢复。仅显示产品实际记录的最终 K 线；坐标为近似值，表格保留金额原值。图表：
+        按住图内拖动可上下左右平移；滚轮在图内缩放时间，在右侧价格轴上缩放纵轴；拖动价格轴也可缩放纵轴，双击价格轴或点“纵轴自动”恢复。仅显示产品实际记录的最终 K 线；坐标为近似值，表格保留金额原值。图表：
         <a href="https://www.tradingview.com/" target="_blank" rel="noreferrer">
           TradingView Lightweight Charts
         </a>

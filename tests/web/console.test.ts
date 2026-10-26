@@ -16,6 +16,7 @@ import {
 import {
   candleData,
   offChart,
+  panRange,
   scaleRange,
   zoomRange,
 } from "../../src/factorforge/applications/console/web/src/features/market-chart";
@@ -111,5 +112,13 @@ describe("read-only browser semantics", () => {
     expect((narrower.from + narrower.to) / 2).toBeCloseTo(85);
     const edge = zoomRange(range, 80, -100)!;
     expect(edge.from).toBeCloseTo(80);
+  });
+  it("pans the price range with the cursor", () => {
+    const range = { from: 80, to: 90 };
+    const down = panRange(range, 101, 102)!;
+    expect(down.from).toBeCloseTo(90);
+    expect(down.to).toBeCloseTo(100);
+    expect(panRange(range, -101, 102)!.from).toBeCloseTo(70);
+    expect(panRange(range, 10, 0)).toBeNull();
   });
 });
