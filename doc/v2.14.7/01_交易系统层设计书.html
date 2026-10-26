@@ -507,10 +507,13 @@ figure{margin:24px 0;border:1px solid var(--line);border-radius:10px;padding:16p
 <h3 id="demo-protection-overlap-change">23.1 处理</h3>
 <p>新增 venueexec.Capabilities(environment, readiness)，执行器启动后以其结果作为声明的能力。模拟盘（SIM 绑定的交易所执行器）声明 overlapping_protections = true：第 18 章已核验表记录同一持仓可同时挂多张 reduceOnly STOP_MARKET（algoOrder），模拟盘与实盘是同一交易所接口；E20 运行中保险与上层止损两张条件单一直并存。atomic_protection_modify 仍为 false。实盘不变，两项能力只取审核过的就绪记录。保护工作池、替换状态机与对账规则不变；替换期间可能短暂多于两张条件单，仍按角色与代次管理并在确认新单后撤旧单。</p>
 <p>未声明重叠能力时被拒的新代次会随下一轮同步重新生成（本章事故中的循环）。该路径只在实盘就绪记录未声明重叠时出现，实盘未准入；是否改为保留待办并先降险，留待实盘准入设计处理，本版不改。</p>
-<h3 id="demo-protection-overlap-tests">23.2 验证</h3>
+<h3 id="demo-protection-sync-retire">23.2 同步先确认的替换撤销旧代次</h3>
+<p>部署 23.1 后 E20 的两张新单（覆盖 2.85）挂出，但工作池提交后的查询结果不明，新代次记为 UNKNOWN 并告警 PROTECTION_CONFIRMATION_REQUIRED；工作池再次查询之前，交易所执行器的账户同步（application/venue.go Synchronize）查询到交易所上的新单，按事实记为 ACTIVE_VERIFIED。撤销被替换代次只写在工作池自己的确认路径中，于是覆盖 2.13 的两张旧单一直保持 ACTIVE_VERIFIED 留在交易所。workers/protection.go 每轮选取待办前先检查：带 replaces_id 的代次已 ACTIVE_VERIFIED、未被要求撤销、属于当前持仓方向与周期且覆盖量等于实际持仓时，其替换的同角色旧代次若仍 ACTIVE_VERIFIED，标记 CANCEL_PENDING，之后按原撤单路径撤销并查询终态。与确认路径相同，仍是先有已核实的新单再撤旧单；新单覆盖量与实际不符时不撤旧单。</p>
+<h3 id="demo-protection-overlap-tests">23.3 验证</h3>
 <div class="table-wrap"><table><thead><tr><th>式样 / 验收</th><th>测试（tests/trading/go_demo_protection_test.go）</th></tr></thead><tbody>
 <tr><td>S1-002 / 保护替换</td><td>TestT122DemoReplacementPlacedBeforeCancel：模拟盘运行多单 1 两层保护生效后加仓 1，按 Capabilities("SIM", 空就绪记录) 声明的能力运行保护工作池，两种角色都换成覆盖 2 的新单，旧单关闭，无遗留待办。</td></tr>
 <tr><td>对照</td><td>TestT122DemoWithoutOverlapReproducesChurn：按修正前的能力（不支持重叠）运行，两张新代次被拒关闭，运行 DEGRADED、持仓 UNPROTECTED，与 E20 现象一致。</td></tr>
+<tr><td>保护替换（23.2）</td><td>TestT122ReplacementVerifiedBySyncRetiresOld：加仓后的新代次由同步记为 ACTIVE_VERIFIED，工作池随后把两张旧代次撤销至 CLOSED，新单保留。对照：不含 23.2 时旧保险代次仍为 ACTIVE_VERIFIED，与 E20 现象一致。</td></tr>
 <tr><td>S1-002 实盘准入</td><td>TestT122LiveCapabilitiesStillFromReadiness：实盘在就绪记录未声明时仍为不支持，声明后才支持。原有保护替换与冻结对照测试照旧通过。</td></tr>
 </tbody></table></div>
 <p>没有新增依赖，公开契约与数据库结构不变。</p></section>

@@ -294,6 +294,27 @@ func (w *Protection) Tick(ctx context.Context, key d.RunKey) (bool, error) {
 			})
 		}
 	}
+	// A replacement the venue sync verified before this worker could (its
+	// post-submit query was ambiguous) still retires the generation it
+	// replaces: new before old, as on the confirmation path (ch. 23, v2.14.7).
+	for _, p := range run.Protections.Values() {
+		if p.ReplacesID == nil || p.State != "ACTIVE_VERIFIED" || p.CancelRequested {
+			continue
+		}
+		old := run.Protections.Value(*p.ReplacesID)
+		pos := run.Positions.Value(p.InstrumentKey.Code())
+		if old == nil || old.State != "ACTIVE_VERIFIED" || old.CancelRequested || old.Role != p.Role || !d.CurrentProtection(p, pos) || p.Plan.CoveredQuantity.Cmp(pos.Quantity.Abs()) != 0 {
+			continue
+		}
+		id := old.ProtectionID
+		return true, w.update(ctx, key, func(current *d.Aggregate) error {
+			if o := current.Protections.Value(id); o != nil && o.State == "ACTIVE_VERIFIED" && !o.CancelRequested {
+				o.CancelRequested = true
+				o.State = "CANCEL_PENDING"
+			}
+			return nil
+		})
+	}
 	// New coverage has priority over old-direction or superseded cancellation.
 	candidates := run.Protections.Values()
 	priority := func(p *d.Protection) int {

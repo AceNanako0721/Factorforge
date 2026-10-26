@@ -96,3 +96,49 @@ func TestT122LiveCapabilitiesStillFromReadiness(t *testing.T) {
 		t.Fatal("LIVE readiness ignored")
 	}
 }
+
+// A replacement whose post-submit query was ambiguous is left UNKNOWN; the
+// venue sync then verifies it before the protection worker queries it again.
+// E20 kept both 2.13 stops beside the 2.85 ones: retiring the replaced
+// generation happened only on the worker's own confirmation path.
+func TestT122ReplacementVerifiedBySyncRetiresOld(t *testing.T) {
+	run := demoRun()
+	compatPosition(t, run, "BUY", "1")
+	epoch, err := run.AcquireLease("demo-worker", run.Clock, time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := memory.New("SIM")
+	if err = store.Create(context.Background(), run); err != nil {
+		t.Fatal(err)
+	}
+	venue := capVenue{&compatVenue{facts: map[string]*d.Protection{}}, venueexec.Capabilities("SIM", d.Readiness{})}
+	w := &workers.Protection{Store: store, Broker: venue, ExecutorID: "demo-worker", LeaseEpoch: epoch, Now: func() time.Time { return run.Clock }}
+	drainProtection(t, w, run.RunKey, 2)
+	before, _ := store.Read(context.Background(), run.RunKey)
+	old := map[string]string{"STRATEGY": activeRole(before, "STRATEGY").ProtectionID, "INSURANCE": activeRole(before, "INSURANCE").ProtectionID}
+	if err = store.Transaction(context.Background(), run.RunKey, func(r *d.Aggregate) error {
+		o := compatOrder(r, "add", "BUY", "1", compatPlan("2", "95"))
+		compatFill(t, r, o, "add-fill", "1", "100", "0")
+		// What Synchronize records for a replacement it found live on the venue.
+		for _, p := range r.Protections.Values() {
+			if p.ReplacesID != nil && p.State == "PENDING" {
+				p.State = "ACTIVE_VERIFIED"
+			}
+		}
+		d.NewEngine(r).RefreshProtectionState(r.Specs.Values()[0].Key)
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	drainProtection(t, w, run.RunKey, 6)
+	current, _ := store.Read(context.Background(), run.RunKey)
+	for role, id := range old {
+		if p := current.Protections.Value(id); p.State != "CLOSED" {
+			t.Fatal(role, "replaced generation still", p.State)
+		}
+		if p := activeRole(current, role); p == nil || p.Plan.CoveredQuantity.Cmp(cv("2")) != 0 {
+			t.Fatal(role, "replacement lost", p)
+		}
+	}
+}

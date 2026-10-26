@@ -111,7 +111,7 @@ figure{margin:24px 0;border:1px solid var(--line);border-radius:10px;padding:16p
 </section>
 <section id="revision-v2147">
 <h2>v2.14.7 当前设计修订</h2>
-<p>E20（币安模拟盘）运行中发现：多单 2.13 加仓 0.72 后，交易所执行器向保护工作池声明“不支持保护重叠”，覆盖 2.85 的新保险与新上层止损每次都以 ATOMIC_PROTECTION_CAPABILITY_UNVERIFIED 被拒、关闭后又重新生成（约每 17 秒一次，170 代），交易所上只剩覆盖 2.13 的两张旧止损，运行转为 DEGRADED、持仓 UNPROTECTED 并停在 RECOVERY_CHECK。P1 设计新增第 23 章：模拟盘运行的交易所执行器按第 18 章已核验的交易所事实（同一持仓可并存多张 reduceOnly STOP_MARKET）声明支持保护重叠，替换按先挂新、确认后撤旧执行；实盘仍只取审核过的就绪记录。式样不变。</p>
+<p>E20（币安模拟盘）运行中发现：多单 2.13 加仓 0.72 后，交易所执行器向保护工作池声明“不支持保护重叠”，覆盖 2.85 的新保险与新上层止损每次都以 ATOMIC_PROTECTION_CAPABILITY_UNVERIFIED 被拒、关闭后又重新生成（约每 17 秒一次，170 代），交易所上只剩覆盖 2.13 的两张旧止损，运行转为 DEGRADED、持仓 UNPROTECTED 并停在 RECOVERY_CHECK。P1 设计新增第 23 章：模拟盘运行的交易所执行器按第 18 章已核验的交易所事实（同一持仓可并存多张 reduceOnly STOP_MARKET）声明支持保护重叠，替换按先挂新、确认后撤旧执行；实盘仍只取审核过的就绪记录。新单若先由账户同步确认（工作池提交后的查询结果不明），工作池随后仍撤销被替换的旧代次。式样不变。</p>
 </section>
 
 
