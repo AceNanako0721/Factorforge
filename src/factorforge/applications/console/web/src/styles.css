@@ -1022,6 +1022,12 @@ tbody tr:hover {
 
 .chart-tools label {
   display: inline-flex;
+  flex-direction: row;
   gap: 4px;
   align-items: center;
+}
+
+.chart-tools input {
+  padding: 0;
+  margin: 0;
 }
