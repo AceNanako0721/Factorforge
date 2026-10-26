@@ -150,6 +150,17 @@ test("S4-017 judgment and stop page on desktop and phone width", async ({
   await expect(mark.locator("strong")).not.toHaveText(first);
   await expect(page.getByText("参考标记价", { exact: true })).toBeVisible();
   await expect(page.getByLabel("参考浮动盈亏").locator("strong")).not.toHaveText("—");
+  // v2.14.8: the wheel over the price axis zooms prices and the page does not
+  // scroll; the toggle and reset only change the view.
+  const host = page.getByLabel("已记录最终K线");
+  const box = (await host.boundingBox())!;
+  const before = await page.evaluate(() => window.scrollY);
+  await page.mouse.move(box.x + box.width - 20, box.y + box.height / 2);
+  await page.mouse.wheel(0, -300);
+  expect(await page.evaluate(() => window.scrollY)).toBe(before);
+  await page.getByLabel("纵轴包含全部止损线").check();
+  await page.getByRole("button", { name: "纵轴自动" }).click();
+  await page.getByLabel("纵轴包含全部止损线").uncheck();
   await page.screenshot({
     path: "../../../../../runtime/console-dynamic-1440.png",
     fullPage: true,

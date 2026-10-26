@@ -27,6 +27,17 @@ export const dynamicSources = [
 ];
 
 // Rolling default range: 5-minute bars over 24 hours, timelines over 72 hours.
+// v2.14.8: P1 keeps replaced generations as CLOSED; only the generation
+// still guarding the position is drawn, verified first, then the newest.
+export function currentProtection(protections: Record<string, Json>[], role: string) {
+  return protections
+    .filter((p) => p.role === role && p.state !== "CLOSED" && p.state !== "CANCELLED" && p.state !== "CANCEL_PENDING")
+    .sort(
+      (a, b) =>
+        Number(b.state === "ACTIVE_VERIFIED") - Number(a.state === "ACTIVE_VERIFIED") ||
+        Number(b.generation ?? 0) - Number(a.generation ?? 0),
+    )[0];
+}
 export function dynamicRange(now = Date.now()): Record<string, string> {
   const minute = 60_000;
   const end = new Date(Math.ceil(now / (5 * minute)) * 5 * minute);
@@ -117,8 +128,7 @@ export function DynamicView({
   const entry = batch ? num(batch.entry) : null;
   const budget = batch ? num(batch.budget) : null;
   const unrealized = num(account.unrealized_pnl);
-  const protectionOf = (role: string) =>
-    protections.find((p) => p.role === role && p.state !== "CANCELLED");
+  const protectionOf = (role: string) => currentProtection(protections, role);
   // S4-019 reference layer: venue public push, display conversion only.
   const refMark = live.mark ? num(live.mark.price) : null;
   const qty = position ? num(position.quantity) : null;
@@ -361,7 +371,7 @@ export function DynamicView({
           <MarketChart candles={candles} lines={lines} markers={markers} live={live.kline} />
         </Suspense>
         <p className="muted">
-          箭头为研判时刻（空/多 + 信心），横线为入场价与各止损位（纵轴放宽到包含全部横线）；半透明的最后一根是交易所推送的未完成 K 线（参考），收盘后以 P1 最终 K 线为准；不画预测。
+          箭头为研判时刻（空/多 + 信心），横线为入场价与各止损位（纵轴默认只按 K 线缩放，范围外的横线列在图下）；半透明的最后一根是交易所推送的未完成 K 线（参考），收盘后以 P1 最终 K 线为准；不画预测。
         </p>
       </section>
 

@@ -13,7 +13,13 @@ import {
   type Selection,
   type Response,
 } from "../../src/factorforge/applications/console/web/src/api/client";
-import { candleData } from "../../src/factorforge/applications/console/web/src/features/market-chart";
+import {
+  candleData,
+  offChart,
+  scaleRange,
+  zoomRange,
+} from "../../src/factorforge/applications/console/web/src/features/market-chart";
+import { currentProtection } from "../../src/factorforge/applications/console/web/src/features/dynamic-page";
 describe("read-only browser semantics", () => {
   it("retains exact monetary strings and sorts without rounding", () => {
     expect(
@@ -65,5 +71,45 @@ describe("read-only browser semantics", () => {
     ]);
     expect(bars).toHaveLength(2);
     expect(Number(bars[1].time) - Number(bars[0].time)).toBe(180);
+  });
+  // v2.14.8: the chart showed a CLOSED stop left from the earlier short
+  // (105.20 above a long) instead of the generation guarding the position.
+  it("draws the protection generation still guarding the position", () => {
+    const rows = [
+      { role: "INSURANCE", state: "CLOSED", generation: 9, plan: { trigger_price: "105.20" } },
+      { role: "INSURANCE", state: "ACTIVE_VERIFIED", generation: 4, plan: { trigger_price: "64.34" } },
+      { role: "INSURANCE", state: "PENDING", generation: 5, plan: { trigger_price: "64.40" } },
+      { role: "STRATEGY", state: "CANCEL_PENDING", generation: 3, plan: { trigger_price: "97.84" } },
+      { role: "STRATEGY", state: "PENDING", generation: 4, plan: { trigger_price: "72.89" } },
+    ];
+    expect(currentProtection(rows, "INSURANCE")?.plan).toEqual({ trigger_price: "64.34" });
+    expect(currentProtection(rows, "STRATEGY")?.plan).toEqual({ trigger_price: "72.89" });
+    expect(currentProtection(rows.slice(0, 1), "INSURANCE")).toBeUndefined();
+  });
+  it("fits the price axis to the bars unless the stops are asked for", () => {
+    const info = { priceRange: { minValue: 82, maxValue: 88 } };
+    const stops = [
+      { price: 105.2, title: "保险止损", color: "#000" },
+      { price: 74.89, title: "收盘止损", color: "#000" },
+    ];
+    expect(scaleRange(info, [])).toEqual(info);
+    expect(scaleRange(info, stops)?.priceRange).toEqual({ minValue: 74.89, maxValue: 105.2 });
+    const bars = candleData([
+      { final: true, open_at: "2026-01-05T00:00:00Z", open: "85", high: "88", low: "82", close: "86" },
+    ]);
+    expect(offChart([...stops, { price: 85.84, title: "入场价", color: "#000" }], bars).map((l) => l.title)).toEqual([
+      "保险止损",
+      "收盘止损",
+    ]);
+  });
+  it("zooms the price axis around the cursor", () => {
+    const range = { from: 80, to: 90 };
+    const narrower = zoomRange(range, 85, -100)!;
+    const wider = zoomRange(range, 85, 100)!;
+    expect(narrower.to - narrower.from).toBeLessThan(10);
+    expect(wider.to - wider.from).toBeGreaterThan(10);
+    expect((narrower.from + narrower.to) / 2).toBeCloseTo(85);
+    const edge = zoomRange(range, 80, -100)!;
+    expect(edge.from).toBeCloseTo(80);
   });
 });
