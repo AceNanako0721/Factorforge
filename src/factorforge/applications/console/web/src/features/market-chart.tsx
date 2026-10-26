@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { LiveKline } from "./live-market";
 import {
   createChart,
@@ -7,8 +7,13 @@ import {
   LineStyle,
   type AutoscaleInfo,
   type CandlestickData,
+  type IChartApi,
+  type IPriceLine,
+  type IRange,
   type ISeriesApi,
+  type ISeriesMarkersPluginApi,
   type SeriesMarker,
+  type Time,
   type UTCTimestamp,
 } from "lightweight-charts";
 import { type Json, record } from "../api/client";
@@ -54,6 +59,36 @@ export type TimeMarker = {
   color: string;
   shape: "arrowUp" | "arrowDown" | "circle";
 };
+// v2.14.8: like TradingView, the price axis fits the bars by default; the
+// stop lines join the range only when the viewer asks for it.
+export function scaleRange(info: AutoscaleInfo | null, lines: PriceLine[]): AutoscaleInfo | null {
+  const prices = lines.map((l) => l.price).filter((p) => Number.isFinite(p) && p > 0);
+  if (!info?.priceRange || prices.length === 0) return info;
+  return {
+    ...info,
+    priceRange: {
+      minValue: Math.min(info.priceRange.minValue, ...prices),
+      maxValue: Math.max(info.priceRange.maxValue, ...prices),
+    },
+  };
+}
+// Wheel over the price axis: deltaY > 0 widens the range, < 0 narrows it,
+// keeping the price under the cursor in place.
+export function zoomRange(range: IRange<number>, anchor: number, deltaY: number): IRange<number> | null {
+  const factor = Math.exp(Math.max(-200, Math.min(200, deltaY)) * 0.002);
+  const from = anchor - (anchor - range.from) * factor;
+  const to = anchor + (range.to - anchor) * factor;
+  if (!Number.isFinite(from) || !Number.isFinite(to) || to - from <= 1e-9) return null;
+  return { from, to };
+}
+// Lines outside the bars' high/low are listed under the chart so a far stop is
+// never silently off screen.
+export function offChart(lines: PriceLine[], data: CandlestickData<UTCTimestamp>[]): PriceLine[] {
+  if (data.length === 0) return [];
+  const low = Math.min(...data.map((c) => c.low));
+  const high = Math.max(...data.map((c) => c.high));
+  return lines.filter((l) => Number.isFinite(l.price) && (l.price < low || l.price > high));
+}
 export function MarketChart({
   candles,
   lines = [],
@@ -66,13 +101,26 @@ export function MarketChart({
   live?: LiveKline | null;
 }) {
   const div = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const markerRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
+  const priceLines = useRef<IPriceLine[]>([]);
+  const fitted = useRef(false);
   const lastFinal = useRef(0);
   const liveRef = useRef<LiveKline | null>(live);
   liveRef.current = live;
+  const linesRef = useRef(lines);
+  linesRef.current = lines;
+  const [withLines, setWithLines] = useState(false);
+  const withLinesRef = useRef(withLines);
+  withLinesRef.current = withLines;
+  const data = useMemo(() => candleData(candles), [candles]);
+  // The chart is built once; data, lines and markers update in place so a
+  // refresh keeps the viewer's zoom and scroll.
   useEffect(() => {
-    if (!div.current) return;
-    const chart = createChart(div.current, {
+    const host = div.current;
+    if (!host) return;
+    const chart = createChart(host, {
       height: 320,
       autoSize: true,
       layout: {
@@ -92,40 +140,74 @@ export function MarketChart({
       borderVisible: false,
       wickUpColor: "#267b59",
       wickDownColor: "#b15447",
-      // The price axis spans the drawn lines too, so stops far from the
-      // recent bars stay on screen instead of being clipped.
-      autoscaleInfoProvider: (base: () => AutoscaleInfo | null) => {
-        const info = base();
-        const prices = lines
-          .map((l) => l.price)
-          .filter((p) => Number.isFinite(p) && p > 0);
-        if (!info?.priceRange || prices.length === 0) return info;
-        return {
-          ...info,
-          priceRange: {
-            minValue: Math.min(info.priceRange.minValue, ...prices),
-            maxValue: Math.max(info.priceRange.maxValue, ...prices),
-          },
-        };
-      },
+      autoscaleInfoProvider: (base: () => AutoscaleInfo | null) =>
+        scaleRange(base(), withLinesRef.current ? linesRef.current : []),
     });
-    const data = candleData(candles);
+    const onWheel = (e: WheelEvent) => {
+      const scale = chart.priceScale("right");
+      const rect = host.getBoundingClientRect();
+      if (e.clientX < rect.right - scale.width()) return;
+      const range = scale.getVisibleRange();
+      const anchor = series.coordinateToPrice(e.clientY - rect.top);
+      if (!range || anchor === null) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const next = zoomRange(range, anchor, e.deltaY);
+      if (!next) return;
+      scale.setAutoScale(false);
+      scale.setVisibleRange(next);
+    };
+    host.addEventListener("wheel", onWheel, { passive: false, capture: true });
+    chartRef.current = chart;
+    seriesRef.current = series;
+    markerRef.current = createSeriesMarkers(series, []);
+    return () => {
+      host.removeEventListener("wheel", onWheel, { capture: true });
+      chartRef.current = null;
+      seriesRef.current = null;
+      markerRef.current = null;
+      priceLines.current = [];
+      fitted.current = false;
+      chart.remove();
+    };
+  }, []);
+  useEffect(() => {
+    const chart = chartRef.current;
+    const series = seriesRef.current;
+    if (!chart || !series) return;
     series.setData(data);
+    if (!fitted.current && data.length > 0) {
+      chart.timeScale().fitContent();
+      fitted.current = true;
+    }
+    lastFinal.current = data.length > 0 ? Number(data[data.length - 1].time) : 0;
+    drawLive(series, liveRef.current, lastFinal.current);
+  }, [data]);
+  useEffect(() => {
+    const series = seriesRef.current;
+    if (!series) return;
+    for (const l of priceLines.current) series.removePriceLine(l);
+    priceLines.current = [];
     for (const l of lines)
       if (Number.isFinite(l.price) && l.price > 0)
-        series.createPriceLine({
-          price: l.price,
-          color: l.color,
-          title: l.title,
-          lineWidth: 1,
-          lineStyle: l.dashed ? LineStyle.Dashed : LineStyle.Solid,
-          axisLabelVisible: true,
-        });
-    if (data.length > 0 && markers.length > 0) {
+        priceLines.current.push(
+          series.createPriceLine({
+            price: l.price,
+            color: l.color,
+            title: l.title,
+            lineWidth: 1,
+            lineStyle: l.dashed ? LineStyle.Dashed : LineStyle.Solid,
+            axisLabelVisible: true,
+          }),
+        );
+  }, [lines]);
+  useEffect(() => {
+    if (!markerRef.current) return;
+    const placed: SeriesMarker<UTCTimestamp>[] = [];
+    if (data.length > 0) {
       // Markers snap to the bar that contains their time.
       const first = Number(data[0].time);
       const step = data.length > 1 ? Number(data[1].time) - first : 60;
-      const placed: SeriesMarker<UTCTimestamp>[] = [];
       for (const m of markers) {
         const at = Date.parse(m.at) / 1000;
         if (!Number.isFinite(at) || at < first) continue;
@@ -140,22 +222,30 @@ export function MarketChart({
         });
       }
       placed.sort((a, b) => Number(a.time) - Number(b.time));
-      createSeriesMarkers(series, placed);
     }
-    chart.timeScale().fitContent();
-    seriesRef.current = series;
-    lastFinal.current = data.length > 0 ? Number(data[data.length - 1].time) : 0;
-    drawLive(series, liveRef.current, lastFinal.current);
-    return () => {
-      seriesRef.current = null;
-      chart.remove();
-    };
-  }, [candles, lines, markers]);
+    markerRef.current.setMarkers(placed);
+  }, [data, markers]);
+  useEffect(() => {
+    chartRef.current?.priceScale("right").setAutoScale(true);
+  }, [withLines]);
   useEffect(() => {
     if (seriesRef.current) drawLive(seriesRef.current, live, lastFinal.current);
   }, [live]);
+  const outside = withLines ? [] : offChart(lines, data);
   return (
     <div>
+      <div className="chart-tools">
+        <button type="button" onClick={() => chartRef.current?.priceScale("right").setAutoScale(true)}>
+          纵轴自动
+        </button>
+        <button type="button" onClick={() => chartRef.current?.timeScale().fitContent()}>
+          显示全部时间
+        </button>
+        <label>
+          <input type="checkbox" checked={withLines} onChange={(e) => setWithLines(e.target.checked)} />
+          纵轴包含全部止损线
+        </label>
+      </div>
       <div
         ref={div}
         aria-label="已记录最终K线"
@@ -163,8 +253,13 @@ export function MarketChart({
         className="chart-host"
         style={{ height: 320, position: "relative" }}
       />
+      {outside.length > 0 && (
+        <p className="muted">
+          K 线范围外：{outside.map((l) => `${l.title} ${l.price}`).join("、")}（勾选“纵轴包含全部止损线”可显示）
+        </p>
+      )}
       <p className="muted">
-        仅显示产品实际记录的最终 K 线；坐标为近似值，表格保留金额原值。图表：
+        滚轮在图内缩放时间，在右侧价格轴上缩放纵轴；拖动价格轴也可缩放纵轴，双击价格轴或点“纵轴自动”恢复。仅显示产品实际记录的最终 K 线；坐标为近似值，表格保留金额原值。图表：
         <a href="https://www.tradingview.com/" target="_blank" rel="noreferrer">
           TradingView Lightweight Charts
         </a>
