@@ -294,6 +294,24 @@ func (w *Protection) Tick(ctx context.Context, key d.RunKey) (bool, error) {
 			})
 		}
 	}
+	// A replacement verified outside this worker's confirmation (the venue
+	// sync before v2.14.10) still retires the generation it replaces (23.4).
+	for _, n := range run.Protections.Values() {
+		if n.State != "ACTIVE_VERIFIED" || n.CancelRequested || n.ReplacesID == nil {
+			continue
+		}
+		old := run.Protections.Value(*n.ReplacesID)
+		pos := run.Positions.Value(n.InstrumentKey.Code())
+		if old == nil || old.State != "ACTIVE_VERIFIED" || old.CancelRequested || old.Role != n.Role || pos == nil || !d.CurrentProtection(n, pos) || !d.CurrentProtection(old, pos) || n.Plan.CoveredQuantity.Cmp(pos.Quantity.Abs()) != 0 {
+			continue
+		}
+		return true, w.update(ctx, key, func(current *d.Aggregate) error {
+			p := current.Protections.Value(old.ProtectionID)
+			p.CancelRequested = true
+			p.State = "CANCEL_PENDING"
+			return nil
+		})
+	}
 	// New coverage has priority over old-direction or superseded cancellation.
 	candidates := run.Protections.Values()
 	priority := func(p *d.Protection) int {

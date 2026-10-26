@@ -9,6 +9,7 @@ import (
 	a "github.com/AceNanako0721/Factorforge/src/factorforge/trading/application"
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/trading/domain"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/entrypoints/venueexec"
+	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/ports"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/workers"
 )
 
@@ -149,5 +150,124 @@ func TestT122SyncKeepsRequestedCancellation(t *testing.T) {
 	}
 	if p := activeRole(current, "INSURANCE"); p == nil || p.Plan.CoveredQuantity.Cmp(cv("2")) != 0 {
 		t.Fatal("replacement lost", p)
+	}
+}
+
+// v2.14.10 (P1 design 23.4): on 10-27 00:05 JST E20 raised its strategy stop
+// 72.71 -> 84.05. The query right after the submit did not confirm it, so the
+// worker left the new generation UNKNOWN; the venue sync then found it live
+// and wrote ACTIVE_VERIFIED. The worker only picks UNKNOWN, so the handoff
+// that cancels the replaced generation never ran and both stops stayed live.
+type flakyVenue struct {
+	syncVenue
+	fail *int
+}
+
+func (v flakyVenue) QueryProtection(ctx context.Context, run *d.Aggregate, id string) (*d.Protection, error) {
+	if *v.fail > 0 {
+		*v.fail--
+		return nil, &ports.Ambiguous{}
+	}
+	return v.syncVenue.QueryProtection(ctx, run, id)
+}
+
+func TestT122SyncLeavesUnconfirmedReplacementToWorker(t *testing.T) {
+	run := demoRun()
+	compatPosition(t, run, "BUY", "1")
+	epoch, err := run.AcquireLease("demo-worker", run.Clock, time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := memory.New("SIM")
+	if err = store.Create(context.Background(), run); err != nil {
+		t.Fatal(err)
+	}
+	fail := 0
+	venue := flakyVenue{syncVenue{markedVenue{demoVenue: demoVenue{&compatVenue{facts: map[string]*d.Protection{}}}, at: run.Clock.Add(time.Second), cash: "10000", entry: "100", equity: "10000"}}, &fail}
+	w := &workers.Protection{Store: store, Broker: venue, ExecutorID: "demo-worker", LeaseEpoch: epoch, Now: func() time.Time { return run.Clock }}
+	drainProtection(t, w, run.RunKey, 2)
+	if err = store.Transaction(context.Background(), run.RunKey, func(r *d.Aggregate) error {
+		o := compatOrder(r, "add", "BUY", "1", compatPlan("2", "95"))
+		compatFill(t, r, o, "add-fill", "1", "100", "0")
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	fail = 1
+	drainProtection(t, w, run.RunKey, 1) // submitted, confirmation query fails
+	mid, _ := store.Read(context.Background(), run.RunKey)
+	var unknown *d.Protection
+	for _, p := range mid.Protections.Values() {
+		if p.State == "UNKNOWN" {
+			unknown = p
+		}
+	}
+	if unknown == nil || unknown.ReplacesID == nil {
+		t.Fatal("setup: no unconfirmed replacement")
+	}
+	if _, err = a.Synchronize(context.Background(), store, run.RunKey, venue, cv("0.00000001"), false); err != nil {
+		t.Fatal(err)
+	}
+	drainProtection(t, w, run.RunKey, 8)
+	current, _ := store.Read(context.Background(), run.RunKey)
+	if p := current.Protections.Value(*unknown.ReplacesID); p.State != "CLOSED" {
+		t.Fatal("replaced generation left on the venue", p.State, p.CancelRequested)
+	}
+	for _, role := range []string{"STRATEGY", "INSURANCE"} {
+		live := 0
+		for _, p := range current.Protections.Values() {
+			if p.Role == role && p.State != "CLOSED" {
+				live++
+			}
+		}
+		if p := activeRole(current, role); live != 1 || p == nil || p.Plan.CoveredQuantity.Cmp(cv("2")) != 0 {
+			t.Fatal(role, "live generations", live, p)
+		}
+	}
+}
+
+// E20 kept both generations ACTIVE_VERIFIED after the sync took over; the
+// worker retires the replaced one once the replacement covers the position.
+func TestT122WorkerRetiresGenerationLeftBySync(t *testing.T) {
+	run := demoRun()
+	compatPosition(t, run, "BUY", "1")
+	epoch, err := run.AcquireLease("demo-worker", run.Clock, time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := memory.New("SIM")
+	if err = store.Create(context.Background(), run); err != nil {
+		t.Fatal(err)
+	}
+	venue := capVenue{&compatVenue{facts: map[string]*d.Protection{}}, venueexec.Capabilities("SIM", d.Readiness{})}
+	w := &workers.Protection{Store: store, Broker: venue, ExecutorID: "demo-worker", LeaseEpoch: epoch, Now: func() time.Time { return run.Clock }}
+	drainProtection(t, w, run.RunKey, 2)
+	if err = store.Transaction(context.Background(), run.RunKey, func(r *d.Aggregate) error {
+		o := compatOrder(r, "add", "BUY", "1", compatPlan("2", "95"))
+		compatFill(t, r, o, "add-fill", "1", "100", "0")
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	drainProtection(t, w, run.RunKey, 1)
+	var replaced string
+	// Recreate the E20 snapshot: the replaced generation was never marked.
+	if err = store.Transaction(context.Background(), run.RunKey, func(r *d.Aggregate) error {
+		for _, p := range r.Protections.Values() {
+			if p.ReplacesID != nil && p.State == "ACTIVE_VERIFIED" {
+				replaced = *p.ReplacesID
+				old := r.Protections.Value(replaced)
+				old.State, old.CancelRequested = "ACTIVE_VERIFIED", false
+				venue.facts[replaced].State = "ACTIVE_VERIFIED"
+			}
+		}
+		return nil
+	}); err != nil || replaced == "" {
+		t.Fatal("setup", err, replaced)
+	}
+	drainProtection(t, w, run.RunKey, 10)
+	current, _ := store.Read(context.Background(), run.RunKey)
+	if p := current.Protections.Value(replaced); p.State != "CLOSED" {
+		t.Fatal("replaced generation left live", p.State, p.CancelRequested)
 	}
 }
