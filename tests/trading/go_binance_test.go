@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/adapters/binance"
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/trading/domain"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/ports"
@@ -49,7 +50,7 @@ func TestSignedBinanceBoundary(t *testing.T) {
 		case "/fapi/v1/userTrades":
 			reply = []any{}
 		case "/fapi/v3/account":
-			reply = map[string]any{"totalMarginBalance": "1000", "availableBalance": "1000", "totalWalletBalance": "1000"}
+			reply = map[string]any{"totalMarginBalance": "1000", "availableBalance": "1000", "totalWalletBalance": "1000", "totalUnrealizedProfit": "0", "positions": []any{map[string]any{"symbol": request.InstrumentKey.InstrumentID, "positionSide": "BOTH", "unrealizedProfit": "1.25"}, map[string]any{"symbol": "UNREGISTEREDUSDT", "positionSide": "BOTH", "unrealizedProfit": "9"}}}
 		case "/fapi/v1/accountConfig":
 			reply = map[string]any{"canTrade": true, "dualSidePosition": false, "multiAssetsMargin": false}
 		case "/fapi/v3/positionRisk":
@@ -86,6 +87,10 @@ func TestSignedBinanceBoundary(t *testing.T) {
 	account, err := broker.GetAccount(ctx, run)
 	if err != nil || account["observed_at"] != run.Clock {
 		t.Fatal("account mapping failed", err)
+	}
+	// v2.15.0: the venue's unrealized profit is kept per registered instrument only.
+	if positions, ok := account["position_unrealized"].(map[string]any); !ok || len(positions) != 1 || fmt.Sprint(positions[request.InstrumentKey.Code()]) != "1.25" {
+		t.Fatal("venue unrealized mapping failed", account["position_unrealized"])
 	}
 	incomes, err := broker.GetIncome(ctx, run)
 	if err != nil || len(incomes) != 1 || incomes[0].Kind != "FUNDING" {

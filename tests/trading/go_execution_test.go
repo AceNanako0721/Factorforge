@@ -73,6 +73,11 @@ func executionEqual(t *testing.T, expected json.RawMessage, actual any) {
 					delete(v, "create_run")
 				}
 			}
+			// v2.15.0 adds the account view's pnl block (design chapter 24),
+			// checked by go_pnl_reference_test.go; frozen fixtures predate it.
+			if _, ok := v["fx_revaluation"]; ok {
+				delete(v, "pnl")
+			}
 			if changes, ok := v["revised_candles"].([]any); ok && len(changes) == 0 {
 				delete(v, "revised_candles")
 			}

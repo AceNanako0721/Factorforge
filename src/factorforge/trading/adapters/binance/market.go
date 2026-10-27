@@ -435,3 +435,50 @@ func AccountProbe(ctx context.Context, t Transport) (map[string]any, error) {
 	}
 	return map[string]any{"account_readable": true, "account_trading_enabled": true, "one_way": true, "single_asset": true, "ordinary_open_count": len(ordinary), "conditional_open_count": len(conditional), "execution_approved": false, "protection_submit_verified": false}, nil
 }
+
+// MainnetPublicEndpoint is the fixed source of reference funding settlements
+// (design 24.2). It is a program constant so a demo run cannot be pointed at
+// another source by configuration; the market reading it carries no keys.
+const MainnetPublicEndpoint = "https://fapi.binance.com"
+
+// FundingSettlements reads settled funding records from startTime on, in
+// ascending order. A record without a usable mark price stops the read so the
+// next call starts from it again.
+func (m *Market) FundingSettlements(ctx context.Context, key d.InstrumentKey, since time.Time) ([]d.FundingSettlement, error) {
+	if key.Product != "LINEAR_PERPETUAL" {
+		return nil, nil
+	}
+	raw, err := m.get(ctx, "/fapi/v1/fundingRate", Params{"symbol": key.InstrumentID, "startTime": strconv.FormatInt(since.UnixMilli(), 10), "limit": "1000"})
+	if err != nil {
+		return nil, err
+	}
+	rows, err := array(raw)
+	if err != nil {
+		return nil, err
+	}
+	result := []d.FundingSettlement{}
+	for _, value := range rows {
+		item, err := object(value)
+		if err != nil {
+			return nil, reject("VENUE_FORMAT_INVALID", 503)
+		}
+		if symbol := text(item["symbol"]); symbol != "" && symbol != key.InstrumentID {
+			return nil, reject("VENUE_FORMAT_INVALID", 503)
+		}
+		at, e1 := stamp(item["fundingTime"])
+		rate, e2 := parseAmount(item["fundingRate"])
+		if e1 != nil || e2 != nil || at.UnixMilli() <= 0 {
+			return nil, reject("VENUE_FORMAT_INVALID", 503)
+		}
+		mark, e3 := parseAmount(item["markPrice"])
+		if e3 != nil || mark.Sign() <= 0 {
+			break
+		}
+		kind := "FUNDING"
+		if text(item["rateType"]) == "Special" {
+			kind = "SPECIAL_FUNDING"
+		}
+		result = append(result, d.FundingSettlement{InstrumentKey: key, SettledAt: at.UTC(), Kind: kind, Rate: rate, MarkPrice: mark, SourceID: "binance-mainnet-public"})
+	}
+	return result, nil
+}

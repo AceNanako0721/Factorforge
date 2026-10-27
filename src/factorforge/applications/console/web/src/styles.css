@@ -1031,3 +1031,32 @@ tbody tr:hover {
   padding: 0;
   margin: 0;
 }
+/* S4-020: source tags of the PnL block. */
+.source-tag {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 5px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 500;
+  border: 1px solid var(--line);
+}
+.source-venue {
+  color: #2f6b8a;
+  background: #eaf3f7;
+  border-color: #cfe2ec;
+}
+.source-system {
+  color: #7a6a3a;
+  background: #f7f3e6;
+  border-color: #e9dfbf;
+}
+table.pnl .pos {
+  color: #3e7750;
+}
+table.pnl .neg {
+  color: #a15b4e;
+}
+table.pnl td small {
+  color: var(--muted);
+}

@@ -339,6 +339,7 @@ type AccountView struct {
 	WouldTrigger    []string               `json:"would_trigger"`
 	RiskLocks       []string               `json:"risk_locks"`
 	ObservedAt      time.Time              `json:"observed_at"`
+	PnL             PnLView                `json:"pnl"`
 }
 
 func (e *Engine) AccountView() AccountView {
@@ -376,5 +377,5 @@ func (e *Engine) AccountView() AccountView {
 		balances.Set(run.Currency, run.Cash)
 	}
 	realized := e.Math.Sub(e.Math.Sub(e.Math.Sub(e.Math.Add(e.Math.Sub(run.Cash, run.InitialCash), fees), funding), flows), run.FXRevaluation)
-	return AccountView{run.Currency, value, decimal.Max(zero, e.Math.Sub(e.Math.Sub(value, used), e.Math.Div(reserved, run.SimConfig.Leverage))), run.Cash, realized, balances, run.FXRevaluation, unrealized, fees, funding, flows, run.RiskDay, e.Math.Sub(e.Math.Sub(value, run.DayStartEquity), run.DayExternalFlow), run.State, run.Policy.Version, run.WouldTrigger, run.RiskLocks, run.Clock}
+	return AccountView{run.Currency, value, decimal.Max(zero, e.Math.Sub(e.Math.Sub(value, used), e.Math.Div(reserved, run.SimConfig.Leverage))), run.Cash, realized, balances, run.FXRevaluation, unrealized, fees, funding, flows, run.RiskDay, e.Math.Sub(e.Math.Sub(value, run.DayStartEquity), run.DayExternalFlow), run.State, run.Policy.Version, run.WouldTrigger, run.RiskLocks, run.Clock, e.PnLView()}
 }

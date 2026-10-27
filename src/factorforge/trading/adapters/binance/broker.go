@@ -361,13 +361,43 @@ func (b *Broker) GetAccount(ctx context.Context, run *d.Aggregate) (map[string]a
 		return nil, err
 	}
 	result := map[string]any{"observed_at": b.Transport.Clock()}
-	for field, key := range map[string]string{"equity": "totalMarginBalance", "available_margin": "availableBalance", "cash": "totalWalletBalance"} {
+	for field, key := range map[string]string{"equity": "totalMarginBalance", "available_margin": "availableBalance", "cash": "totalWalletBalance", "unrealized": "totalUnrealizedProfit"} {
 		amount, err := parseAmount(item[key])
 		if err != nil {
 			return nil, reject("VENUE_ACCOUNT_FORMAT_INVALID", 503)
 		}
 		result[field] = amount
 	}
+	// v2.15.0: the venue's own unrealized profit per registered instrument
+	// (one-way mode, positionSide BOTH), reported instead of recomputed.
+	positions := map[string]any{}
+	if raw, ok := item["positions"]; ok {
+		rows, err := array(raw)
+		if err != nil {
+			return nil, reject("VENUE_ACCOUNT_FORMAT_INVALID", 503)
+		}
+		for _, value := range rows {
+			row, err := object(value)
+			if err != nil {
+				return nil, reject("VENUE_ACCOUNT_FORMAT_INVALID", 503)
+			}
+			symbol, side := text(row["symbol"]), text(row["positionSide"])
+			if side != "" && side != "BOTH" {
+				continue
+			}
+			for _, spec := range run.Specs.Values() {
+				if spec.Key.InstrumentID != symbol {
+					continue
+				}
+				amount, err := parseAmount(row["unrealizedProfit"])
+				if err != nil {
+					return nil, reject("VENUE_ACCOUNT_FORMAT_INVALID", 503)
+				}
+				positions[spec.Key.Code()] = amount
+			}
+		}
+	}
+	result["position_unrealized"] = positions
 	return result, nil
 }
 func (b *Broker) GetIncome(ctx context.Context, run *d.Aggregate) ([]*d.Income, error) {

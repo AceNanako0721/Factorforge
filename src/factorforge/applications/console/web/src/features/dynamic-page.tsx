@@ -9,6 +9,7 @@ import {
 import { displayTime, useDisplay } from "./display-settings";
 import { liveStateText, useLiveMarket } from "./live-market";
 import type { PriceLine, TimeMarker } from "./market-chart";
+import { PnlPanel } from "./pnl-panel";
 const MarketChart = lazy(() =>
   import("./market-chart").then((module) => ({ default: module.MarketChart })),
 );
@@ -310,6 +311,12 @@ export function DynamicView({
           <StateNote panel={statusPanel} />
         </div>
       </div>
+
+      <PnlPanel
+        pnl={account.pnl}
+        instrumentCode={`${selection.instrument_key.venue}:${selection.instrument_key.product}:${selection.instrument_key.instrument_id}`}
+        time={t}
+      />
 
       <section className="panel" aria-label="三层止损">
         <div className="panel-head">

@@ -225,6 +225,23 @@ func (s *Service) IngestSnapshot(ctx context.Context, p d.Principal, body d.Mark
 				run.Funding.Set(code, &copy)
 			}
 		}
+		// v2.15.0: settled mainnet funding feeds only the account view's
+		// reference funding. A repeat is skipped; a differing repeat keeps the
+		// first record and raises an alert instead of rejecting the snapshot.
+		for i := range body.FundingSettlements {
+			settlement := body.FundingSettlements[i]
+			if settlement.InstrumentKey.Product != "LINEAR_PERPETUAL" || run.Specs.Value(settlement.InstrumentKey.Code()) == nil || settlement.SettledAt.After(body.At) {
+				return problem("FUNDING_SETTLEMENT_INVALID")
+			}
+			key := settlement.Key()
+			if old := run.ReferenceFunding.Value(key); old != nil {
+				if old.Rate.Cmp(settlement.Rate) != 0 || old.MarkPrice.Cmp(settlement.MarkPrice) != 0 || old.SourceID != settlement.SourceID {
+					run.Alerts = append(run.Alerts, d.Alert("FUNDING_SETTLEMENT_CONFLICT", body.At, "settlement", key))
+				}
+				continue
+			}
+			run.ReferenceFunding.Set(key, &settlement)
+		}
 		for _, point := range body.Points {
 			code := point.InstrumentKey.Code()
 			spec := run.Specs.Value(code)
