@@ -20,7 +20,7 @@ import {
   scaleRange,
   zoomRange,
 } from "../../src/factorforge/applications/console/web/src/features/market-chart";
-import { currentProtection } from "../../src/factorforge/applications/console/web/src/features/dynamic-page";
+import { chartMarkers, currentProtection, judgmentEffects } from "../../src/factorforge/applications/console/web/src/features/dynamic-page";
 import { fundingGap, pnlRows } from "../../src/factorforge/applications/console/web/src/features/pnl-panel";
 describe("read-only browser semantics", () => {
   it("retains exact monetary strings and sorts without rounding", () => {
@@ -160,5 +160,35 @@ describe("read-only browser semantics", () => {
     expect(unobserved.check).toBe("DIFFERENT");
     expect(unobserved.missing).toEqual(["VENUE_ACCOUNT_NOT_OBSERVED"]);
     expect(pnlRows(undefined, code).layout).toBe("MISSING");
+  });
+});
+
+describe("S4-017 v2.16.0 effective judgment markers", () => {
+  const judgments = [
+    { judgment_id: "j-20261025T173110Z", at: "2026-10-25T17:31:10Z", ok: true, direction: "LONG", confidence: 3 },
+    { judgment_id: "j-20261025T180102Z", at: "2026-10-25T18:01:02Z", ok: true, direction: "LONG", confidence: 3 },
+    { judgment_id: "j-20261026T030102Z", at: "2026-10-26T03:01:02Z", ok: true, direction: "FLAT", confidence: 3 },
+    { judgment_id: "j-20261026T033102Z", at: "2026-10-26T03:31:02Z", ok: false },
+  ];
+  const actions = [
+    { action_id: "j-20261025T173110Z-INVALIDATE-12-", at: "2026-10-25T17:31:10Z", source: "INJECTION", kind: "INVALIDATE", reason: "INVALIDATED" },
+    { action_id: "j-20261025T180102Z-INJECT-0-judgment-j-20261025T180102Z-13", at: "2026-10-25T18:01:02Z", source: "INJECTION", kind: "INJECT", reason: "FIRST_DIRECTION" },
+    // Same id prefix at another time is not this judgment's action.
+    { action_id: "j-20261026T030102Z-INJECT-0-x", at: "2026-10-26T03:05:00Z", source: "INJECTION", kind: "INJECT" },
+    { action_id: "open-cycle", at: "2026-10-25T18:10:05Z", source: "POSITION", kind: "OPEN", entry: "85.83906103286385" },
+  ];
+  it("links actions to judgments by id prefix and time", () => {
+    const e = judgmentEffects(judgments, actions);
+    expect(e.get("j-20261025T173110Z")).toEqual({ kinds: ["INVALIDATE"], reasons: ["INVALIDATED"] });
+    expect(e.get("j-20261025T180102Z")?.kinds).toEqual(["INJECT"]);
+    expect(e.has("j-20261026T030102Z")).toBe(false);
+  });
+  it("marks only effective judgments unless recorded ones are asked for", () => {
+    const m = chartMarkers(judgments, actions, false);
+    expect(m.map((x) => x.text)).toEqual(["多3 作废原链", "多3 注入", "开仓 85.84"]);
+    expect(m[2].shape).toBe("square");
+    const all = chartMarkers(judgments, actions, true);
+    expect(all).toHaveLength(4);
+    expect(all.find((x) => x.at === "2026-10-26T03:01:02Z")).toMatchObject({ text: "", shape: "circle" });
   });
 });

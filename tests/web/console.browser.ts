@@ -140,6 +140,11 @@ test("S4-017 judgment and stop page on desktop and phone width", async ({
   await expect(page.getByText("收盘止损", { exact: true })).toBeVisible();
   await expect(page.getByText("synthetic thesis", { exact: true })).toBeVisible();
   await expect(page.getByText("注入研判 · 做空", { exact: true })).toBeVisible();
+  // v2.16.0: the timeline says which judgment changed the position inputs.
+  await expect(page.getByText("注入（首次方向）", { exact: true })).toBeVisible();
+  await expect(page.getByText("仅记录，未改变仓位", { exact: true })).toBeVisible();
+  await page.getByLabel("显示未生效的研判（灰点）").check();
+  await page.getByLabel("显示未生效的研判（灰点）").uncheck();
   await expect(page.getByText("未实现", { exact: true })).toBeVisible();
   await expect(page.getByText("PRIVATE RAW")).toHaveCount(0);
   // S4-020: the fixture run is internal matching, so the PnL block shows the
@@ -163,6 +168,7 @@ test("S4-017 judgment and stop page on desktop and phone width", async ({
   // v2.14.8: the wheel over the price axis zooms prices and the page does not
   // scroll; the toggle and reset only change the view.
   const host = page.getByLabel("已记录最终K线");
+  await host.scrollIntoViewIfNeeded();
   const box = (await host.boundingBox())!;
   const before = await page.evaluate(() => window.scrollY);
   await page.mouse.move(box.x + box.width - 20, box.y + box.height / 2);
