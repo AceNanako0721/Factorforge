@@ -126,7 +126,127 @@
                                   "type": "array"
                                 },
                                 "positions": {
-                                  "type": "null"
+                                  "items": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "booked": {
+                                        "anyOf": [
+                                          {
+                                            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ],
+                                        "title": "Booked"
+                                      },
+                                      "booked_funding": {
+                                        "anyOf": [
+                                          {
+                                            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ],
+                                        "title": "Booked Funding"
+                                      },
+                                      "instrument_key": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "instrument_id": {
+                                            "maxLength": 128,
+                                            "minLength": 1,
+                                            "pattern": "^[A-Za-z0-9_.-]+$",
+                                            "title": "Instrument Id",
+                                            "type": "string"
+                                          },
+                                          "product": {
+                                            "const": "LINEAR_PERPETUAL",
+                                            "title": "Product",
+                                            "type": "string"
+                                          },
+                                          "venue": {
+                                            "maxLength": 128,
+                                            "minLength": 1,
+                                            "pattern": "^[A-Za-z0-9_.-]+$",
+                                            "title": "Venue",
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "venue",
+                                          "product",
+                                          "instrument_id"
+                                        ],
+                                        "title": "InstrumentKey",
+                                        "type": "object"
+                                      },
+                                      "reference": {
+                                        "anyOf": [
+                                          {
+                                            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ],
+                                        "title": "Reference"
+                                      },
+                                      "reference_funding": {
+                                        "anyOf": [
+                                          {
+                                            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ],
+                                        "title": "Reference Funding"
+                                      },
+                                      "since": {
+                                        "anyOf": [
+                                          {
+                                            "format": "date-time",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ],
+                                        "title": "Since"
+                                      },
+                                      "trading": {
+                                        "anyOf": [
+                                          {
+                                            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ],
+                                        "title": "Trading"
+                                      }
+                                    },
+                                    "required": [
+                                      "instrument_key",
+                                      "since",
+                                      "trading",
+                                      "booked_funding",
+                                      "reference_funding",
+                                      "booked",
+                                      "reference"
+                                    ],
+                                    "title": "PositionPnL",
+                                    "type": "object"
+                                  },
+                                  "title": "Positions",
+                                  "type": "array"
                                 },
                                 "reference": {
                                   "additionalProperties": false,
@@ -353,8 +473,7 @@
                             "risk_locks",
                             "observed_at",
                             "cash_balances",
-                            "fx_revaluation",
-                            "pnl"
+                            "fx_revaluation"
                           ],
                           "title": "AccountView",
                           "type": "object"

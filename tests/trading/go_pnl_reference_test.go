@@ -40,6 +40,15 @@ func same(t *testing.T, name string, got *decimal.Value, want string) {
 
 // pnlRun: long 2 from t0 (25 h before the run clock), closed at t0+10 h, long
 // 1 again from t0+20 h, marked at 60 against an entry of 50 at the run clock.
+func positionOf(view d.PnLView, key d.InstrumentKey) *d.PnLBlock {
+	for i := range view.Positions {
+		if view.Positions[i].InstrumentKey == key {
+			return &view.Positions[i].PnLBlock
+		}
+	}
+	return nil
+}
+
 func pnlRun(t *testing.T) (*d.Aggregate, d.InstrumentKey, time.Time) {
 	run, _, _, request := serviceBase(t)
 	key := request.InstrumentKey
@@ -86,7 +95,7 @@ func TestS124SystemRunReferenceFunding(t *testing.T) {
 	// Equity = cash 1000 + 1*(60-50); trading = equity - initial 1000.
 	same(t, "total trading", view.Total.Trading, "10")
 	same(t, "total reference", view.Total.Reference, "9.9")
-	position := view.Positions.Value(key.Code())
+	position := positionOf(view, key)
 	if position == nil || position.Since == nil || !position.Since.Equal(t0.Add(20*time.Hour)) {
 		t.Fatalf("position cycle: %+v", position)
 	}
@@ -118,7 +127,7 @@ func TestS124VenueRunReportsVenueFigures(t *testing.T) {
 	if view.Basis != "VENUE" || view.Total.Trading != nil || view.Total.Booked != nil || !strings.Contains(strings.Join(view.Missing, ","), "VENUE_ACCOUNT_NOT_OBSERVED") {
 		t.Fatalf("unobserved venue account produced figures: %+v", view.Total)
 	}
-	if p := view.Positions.Value(key.Code()); p == nil || p.Trading != nil {
+	if p := positionOf(view, key); p == nil || p.Trading != nil {
 		t.Fatal("position trading without the venue's unrealized")
 	}
 	at := t0.Add(24 * time.Hour)
@@ -134,7 +143,7 @@ func TestS124VenueRunReportsVenueFigures(t *testing.T) {
 	same(t, "venue booked funding", view.Total.BookedFunding, "3")
 	same(t, "venue booked", view.Total.Booked, "15")
 	same(t, "venue reference", view.Total.Reference, "11.9")
-	position := view.Positions.Value(key.Code())
+	position := positionOf(view, key)
 	// Cycle net -0.01 minus the cycle's booked funding 3 plus venue unrealized 12.
 	same(t, "position trading", position.Trading, "8.99")
 	same(t, "position booked funding", position.BookedFunding, "3")

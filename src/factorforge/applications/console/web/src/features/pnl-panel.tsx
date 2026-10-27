@@ -59,8 +59,13 @@ export function pnlRows(pnl: Json | undefined, instrumentCode: string): PnlSumma
   const layout: PnlLayout =
     view.basis === "SYSTEM" ? "SYSTEM" : view.environment === "LIVE" ? "LIVE" : "DEMO";
   const rows: PnlRow[] = [];
-  const position = record(view.positions ?? null)[instrumentCode];
-  if (position && typeof position === "object") rows.push(row("当前持仓", record(position)));
+  const position = (Array.isArray(view.positions) ? view.positions : [])
+    .map(record)
+    .find((p) => {
+      const k = record(p.instrument_key ?? null);
+      return `${k.venue}:${k.product}:${k.instrument_id}` === instrumentCode;
+    });
+  if (position) rows.push(row("当前持仓", position));
   rows.push(row("累计", record(view.total ?? null)));
   return {
     layout,

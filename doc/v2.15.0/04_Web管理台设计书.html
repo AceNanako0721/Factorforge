@@ -271,7 +271,7 @@ runtime/web-build/             # 忽略：前端构建产物、截图与验收
 </section>
 <section id="pnl-panel-design">
 <h2 id="pnl-panel2150">19 v2.15.0 持仓盈亏区块</h2>
-<p>对应 S4-020。数据取已有的 <code>account</code> 面板（P1 <code>/api/v2/trading/account</code>）中的 <code>pnl</code>（P1 设计 24.4），不新增读取路由，浏览器不做账务计算，只做相减显示资金费差额。projections.json 随 P1 契约重新生成后，BFF 的安全模式校验放行 pnl 字段。</p>
+<p>对应 S4-020。数据取已有的 <code>account</code> 面板（P1 <code>/api/v2/trading/account</code>）中的 <code>pnl</code>（P1 设计 24.4），不新增读取路由，浏览器不做账务计算，只做相减显示资金费差额。projections.json 随 P1 契约重新生成后，BFF 的安全模式校验放行 pnl 字段；pnl 为可选，旧版交易层的账户响应照常通过（tests/applications/console/console_test.go TestPnLBlockProjection 同时覆盖带当前持仓的 pnl 与缺 pnl 两种响应）。</p>
 <p>web/src/features/pnl-panel.tsx 新增 <code>PnlPanel</code> 与导出的纯函数 <code>pnlRows(pnl, instrumentCode)</code>：返回“当前持仓”“累计”两行，每行含交易盈亏、账面资金费、参考资金费、账面合计、参考合计及各自来源（basis=VENUE 时交易盈亏与账面数字为“交易所”，参考资金费为“系统计算”；SYSTEM 全为“系统计算”）。null 显示“未取得”，missing 代码显示为中文说明；pnl 缺失（旧版交易层）时整块显示“交易层未提供（版本早于 v2.15.0）”。布局按 basis 与环境：SYSTEM 只显示“按真实资金费”列；VENUE 且非 LIVE 显示“模拟盘实际”与“按真实资金费”两列和资金费差额；LIVE 只显示实际列，reference.check 为 DIFFERENT 时显示告警与差额。reference.stale 为真显示“资金费待更新”。dynamic-page.tsx 在摘要卡片之后放置 PnlPanel，传入当前选择的品种代码；原“权益（P1）”卡片不变。</p>
 <p>验证：tests/web/console.test.ts 覆盖 pnlRows 的三种布局、null 与 pnl 缺失；console.browser.ts 用夹具（内部撮合运行、无结算记录）检查“按真实资金费合计”列、只有“系统计算”标签以及“真实资金费尚未取得”。部署后用真实数据截图核对 E20、E21、E22 三页。</p>
 </section>

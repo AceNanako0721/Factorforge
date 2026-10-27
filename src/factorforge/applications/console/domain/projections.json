@@ -9971,7 +9971,8 @@
               "type": "string"
             },
             "pnl": {
-              "$ref": "#/components/schemas/PnLView"
+              "$ref": "#/components/schemas/PnLView",
+              "description": "v2.15.0; absent from older trading layers."
             },
             "policy_version": {
               "maxLength": 128,
@@ -10031,8 +10032,7 @@
             "risk_locks",
             "observed_at",
             "cash_balances",
-            "fx_revaluation",
-            "pnl"
+            "fx_revaluation"
           ],
           "title": "AccountView",
           "type": "object"
@@ -12910,11 +12910,11 @@
               "type": "array"
             },
             "positions": {
-              "additionalProperties": {
-                "$ref": "#/components/schemas/PnLBlock"
+              "items": {
+                "$ref": "#/components/schemas/PositionPnL"
               },
               "title": "Positions",
-              "type": "object"
+              "type": "array"
             },
             "reference": {
               "$ref": "#/components/schemas/ReferenceStatus"
@@ -12945,6 +12945,97 @@
             "missing"
           ],
           "title": "PnLView",
+          "type": "object"
+        },
+        "PositionPnL": {
+          "additionalProperties": false,
+          "properties": {
+            "booked": {
+              "anyOf": [
+                {
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Booked"
+            },
+            "booked_funding": {
+              "anyOf": [
+                {
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Booked Funding"
+            },
+            "instrument_key": {
+              "$ref": "#/components/schemas/InstrumentKey"
+            },
+            "reference": {
+              "anyOf": [
+                {
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Reference"
+            },
+            "reference_funding": {
+              "anyOf": [
+                {
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Reference Funding"
+            },
+            "since": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            },
+            "trading": {
+              "anyOf": [
+                {
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Trading"
+            }
+          },
+          "required": [
+            "instrument_key",
+            "since",
+            "trading",
+            "booked_funding",
+            "reference_funding",
+            "booked",
+            "reference"
+          ],
+          "title": "PositionPnL",
           "type": "object"
         },
         "PositionView": {

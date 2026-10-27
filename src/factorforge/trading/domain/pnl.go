@@ -20,6 +20,12 @@ type PnLBlock struct {
 	Reference        *decimal.Value `json:"reference"`
 }
 
+// PositionPnL is the current position cycle of one instrument.
+type PositionPnL struct {
+	InstrumentKey InstrumentKey `json:"instrument_key"`
+	PnLBlock
+}
+
 type ReferenceStatus struct {
 	SourceID    *string    `json:"source_id"`
 	Settlements int64      `json:"settlements"`
@@ -29,13 +35,13 @@ type ReferenceStatus struct {
 }
 
 type PnLView struct {
-	Basis           string             `json:"basis"`
-	Environment     string             `json:"environment"`
-	VenueObservedAt *time.Time         `json:"venue_observed_at"`
-	Total           PnLBlock           `json:"total"`
-	Positions       Ordered[*PnLBlock] `json:"positions"`
-	Reference       ReferenceStatus    `json:"reference"`
-	Missing         []string           `json:"missing"`
+	Basis           string          `json:"basis"`
+	Environment     string          `json:"environment"`
+	VenueObservedAt *time.Time      `json:"venue_observed_at"`
+	Total           PnLBlock        `json:"total"`
+	Positions       []PositionPnL   `json:"positions"`
+	Reference       ReferenceStatus `json:"reference"`
+	Missing         []string        `json:"missing"`
 }
 
 type positionHistory struct {
@@ -103,7 +109,7 @@ func ptr(v decimal.Value) *decimal.Value { return &v }
 
 func (e *Engine) PnLView() PnLView {
 	run := e.Run
-	view := PnLView{Basis: "SYSTEM", Environment: run.RunKey.Environment, Missing: []string{}}
+	view := PnLView{Basis: "SYSTEM", Environment: run.RunKey.Environment, Positions: []PositionPnL{}, Missing: []string{}}
 	if run.VenueBacked() {
 		view.Basis = "VENUE"
 	}
@@ -256,7 +262,7 @@ func (e *Engine) PnLView() PnLView {
 				block.Reference = ptr(e.Math.Add(trading, *block.ReferenceFunding))
 			}
 		}
-		view.Positions.Set(code, block)
+		view.Positions = append(view.Positions, PositionPnL{InstrumentKey: p.InstrumentKey, PnLBlock: *block})
 	}
 	return view
 }

@@ -541,7 +541,7 @@ figure{margin:24px 0;border:1px solid var(--line);border-radius:10px;padding:16p
 <li>当前持仓：交易盈亏 = Position.CycleNet − 本持仓账面资金费 + 浮盈；VENUE 的浮盈取 VenueAccount.position_unrealized，未取得时为 null；SYSTEM 的浮盈为数量 × 乘数 ×（Mark − 均价）。本持仓账面资金费为开出时刻之后带该品种的资金费流水之和。</li>
 <li>reference：source_id、settlements（条数）、through_at（最新 settled_at）、stale（through_at 为空，或运行时钟已超过 through_at 加上最近两次结算间隔再加 30 分钟；只有一条记录时间隔按 8 小时）、check。check 只对 RunKey.Environment=LIVE 计算：|累计参考资金费 − 累计账面资金费| 超过 0.00000001 × 结算条数为 DIFFERENT，否则 MATCH；其他运行为 NOT_APPLICABLE。</li>
 </ul>
-<p>契约：api/openapi.go 的 AccountView 增加 pnl（PnLView / PnLBlock / ReferenceStatus），MarketSnapshot 请求增加 funding_settlements（dto/schema.go 同步）；contracts/v2/trading/openapi.json 由 export-trading-contract 重新导出，管理台 projections.json 由 generate-console-projections 重新生成。旧版本交易层不返回 pnl，管理台按缺项处理（P4 设计第 19 章）。</p>
+<p>契约：api/openapi.go 的 AccountView 增加可选的 pnl（PnLView / PnLBlock / PositionPnL / ReferenceStatus；不列为必需，旧版本交易层的响应仍合格），positions 为数组、每项带 instrument_key（管理台投影只接受登记过的字典字段，且键不能含冒号），MarketSnapshot 请求增加 funding_settlements（dto/schema.go 同步）；contracts/v2/trading/openapi.json 由 export-trading-contract 重新导出，管理台 projections.json 由 generate-console-projections 重新生成。旧版本交易层不返回 pnl，管理台按缺项处理（P4 设计第 19 章）。</p>
 <h3 id="pnl-sources-verify">24.5 验证</h3>
 <p>tests/trading/go_pnl_reference_test.go：内部撮合运行跨两次结算持有多单、中途平仓，参考资金费只计结算前持有的部分，正费率多头为负、空头为正，权益与风控不变；同一记录重复送达不重复计入，数值冲突保留原值并告警，非法记录拒绝整份快照；当前持仓只计开出后的结算；模拟盘运行未观测交易所账户时交易盈亏为 null，观测后等于保证金余额减起始资金与资金费流水，当前持仓浮盈取交易所值；LIVE 运行参考与账面一致为 MATCH、不一致为 DIFFERENT。同一文件还覆盖 FundingSettlements 的转换、Special 类型、空 markPrice 截断、Collector 读取失败时快照照常、尚无结算记录时为 null，以及账户同步保存交易所数字、未报告时保留上次观测；tests/trading/go_binance_test.go 覆盖 GetAccount 只按已登记品种读取浮盈。冻结的执行轨迹夹具早于 pnl 字段，比较时去掉该字段。部署后用 E20 核对：按模拟盘费率重算的资金费等于账面 5.87。</p>
 </section>

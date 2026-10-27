@@ -134,7 +134,7 @@ describe("read-only browser semantics", () => {
     });
     const status = { source_id: "binance-mainnet-public", settlements: 12, through_at: "2026-10-27T00:00:00Z", stale: false, check: "NOT_APPLICABLE" };
     const demo = pnlRows(
-      { basis: "VENUE", environment: "SIM", venue_observed_at: "2026-10-27T02:00:00Z", total: block("14.37", "5.87", "0.03"), positions: { [code]: block("19.3", "0.1", "0") }, reference: status, missing: [] },
+      { basis: "VENUE", environment: "SIM", venue_observed_at: "2026-10-27T02:00:00Z", total: block("14.37", "5.87", "0.03"), positions: [{ instrument_key: { venue: "BINANCE", product: "LINEAR_PERPETUAL", instrument_id: "SOXLUSDT" }, ...block("19.3", "0.1", "0") }], reference: status, missing: [] },
       code,
     );
     expect(demo.layout).toBe("DEMO");
@@ -143,7 +143,7 @@ describe("read-only browser semantics", () => {
     expect(demo.rows[1].reference).toBeCloseTo(14.4);
     expect(fundingGap(demo.rows[1])).toBeCloseTo(-5.84);
     const system = pnlRows(
-      { basis: "SYSTEM", environment: "SIM", venue_observed_at: null, total: block("10.82", null, "0.03"), positions: {}, reference: { ...status, stale: true }, missing: [] },
+      { basis: "SYSTEM", environment: "SIM", venue_observed_at: null, total: block("10.82", null, "0.03"), positions: [], reference: { ...status, stale: true }, missing: [] },
       code,
     );
     expect(system.layout).toBe("SYSTEM");
@@ -151,7 +151,7 @@ describe("read-only browser semantics", () => {
     expect(system.rows[0].booked).toBeNull();
     expect(system.stale).toBe(true);
     const unobserved = pnlRows(
-      { basis: "VENUE", environment: "LIVE", venue_observed_at: null, total: block(null, "1", "1"), positions: {}, reference: { ...status, check: "DIFFERENT" }, missing: ["VENUE_ACCOUNT_NOT_OBSERVED"] },
+      { basis: "VENUE", environment: "LIVE", venue_observed_at: null, total: block(null, "1", "1"), positions: [], reference: { ...status, check: "DIFFERENT" }, missing: ["VENUE_ACCOUNT_NOT_OBSERVED"] },
       code,
     );
     expect(unobserved.layout).toBe("LIVE");

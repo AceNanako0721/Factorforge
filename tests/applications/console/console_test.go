@@ -299,3 +299,49 @@ func TestLegacyObjectScopeAndFiniteCaseMasks(t *testing.T) {
 		t.Fatal("unchecked legacy amount allowed")
 	}
 }
+
+// S4-020: the account projection keeps the P1 pnl block, including each
+// current position, and an older P1 without pnl still projects.
+func TestPnLBlockProjection(t *testing.T) {
+	w := world(t)
+	raw, e := w.Client.Get(context.Background(), w.Selection, "account", "", nil)
+	if e != nil {
+		t.Fatal(e)
+	}
+	var row map[string]any
+	json.Unmarshal(raw, &row)
+	block := map[string]any{"since": "2026-10-25T17:35:21Z", "trading": "14.37", "booked_funding": "5.87", "reference_funding": "0.03", "booked": "20.24", "reference": "14.40"}
+	position := map[string]any{"instrument_key": map[string]any{"venue": "BINANCE", "product": "LINEAR_PERPETUAL", "instrument_id": "SOXLUSDT"}}
+	for k, v := range block {
+		position[k] = v
+	}
+	row["pnl"] = map[string]any{"basis": "VENUE", "environment": "SIM", "venue_observed_at": "2026-10-27T02:00:00Z", "total": block, "positions": []any{position}, "reference": map[string]any{"source_id": "binance-mainnet-public", "settlements": 12, "through_at": "2026-10-27T00:00:00Z", "stale": false, "check": "NOT_APPLICABLE"}, "missing": []any{}}
+	data, _ := json.Marshal(row)
+	dto, e := d.Project("trading", d.Routes["account"].Path, data, false)
+	if e != nil {
+		t.Fatal(e)
+	}
+	out, _ := json.Marshal(dto)
+	var got struct {
+		PnL struct {
+			Positions []struct {
+				InstrumentKey struct {
+					InstrumentID string `json:"instrument_id"`
+				} `json:"instrument_key"`
+				Reference string `json:"reference"`
+			} `json:"positions"`
+			Total struct {
+				Booked string `json:"booked"`
+			} `json:"total"`
+		} `json:"pnl"`
+	}
+	json.Unmarshal(out, &got)
+	if len(got.PnL.Positions) != 1 || got.PnL.Positions[0].InstrumentKey.InstrumentID != "SOXLUSDT" || got.PnL.Positions[0].Reference != "14.40" || got.PnL.Total.Booked != "20.24" {
+		t.Fatalf("pnl not projected: %s", out)
+	}
+	delete(row, "pnl")
+	data, _ = json.Marshal(row)
+	if _, e = d.Project("trading", d.Routes["account"].Path, data, false); e != nil {
+		t.Fatal("account without pnl rejected", e)
+	}
+}
