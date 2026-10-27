@@ -130,6 +130,7 @@ func extendCompositionShapes(s map[string]shape) {
 	add("CaseRecord", "direction", map[string]any{"type": "integer", "enum": []int{-1, 0, 1}})
 	add("TradingSnapshot", "account_currency", map[string]any{"type": "string"})
 	add("TradingSnapshot", "funding", map[string]any{"type": "object", "additionalProperties": ref("FundingObservation")})
+	add("TradingSnapshot", "funding_source", map[string]any{"type": "string", "enum": []string{"REFERENCE"}})
 	for key, n := range map[string]string{"factor_series": "FactorSeries", "scheduled_events": "ScheduledEvent", "templates": "ScheduledTemplate", "layer_ledger": "LayerDay", "layer_settlements": "LayerSettlement"} {
 		add("StrategyState", key, map[string]any{"type": "object", "additionalProperties": ref(n)})
 	}

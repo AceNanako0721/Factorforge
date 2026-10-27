@@ -79,6 +79,7 @@ func Assemble(ctx context.Context, c config.Config, internal bool) (*Runtime, er
 	if err != nil {
 		return fail(err)
 	}
+	trading.FundingSource = c.FundingSource
 	cycle := app.DecisionCycle{Store: store, Clock: clock, Trading: trading}
 	return &Runtime{Store: store, Clock: clock, Identity: identity, Trading: trading, Cycle: cycle}, nil
 }

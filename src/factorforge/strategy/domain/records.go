@@ -242,6 +242,7 @@ type TradingSnapshot struct {
 	Targets         map[string]map[string]any          `json:"targets,omitempty"`
 	TriggerPrices   map[string]map[string]MarketSample `json:"trigger_prices,omitempty"`
 	Funding         map[string]FundingObservation      `json:"funding,omitempty"`
+	FundingSource   string                             `json:"funding_source,omitempty"`
 	AccountCurrency string                             `json:"account_currency,omitempty"`
 	RunKey          RunBinding                         `json:"run_key"`
 	Version         int                                `json:"version"`

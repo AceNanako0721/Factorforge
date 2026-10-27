@@ -5665,6 +5665,45 @@
                                             "title": "Quote Currency",
                                             "type": "string"
                                           },
+                                          "reference_funding": {
+                                            "anyOf": [
+                                              {
+                                                "additionalProperties": false,
+                                                "properties": {
+                                                  "interval_hours": {
+                                                    "minimum": 1,
+                                                    "title": "Interval Hours",
+                                                    "type": "integer"
+                                                  },
+                                                  "next_funding_at": {
+                                                    "format": "date-time",
+                                                    "title": "Next Funding At",
+                                                    "type": "string"
+                                                  },
+                                                  "observed_at": {
+                                                    "format": "date-time",
+                                                    "title": "Observed At",
+                                                    "type": "string"
+                                                  },
+                                                  "rate": {
+                                                    "title": "Rate",
+                                                    "type": "string"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "rate",
+                                                  "next_funding_at",
+                                                  "interval_hours",
+                                                  "observed_at"
+                                                ],
+                                                "title": "FundingObservation",
+                                                "type": "object"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
                                           "risk_group": {
                                             "anyOf": [
                                               {
@@ -6765,6 +6804,45 @@
                                     "pattern": "^[A-Za-z0-9_.-]+$",
                                     "title": "Quote Currency",
                                     "type": "string"
+                                  },
+                                  "reference_funding": {
+                                    "anyOf": [
+                                      {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "interval_hours": {
+                                            "minimum": 1,
+                                            "title": "Interval Hours",
+                                            "type": "integer"
+                                          },
+                                          "next_funding_at": {
+                                            "format": "date-time",
+                                            "title": "Next Funding At",
+                                            "type": "string"
+                                          },
+                                          "observed_at": {
+                                            "format": "date-time",
+                                            "title": "Observed At",
+                                            "type": "string"
+                                          },
+                                          "rate": {
+                                            "title": "Rate",
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "rate",
+                                          "next_funding_at",
+                                          "interval_hours",
+                                          "observed_at"
+                                        ],
+                                        "title": "FundingObservation",
+                                        "type": "object"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
                                   },
                                   "risk_group": {
                                     "anyOf": [

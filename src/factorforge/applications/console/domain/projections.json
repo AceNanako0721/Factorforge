@@ -11445,6 +11445,17 @@
               "title": "Quote Currency",
               "type": "string"
             },
+            "reference_funding": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/FundingObservation"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Latest settled reference-venue (mainnet) funding rate; upper layers may use it as their funding estimate (S1-024 v2.17.0). Absent before a record exists or once the next record is overdue by 30 minutes."
+            },
             "risk_group": {
               "anyOf": [
                 {

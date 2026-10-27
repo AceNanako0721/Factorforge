@@ -318,6 +318,7 @@ func (h *Handler) queryRun(r *http.Request, run *d.Aggregate, history ports.Hist
 			view := dto.InstrumentView{InstrumentSpec: *x}
 			if x.Key.Product == "LINEAR_PERPETUAL" {
 				view.Funding = run.Funding.Value(x.Key.Code())
+				view.ReferenceFunding = run.ReferenceFundingObservation(x.Key.Code())
 			}
 			items = append(items, view)
 		}

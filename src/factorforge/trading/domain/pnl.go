@@ -277,3 +277,37 @@ func firstFill(run *Aggregate) *time.Time {
 	}
 	return first
 }
+
+// ReferenceFundingObservation is the latest settled reference record of one
+// instrument as a rate observation (S1-024 v2.17.0): the interval is the gap
+// to the previous record (8 h before two exist), the next settlement is one
+// interval later, and nothing is returned once the next record is overdue by
+// 30 minutes, matching ReferenceStatus.Stale.
+func (run *Aggregate) ReferenceFundingObservation(code string) *FundingObservation {
+	var last, previous *FundingSettlement
+	for _, s := range run.ReferenceFunding.Values() {
+		if s.InstrumentKey.Code() != code {
+			continue
+		}
+		if last == nil || s.SettledAt.After(last.SettledAt) {
+			last, previous = s, last
+		} else if previous == nil || s.SettledAt.After(previous.SettledAt) {
+			previous = s
+		}
+	}
+	if last == nil {
+		return nil
+	}
+	interval := 8 * time.Hour
+	if previous != nil {
+		interval = last.SettledAt.Sub(previous.SettledAt).Round(time.Hour)
+		if interval < time.Hour {
+			interval = time.Hour
+		}
+	}
+	next := last.SettledAt.Add(interval)
+	if run.Clock.After(next.Add(30 * time.Minute)) {
+		return nil
+	}
+	return &FundingObservation{Rate: last.Rate, NextFundingAt: next, IntervalHours: int64(interval / time.Hour), ObservedAt: last.SettledAt}
+}
