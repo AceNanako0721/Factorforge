@@ -136,6 +136,10 @@ func Synchronize(ctx context.Context, store ports.Store, key d.RunKey, broker po
 	if err != nil {
 		return nil, problem("VENUE_ACCOUNT_FORMAT_INVALID", 503)
 	}
+	venueAccount, err := venueAccountFigures(account, cash, at)
+	if err != nil {
+		return nil, err
+	}
 	var issues []string
 	err = store.Transaction(ctx, key, func(run *d.Aggregate) error {
 		if run.Version != snapshot.Version {
@@ -144,6 +148,9 @@ func Synchronize(ctx context.Context, store ports.Store, key d.RunKey, broker po
 		e := d.NewEngine(run)
 		if err := AdvanceLiveClock(e, at); err != nil {
 			return err
+		}
+		if venueAccount != nil {
+			run.VenueAccount = venueAccount
 		}
 		kept := []string{}
 		for _, issue := range run.RecoveryIssues {
@@ -434,6 +441,50 @@ func Recover(ctx context.Context, store ports.Store, key d.RunKey, broker ports.
 	return Synchronize(ctx, store, key, broker, tolerance, true)
 }
 
+// venueAccountFigures keeps the venue's own margin balance and unrealized
+// profit for the account view (v2.15.0). A broker that does not report them
+// leaves the last observation in place.
+func venueAccountFigures(account map[string]any, cash decimal.Value, at time.Time) (*d.VenueAccount, error) {
+	rawUnrealized, ok := account["unrealized"]
+	if !ok {
+		return nil, nil
+	}
+	margin, err := venueAmount(account["equity"])
+	if err != nil {
+		return nil, problem("VENUE_ACCOUNT_FORMAT_INVALID", 503)
+	}
+	unrealized, err := venueAmount(rawUnrealized)
+	if err != nil {
+		return nil, problem("VENUE_ACCOUNT_FORMAT_INVALID", 503)
+	}
+	result := &d.VenueAccount{WalletBalance: cash, MarginBalance: margin, UnrealizedPnL: unrealized, ObservedAt: at}
+	var positions map[string]any
+	switch v := account["position_unrealized"].(type) {
+	case nil:
+	case map[string]decimal.Value:
+		positions = map[string]any{}
+		for code, amount := range v {
+			positions[code] = amount
+		}
+	case map[string]any:
+		positions = v
+	default:
+		return nil, problem("VENUE_ACCOUNT_FORMAT_INVALID", 503)
+	}
+	codes := make([]string, 0, len(positions))
+	for code := range positions {
+		codes = append(codes, code)
+	}
+	sort.Strings(codes)
+	for _, code := range codes {
+		amount, err := venueAmount(positions[code])
+		if err != nil {
+			return nil, problem("VENUE_ACCOUNT_FORMAT_INVALID", 503)
+		}
+		result.PositionUnrealized.Set(code, amount)
+	}
+	return result, nil
+}
 func venueAmount(raw any) (decimal.Value, error) {
 	switch v := raw.(type) {
 	case decimal.Value:

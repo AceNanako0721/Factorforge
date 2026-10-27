@@ -142,6 +142,16 @@ test("S4-017 judgment and stop page on desktop and phone width", async ({
   await expect(page.getByText("注入研判 · 做空", { exact: true })).toBeVisible();
   await expect(page.getByText("未实现", { exact: true })).toBeVisible();
   await expect(page.getByText("PRIVATE RAW")).toHaveCount(0);
+  // S4-020: the fixture run is internal matching, so the PnL block shows the
+  // real-funding total with system-computed sources only.
+  const pnl = page.getByLabel("持仓盈亏");
+  await expect(pnl.getByRole("heading", { name: "持仓盈亏", exact: true })).toBeVisible();
+  await expect(pnl.getByText("按真实资金费合计", { exact: true })).toBeVisible();
+  await expect(pnl.getByText("系统计算").first()).toBeVisible();
+  await expect(pnl.getByText("交易所", { exact: true })).toHaveCount(0);
+  await expect(pnl.getByRole("cell", { name: /^累计/ })).toBeVisible();
+  // No settlement record in the fixture: the reference is "not obtained", not 0.
+  await expect(pnl.getByText("真实资金费尚未取得", { exact: true })).toBeVisible();
   // S4-019 reference layer: pushed values arrive and keep changing.
   const mark = page.getByLabel("参考标记价");
   await expect(mark.locator("strong")).toHaveText(/^100\.\d+$/);

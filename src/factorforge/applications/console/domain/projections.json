@@ -9970,6 +9970,10 @@
               "title": "Observed At",
               "type": "string"
             },
+            "pnl": {
+              "$ref": "#/components/schemas/PnLView",
+              "description": "v2.15.0; absent from older trading layers."
+            },
             "policy_version": {
               "maxLength": 128,
               "minLength": 1,
@@ -10910,6 +10914,53 @@
           "title": "FundingObservation",
           "type": "object"
         },
+        "FundingSettlement": {
+          "additionalProperties": false,
+          "description": "Settled funding record of the reference venue (mainnet public); feeds only the account view's reference funding.",
+          "properties": {
+            "instrument_key": {
+              "$ref": "#/components/schemas/InstrumentKey"
+            },
+            "kind": {
+              "enum": [
+                "FUNDING",
+                "SPECIAL_FUNDING"
+              ],
+              "title": "Kind",
+              "type": "string"
+            },
+            "mark_price": {
+              "title": "Mark Price",
+              "type": "string"
+            },
+            "rate": {
+              "title": "Rate",
+              "type": "string"
+            },
+            "settled_at": {
+              "format": "date-time",
+              "title": "Settled At",
+              "type": "string"
+            },
+            "source_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.-]+$",
+              "title": "Source Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "instrument_key",
+            "settled_at",
+            "kind",
+            "rate",
+            "mark_price",
+            "source_id"
+          ],
+          "title": "FundingSettlement",
+          "type": "object"
+        },
         "FxRate": {
           "additionalProperties": false,
           "properties": {
@@ -11719,6 +11770,14 @@
                   "type": "null"
                 }
               ]
+            },
+            "funding_settlements": {
+              "items": {
+                "$ref": "#/components/schemas/FundingSettlement"
+              },
+              "maxItems": 1000,
+              "title": "Funding Settlements",
+              "type": "array"
             },
             "idempotency_key": {
               "maxLength": 128,
@@ -12736,6 +12795,249 @@
           "title": "Page[Target]",
           "type": "object"
         },
+        "PnLBlock": {
+          "additionalProperties": false,
+          "properties": {
+            "booked": {
+              "anyOf": [
+                {
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Booked"
+            },
+            "booked_funding": {
+              "anyOf": [
+                {
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Booked Funding"
+            },
+            "reference": {
+              "anyOf": [
+                {
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Reference"
+            },
+            "reference_funding": {
+              "anyOf": [
+                {
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Reference Funding"
+            },
+            "since": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            },
+            "trading": {
+              "anyOf": [
+                {
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Trading"
+            }
+          },
+          "required": [
+            "since",
+            "trading",
+            "booked_funding",
+            "reference_funding",
+            "booked",
+            "reference"
+          ],
+          "title": "PnLBlock",
+          "type": "object"
+        },
+        "PnLView": {
+          "additionalProperties": false,
+          "description": "Design chapter 24: venue-backed runs report venue figures; reference funding from settled mainnet records never enters accounting.",
+          "properties": {
+            "basis": {
+              "enum": [
+                "VENUE",
+                "SYSTEM"
+              ],
+              "title": "Basis",
+              "type": "string"
+            },
+            "environment": {
+              "enum": [
+                "SIM",
+                "LIVE"
+              ],
+              "title": "Environment",
+              "type": "string"
+            },
+            "missing": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Missing",
+              "type": "array"
+            },
+            "positions": {
+              "items": {
+                "$ref": "#/components/schemas/PositionPnL"
+              },
+              "title": "Positions",
+              "type": "array"
+            },
+            "reference": {
+              "$ref": "#/components/schemas/ReferenceStatus"
+            },
+            "total": {
+              "$ref": "#/components/schemas/PnLBlock"
+            },
+            "venue_observed_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Venue Observed At"
+            }
+          },
+          "required": [
+            "basis",
+            "environment",
+            "venue_observed_at",
+            "total",
+            "positions",
+            "reference",
+            "missing"
+          ],
+          "title": "PnLView",
+          "type": "object"
+        },
+        "PositionPnL": {
+          "additionalProperties": false,
+          "properties": {
+            "booked": {
+              "anyOf": [
+                {
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Booked"
+            },
+            "booked_funding": {
+              "anyOf": [
+                {
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Booked Funding"
+            },
+            "instrument_key": {
+              "$ref": "#/components/schemas/InstrumentKey"
+            },
+            "reference": {
+              "anyOf": [
+                {
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Reference"
+            },
+            "reference_funding": {
+              "anyOf": [
+                {
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Reference Funding"
+            },
+            "since": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            },
+            "trading": {
+              "anyOf": [
+                {
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Trading"
+            }
+          },
+          "required": [
+            "instrument_key",
+            "since",
+            "trading",
+            "booked_funding",
+            "reference_funding",
+            "booked",
+            "reference"
+          ],
+          "title": "PositionPnL",
+          "type": "object"
+        },
         "PositionView": {
           "additionalProperties": false,
           "properties": {
@@ -13326,6 +13628,61 @@
             "income"
           ],
           "title": "RecordIncome",
+          "type": "object"
+        },
+        "ReferenceStatus": {
+          "additionalProperties": false,
+          "properties": {
+            "check": {
+              "enum": [
+                "NOT_APPLICABLE",
+                "MATCH",
+                "DIFFERENT"
+              ],
+              "title": "Check",
+              "type": "string"
+            },
+            "settlements": {
+              "minimum": 0,
+              "title": "Settlements",
+              "type": "integer"
+            },
+            "source_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source Id"
+            },
+            "stale": {
+              "title": "Stale",
+              "type": "boolean"
+            },
+            "through_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Through At"
+            }
+          },
+          "required": [
+            "source_id",
+            "settlements",
+            "through_at",
+            "stale",
+            "check"
+          ],
+          "title": "ReferenceStatus",
           "type": "object"
         },
         "RegisterFx": {

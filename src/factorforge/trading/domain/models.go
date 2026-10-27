@@ -107,6 +107,32 @@ type FundingObservation struct {
 	ObservedAt    time.Time     `json:"observed_at"`
 }
 
+// FundingSettlement is a settled funding event published by the reference
+// venue (mainnet public records), independent of the account's own venue. It
+// only feeds the account view's reference funding (v2.15.0), never accounting.
+type FundingSettlement struct {
+	InstrumentKey InstrumentKey `json:"instrument_key"`
+	SettledAt     time.Time     `json:"settled_at"`
+	Kind          string        `json:"kind"`
+	Rate          decimal.Value `json:"rate"`
+	MarkPrice     decimal.Value `json:"mark_price"`
+	SourceID      string        `json:"source_id"`
+}
+
+func (s FundingSettlement) Key() string {
+	return s.InstrumentKey.Code() + ":" + s.Kind + ":" + s.SettledAt.UTC().Format(time.RFC3339Nano)
+}
+
+// VenueAccount keeps the venue's own account figures from the last sync
+// (v2.15.0); the account view reports them instead of recomputing.
+type VenueAccount struct {
+	WalletBalance      decimal.Value          `json:"wallet_balance"`
+	MarginBalance      decimal.Value          `json:"margin_balance"`
+	UnrealizedPnL      decimal.Value          `json:"unrealized_pnl"`
+	PositionUnrealized Ordered[decimal.Value] `json:"position_unrealized"`
+	ObservedAt         time.Time              `json:"observed_at"`
+}
+
 type MarketTrade struct {
 	ExternalID    string        `json:"external_id"`
 	InstrumentKey InstrumentKey `json:"instrument_key"`
@@ -432,4 +458,6 @@ type Aggregate struct {
 	FactsStartAt           *time.Time                   `json:"facts_start_at"`
 	VenueReconciledVersion *int64                       `json:"venue_reconciled_version"`
 	VenueFactsCursorAt     *time.Time                   `json:"venue_facts_cursor_at"`
+	ReferenceFunding       Ordered[*FundingSettlement]  `json:"reference_funding,omitzero"`
+	VenueAccount           *VenueAccount                `json:"venue_account,omitempty"`
 }

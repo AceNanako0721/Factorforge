@@ -28,6 +28,7 @@ func run() error {
 	simCapabilities := flag.Bool("sim-capabilities", false, "declare simulator protection/short capabilities (REPLAY runs only)")
 	simFrames := flag.Bool("sim-frames", false, "submit a simulation frame after each snapshot (SIM with --sim-capabilities only)")
 	demoCapabilities := flag.Bool("demo-capabilities", false, "declare demo-account protection/short capabilities (SIM demo runs only)")
+	referenceFunding := flag.Bool("reference-funding", false, "also read settled mainnet funding records for the reference funding (v2.15.0)")
 	flag.Parse()
 	multiplier, err := decimal.Parse(*multiple)
 	if err != nil || multiplier.Sign() <= 0 || *poll <= 0 || *lookback <= 0 || *delay < 0 || *limit < 1 || *limit > 1000 || *id == "" || *instrument == "" || *interval == "" {
@@ -51,6 +52,9 @@ func run() error {
 	market := &binance.Market{Client: r.Client(10 * time.Second), Endpoint: config.Services.ExchangeAPIURL, Multipliers: map[string]string{*instrument: *multiple}, PublicationDelay: time.Duration(*delay) * time.Millisecond, SimCapabilities: *simCapabilities, DemoCapabilities: *demoCapabilities}
 	client := &httptrading.Client{HTTP: r.Client(15 * time.Second), Endpoint: config.Services.TradingAPIURL, Token: config.Credentials.TradingAPIToken}
 	collector := &workers.Collector{Market: market, Client: client, Key: d.RunKey{Environment: config.Runtime.Environment, AccountID: config.Trading.AccountID, RunID: *id}, TradeLimit: *limit, SimFrames: *simFrames}
+	if *referenceFunding {
+		collector.Reference = &binance.Market{Client: r.Client(10 * time.Second), Endpoint: binance.MainnetPublicEndpoint}
+	}
 	for {
 		end := time.Now().UTC()
 		points, bars, err := collector.Collect(ctx, *instrument, *interval, end.Add(-time.Duration(*lookback)*time.Second), end)
@@ -67,6 +71,9 @@ func run() error {
 			fmt.Printf("COLLECT_FAILED %s %d\n", err.Error(), status)
 		} else {
 			fmt.Printf("Collected %d points and %d completed candles\n", points, bars)
+		}
+		if collector.ReferenceIssue != "" {
+			fmt.Println(collector.ReferenceIssue)
 		}
 		if *once || !r.Pause(ctx, time.Duration(*poll*float64(time.Second))) {
 			return nil

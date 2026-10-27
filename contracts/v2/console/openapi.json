@@ -99,6 +99,322 @@
                               "title": "Observed At",
                               "type": "string"
                             },
+                            "pnl": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "basis": {
+                                  "enum": [
+                                    "VENUE",
+                                    "SYSTEM"
+                                  ],
+                                  "title": "Basis",
+                                  "type": "string"
+                                },
+                                "environment": {
+                                  "enum": [
+                                    "SIM",
+                                    "LIVE"
+                                  ],
+                                  "title": "Environment",
+                                  "type": "string"
+                                },
+                                "missing": {
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "title": "Missing",
+                                  "type": "array"
+                                },
+                                "positions": {
+                                  "items": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "booked": {
+                                        "anyOf": [
+                                          {
+                                            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ],
+                                        "title": "Booked"
+                                      },
+                                      "booked_funding": {
+                                        "anyOf": [
+                                          {
+                                            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ],
+                                        "title": "Booked Funding"
+                                      },
+                                      "instrument_key": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "instrument_id": {
+                                            "maxLength": 128,
+                                            "minLength": 1,
+                                            "pattern": "^[A-Za-z0-9_.-]+$",
+                                            "title": "Instrument Id",
+                                            "type": "string"
+                                          },
+                                          "product": {
+                                            "const": "LINEAR_PERPETUAL",
+                                            "title": "Product",
+                                            "type": "string"
+                                          },
+                                          "venue": {
+                                            "maxLength": 128,
+                                            "minLength": 1,
+                                            "pattern": "^[A-Za-z0-9_.-]+$",
+                                            "title": "Venue",
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "venue",
+                                          "product",
+                                          "instrument_id"
+                                        ],
+                                        "title": "InstrumentKey",
+                                        "type": "object"
+                                      },
+                                      "reference": {
+                                        "anyOf": [
+                                          {
+                                            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ],
+                                        "title": "Reference"
+                                      },
+                                      "reference_funding": {
+                                        "anyOf": [
+                                          {
+                                            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ],
+                                        "title": "Reference Funding"
+                                      },
+                                      "since": {
+                                        "anyOf": [
+                                          {
+                                            "format": "date-time",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ],
+                                        "title": "Since"
+                                      },
+                                      "trading": {
+                                        "anyOf": [
+                                          {
+                                            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ],
+                                        "title": "Trading"
+                                      }
+                                    },
+                                    "required": [
+                                      "instrument_key",
+                                      "since",
+                                      "trading",
+                                      "booked_funding",
+                                      "reference_funding",
+                                      "booked",
+                                      "reference"
+                                    ],
+                                    "title": "PositionPnL",
+                                    "type": "object"
+                                  },
+                                  "title": "Positions",
+                                  "type": "array"
+                                },
+                                "reference": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "check": {
+                                      "enum": [
+                                        "NOT_APPLICABLE",
+                                        "MATCH",
+                                        "DIFFERENT"
+                                      ],
+                                      "title": "Check",
+                                      "type": "string"
+                                    },
+                                    "settlements": {
+                                      "minimum": 0,
+                                      "title": "Settlements",
+                                      "type": "integer"
+                                    },
+                                    "source_id": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ],
+                                      "title": "Source Id"
+                                    },
+                                    "stale": {
+                                      "title": "Stale",
+                                      "type": "boolean"
+                                    },
+                                    "through_at": {
+                                      "anyOf": [
+                                        {
+                                          "format": "date-time",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ],
+                                      "title": "Through At"
+                                    }
+                                  },
+                                  "required": [
+                                    "source_id",
+                                    "settlements",
+                                    "through_at",
+                                    "stale",
+                                    "check"
+                                  ],
+                                  "title": "ReferenceStatus",
+                                  "type": "object"
+                                },
+                                "total": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "booked": {
+                                      "anyOf": [
+                                        {
+                                          "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ],
+                                      "title": "Booked"
+                                    },
+                                    "booked_funding": {
+                                      "anyOf": [
+                                        {
+                                          "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ],
+                                      "title": "Booked Funding"
+                                    },
+                                    "reference": {
+                                      "anyOf": [
+                                        {
+                                          "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ],
+                                      "title": "Reference"
+                                    },
+                                    "reference_funding": {
+                                      "anyOf": [
+                                        {
+                                          "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ],
+                                      "title": "Reference Funding"
+                                    },
+                                    "since": {
+                                      "anyOf": [
+                                        {
+                                          "format": "date-time",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ],
+                                      "title": "Since"
+                                    },
+                                    "trading": {
+                                      "anyOf": [
+                                        {
+                                          "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ],
+                                      "title": "Trading"
+                                    }
+                                  },
+                                  "required": [
+                                    "since",
+                                    "trading",
+                                    "booked_funding",
+                                    "reference_funding",
+                                    "booked",
+                                    "reference"
+                                  ],
+                                  "title": "PnLBlock",
+                                  "type": "object"
+                                },
+                                "venue_observed_at": {
+                                  "anyOf": [
+                                    {
+                                      "format": "date-time",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "title": "Venue Observed At"
+                                }
+                              },
+                              "required": [
+                                "basis",
+                                "environment",
+                                "venue_observed_at",
+                                "total",
+                                "positions",
+                                "reference",
+                                "missing"
+                              ],
+                              "title": "PnLView",
+                              "type": "object"
+                            },
                             "policy_version": {
                               "maxLength": 128,
                               "minLength": 1,

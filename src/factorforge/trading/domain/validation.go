@@ -122,6 +122,13 @@ func validateBusiness(value any) error {
 		if v.Funding != nil && (v.InstrumentKey == nil || v.InstrumentKey.Product != "LINEAR_PERPETUAL") {
 			return invalidModel()
 		}
+		if len(v.FundingSettlements) > 1000 {
+			return invalidModel()
+		}
+	case FundingSettlement:
+		if v.SettledAt.IsZero() {
+			return invalidModel()
+		}
 	case ExternalFact:
 		for _, id := range v.ExternalFillIDs {
 			if len(id) < 1 || len(id) > 128 || !modelID.MatchString(id) {

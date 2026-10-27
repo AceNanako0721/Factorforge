@@ -28,6 +28,7 @@ var modelRules = map[string][]fieldRule{
 	"Fill":              {{name: "ExternalFillID", kind: "id"}, {name: "ExternalOrderID", kind: "id"}, {name: "Side", kind: "enum", values: []string{"BUY", "SELL"}}, {name: "Quantity", kind: "number", gt: bound(0)}, {name: "Price", kind: "number", gt: bound(0)}, {name: "Fee", kind: "number", ge: bound(0)}, {name: "FeeCurrency", kind: "id"}},
 	"Position":          {{name: "OwnerID", kind: "id"}},
 	"Protection":        {{name: "ProtectionID", kind: "id"}, {name: "OwnerID", kind: "id"}, {name: "ReplacesID", kind: "id"}, {name: "ExitOrderID", kind: "id"}},
+	"FundingSettlement": {{name: "Kind", kind: "enum", values: []string{"FUNDING", "SPECIAL_FUNDING"}}, {name: "Rate", kind: "number"}, {name: "MarkPrice", kind: "number", gt: bound(0)}, {name: "SourceID", kind: "id"}},
 	"Income":            {{name: "ExternalID", kind: "id"}, {name: "Kind", kind: "enum", values: []string{"FUNDING", "SPECIAL_FUNDING", "TRANSFER", "SETTLEMENT", "CORPORATE_ACTION"}}, {name: "Currency", kind: "id"}},
 	"OutboxItem":        {{name: "CommandID", kind: "id"}, {name: "Kind", kind: "enum", values: []string{"SUBMIT", "CANCEL"}}, {name: "OrderID", kind: "id"}, {name: "PrincipalID", kind: "id"}, {name: "State", kind: "enum", values: []string{"PENDING", "DISPATCHING", "DONE", "UNKNOWN"}}, {name: "ClaimedBy", kind: "id"}},
 	"Target":            {{name: "OwnerID", kind: "id"}, {name: "PolicyVersion", kind: "id"}, {name: "SpecVersion", kind: "id"}, {name: "SourceDecisionID", kind: "id"}},

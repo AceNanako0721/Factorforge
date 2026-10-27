@@ -23,7 +23,19 @@ type Collector struct {
 	SimFrames  bool
 	lastFrame  time.Time
 	lastCandle time.Time
+	// Reference (v2.15.0) reads settled mainnet funding every ReferenceEvery
+	// (10 minutes by default). A failed read only leaves this round without
+	// settlements and records ReferenceIssue; the snapshot is posted as usual.
+	Reference      ports.FundingHistory
+	ReferenceEvery time.Duration
+	ReferenceIssue string
+	referenceAt    time.Time
+	referenceSince time.Time
 }
+
+// ReferenceLookback is how far back the first read after start goes; P1
+// skips records it already holds.
+const ReferenceLookback = 30 * 24 * time.Hour
 
 func (c *Collector) now() time.Time {
 	if c.Now != nil {
@@ -47,6 +59,7 @@ func (c *Collector) command(ctx context.Context, id string, at time.Time) (d.Com
 	}
 	return d.Command{SchemaVersion: "trading-2.0", RequestID: id, IdempotencyKey: id, RunKey: c.Key, ExpectedVersion: run.Version, Reason: "public market collection", ExpiresAtUTC: at.Add(time.Minute)}, nil
 }
+
 // CollectorConflictAttempts bounds re-reads of the run version when another
 // writer (P2 targets, the executor) commits between the GET and the POST.
 const CollectorConflictAttempts = 3
@@ -164,6 +177,29 @@ func (c *Collector) Collect(ctx context.Context, instrument, interval string, st
 		body.InstrumentKey = &key
 		body.Funding = funding
 	}
+	c.ReferenceIssue = ""
+	if c.Reference != nil && spec.Key.Product == "LINEAR_PERPETUAL" {
+		every := c.ReferenceEvery
+		if every <= 0 {
+			every = 10 * time.Minute
+		}
+		if now := c.now(); c.referenceAt.IsZero() || now.Sub(c.referenceAt) >= every {
+			since := c.referenceSince
+			if since.IsZero() {
+				since = now.Add(-ReferenceLookback)
+			}
+			c.referenceAt = now
+			rows, err := c.Reference.FundingSettlements(ctx, spec.Key, since)
+			if err != nil {
+				c.ReferenceIssue = "REFERENCE_FUNDING_UNAVAILABLE"
+			}
+			for _, row := range rows {
+				if !row.SettledAt.After(at) {
+					body.FundingSettlements = append(body.FundingSettlements, row)
+				}
+			}
+		}
+	}
 	snapshot := func() error {
 		return c.post(ctx, observationID("market-", spec.Version, at), at, "/api/v2/trading/market/snapshots", func(command d.Command) any {
 			body.Command = command
@@ -184,6 +220,9 @@ func (c *Collector) Collect(ctx context.Context, instrument, interval string, st
 	}
 	if err != nil {
 		return 0, 0, err
+	}
+	if n := len(body.FundingSettlements); n > 0 {
+		c.referenceSince = body.FundingSettlements[n-1].SettledAt.Add(time.Millisecond)
 	}
 	if c.SimFrames {
 		if err = c.frame(ctx, spec, body); err != nil {
