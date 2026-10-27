@@ -259,6 +259,59 @@ func TestCompositionTradingAdapterFundingOptionalAndIntegerInterval(t *testing.T
 	}
 }
 
+// S2-043 (v2.17.0): funding_source REFERENCE takes P1's reference_funding as
+// the funding estimate; a missing reference falls back to the registered
+// annual rate instead of the run's own venue rate.
+func TestS243ReferenceFundingSource(t *testing.T) {
+	_, o, p, snap, _, at := compositionCycleBase(t)
+	for _, c := range []struct {
+		source    string
+		reference bool
+		annual    string
+		tag       string
+	}{{"", true, "8.2125", ""}, {"REFERENCE", true, "0.1095", "REFERENCE"}, {"REFERENCE", false, "0.1", "REFERENCE"}} {
+		t.Run(fmt.Sprint(c.source, c.reference), func(t *testing.T) {
+			spec := sd.Clone(snap.Specs[o.ObjectID])
+			spec["key"] = sd.Map(o.InstrumentKey)
+			// A demo venue rate at its cap and a near-zero mainnet record.
+			spec["funding"] = map[string]any{"rate": "0.0075", "next_funding_at": sd.ISO(at.Add(8 * time.Hour)), "interval_hours": 8, "observed_at": sd.ISO(at)}
+			if c.reference {
+				spec["reference_funding"] = map[string]any{"rate": "0.0001", "next_funding_at": sd.ISO(at.Add(7 * time.Hour)), "interval_hours": 8, "observed_at": sd.ISO(at.Add(-time.Hour))}
+			}
+			transport := compositionTransport(func(r *http.Request) (*http.Response, error) {
+				page := map[string]any{"snapshot_version": 1, "items": []any{}}
+				switch r.URL.Path {
+				case adapters.TradingPrefix + "/runs/" + o.TradingRunKey.RunID:
+					page = map[string]any{"aggregate_version": 1, "state": "NORMAL"}
+				case adapters.TradingPrefix + "/account":
+					page = map[string]any{"observed_at": sd.ISO(at), "equity": "10000", "policy_version": "fixture-policy", "currency": "USDT", "risk_locks": []string{}}
+				case adapters.TradingPrefix + "/instruments":
+					page["items"] = []any{spec}
+				case adapters.TradingPrefix + "/owners":
+					page["items"] = []any{map[string]any{"instrument_key": sd.Map(o.InstrumentKey), "owner_id": o.OwnerID, "owner_epoch": 0}}
+				case adapters.TradingPrefix + "/market/points":
+					page["items"] = []any{map[string]any{"instrument_key": sd.Map(o.InstrumentKey), "kind": "MARK", "available_at": sd.ISO(at), "quality": "VALID", "value": "100"}}
+				}
+				raw, _ := json.Marshal(page)
+				return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(bytes.NewReader(raw)), Request: r}, nil
+			})
+			client := &adapters.TradingV2{URL: "http://fixture.invalid", CandleInterval: "1m", HistorySeconds: 3600, Client: &http.Client{Transport: transport}, FundingSource: c.source}
+			result, err := client.Snapshot(context.Background(), []*sd.ObservedObject{o})
+			if err != nil {
+				t.Fatal(err)
+			}
+			annual, err := sd.FundingAnnual(result, o.ObjectID, p)
+			if err != nil {
+				t.Fatal(err)
+			}
+			assertAmount(t, annual, c.annual)
+			if result.FundingSource != c.tag {
+				t.Fatalf("funding source %q", result.FundingSource)
+			}
+		})
+	}
+}
+
 func TestCompositionRiskAndUnsetParameterDecisionsKeepComponents(t *testing.T) {
 	s, o, p, snap, id, at := compositionCycleBase(t)
 	delete(s.Parameters.Value(o.ParameterVersion).Values, "w")

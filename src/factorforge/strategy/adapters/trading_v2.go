@@ -25,6 +25,10 @@ type TradingV2 struct {
 	URL, Token, CandleInterval string
 	HistorySeconds             int
 	Client                     *http.Client
+	// FundingSource selects P1's funding observation used as the funding
+	// estimate (S2-043): "" or RUN takes the run's own venue rate, REFERENCE
+	// the latest settled reference-venue rate. Booked funding is unaffected.
+	FundingSource string
 
 	mu     sync.Mutex
 	audits map[string]*auditTargets
@@ -226,7 +230,12 @@ func (t *TradingV2) Snapshot(ctx context.Context, objects []*d.ObservedObject) (
 			}
 			id := obj.ObjectID
 			snap.Specs[id] = spec
-			if raw := d.Object(spec["funding"]); len(raw) > 0 {
+			fundingKey := "funding"
+			if t.FundingSource == "REFERENCE" {
+				fundingKey = "reference_funding"
+				snap.FundingSource = "REFERENCE"
+			}
+			if raw := d.Object(spec[fundingKey]); len(raw) > 0 {
 				var funding d.FundingObservation
 				// P1 may encode a whole-hour interval as an integer. Normalize this
 				// public scalar before admitting P2's decimal-string value model.

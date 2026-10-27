@@ -372,3 +372,26 @@ func TestS124SyncKeepsVenueAccountFigures(t *testing.T) {
 		t.Fatal("a broker without the figures cleared or replaced the last observation")
 	}
 }
+
+// S1-024 v2.17.0: the instrument view's reference rate is the latest settled
+// record; interval from the previous record, gone once the next is overdue.
+func TestS124ReferenceFundingObservation(t *testing.T) {
+	run, key, t0 := pnlRun(t)
+	got := run.ReferenceFundingObservation(key.Code())
+	if got == nil || got.Rate.Cmp(dec(t, "-0.002")) != 0 || got.IntervalHours != 8 || !got.ObservedAt.Equal(t0.Add(24*time.Hour)) || !got.NextFundingAt.Equal(t0.Add(32*time.Hour)) {
+		t.Fatalf("observation %+v", got)
+	}
+	// Hourly settlement after the venue's cap switch.
+	hourly := d.FundingSettlement{InstrumentKey: key, SettledAt: t0.Add(25 * time.Hour), Kind: "FUNDING", Rate: dec(t, "0.0003"), MarkPrice: dec(t, "60"), SourceID: "binance-mainnet-public"}
+	run.ReferenceFunding.Set(hourly.Key(), &hourly)
+	if got = run.ReferenceFundingObservation(key.Code()); got == nil || got.IntervalHours != 1 || got.Rate.Cmp(dec(t, "0.0003")) != 0 {
+		t.Fatalf("hourly observation %+v", got)
+	}
+	run.Clock = t0.Add(26*time.Hour + 31*time.Minute)
+	if got = run.ReferenceFundingObservation(key.Code()); got != nil {
+		t.Fatalf("overdue record still offered: %+v", got)
+	}
+	if run.ReferenceFundingObservation("BINANCE:LINEAR_PERPETUAL:OTHER") != nil {
+		t.Fatal("record of another instrument used")
+	}
+}

@@ -32,6 +32,7 @@ type Config struct {
 	TimeoutSeconds        float64        `toml:"timeout_seconds"`
 	CandleInterval        string         `toml:"candle_interval"`
 	HistorySeconds        int            `toml:"history_seconds"`
+	FundingSource         string         `toml:"funding_source"`
 	WorkerPollSeconds     float64        `toml:"worker_poll_seconds"`
 	ReplayClock           string         `toml:"replay_clock"`
 	QueryDefaultLimit     int            `toml:"query_default_limit"`
@@ -51,6 +52,9 @@ func Load(path string) (Config, error) {
 	}
 	c := root.Strategy
 	if !d.Has([]string{"SIM", "LIVE"}, c.Environment) || c.InstanceID == "" {
+		return Config{}, &d.Error{Code: "STRATEGY_CONFIGURATION_INCOMPLETE", Status: 503}
+	}
+	if !d.Has([]string{"", "RUN", "REFERENCE"}, c.FundingSource) {
 		return Config{}, &d.Error{Code: "STRATEGY_CONFIGURATION_INCOMPLETE", Status: 503}
 	}
 	if c.QueryCursorAgeSeconds < 0 || int64(c.QueryCursorAgeSeconds) > math.MaxInt64/int64(time.Second) {
