@@ -1060,3 +1060,21 @@ table.pnl .neg {
 table.pnl td small {
   color: var(--muted);
 }
+/* S4-017 v2.16.0: whether a judgment changed the position inputs. */
+.effect-tag {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  border: 1px solid var(--line);
+  white-space: nowrap;
+}
+.effect-applied {
+  color: #20573f;
+  background: #e8f3ec;
+  border-color: #c5dfcf;
+}
+.effect-recorded {
+  color: #7a827c;
+  background: transparent;
+}

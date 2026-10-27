@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import {
   record,
   rows,
@@ -49,6 +49,71 @@ export function dynamicRange(now = Date.now()): Record<string, string> {
     end: iso(end),
     from: iso(new Date(end.getTime() - 72 * 60 * minute)),
   };
+}
+
+// v2.16.0 (S4-017 / P4 design 20): only judgments that changed the position
+// inputs are marked by default. P3 records an injection action under the id
+// "<judgment_id>-<kind>-…" at the judgment's own time, so a judgment took
+// effect when an INJECTION action carries both its id prefix and its time.
+export type JudgmentEffect = { kinds: string[]; reasons: string[] };
+export function judgmentEffects(
+  judgments: Record<string, Json>[],
+  actions: Record<string, Json>[],
+): Map<string, JudgmentEffect> {
+  const out = new Map<string, JudgmentEffect>();
+  for (const j of judgments) {
+    const id = typeof j.judgment_id === "string" ? j.judgment_id : "";
+    if (!id || typeof j.at !== "string") continue;
+    const at = Date.parse(j.at);
+    const own = actions.filter(
+      (a) =>
+        a.source === "INJECTION" &&
+        typeof a.action_id === "string" &&
+        a.action_id.startsWith(id + "-") &&
+        typeof a.at === "string" &&
+        Date.parse(a.at) === at,
+    );
+    if (own.length === 0) continue;
+    out.set(id, {
+      kinds: [...new Set(own.map((a) => String(a.kind)))],
+      reasons: [...new Set(own.map((a) => (typeof a.reason === "string" ? a.reason : "")).filter((r) => r !== ""))],
+    });
+  }
+  return out;
+}
+const effectText: Record<string, string> = { INJECT: "注入", INVALIDATE: "作废原链", REVISE: "修订" };
+const markerColor = { LONG: "#267b59", SHORT: "#b15447", FLAT: "#55605a", MUTED: "#a3aca5", POSITION: "#2f5d8a" };
+export function chartMarkers(
+  judgments: Record<string, Json>[],
+  actions: Record<string, Json>[],
+  showRecorded: boolean,
+): TimeMarker[] {
+  const effects = judgmentEffects(judgments, actions);
+  const out: TimeMarker[] = [];
+  for (const j of judgments) {
+    if (j.ok !== true || typeof j.at !== "string") continue;
+    const dir = String(j.direction);
+    const effect = effects.get(String(j.judgment_id));
+    const label = `${dir === "LONG" ? "多" : dir === "SHORT" ? "空" : "平"}${j.confidence ?? ""}`;
+    if (effect) {
+      out.push({
+        at: j.at,
+        text: `${label} ${effect.kinds.map((k) => effectText[k] ?? k).join("·")}`,
+        color: dir === "LONG" ? markerColor.LONG : dir === "SHORT" ? markerColor.SHORT : markerColor.FLAT,
+        shape: dir === "LONG" ? "arrowUp" : dir === "SHORT" ? "arrowDown" : "circle",
+      });
+    } else if (showRecorded) {
+      out.push({ at: j.at, text: "", color: markerColor.MUTED, shape: "circle", size: 0.5 });
+    }
+  }
+  for (const a of actions) {
+    if (a.source !== "POSITION" || typeof a.at !== "string") continue;
+    if (a.kind === "OPEN")
+      out.push({ at: a.at, text: `开仓${typeof a.entry === "string" ? " " + Number(a.entry).toFixed(2) : ""}`, color: markerColor.POSITION, shape: "square" });
+    if (a.kind === "CLOSE")
+      out.push({ at: a.at, text: `平仓${typeof a.close === "string" ? " " + Number(a.close).toFixed(2) : ""}`, color: markerColor.POSITION, shape: "square" });
+  }
+  return out;
 }
 
 function text(v: Json): string | null {
@@ -223,27 +288,18 @@ export function DynamicView({
         })),
     [JSON.stringify(ladder.map((l) => [l.name, l.price]))],
   );
+  const [showRecorded, setShowRecorded] = useState(false);
+  const effects = useMemo(
+    () => judgmentEffects(judgments, actions),
+    [JSON.stringify(judgments.map((j) => j.judgment_id)), JSON.stringify(actions.map((a) => a.action_id))],
+  );
   const markers: TimeMarker[] = useMemo(
-    () =>
-      judgments
-        .filter((j) => j.ok === true && typeof j.at === "string")
-        .map((j) => ({
-          at: j.at as string,
-          text: `${j.direction === "LONG" ? "多" : j.direction === "SHORT" ? "空" : "平"}${j.confidence ?? ""}`,
-          color:
-            j.direction === "LONG"
-              ? "#267b59"
-              : j.direction === "SHORT"
-                ? "#b15447"
-                : "#738071",
-          shape:
-            j.direction === "LONG"
-              ? ("arrowUp" as const)
-              : j.direction === "SHORT"
-                ? ("arrowDown" as const)
-                : ("circle" as const),
-        })),
-    [JSON.stringify(judgments.map((j) => [j.judgment_id, j.direction]))],
+    () => chartMarkers(judgments, actions, showRecorded),
+    [
+      JSON.stringify(judgments.map((j) => [j.judgment_id, j.direction])),
+      JSON.stringify(actions.map((a) => a.action_id)),
+      showRecorded,
+    ],
   );
 
   return (
@@ -374,11 +430,17 @@ export function DynamicView({
           <h2>{selection.instrument_key.instrument_id} · 5 分钟最终 K 线（24 小时）</h2>
           <StateNote panel={candlePanel} />
         </div>
+        <div className="chart-tools">
+          <label>
+            <input type="checkbox" checked={showRecorded} onChange={(e) => setShowRecorded(e.target.checked)} />
+            显示未生效的研判（灰点）
+          </label>
+        </div>
         <Suspense fallback={<p role="status">正在装载图表…</p>}>
           <MarketChart candles={candles} lines={lines} markers={markers} live={live.kline} />
         </Suspense>
         <p className="muted">
-          箭头为研判时刻（空/多 + 信心），横线为入场价与各止损位（纵轴默认只按 K 线缩放，范围外的横线列在图下）；半透明的最后一根是交易所推送的未完成 K 线（参考），收盘后以 P1 最终 K 线为准；不画预测。
+          箭头只标改变了仓位依据的研判（注入、作废原链、修订；空/多 + 信心），其余研判只记录、不改变仓位，默认不画；方块为本批开仓与平仓（P3 记录）。横线为入场价与各止损位（纵轴默认只按 K 线缩放，范围外的横线列在图下）；半透明的最后一根是交易所推送的未完成 K 线（参考），收盘后以 P1 最终 K 线为准；不画预测。
         </p>
       </section>
 
@@ -401,6 +463,7 @@ export function DynamicView({
                       ? `${directionText[String(j.direction)] ?? j.direction} · 信心 ${j.confidence} · ${j.horizon_hours} 小时`
                       : `研判失败 · ${text(j.reason) ?? ""}`}
                   </strong>
+                  {j.ok === true && <EffectTag effect={effects.get(String(j.judgment_id))} />}
                   <span className="muted">{t(j.at)}</span>
                 </div>
                 {j.ok === true ? (
@@ -551,6 +614,16 @@ export function DynamicView({
   );
 }
 
+function EffectTag({ effect }: { effect?: JudgmentEffect }) {
+  if (!effect) return <span className="effect-tag effect-recorded">仅记录，未改变仓位</span>;
+  const reasons = effect.reasons.map((r) => reasonText[r] ?? r).join("、");
+  return (
+    <span className="effect-tag effect-applied">
+      {effect.kinds.map((k) => effectText[k] ?? k).join("·")}
+      {reasons ? `（${reasons}）` : ""}
+    </span>
+  );
+}
 const actionText: Record<string, string> = {
   INJECT: "注入研判",
   INVALIDATE: "研判失效",
@@ -570,4 +643,5 @@ const reasonText: Record<string, string> = {
   NEW_ITEMS: "新编号新闻",
   DIRECTION_FLIP: "方向改变",
   CONFIDENCE_DOWN: "信心下降",
+  INVALIDATED: "失效条件已出现",
 };

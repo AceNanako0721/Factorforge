@@ -57,7 +57,8 @@ export type TimeMarker = {
   at: string;
   text: string;
   color: string;
-  shape: "arrowUp" | "arrowDown" | "circle";
+  shape: "arrowUp" | "arrowDown" | "circle" | "square";
+  size?: number;
 };
 // v2.14.8: like TradingView, the price axis fits the bars by default; the
 // stop lines join the range only when the viewer asks for it.
@@ -266,10 +267,11 @@ export function MarketChart({
         if (!bar || at - Number(bar.time) > step * 2) continue;
         placed.push({
           time: bar.time,
-          position: m.shape === "arrowUp" ? "belowBar" : "aboveBar",
+          position: m.shape === "arrowUp" || m.shape === "square" ? "belowBar" : "aboveBar",
           shape: m.shape,
           color: m.color,
           text: m.text,
+          ...(m.size !== undefined ? { size: m.size } : {}),
         });
       }
       placed.sort((a, b) => Number(a.time) - Number(b.time));

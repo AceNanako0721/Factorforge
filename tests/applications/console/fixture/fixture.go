@@ -325,7 +325,9 @@ func newDynamicStore(b id.Binding, at time.Time) *dynamicStore {
 		records: []id.DynamicRecord{
 			{DynamicRecordKey: id.DynamicRecordKey{At: at.Add(-time.Hour), Kind: "STOP_EVENT", ID: "open-fixture-cycle"}, Payload: raw(map[string]any{"kind": "OPEN", "batch": batch})},
 			{DynamicRecordKey: id.DynamicRecordKey{At: at.Add(-2 * time.Hour), Kind: "JUDGMENT", ID: "fixture-judgment"}, Payload: raw(map[string]any{"judgment_id": "fixture-judgment", "at": at.Add(-2 * time.Hour), "ok": true, "provider": "gpt", "model": "fixture", "raw": "PRIVATE RAW", "input_ids": []string{"fixture-news"}, "output": map[string]any{"direction": "SHORT", "confidence": 3, "horizon_hours": 48, "thesis": "synthetic thesis", "key_item_ids": []string{"fixture-news"}, "invalidation": "synthetic"}})},
-			{DynamicRecordKey: id.DynamicRecordKey{At: at.Add(-2 * time.Hour), Kind: "ACTION", ID: "fixture-inject"}, Payload: raw(map[string]any{"kind": "INJECT", "reason": "FIRST_DIRECTION", "direction": "SHORT", "confidence": 3, "chain_id": "fixture-chain", "event_id": "e1"})},
+			// A later judgment that P3 only recorded: no action under its id (S4-017 v2.16.0).
+			{DynamicRecordKey: id.DynamicRecordKey{At: at.Add(-90 * time.Minute), Kind: "JUDGMENT", ID: "fixture-judgment-2"}, Payload: raw(map[string]any{"judgment_id": "fixture-judgment-2", "at": at.Add(-90 * time.Minute), "ok": true, "provider": "gpt", "model": "fixture", "input_ids": []string{"fixture-news"}, "output": map[string]any{"direction": "FLAT", "confidence": 3, "horizon_hours": 24, "thesis": "synthetic flat thesis", "key_item_ids": []string{"fixture-news"}, "invalidation": "synthetic"}})},
+			{DynamicRecordKey: id.DynamicRecordKey{At: at.Add(-2 * time.Hour), Kind: "ACTION", ID: "fixture-judgment-INJECT-0-e1"}, Payload: raw(map[string]any{"kind": "INJECT", "reason": "FIRST_DIRECTION", "direction": "SHORT", "confidence": 3, "chain_id": "fixture-chain", "event_id": "e1"})},
 		},
 		news: map[string]json.RawMessage{"fixture-news": raw(map[string]any{"source": "fixture-feed", "title": "Synthetic headline", "published_at": at.Add(-3 * time.Hour), "license_scope": "PUBLIC", "link": "https://private.invalid"})},
 	}
