@@ -185,6 +185,93 @@ func TestT229CloseStopExitRequestValidationAndZeroTarget(t *testing.T) {
 	}
 }
 
+// rejectingTrading refuses every delivery the way P1 refuses a stale
+// expected_version (B8's race).
+type rejectingTrading struct{ compositionTrading }
+
+func (t *rejectingTrading) Deliver(_ context.Context, _ *sd.ObservedObject, _ *sd.TargetOutbox, _ *sd.TradingSnapshot) (map[string]any, error) {
+	return nil, &sd.Error{Code: "VERSION_CONFLICT", Status: 409}
+}
+
+// B28 (v2.18.0): a refused close-stop exit is decided again, and expires once
+// its validity has passed with the batch still open.
+func TestT229CloseStopExitRedeliveredAfterRejectionThenExpires(t *testing.T) {
+	store, clock, service, snap, o, id, at, barAt := exitFixture(t)
+	if _, err := service.SubmitCloseExit(context.Background(), id, exitCommand(store, o, "exit-retry", barAt, nil)); err != nil {
+		t.Fatal(err)
+	}
+	clock.Advance(at.Add(time.Second))
+	snap.At = clock.Now()
+	first := tick(t, store, clock, snap, id)
+	if first.TargetQuantity.Sign() != 0 || !sd.Has(first.ReasonCodes, "CLOSE_STOP_EXIT") {
+		t.Fatal("close exit", first.TargetQuantity, first.ReasonCodes)
+	}
+	if err := (app.DecisionCycle{Store: store, Clock: clock, Trading: &rejectingTrading{compositionTrading{snap: snap}}}).Dispatch(context.Background(), id); err != nil {
+		t.Fatal(err)
+	}
+	state, _ := store.Read(context.Background(), o.InstanceID)
+	if r := state.ExitRequests.Value("exit-retry"); r.State != "ACCEPTED" || r.DecisionID != "" {
+		t.Fatal("refused exit must return to ACCEPTED", r.State, r.DecisionID)
+	}
+	if row := state.Outbox.Value(first.DecisionID); row == nil || row.State != "REJECTED" {
+		t.Fatal("delivery", row)
+	}
+	// The next cycle decides the exit again.
+	clock.Advance(at.Add(5 * time.Minute))
+	move(snap, o, clock.Now())
+	second := tick(t, store, clock, snap, id)
+	if second.TargetQuantity.Sign() != 0 || !sd.Has(second.ReasonCodes, "CLOSE_STOP_EXIT") || second.DecisionID == first.DecisionID {
+		t.Fatal("redelivered exit", second.TargetQuantity, second.ReasonCodes)
+	}
+	state, _ = store.Read(context.Background(), o.InstanceID)
+	if r := state.ExitRequests.Value("exit-retry"); r.State != "APPLIED" || r.DecisionID != second.DecisionID {
+		t.Fatal("second application", r.State, r.DecisionID)
+	}
+	// Acknowledged but the batch is still open past the validity: it expires
+	// and the cycle no longer forces zero.
+	settle(t, store, o.InstanceID)
+	clock.Advance(barAt.Add(sd.ExitRequestValidity + 5*time.Minute))
+	move(snap, o, clock.Now())
+	third := tick(t, store, clock, snap, id)
+	if sd.Has(third.ReasonCodes, "CLOSE_STOP_EXIT") {
+		t.Fatal("expired exit still applied", third.ReasonCodes)
+	}
+	state, _ = store.Read(context.Background(), o.InstanceID)
+	if r := state.ExitRequests.Value("exit-retry"); r.State != "EXPIRED" {
+		t.Fatal("expiry", r.State)
+	}
+}
+
+// Control: a pending exit never delivered also expires, and a closed batch
+// keeps APPLIED for the batch's exit kind.
+func TestT229PendingCloseExitExpiresAppliedClosedKept(t *testing.T) {
+	store, clock, service, snap, o, id, _, barAt := exitFixture(t)
+	if _, err := service.SubmitCloseExit(context.Background(), id, exitCommand(store, o, "exit-late", barAt, nil)); err != nil {
+		t.Fatal(err)
+	}
+	clock.Advance(barAt.Add(sd.ExitRequestValidity + time.Minute))
+	move(snap, o, clock.Now())
+	d := tick(t, store, clock, snap, id)
+	state, _ := store.Read(context.Background(), o.InstanceID)
+	if sd.Has(d.ReasonCodes, "CLOSE_STOP_EXIT") || state.ExitRequests.Value("exit-late").State != "EXPIRED" {
+		t.Fatal("pending exit past validity", d.ReasonCodes, state.ExitRequests.Value("exit-late").State)
+	}
+	if err := store.Transaction(context.Background(), o.InstanceID, func(s *sd.StrategyState) error {
+		s.ExitRequests.Set("exit-done", &sd.ExitRequestRecord{Request: sd.ExitRequest{ExitID: "exit-done", ObjectID: o.ObjectID, PositionDirection: "LONG", BarCloseAt: barAt}, State: "APPLIED", BatchID: "batch-old"})
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	settle(t, store, o.InstanceID)
+	clock.Advance(clock.Now().Add(5 * time.Minute))
+	move(snap, o, clock.Now())
+	tick(t, store, clock, snap, id)
+	state, _ = store.Read(context.Background(), o.InstanceID)
+	if state.ExitRequests.Value("exit-done").State != "APPLIED" {
+		t.Fatal("applied exit of another batch must stay", state.ExitRequests.Value("exit-done").State)
+	}
+}
+
 func TestT229ClosedBatchRecordsKindChainAndReentry(t *testing.T) {
 	_, _, _, snap, o, _, at, _ := exitFixture(t)
 	s, _, _, _, _, _ := riskUnitFixture(t)

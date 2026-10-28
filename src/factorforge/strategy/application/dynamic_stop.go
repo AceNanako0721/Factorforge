@@ -101,7 +101,18 @@ func (c DecisionCycle) DynamicTarget(ctx context.Context, state *d.StrategyState
 	current := m.Add(actual, pending)
 	for _, key := range state.ExitRequests.Keys() {
 		r := state.ExitRequests.Value(key)
-		if r.Request.ObjectID != obj.ObjectID || r.State != "ACCEPTED" {
+		if r.Request.ObjectID != obj.ObjectID {
+			continue
+		}
+		// v2.18.0: an exit still pending, or applied but never executed (the
+		// same batch is still open in its direction), ends at its validity.
+		open := actual.Sign() != 0 && d.DirectionName(actual) == r.Request.PositionDirection && (r.BatchID == "" || obj.RiskUnit != nil && obj.RiskUnit.BatchID == r.BatchID)
+		if (r.State == "ACCEPTED" || r.State == "APPLIED" && open) && at.After(r.Request.BarCloseAt.Add(d.ExitRequestValidity)) {
+			r.State = "EXPIRED"
+			state.AppendAudit(map[string]any{"action": "CLOSE_EXIT_EXPIRED", "request_id": key, "object_id": obj.ObjectID, "decision_id": r.DecisionID, "at": d.ISO(at)})
+			continue
+		}
+		if r.State != "ACCEPTED" {
 			continue
 		}
 		if actual.Sign() == 0 || d.DirectionName(actual) != r.Request.PositionDirection {
