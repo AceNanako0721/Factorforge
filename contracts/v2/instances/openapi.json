@@ -797,10 +797,7 @@
                   "close_stop",
                   "trailing",
                   "transferred",
-                  "trail_trigger",
-                  "stop_source",
-                  "ladder",
-                  "exit_pending"
+                  "trail_trigger"
                 ],
                 "type": "object"
               },
