@@ -318,7 +318,7 @@ func newDynamicStore(b id.Binding, at time.Time) *dynamicStore {
 	batch := map[string]any{"cycle_id": "fixture-cycle", "direction": -1, "entry": 107.8, "opened_at": at.Add(-time.Hour), "geometry": map[string]any{"tier": 72, "session": "OVERNIGHT", "r": 0.16, "buffer": 0.017, "trail": 0.16, "requested_tier": 72}, "budget": 40, "best_close": 103, "last_bar_at": at, "close_stop": 125.2, "trailing": false, "transferred": false}
 	return &dynamicStore{binding: b, at: at,
 		states: map[string]json.RawMessage{
-			"POSITION":     raw(map[string]any{"noise_id": "fixture-noise", "noise_at": at.Add(-2 * time.Hour), "batch": batch, "baseline": map[string]any{"phase": "", "started_at": "0001-01-01T00:00:00Z", "suspended_at": "0001-01-01T00:00:00Z"}, "equity_peak": 4010}),
+			"POSITION":     raw(map[string]any{"noise_id": "fixture-noise", "noise_at": at.Add(-2 * time.Hour), "batch": batch, "baseline": map[string]any{"phase": "", "started_at": "0001-01-01T00:00:00Z", "suspended_at": "0001-01-01T00:00:00Z"}, "equity_peak": 4010, "ladder": map[string]any{"step": 0.04, "round_trip_cost": 0.001}}),
 			"INJECTION":    raw(map[string]any{"active": map[string]any{"direction": "SHORT", "confidence": 3, "event_ids": []string{"e1"}, "chain_id": "fixture-chain", "since": at.Add(-2 * time.Hour)}, "last_judgment": "fixture-judgment"}),
 			"NEWS_SOURCES": raw(map[string]any{"fixture-feed": map[string]any{"failing": false, "last_success": at}}),
 		},

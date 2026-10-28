@@ -740,6 +740,28 @@ func TestT324CloseExitNotExecutedResumesTrailing(t *testing.T) {
 	}
 }
 
+// v2.19.0: LadderNext agrees with Ladder for every rung, long and short.
+func TestT329LadderNextMatchesLadder(t *testing.T) {
+	for _, dir := range []int{1, -1} {
+		entry, step, cost := 100.0, 0.04, 0.1
+		for _, gain := range []float64{0, 0.02, 0.04, 0.079, 0.08, 0.2} {
+			best := entry * (1 + float64(dir)*gain)
+			rung, locked, next, nextStop := d.LadderNext(dir, entry, best, step, cost)
+			m, stepped := d.Ladder(dir, entry, best, step, cost, 0)
+			if stepped != (rung > 0) || stepped && math.Abs(m-locked) > 1e-9 {
+				t.Fatal("rung", dir, gain, rung, locked, m, stepped)
+			}
+			m2, _ := d.Ladder(dir, entry, next, step, cost, 0)
+			if math.Abs(m2-nextStop) > 1e-9 || float64(dir)*(next-best) <= 0 {
+				t.Fatal("next", dir, gain, next, nextStop, m2)
+			}
+		}
+	}
+	if r, _, _, _ := d.LadderNext(1, 100, 120, 0, 0.1); r != 0 {
+		t.Fatal("step 0 has no ladder")
+	}
+}
+
 // ---------- store ----------
 
 func TestP3DynamicStorePostgresAppendCASAndIsolation(t *testing.T) {

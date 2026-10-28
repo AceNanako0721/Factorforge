@@ -119,6 +119,12 @@ func TestT328DynamicReadAPI(t *testing.T) {
 		t.Fatal(err)
 	}
 	batch := map[string]any{"cycle_id": "cycle-1", "direction": -1, "entry": 107.8, "opened_at": at.Add(34 * time.Minute), "geometry": map[string]any{"tier": 72, "session": "OVERNIGHT", "r": 0.1612, "buffer": 0.017, "trail": 0.1638, "requested_tier": 72}, "budget": 40, "best_close": 105.95, "last_bar_at": at.Add(2 * time.Hour), "close_stop": 125.2272, "trailing": false, "transferred": false}
+	// v2.19.0: a batch saved with a pending exit (no exit_bar_at, as before v2.18.0).
+	pending := map[string]any{}
+	for k, v := range batch {
+		pending[k] = v
+	}
+	pending["exit_id"] = "exit-cycle-1-20261016T0900"
 	for i := 0; i < 3; i++ {
 		if err = writer.AppendRecord(ctx, "STOP_EVENT", fmt.Sprintf("initial-%d", i), at.Add(time.Duration(i)*10*time.Minute), map[string]any{"kind": "INITIAL", "plan": map[string]any{"price": 107}}); err != nil {
 			t.Fatal(err)
@@ -127,9 +133,9 @@ func TestT328DynamicReadAPI(t *testing.T) {
 	if err = writer.AppendRecord(ctx, "STOP_EVENT", "open-cycle-1", at.Add(34*time.Minute), map[string]any{"kind": "OPEN", "batch": batch}); err != nil {
 		t.Fatal(err)
 	}
-	position := map[string]any{"noise_id": "noise-1", "noise_at": at.Add(-time.Hour), "versions": map[string]int{}, "batch": batch,
+	position := map[string]any{"noise_id": "noise-1", "noise_at": at.Add(-time.Hour), "versions": map[string]int{}, "batch": pending,
 		"initial":  map[string]any{"direction": -1, "geometry": map[string]any{"tier": 72, "session": "OVERNIGHT", "r": 0.16}, "price": 107.26, "distance": 19.11, "close_distance": 17.2, "risk_fraction": 0.01, "equity": 4001.03, "directive_id": "initial-20261016T072005Z"},
-		"baseline": map[string]any{"phase": "", "value": 0, "direction": 0, "started_at": "0001-01-01T00:00:00Z", "source_chain": "", "suspended_at": "0001-01-01T00:00:00Z"}, "baseline_at": at, "equity_peak": 4003.7, "outcomes": nil, "seen_cases": nil}
+		"baseline": map[string]any{"phase": "", "value": 0, "direction": 0, "started_at": "0001-01-01T00:00:00Z", "source_chain": "", "suspended_at": "0001-01-01T00:00:00Z"}, "baseline_at": at, "equity_peak": 4003.7, "outcomes": nil, "seen_cases": nil, "ladder": map[string]any{"step": 0.01, "round_trip_cost": 0.001}}
 	for key, value := range map[string]any{"POSITION": position, "INJECTION": map[string]any{"seen": []string{"news-a"}, "active": map[string]any{"direction": "SHORT", "confidence": 3, "event_ids": []string{"e1", "e2"}, "chain_id": "chain-1", "since": at}, "sequence": 2, "last_judgment": "j-3"}, "NEWS_SOURCES": map[string]any{"wscn-us": map[string]any{"failing": false, "last_success": at}, "cnbc-tech": map[string]any{"failing": true, "last_success": at.Add(-time.Hour)}},
 		// v2.13.0 S3-034: the follower cursor is stored under FOLLOW (migration 009).
 		"FOLLOW": map[string]any{"last_at": at, "last_id": "j-3"}} {
@@ -145,6 +151,14 @@ func TestT328DynamicReadAPI(t *testing.T) {
 	v := status.Data.(operations.DynamicStatusView)
 	if v.Batch == nil || v.Batch.Direction != "SHORT" || v.Batch.Entry != "107.8" || v.Batch.CloseStop != "125.2272" || v.Batch.TierHours != 72 || v.Batch.TrailTrigger != "90.42264" {
 		t.Fatalf("batch %+v", v.Batch)
+	}
+	// v2.19.0 (S3-032): 1% ladder, short from 107.8 with best 105.95 → rung 1
+	// (break-even plus cost), rung 2 at 105.644 locks 106.722.
+	if l := v.Batch.Ladder; l == nil || l.Step != "0.01" || l.Rung != 1 || l.RungStop == nil || *l.RungStop != "107.6922" || l.NextBest != "105.644" || l.NextStop != "106.722" || v.Batch.StopSource != "INITIAL" {
+		t.Fatalf("ladder %+v %s", v.Batch.Ladder, v.Batch.StopSource)
+	}
+	if e := v.Batch.ExitPending; e == nil || e.ExitID != "exit-cycle-1-20261016T0900" || !e.BarCloseAt.Equal(time.Date(2026, 10, 16, 9, 0, 0, 0, time.UTC)) || !e.ExpiresAt.Equal(time.Date(2026, 10, 16, 9, 30, 0, 0, time.UTC)) {
+		t.Fatalf("exit pending %+v", v.Batch.ExitPending)
 	}
 	if v.NextEntry == nil || v.NextEntry.PlannedAt == nil || !v.NextEntry.PlannedAt.Equal(time.Date(2026, 10, 16, 7, 20, 5, 0, time.UTC)) || v.Baseline.Phase != "NONE" || v.Baseline.StartedAt != nil {
 		t.Fatalf("plan/baseline %+v %+v", v.NextEntry, v.Baseline)

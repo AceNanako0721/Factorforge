@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"io"
+	"math"
 	"regexp"
 	"sort"
 	"strconv"
@@ -45,6 +46,23 @@ type DynamicBatchView struct {
 	Trailing           bool       `json:"trailing"`
 	Transferred        bool       `json:"transferred"`
 	TrailTrigger       string     `json:"trail_trigger"`
+	// v2.19.0 (S3-032): what set the current close stop, the ladder rungs
+	// and a close-stop exit still waiting to be executed.
+	StopSource  string               `json:"stop_source"`
+	Ladder      *DynamicLadderView   `json:"ladder"`
+	ExitPending *DynamicExitPendView `json:"exit_pending"`
+}
+type DynamicLadderView struct {
+	Step     string  `json:"step"`
+	Rung     int     `json:"rung"`
+	RungStop *string `json:"rung_stop"`
+	NextBest string  `json:"next_best"`
+	NextStop string  `json:"next_stop"`
+}
+type DynamicExitPendView struct {
+	ExitID     string    `json:"exit_id"`
+	BarCloseAt time.Time `json:"bar_close_at"`
+	ExpiresAt  time.Time `json:"expires_at"`
 }
 type DynamicEntryPlanView struct {
 	Direction     string     `json:"direction"`
@@ -167,6 +185,9 @@ type storedBatch struct {
 	CloseStop   float64        `json:"close_stop"`
 	Trailing    bool           `json:"trailing"`
 	Transferred bool           `json:"transferred"`
+	ExitID      string         `json:"exit_id"`
+	ExitBarAt   time.Time      `json:"exit_bar_at"`
+	StopReason  string         `json:"stop_reason"`
 }
 type storedPlan struct {
 	Direction   int            `json:"direction"`
@@ -192,7 +213,11 @@ type storedPosition struct {
 		Value       float64   `json:"value"`
 	} `json:"baseline"`
 	EquityPeak float64 `json:"equity_peak"`
-	Outcomes   []struct {
+	Ladder     *struct {
+		Step          float64 `json:"step"`
+		RoundTripCost float64 `json:"round_trip_cost"`
+	} `json:"ladder"`
+	Outcomes []struct {
 		R        float64 `json:"r"`
 		ClosedAt string  `json:"closed_at"`
 	} `json:"outcomes"`
@@ -312,6 +337,22 @@ func (q DynamicQuery) Status(ctx context.Context, p d.ReadPrincipal) (Record, er
 			CloseStop: decimal(b.CloseStop), Trailing: b.Trailing, Transferred: b.Transferred,
 			// The same +1R condition as domain.Trailing (P3 design 28), shown only.
 			TrailTrigger: decimal(b.Entry * (1 + dir*b.Geometry.R))}
+		v.Batch.StopSource = stopSource(b, pos.Ladder)
+		if l := pos.Ladder; l != nil && l.Step > 0 {
+			rung, locked, next, nextStop := d.LadderNext(b.Direction, b.Entry, b.BestClose, l.Step, l.RoundTripCost*b.Entry)
+			v.Batch.Ladder = &DynamicLadderView{Step: decimal(l.Step), Rung: rung, NextBest: decimal(round8(next)), NextStop: decimal(round8(nextStop))}
+			if rung > 0 {
+				rs := decimal(round8(locked))
+				v.Batch.Ladder.RungStop = &rs
+			}
+		}
+		if b.ExitID != "" {
+			at := b.ExitBarAt
+			if at.IsZero() && len(b.ExitID) >= 13 {
+				at, _ = time.Parse("20060102T1504", b.ExitID[len(b.ExitID)-13:])
+			}
+			v.Batch.ExitPending = &DynamicExitPendView{ExitID: b.ExitID, BarCloseAt: at.UTC(), ExpiresAt: at.Add(d.CloseExitValidity).UTC()}
+		}
 	}
 	if pl := pos.Initial; pl != nil {
 		v.NextEntry = &DynamicEntryPlanView{Direction: direction(pl.Direction), Price: decimal(pl.Price), Distance: decimal(pl.Distance), CloseDistance: decimal(pl.CloseDist), RiskFraction: decimal(pl.Fraction), Equity: decimal(pl.Equity), TierHours: pl.Geometry.Tier, Session: pl.Geometry.Session, DirectiveID: pl.DirectiveID}
@@ -608,3 +649,28 @@ func (q DynamicQuery) Actions(ctx context.Context, p d.ReadPrincipal, f Filter) 
 	}
 	return Page{meta, items, next}, nil
 }
+
+// stopSource names what set the batch's close stop: the recorded reason of
+// the last accepted POSITION_STOP, or, for batches saved before v2.19.0, the
+// ladder when its current rung equals the close stop (display only).
+func stopSource(b *storedBatch, ladder *struct {
+	Step          float64 `json:"step"`
+	RoundTripCost float64 `json:"round_trip_cost"`
+}) string {
+	switch {
+	case b.StopReason == "DYNAMIC_STOP_LADDER":
+		return "LADDER"
+	case b.StopReason != "":
+		return "TRAIL"
+	case !b.Trailing:
+		return "INITIAL"
+	case ladder != nil && ladder.Step > 0:
+		if rung, stop, _, _ := d.LadderNext(b.Direction, b.Entry, b.BestClose, ladder.Step, ladder.RoundTripCost*b.Entry); rung > 0 && math.Abs(stop-b.CloseStop) < 1e-6*b.Entry {
+			return "LADDER"
+		}
+	}
+	return "TRAIL"
+}
+
+// round8 drops binary floating-point tails from display conversions.
+func round8(v float64) float64 { return math.Round(v*1e8) / 1e8 }
