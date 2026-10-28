@@ -138,6 +138,10 @@ test("S4-017 judgment and stop page on desktop and phone width", async ({
     page.getByRole("heading", { name: "三层止损与价格", exact: true }),
   ).toBeVisible();
   await expect(page.getByText("收盘止损", { exact: true })).toBeVisible();
+  // v2.19.0: the ladder's next rung and what set the close stop are listed.
+  await expect(page.getByText("阶梯第 2 级触发价", { exact: true })).toBeVisible();
+  await expect(page.getByText("来自开仓时的初始止损 · 阶梯第 1 级", { exact: true })).toBeVisible();
+  await expect(page.getByText(/阶梯步长 4\.0% · 当前第 1 级/)).toBeVisible();
   await expect(page.getByText("synthetic thesis", { exact: true })).toBeVisible();
   await expect(page.getByText("注入研判 · 做空", { exact: true })).toBeVisible();
   // v2.16.0: the timeline says which judgment changed the position inputs.

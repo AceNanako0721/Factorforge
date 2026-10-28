@@ -3797,6 +3797,79 @@
                                         "entry": {
                                           "type": "string"
                                         },
+                                        "exit_pending": {
+                                          "anyOf": [
+                                            {
+                                              "additionalProperties": false,
+                                              "properties": {
+                                                "bar_close_at": {
+                                                  "format": "date-time",
+                                                  "pattern": "Z$",
+                                                  "type": "string"
+                                                },
+                                                "exit_id": {
+                                                  "type": "string"
+                                                },
+                                                "expires_at": {
+                                                  "format": "date-time",
+                                                  "pattern": "Z$",
+                                                  "type": "string"
+                                                }
+                                              },
+                                              "required": [
+                                                "exit_id",
+                                                "bar_close_at",
+                                                "expires_at"
+                                              ],
+                                              "type": "object"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "ladder": {
+                                          "anyOf": [
+                                            {
+                                              "additionalProperties": false,
+                                              "properties": {
+                                                "next_best": {
+                                                  "type": "string"
+                                                },
+                                                "next_stop": {
+                                                  "type": "string"
+                                                },
+                                                "rung": {
+                                                  "type": "integer"
+                                                },
+                                                "rung_stop": {
+                                                  "anyOf": [
+                                                    {
+                                                      "type": "string"
+                                                    },
+                                                    {
+                                                      "type": "null"
+                                                    }
+                                                  ]
+                                                },
+                                                "step": {
+                                                  "type": "string"
+                                                }
+                                              },
+                                              "required": [
+                                                "step",
+                                                "rung",
+                                                "rung_stop",
+                                                "next_best",
+                                                "next_stop"
+                                              ],
+                                              "type": "object"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
                                         "last_bar_at": {
                                           "anyOf": [
                                             {
@@ -3821,6 +3894,9 @@
                                           "type": "integer"
                                         },
                                         "session": {
+                                          "type": "string"
+                                        },
+                                        "stop_source": {
                                           "type": "string"
                                         },
                                         "tier_hours": {
@@ -3856,7 +3932,10 @@
                                         "close_stop",
                                         "trailing",
                                         "transferred",
-                                        "trail_trigger"
+                                        "trail_trigger",
+                                        "stop_source",
+                                        "ladder",
+                                        "exit_pending"
                                       ],
                                       "type": "object"
                                     },

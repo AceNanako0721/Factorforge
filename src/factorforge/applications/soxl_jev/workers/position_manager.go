@@ -73,6 +73,7 @@ type BatchState struct {
 	Transferred bool           `json:"transferred"`
 	ExitID      string         `json:"exit_id,omitempty"`
 	ExitBarAt   time.Time      `json:"exit_bar_at,omitempty"`
+	StopReason  string         `json:"stop_reason,omitempty"` // v2.19.0: reason of the last accepted POSITION_STOP
 	CloseFrozen bool           `json:"close_frozen,omitempty"`
 }
 type InitialPlan struct {
@@ -98,6 +99,13 @@ type PositionState struct {
 	EquityPeak float64          `json:"equity_peak"`
 	Outcomes   []d.BatchOutcome `json:"outcomes"`
 	SeenCases  []string         `json:"seen_cases"`
+	// v2.19.0 (S3-032): the registered ladder, recorded for the read view.
+	Ladder *LadderSetting `json:"ladder,omitempty"`
+}
+
+type LadderSetting struct {
+	Step          float64 `json:"step"`
+	RoundTripCost float64 `json:"round_trip_cost"`
 }
 
 type PositionManager struct {
@@ -123,6 +131,10 @@ func (m *PositionManager) Run(ctx context.Context) error {
 	}
 	if st.Versions == nil {
 		st.Versions = map[string]int{}
+	}
+	st.Ladder = nil
+	if s.LadderStep > 0 {
+		st.Ladder = &LadderSetting{Step: s.LadderStep, RoundTripCost: s.RoundTripCost}
 	}
 	if err = m.refreshNoise(ctx, &st, now); err != nil {
 		m.alert(ctx, "NOISE_TABLE_UNAVAILABLE", errCode(err))
@@ -476,7 +488,7 @@ func (m *PositionManager) manage(ctx context.Context, st *PositionState, p *subm
 		if _, err := m.Framework.SubmitStopDirective(ctx, directive); err != nil {
 			m.alert(ctx, "TRAIL_REJECTED", errCode(err))
 		} else {
-			b.Trailing = true
+			b.Trailing, b.StopReason = true, reason
 			if err = m.Store.AppendRecord(ctx, "STOP_EVENT", id, now, map[string]any{"kind": "TRAIL", "close_stop": m1, "trigger": trigger, "best": b.BestClose, "reason": reason}); err != nil {
 				return err
 			}

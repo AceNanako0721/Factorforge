@@ -20,7 +20,7 @@ import {
   scaleRange,
   zoomRange,
 } from "../../src/factorforge/applications/console/web/src/features/market-chart";
-import { chartMarkers, currentProtection, judgmentEffects } from "../../src/factorforge/applications/console/web/src/features/dynamic-page";
+import { chartMarkers, currentProtection, judgmentEffects, ladderInfo } from "../../src/factorforge/applications/console/web/src/features/dynamic-page";
 import { fundingGap, pnlRows } from "../../src/factorforge/applications/console/web/src/features/pnl-panel";
 describe("read-only browser semantics", () => {
   it("retains exact monetary strings and sorts without rounding", () => {
@@ -190,5 +190,24 @@ describe("S4-017 v2.16.0 effective judgment markers", () => {
     const all = chartMarkers(judgments, actions, true);
     expect(all).toHaveLength(4);
     expect(all.find((x) => x.at === "2026-10-26T03:01:02Z")).toMatchObject({ text: "", shape: "circle" });
+  });
+});
+
+describe("S4-017 v2.19.0 ladder stop", () => {
+  it("reads rung, next trigger and stop source from P3's batch view", () => {
+    const l = ladderInfo({
+      stop_source: "LADDER",
+      ladder: { step: "0.04", rung: 4, rung_stop: "96.1397", next_best: "103.008", next_stop: "99.5744" },
+      exit_pending: null,
+    });
+    expect(l).toEqual({ source: "阶梯止损", step: 0.04, rung: 4, rungStop: 96.1397, nextBest: 103.008, nextStop: 99.5744, exitExpiresAt: null });
+  });
+  it("shows no ladder without a registered step and keeps a pending exit", () => {
+    const l = ladderInfo({ stop_source: "INITIAL", ladder: null, exit_pending: { exit_id: "exit-1", bar_close_at: "2026-10-27T05:45:00Z", expires_at: "2026-10-27T06:15:00Z" } });
+    expect(l?.step).toBeNull();
+    expect(l?.source).toBe("开仓时的初始止损");
+    expect(l?.exitExpiresAt).toBe("2026-10-27T06:15:00Z");
+    expect(ladderInfo({})?.source).toBe("未记录");
+    expect(ladderInfo(null)).toBeNull();
   });
 });

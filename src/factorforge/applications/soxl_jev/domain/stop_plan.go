@@ -241,6 +241,32 @@ func Ladder(direction int, entry, best, step, cost, current float64) (float64, b
 	return m, true
 }
 
+// LadderNext is the display counterpart of Ladder (S3-033, v2.19.0): the
+// current rung k (0 below the first step), the close stop rung k locks
+// ((k−1) steps, at least break-even plus cost; 0 when k is 0), the best close
+// that reaches rung k+1 and the close stop that rung locks.
+func LadderNext(direction int, entry, best, step, cost float64) (rung int, rungStop, nextBest, nextStop float64) {
+	d := float64(direction)
+	if step <= 0 || entry <= 0 || direction == 0 {
+		return 0, 0, 0, 0
+	}
+	lock := func(steps float64) float64 {
+		m := entry * (1 + d*step*steps)
+		if breakEven := entry + d*cost; d*(m-breakEven) < 0 {
+			m = breakEven
+		}
+		return m
+	}
+	k := math.Floor(d*(best-entry)/entry/step + 1e-9)
+	if k < 0 {
+		k = 0
+	}
+	if k >= 1 {
+		rungStop = lock(k - 1)
+	}
+	return int(k), rungStop, entry * (1 + d*step*(k+1)), lock(k)
+}
+
 // CloseExitValidity (S3-028 v2.18.0) matches the framework's exit-request
 // validity: an exit not executed this long after its bar closed has expired.
 const CloseExitValidity = 30 * time.Minute

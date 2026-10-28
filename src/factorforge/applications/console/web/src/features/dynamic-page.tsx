@@ -116,6 +116,37 @@ export function chartMarkers(
   return out;
 }
 
+// S4-017 v2.19.0: the ladder and what set the close stop, from P3's batch
+// view (P3 S3-032); the browser only formats.
+export type LadderInfo = {
+  source: string;
+  step: number | null;
+  rung: number;
+  rungStop: number | null;
+  nextBest: number | null;
+  nextStop: number | null;
+  exitExpiresAt: string | null;
+};
+const stopSourceText: Record<string, string> = {
+  INITIAL: "开仓时的初始止损",
+  TRAIL: "移动止损",
+  LADDER: "阶梯止损",
+};
+export function ladderInfo(batch: Record<string, Json> | null | undefined): LadderInfo | null {
+  if (!batch) return null;
+  const l = batch.ladder && typeof batch.ladder === "object" && !Array.isArray(batch.ladder) ? record(batch.ladder) : null;
+  const exit = batch.exit_pending && typeof batch.exit_pending === "object" && !Array.isArray(batch.exit_pending) ? record(batch.exit_pending) : null;
+  return {
+    source: stopSourceText[String(batch.stop_source)] ?? "未记录",
+    step: l ? num(l.step) : null,
+    rung: l && typeof l.rung === "number" ? l.rung : 0,
+    rungStop: l ? num(l.rung_stop) : null,
+    nextBest: l ? num(l.next_best) : null,
+    nextStop: l ? num(l.next_stop) : null,
+    exitExpiresAt: exit ? text(exit.expires_at) : null,
+  };
+}
+
 function text(v: Json): string | null {
   return typeof v === "string" && v !== "" ? v : null;
 }
@@ -232,15 +263,27 @@ export function DynamicView({
       note: `${text(strategy.state) ?? "未记录"} · ${text(record(strategy.plan).trigger_kind) ?? ""}`,
       color: "#b15447",
     });
+  const ladderView = ladderInfo(batch);
   if (batch) {
     ladder.push({
       name: "收盘止损",
       price: num(batch.close_stop),
       source: "P3 记录（完成的 K 线收盘越过才退出，不挂单）",
-      note: batch.trailing === true ? "已启动移动止损" : "未移动",
+      note:
+        `来自${ladderView?.source ?? "未记录"}` +
+        (ladderView && ladderView.step !== null && ladderView.rung > 0 ? ` · 阶梯第 ${ladderView.rung} 级` : ""),
       color: "#c27c1a",
       dashed: true,
     });
+    if (ladderView && ladderView.step !== null && ladderView.nextBest !== null)
+      ladder.push({
+        name: `阶梯第 ${ladderView.rung + 1} 级触发价`,
+        price: ladderView.nextBest,
+        source: `P3 记录换算（步长 ${fmt(ladderView.step * 100, 1)}%）`,
+        note: `5 分钟收盘达到后，收盘止损上移到 ${fmt(ladderView.nextStop)}`,
+        color: "#6b4fa3",
+        dashed: true,
+      });
     ladder.push({
       name: "移动止损启动价（+1R）",
       price: num(batch.trail_trigger),
@@ -380,6 +423,9 @@ export function DynamicView({
             <p className="eyebrow">STOP LADDER</p>
             <h2>三层止损与价格</h2>
           </div>
+          {ladderView?.exitExpiresAt && (
+            <span className="badge state-STALE">收盘止损退出待执行（{t(ladderView.exitExpiresAt)} 前有效）</span>
+          )}
           <span className="badge">距离为显示换算</span>
         </div>
         {batch && (
@@ -391,6 +437,12 @@ export function DynamicView({
               回撤 {fmt(num(batch.trail) !== null ? num(batch.trail)! * 100 : null)}%
             </span>
             <span>最有利收盘 {text(batch.best_close)}</span>
+            {ladderView && ladderView.step !== null && (
+              <span>
+                阶梯步长 {fmt(ladderView.step * 100, 1)}% · 当前第 {ladderView.rung} 级
+                {ladderView.rungStop !== null ? `（锁定 ${fmt(ladderView.rungStop)}）` : "（未到第 1 级）"}
+              </span>
+            )}
             <span>批次 {text(batch.cycle_id)}</span>
           </p>
         )}
@@ -631,6 +683,7 @@ const actionText: Record<string, string> = {
   OPEN: "开仓",
   TRAIL: "移动止损",
   CLOSE_EXIT: "收盘止损退出",
+  CLOSE_EXIT_EXPIRED: "收盘止损退出未执行（已过期）",
   TRANSFER: "转入基线",
   CLOSE: "批次结束",
   STOP_SUSPEND: "基线暂停（止损后）",
@@ -644,4 +697,6 @@ const reasonText: Record<string, string> = {
   DIRECTION_FLIP: "方向改变",
   CONFIDENCE_DOWN: "信心下降",
   INVALIDATED: "失效条件已出现",
+  DYNAMIC_STOP_LADDER: "阶梯止损",
+  DYNAMIC_STOP_TRAIL: "移动止损",
 };
