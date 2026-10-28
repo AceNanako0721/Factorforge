@@ -936,6 +936,21 @@
         "04_Web管理台",
         "05_模型接入模块"
       ]
+    },
+    {
+      "version": "2.19.1",
+      "directory": "doc/v2.19.1",
+      "change_kind": "design",
+      "date": "2026-10-28",
+      "reason": "P3 设计第 38 章 / P4 设计第 21 章补充：batch 的 stop_source、ladder、exit_pending 改为可省略字段。管理台按契约校验下层返回，v2.19.0 列为必填会使旧版实例接口（E15 在 10-30 升级前）的状态被判为无效；部署前发现，对照测试确认。式样不变。代码同 PR。标签 v2.19.1-beta。",
+      "format": "html",
+      "document_pairs": [
+        "01_交易系统层",
+        "02_策略化框架层",
+        "03_SOXLUSDT_JEV应用实例",
+        "04_Web管理台",
+        "05_模型接入模块"
+      ]
     }
   ]
 }

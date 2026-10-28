@@ -47,10 +47,11 @@ type DynamicBatchView struct {
 	Transferred        bool       `json:"transferred"`
 	TrailTrigger       string     `json:"trail_trigger"`
 	// v2.19.0 (S3-032): what set the current close stop, the ladder rungs
-	// and a close-stop exit still waiting to be executed.
-	StopSource  string               `json:"stop_source"`
-	Ladder      *DynamicLadderView   `json:"ladder"`
-	ExitPending *DynamicExitPendView `json:"exit_pending"`
+	// and a close-stop exit still waiting to be executed. Optional (v2.19.1):
+	// instance APIs older than v2.19.0 omit them and stay readable.
+	StopSource  string               `json:"stop_source,omitempty"`
+	Ladder      *DynamicLadderView   `json:"ladder,omitempty"`
+	ExitPending *DynamicExitPendView `json:"exit_pending,omitempty"`
 }
 type DynamicLadderView struct {
 	Step     string  `json:"step"`
