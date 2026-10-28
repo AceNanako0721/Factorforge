@@ -279,6 +279,17 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 				if obj.LastCycle != nil && at.Before(*obj.LastCycle) {
 					return &d.Error{Code: "CLOCK_REWIND", Status: 422}
 				}
+				exit, err := CloseExitNow(state, obj, snap, at, p, sample)
+				if err != nil {
+					return err
+				}
+				if exit != nil {
+					outputs = append(outputs, exit)
+					spec := snap.Specs[obj.ObjectID]
+					value := m.Mul(m.Mul(m.Add(actual, pending), sample.Price), d.Amount(spec["contract_multiplier"]))
+					base = append(base, d.BaseRisk{Value: value, Stress: m.Mul(value.Abs(), p.MaxStopFraction), Group: riskGroup(spec)})
+					continue
+				}
 				if obj.LastCycle != nil && at.Sub(*obj.LastCycle).Seconds() < float64(p.CycleSeconds) {
 					if sample != nil {
 						spec := snap.Specs[obj.ObjectID]
