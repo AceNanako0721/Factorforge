@@ -445,7 +445,7 @@ func (m *PositionManager) manage(ctx context.Context, st *PositionState, p *subm
 			}
 		}
 	}
-	// v2.17.1 (B28): the batch is still open after the exit's validity, so the
+	// v2.18.0 (B28): the batch is still open after the exit's validity, so the
 	// exit was never executed; record it and resume trailing.
 	if b.ExitID != "" {
 		at := b.ExitBarAt

@@ -630,7 +630,7 @@ func TestT324PositionManagerTrailExitAndTransfer(t *testing.T) {
 	}
 }
 
-// B28 (v2.17.1): an exit request not executed within its validity is recorded
+// B28 (v2.18.0): an exit request not executed within its validity is recorded
 // as expired and the batch's stop trails again; within the validity it waits.
 func TestT324CloseExitNotExecutedResumesTrailing(t *testing.T) {
 	at := time.Date(2026, 10, 15, 15, 0, 5, 0, time.UTC)
@@ -705,7 +705,7 @@ func TestT324CloseExitNotExecutedResumesTrailing(t *testing.T) {
 	if len(ofKind(fw.directives, "POSITION_STOP")) != trails || len(alerts.codes) != 0 {
 		t.Fatal("trailed while the exit was pending", fw.directives, alerts.codes)
 	}
-	// A batch saved before v2.17.1 has no exit_bar_at: the bar time comes from the exit id.
+	// A batch saved before v2.18.0 has no exit_bar_at: the bar time comes from the exit id.
 	var legacy workers.PositionState
 	version, _ := store.LoadState(context.Background(), "POSITION", &legacy)
 	if legacy.Batch == nil || legacy.Batch.ExitBarAt.IsZero() {

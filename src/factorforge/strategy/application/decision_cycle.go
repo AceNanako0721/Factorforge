@@ -961,7 +961,7 @@ func (c DecisionCycle) Dispatch(ctx context.Context, identity d.Identity) error 
 					state.Objects.Value(obj.ObjectID).LastAdjustmentTradeAt = d.Ptr(now)
 				}
 			}
-			// v2.17.1 (S2-034): a refused close-stop exit goes back to ACCEPTED and
+			// v2.18.0 (S2-034): a refused close-stop exit goes back to ACCEPTED and
 			// is decided again next cycle, until ExitRequestValidity.
 			if status == "REJECTED" || status == "EXPIRED" {
 				for _, r := range state.ExitRequests.Values() {

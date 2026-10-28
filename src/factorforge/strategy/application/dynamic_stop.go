@@ -104,7 +104,7 @@ func (c DecisionCycle) DynamicTarget(ctx context.Context, state *d.StrategyState
 		if r.Request.ObjectID != obj.ObjectID {
 			continue
 		}
-		// v2.17.1: an exit still pending, or applied but never executed (the
+		// v2.18.0: an exit still pending, or applied but never executed (the
 		// same batch is still open in its direction), ends at its validity.
 		open := actual.Sign() != 0 && d.DirectionName(actual) == r.Request.PositionDirection && (r.BatchID == "" || obj.RiskUnit != nil && obj.RiskUnit.BatchID == r.BatchID)
 		if (r.State == "ACCEPTED" || r.State == "APPLIED" && open) && at.After(r.Request.BarCloseAt.Add(d.ExitRequestValidity)) {

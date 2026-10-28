@@ -193,7 +193,7 @@ func (t *rejectingTrading) Deliver(_ context.Context, _ *sd.ObservedObject, _ *s
 	return nil, &sd.Error{Code: "VERSION_CONFLICT", Status: 409}
 }
 
-// B28 (v2.17.1): a refused close-stop exit is decided again, and expires once
+// B28 (v2.18.0): a refused close-stop exit is decided again, and expires once
 // its validity has passed with the batch still open.
 func TestT229CloseStopExitRedeliveredAfterRejectionThenExpires(t *testing.T) {
 	store, clock, service, snap, o, id, at, barAt := exitFixture(t)
