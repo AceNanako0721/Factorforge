@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="ff:version" content="2.19.2"><meta name="ff:kind" content="specification"><meta name="ff:pair" content="04_Web管理台设计书.html"><title>04_Web管理台式样书 · Factorforge v2.19.2</title><style>
+:root{--ink:#172d40;--muted:#587083;--accent:#006e82;--line:#cfdee5;--paper:#fff;--bg:#edf3f6}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.8 system-ui,'Microsoft YaHei',sans-serif}
+a{color:var(--accent);text-underline-offset:3px;overflow-wrap:anywhere}header{background:#15384a;color:white;padding:28px max(24px,calc((100vw - 1320px)/2));border-bottom:5px solid #2eb6ad}
+header p{margin:0}header strong{font-size:23px}header a{color:#a9eee9}.shell{display:grid;grid-template-columns:245px minmax(0,1fr);gap:26px;max-width:1320px;margin:28px auto;padding:0 24px}
+nav{position:sticky;top:16px;align-self:start;max-height:calc(100vh - 32px);overflow:auto;padding:18px;background:var(--paper);border:1px solid var(--line);border-radius:12px;font-size:14px}
+nav a{display:block;padding:6px 0;text-decoration:none}main{overflow-wrap:anywhere;min-width:0;background:var(--paper);padding:30px 38px;border:1px solid var(--line);border-radius:12px}
+h1{font-size:30px;line-height:1.35;margin:0 0 18px}h2{font-size:23px;border-bottom:2px solid var(--line);padding:10px 0;margin:34px 0 18px;scroll-margin-top:20px}h3{font-size:18px;margin:25px 0 10px;scroll-margin-top:20px}p{margin:12px 0}
+.meta,.note{background:#eef7f8;border-left:4px solid var(--accent);padding:12px 16px;margin:18px 0;color:#294c60}.warning{background:#fff7e9;border-color:#d09b39}.table-wrap{overflow:auto;margin:18px 0}
+table{width:100%;border-collapse:collapse;font-size:14px}th{background:#e8f1f4;text-align:left}th,td{padding:11px 13px;border:1px solid var(--line);vertical-align:top;overflow-wrap:anywhere}td code{white-space:normal;overflow-wrap:anywhere}
+pre{padding:16px;background:#102d3d;color:#d8f2ed;border-radius:8px;overflow:auto;font:13px/1.7 Consolas,monospace}code{overflow-wrap:anywhere;font-family:Consolas,monospace;font-size:.9em;background:#edf3f6;padding:1px 4px;border-radius:3px}pre code{background:none;color:inherit;padding:0}
+figure{margin:24px 0;border:1px solid var(--line);border-radius:10px;padding:16px;background:#f8fbfc;overflow:auto}figure svg{display:block;width:100%;height:auto;min-width:520px}figcaption{font-size:14px;color:var(--muted);margin-top:12px}details{margin:12px 0}footer{color:var(--muted);font-size:13px;margin-top:28px;border-top:1px solid var(--line);padding-top:15px}li{margin:5px 0}.badge{display:inline-block;background:#d6eee8;color:#15564b;border-radius:5px;padding:0 7px;font-size:13px}
+@media(max-width:900px){.shell{display:block;padding:0 12px;margin:16px auto}nav{position:static;max-height:220px;margin-bottom:16px}main{padding:22px 18px}h1{font-size:25px}}
+@media print{body{background:white;font-size:11pt}.shell{display:block;margin:0;padding:0;max-width:none}nav,header{display:none}main{padding:0;border:0}h2,h3{break-after:avoid}figure,tr{break-inside:avoid}figure svg{min-width:0}pre{white-space:pre-wrap;overflow-wrap:anywhere}a{color:inherit}table{font-size:9pt}}
+</style></head><body><header><strong>Factorforge / 文档基线</strong><p>v2.19.2 · 2026-10-29 · 三层架构 · HTML 正文</p></header><div class="shell"><nav aria-label="文档目录"><a href="index.html">版本索引</a><a href="#section-1">1 功能边界与信息来源</a><a href="#section-2">2 页面与业务要求</a><a href="#section-3">S4-001 登录、范围与环境识别</a><a href="#section-4">S4-002 总览与独立运行状态</a><a href="#section-5">S4-003 行情与时间语义</a><a href="#section-6">S4-004 事件列表、证据与修订</a><a href="#section-7">S4-005 矢量评分与准入结果</a><a href="#section-8">S4-006 情绪组成与衰减追溯</a><a href="#section-9">S4-007 决策与目标/实际仓位</a><a href="#section-10">S4-008 持仓、订单、保护与账务</a><a href="#section-11">S4-009 案例观察、归因与反事实</a><a href="#section-12">S4-010 参数学习与自动生效</a><a href="#section-13">S4-011 采集、JEV 任务与供应商状态</a><a href="#section-14">S4-012 周期报告、告警与审计</a><a href="#section-15">S4-013 刷新、缺数和恢复逻辑</a><a href="#section-16">S4-014 检索与使用体验</a><a href="#section-17">S4-015 私有资产与部署</a><a href="#section-18">S4-016 可扩展性与实现状态</a><a href="#s4-017">S4-017 研判、止损与基线页</a><a href="#s4-018">S4-018 经认证隧道的远程访问</a><a href="#s4-019">S4-019 实时参考行情</a><a href="#s4-020">S4-020 持仓盈亏与真实资金费</a><a href="#section-19">3 用户操作逻辑</a><a href="#section-20">4 验收效果</a><a href="#section-21">5 与既有式样的关系</a></nav><main><div class="meta">04_Web管理台式样书 · <a href="04_Web管理台设计书.html">对应设计书</a></div><article id="document-body"><h1>Web 管理台仕様书</h1>
+<p>版本：2.19.2；日期：2026年10月27日。归属第三层应用，与 SOXLUSDT/JEV 实例平级。本书只定义功能、效果、业务逻辑与验收；代码、接口路径及开源参考位置由对应设计书定义。</p>
+<h2 id="section-1">1 功能边界与信息来源</h2>
+<p>管理台用于理解系统正在观察什么、为什么得到某个目标仓位、目标是否实际执行，以及案例和参数如何演变。它依赖公开的下层能力，与事件采集及模型分析应用分别运行；关闭管理台不影响交易保护、框架周期和实例任务。管理台可展示不同实例，首期只登记 SOXLUSDT/JEV。</p>
+<p>本版交付范围是观测与追溯界面、受限登录和显示偏好。挂单、撤单、修改止损、手工评分、启动实盘、授予信号资格、编辑真实提示词、手工批准学习或改变业务政策均不属于本版页面操作。实例启停的当前状态可以查看，操作入口留待单独式样。管理台不成为故障时的交易所应急通道。</p>
+<div class="note">显示交易层事实、框架判断与应用分析时，三种信息各自保留来源和状态。页面展示成功不等于评分准入、订单成交、参数生效或实盘可用。v2.10.0 起以 S4-017 展示 P3 新闻研判记录、止损与基线状态、P1 双层保护角色，以及 P2 风险单位/再入场门/判断链中框架已公开的字段；E15 假设账本页面仍未实现，按“尚未实现的能力明确显示未实现”处理。远程访问见 S4-018。v2.11.0 起以 S4-019 在该页增加交易所公开行情的实时参考层，账务仍以 P1 为准。</div>
+<figure id="spec-boundary"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 530" role="img" aria-labelledby="spec-boundary-title spec-boundary-desc"><title id="spec-boundary-title">图 S4-A：第三层两个平级应用与下层职责</title><desc id="spec-boundary-desc">Web 管理台，观察、追溯、显示偏好；SOXLUSDT / JEV 实例，采集、抽取、模型评分；策略化框架层，准入、情绪、目标、案例与学习；交易系统层，行情、实际执行、保护、账务与恢复</desc><defs><marker id="spec-boundary-arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L9,3 L0,6" fill="#39768a"/></marker></defs><path d="M220.0,101 L220.0,150.5 L450.0,150.5 L450.0,200" fill="none" stroke="#39768a" stroke-width="2" marker-end="url(#spec-boundary-arrow)"/><text x="343.0" y="143.5" font-size="13" fill="#45677a">只读</text><path d="M680.0,101 L680.0,150.5 L450.0,150.5 L450.0,200" fill="none" stroke="#39768a" stroke-width="2" marker-end="url(#spec-boundary-arrow)"/><text x="573.0" y="143.5" font-size="13" fill="#45677a">对象 / 事件 / 评分</text><path d="M450.0,280 L450.0,340.0 L450.0,340.0 L450.0,400" fill="none" stroke="#39768a" stroke-width="2" marker-end="url(#spec-boundary-arrow)"/><text x="458.0" y="333.0" font-size="13" fill="#45677a">目标 / 保护 / 事实</text><rect x="25" y="25" width="390" height="76" rx="9" fill="#e5f2f3" stroke="#72a4b2"/><text x="220.0" y="57.5" text-anchor="middle" font-size="15" fill="#17384a">Web 管理台</text><text x="220.0" y="78.5" text-anchor="middle" font-size="15" fill="#17384a">观察、追溯、显示偏好</text><rect x="485" y="25" width="390" height="76" rx="9" fill="#e5f2f3" stroke="#72a4b2"/><text x="680.0" y="57.5" text-anchor="middle" font-size="15" fill="#17384a">SOXLUSDT / JEV 实例</text><text x="680.0" y="78.5" text-anchor="middle" font-size="15" fill="#17384a">采集、抽取、模型评分</text><rect x="160" y="200" width="580" height="80" rx="9" fill="#e5f2f3" stroke="#72a4b2"/><text x="450.0" y="234.5" text-anchor="middle" font-size="15" fill="#17384a">策略化框架层</text><text x="450.0" y="255.5" text-anchor="middle" font-size="15" fill="#17384a">准入、情绪、目标、案例与学习</text><rect x="160" y="400" width="580" height="80" rx="9" fill="#e5f2f3" stroke="#72a4b2"/><text x="450.0" y="434.5" text-anchor="middle" font-size="15" fill="#17384a">交易系统层</text><text x="450.0" y="455.5" text-anchor="middle" font-size="15" fill="#17384a">行情、实际执行、保护、账务与恢复</text></svg><figcaption>图 S4-A：第三层两个平级应用与下层职责</figcaption></figure>
+<h2 id="section-2">2 页面与业务要求</h2>
+<h3 id="section-3">S4-001 登录、范围与环境识别</h3>
+<p>访问非公开页面先验证本地管理台用户。每次读取限定用户被允许的部署、环境、实例、账户运行和观测对象；没有权限时不能通过修改地址访问。固定且明显显示 SIM/LIVE、数据来源与运行绑定。切换展示环境只切换查看对象，不改变任何服务的部署环境或账户配置。当前对象失效时要求重新选择，不自动选择另一个实盘对象。</p>
+<h3 id="section-4">S4-002 总览与独立运行状态</h3>
+<p>总览显示实际权益与保证金、持仓、保护、风险锁、执行恢复状态、策略对象状态、情绪净值与最近决策，以及应用健康。按事实可用程度标注正常、陈旧、缺失、不可用或未实现。某个上层服务离线时，已经可用的下层信息仍可查看。任何 UNKNOWN、REQUIRED_UNSET、EXPERIMENT_ONLY 或未验证实盘能力必须原样显示并解释，不能因页面有绿色卡片转为已就绪。</p>
+<h3 id="section-5">S4-003 行情与时间语义</h3>
+<p>显示目标交易产品的 K 线、可成交/标记/指数价格及数据时间，分别标明价格用途。参考 SOXL ETF 或汇率须另行标明，不能混成合约行情。历史视图只包含当时已可用的记录；没有目标产品数据时显示缺失，不能拿 ETF 历史冒充。未闭合 K 线与最终 K 线必须区别，首期只能取得最终 K 线时明确这一能力限制。</p>
+<p>事件公开时间、接收时间、可用时间和评分完成时间分别展示。交易影响标记按实际生效时间放置，不把后来完成的评分放回新闻公开时点。显示时区可选择，查询及记录始终保持一致的绝对时间；夏令时变化不能改变事件顺序。</p>
+<h3 id="section-6">S4-004 事件列表、证据与修订</h3>
+<p>事件页显示事件类型、主体、事项、来源摘要、版本、转载/确认/修订/撤销关系，支持按对象、时间和状态检索。进入详情后能追溯每个事实的证据来源、许可状态、哈希与引用位置。原文只有在许可和本地权限允许时才能阅读；其他情况只显示受限元数据及不能查看的原因。</p>
+<p>最新版本与历史版本可对照。转载不能表现为新增交易贡献；纯确认、实质修订和撤销要分别标注。由来源更正造成的修改不能在页面覆盖旧事实，历史决策仍引用其当时版本。</p>
+<h3 id="section-7">S4-005 矢量评分与准入结果</h3>
+<p>显示方向、影响程度、生命周期、置信或质量信息，以及模型、量表、校准和提示词版本标识；真实提示词正文不进入页面。评分生产结果与框架准入结果分区显示：弃权、研究用途、隔离、待价格、待生效、已应用与被替代不可混为“评分成功”。修订可比较前后差异，但浏览器不自行将差异注入情绪池。</p>
+<h3 id="section-8">S4-006 情绪组成与衰减追溯</h3>
+<p>显示正向池、负向池、净值和逐事件贡献。进入贡献详情可看到初始量、剩余量、时间消耗、价格兑现、修订差额、失效清除与采用的冻结参数版本。图表只表示框架已经记录的结果；没有历史样本时显示当前快照，不能由页面重算出一条看似真实的衰减历史。</p>
+<h3 id="section-9">S4-007 决策与目标/实际仓位</h3>
+<p>决策页显示周期、输入截止时间、参数版本、前后等级、投影后目标、实际与未成交仓位、保护计划及确定性理由。目标送达状态、交易层受理状态、订单状态和成交事实分别展示。受理回执不能等同成交；DELIVERY_UNKNOWN 不显示为已成交或自动重发。</p>
+<p>跨层数据时间或版本不一致时，仓位比较标注“不同观测时点”，并给出各自时间。保留旧 owner_epoch、目标版本和历史引用，不将失效目标当作当前要求。暂停、风险拒绝、过期及恢复锁都有可见原因。</p>
+<figure id="spec-target"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 560" role="img" aria-labelledby="spec-target-title spec-target-desc"><title id="spec-target-title">图 S4-B：目标和真实交易事实的观察逻辑</title><desc id="spec-target-desc">读取周期决策，保留当时输入和冻结版本；读取目标送达状态，未知 / 拒绝 / 过期分别标注；核对交易层受理和目标版本，受理不等于成交；关联订单、部分成交与实际仓位，缺关联或时间不同则显示未确定；展示实际保护与完整账务，不重发目标，不重算交易结果</desc><defs><marker id="spec-target-arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L9,3 L0,6" fill="#39768a"/></marker></defs><path d="M450.0,88 L450.0,110.0 L450.0,110.0 L450.0,132" fill="none" stroke="#39768a" stroke-width="2" marker-end="url(#spec-target-arrow)"/><path d="M450.0,200 L450.0,222.0 L450.0,222.0 L450.0,244" fill="none" stroke="#39768a" stroke-width="2" marker-end="url(#spec-target-arrow)"/><path d="M450.0,312 L450.0,334.0 L450.0,334.0 L450.0,356" fill="none" stroke="#39768a" stroke-width="2" marker-end="url(#spec-target-arrow)"/><path d="M450.0,424 L450.0,446.0 L450.0,446.0 L450.0,468" fill="none" stroke="#39768a" stroke-width="2" marker-end="url(#spec-target-arrow)"/><rect x="190" y="20" width="520" height="68" rx="9" fill="#e5f2f3" stroke="#72a4b2"/><text x="450.0" y="48.5" text-anchor="middle" font-size="15" fill="#17384a">读取周期决策</text><text x="450.0" y="69.5" text-anchor="middle" font-size="15" fill="#17384a">保留当时输入和冻结版本</text><rect x="190" y="132" width="520" height="68" rx="9" fill="#e5f2f3" stroke="#72a4b2"/><text x="450.0" y="160.5" text-anchor="middle" font-size="15" fill="#17384a">读取目标送达状态</text><text x="450.0" y="181.5" text-anchor="middle" font-size="15" fill="#17384a">未知 / 拒绝 / 过期分别标注</text><rect x="190" y="244" width="520" height="68" rx="9" fill="#e5f2f3" stroke="#72a4b2"/><text x="450.0" y="272.5" text-anchor="middle" font-size="15" fill="#17384a">核对交易层受理和目标版本</text><text x="450.0" y="293.5" text-anchor="middle" font-size="15" fill="#17384a">受理不等于成交</text><rect x="190" y="356" width="520" height="68" rx="9" fill="#e5f2f3" stroke="#72a4b2"/><text x="450.0" y="384.5" text-anchor="middle" font-size="15" fill="#17384a">关联订单、部分成交与实际仓位</text><text x="450.0" y="405.5" text-anchor="middle" font-size="15" fill="#17384a">缺关联或时间不同则显示未确定</text><rect x="190" y="468" width="520" height="68" rx="9" fill="#e5f2f3" stroke="#72a4b2"/><text x="450.0" y="496.5" text-anchor="middle" font-size="15" fill="#17384a">展示实际保护与完整账务</text><text x="450.0" y="517.5" text-anchor="middle" font-size="15" fill="#17384a">不重发目标，不重算交易结果</text></svg><figcaption>图 S4-B：目标和真实交易事实的观察逻辑</figcaption></figure>
+<h3 id="section-10">S4-008 持仓、订单、保护与账务</h3>
+<p>可查实际持仓、订单、成交、保护覆盖与核验时间，以及手续费、资金费、其他收入和外部资金流。实际账务以交易层为准，不通过订单报价、目标数量或前端价格估算真实收益。不同币种保留单位；观察模式与强制模式的风险状态、would-trigger 与实际风险锁分别展示。保护已发出与保护已核验不可用同一状态色代替。</p>
+<h3 id="section-11">S4-009 案例观察、归因与反事实</h3>
+<p>案例页将 OPEN、OBSERVING、MATURE、CENSORED 与标签 IMMATURE、UNKNOWN、NEUTRAL、CORRECT、WRONG 分开。展示实际成交、风险批次、成本组成、退出和观察结束时间。未成熟案例不产生已确定的正确率。归因候选与已验证归因分开，真实收益、研究反事实和冻结对照分开，未知和执行污染有明确标识。</p>
+<h3 id="section-12">S4-010 参数学习与自动生效</h3>
+<p>展示学习理由、证据、样本或有效样本量、固定步长、前后参数版本、发布/拒绝/冻结/回滚状态及生效时点。结果无法由现有记录证明时显示未记录，不能仅凭参数值不同推断已发布。门控合格后的自动生效不等待用户查看页面；管理台没有逐笔批准门，也不把模型或提示词更换归入普通参数学习。</p>
+<h3 id="section-13">S4-011 采集、JEV 任务与供应商状态</h3>
+<p>展示来源启用情况、最近成功采集、最老积压、证据抽取完整性、任务队列、评分延迟、失败、限流和弃权，以及已记录的预算与供应商版本。研究、SIM 与 LIVE 的任务和预算分区显示；页面统计不能把三者合并成一个可互相消耗的交易配额。尚未实现的应用能力明确显示未实现，绝不补造任务或供应商结果。</p>
+<h3 id="section-14">S4-012 周期报告、告警与审计</h3>
+<p>报告包含目标/实际差异、风险事件、已成熟案例、未知比例、参数变化及未变化原因。告警展示来源、首次/最近时间和现状；浏览记录不等于故障已解决。历史审计可以按关联标识追溯，但隐私内容与真实提示词不能被公开导出。首期仅导出当前权限内的脱敏结构化记录，标注范围和生成时间，不生成暗含未展示原文的附件。</p>
+<h3 id="section-15">S4-013 刷新、缺数和恢复逻辑</h3>
+<p>首次访问、手动刷新和周期刷新均读取已提交状态。每个数据区独立显示装载、可用、空结果、陈旧、不可用、禁止和未实现；空数组、空值、零金额与请求失败语义不同。错误时保留最近一次成功结果并标明其年龄，不能继续展示为当前值。网络恢复后重新核验权限及所选绑定，再刷新；过期响应或其他环境响应不能覆盖当前页面。</p>
+<figure id="spec-refresh"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 650" role="img" aria-labelledby="spec-refresh-title spec-refresh-desc"><title id="spec-refresh-title">图 S4-C：刷新、缺数和恢复的业务逻辑</title><desc id="spec-refresh-desc">选择允许查看的环境、实例和对象；分别取得各来源的已提交状态；检查授权、来源和有效性；可用或真实空结果，显示事实、时间和质量；缺失 / 失联 / 陈旧 / 未实现，清楚显示原因；旧值保留年龄；恢复后重新核验范围并刷新，过期或跨环境结果不得覆盖当前页面</desc><defs><marker id="spec-refresh-arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L9,3 L0,6" fill="#39768a"/></marker></defs><path d="M450.0,84 L450.0,104.5 L450.0,104.5 L450.0,125" fill="none" stroke="#39768a" stroke-width="2" marker-end="url(#spec-refresh-arrow)"/><path d="M450.0,189 L450.0,214.5 L450.0,214.5 L450.0,240" fill="none" stroke="#39768a" stroke-width="2" marker-end="url(#spec-refresh-arrow)"/><path d="M450.0,304 L450.0,337.0 L210.0,337.0 L210.0,370" fill="none" stroke="#39768a" stroke-width="2" marker-end="url(#spec-refresh-arrow)"/><text x="338.0" y="330.0" font-size="13" fill="#45677a">可用</text><path d="M450.0,304 L450.0,337.0 L690.0,337.0 L690.0,370" fill="none" stroke="#39768a" stroke-width="2" marker-end="url(#spec-refresh-arrow)"/><text x="578.0" y="330.0" font-size="13" fill="#45677a">不可用</text><path d="M210.0,454 L210.0,494.5 L450.0,494.5 L450.0,535" fill="none" stroke="#39768a" stroke-width="2" marker-end="url(#spec-refresh-arrow)"/><path d="M690.0,454 L690.0,494.5 L450.0,494.5 L450.0,535" fill="none" stroke="#39768a" stroke-width="2" marker-end="url(#spec-refresh-arrow)"/><rect x="190" y="20" width="520" height="64" rx="9" fill="#e5f2f3" stroke="#72a4b2"/><text x="450.0" y="57.0" text-anchor="middle" font-size="15" fill="#17384a">选择允许查看的环境、实例和对象</text><rect x="190" y="125" width="520" height="64" rx="9" fill="#e5f2f3" stroke="#72a4b2"/><text x="450.0" y="162.0" text-anchor="middle" font-size="15" fill="#17384a">分别取得各来源的已提交状态</text><rect x="190" y="240" width="520" height="64" rx="9" fill="#fff1d8" stroke="#72a4b2"/><text x="450.0" y="277.0" text-anchor="middle" font-size="15" fill="#17384a">检查授权、来源和有效性</text><rect x="15" y="370" width="390" height="84" rx="9" fill="#e5f2f3" stroke="#72a4b2"/><text x="210.0" y="406.5" text-anchor="middle" font-size="15" fill="#17384a">可用或真实空结果</text><text x="210.0" y="427.5" text-anchor="middle" font-size="15" fill="#17384a">显示事实、时间和质量</text><rect x="495" y="370" width="390" height="84" rx="9" fill="#e5f2f3" stroke="#72a4b2"/><text x="690.0" y="406.5" text-anchor="middle" font-size="15" fill="#17384a">缺失 / 失联 / 陈旧 / 未实现</text><text x="690.0" y="427.5" text-anchor="middle" font-size="15" fill="#17384a">清楚显示原因；旧值保留年龄</text><rect x="190" y="535" width="520" height="70" rx="9" fill="#e5f2f3" stroke="#72a4b2"/><text x="450.0" y="564.5" text-anchor="middle" font-size="15" fill="#17384a">恢复后重新核验范围并刷新</text><text x="450.0" y="585.5" text-anchor="middle" font-size="15" fill="#17384a">过期或跨环境结果不得覆盖当前页面</text></svg><figcaption>图 S4-C：刷新、缺数和恢复的业务逻辑</figcaption></figure>
+<h3 id="section-16">S4-014 检索与使用体验</h3>
+<p>默认中文，状态码同时保留原值和解释。长列表支持筛选、排序、分页、列选择和详情定位，检索范围可复现。宽屏适合行情与证据并排查看，窄屏可滚动阅读全部字段。主要流程可用键盘操作；状态含文字，不只依赖颜色；复制标识或导出操作必须只使用已获授权的数据。</p>
+<h3 id="section-17">S4-015 私有资产与部署</h3>
+<p>管理台在本地、授权局域网，或按 S4-018 经认证隧道部署。浏览器不保存下层长期访问凭据、交易所或 JEV 密钥、真实提示词或数据库连接；显示偏好可以本地保存。访问任何资源都由服务端再次检查权限与环境。公共开源示例只包含虚构记录，无真实账户、原文、地址或提示词；缺私有配置时以显式示例/不可用状态运行，不能连接实盘。</p>
+<h3 id="section-18">S4-016 可扩展性与实现状态</h3>
+<p>页面以通用对象、实例、交易运行和产品标识组织，不在通用表格或导航中写死 SOXLUSDT/JEV。实例专有的来源和模型信息由独立页面适配，未来新增实例不修改交易或量化算法。每项界面能力可标记已实现、待实现、缺配置或不适用；文档发布不把 P3、Web 管理台或实盘验收标记为已完成。</p>
+<h3 id="s4-017">S4-017 研判、止损与基线页（v2.10.0）</h3>
+<p>为观察第三层 v2.9.0 的新闻研判与动态止损（P3 第 8 章、P2 第 11 章、E15 前向检验）增设一页，所有内容只读，并逐区标注来源、记录时间与状态：</p>
+<ul>
+<li><strong>仓位与账户</strong>（P1）：方向、数量、均价、权益、浮动与已实现盈亏、手续费、风险状态。</li>
+<li><strong>三层止损</strong>：收盘止损价（P3 记录，按完成的 K 线收盘判断，不挂单）、交易所策略止损与保险止损（P1 保护，显示角色、触发价、触发口径与核验状态）。每条线与当前标记价的距离、移动止损启动价、是否已启动移动止损、是否已转入基线、本批风险预算。<b>v2.19.0</b>：收盘止损注明来自初始止损、移动止损还是阶梯止损；登记了阶梯的实例另列阶梯步长、当前级数与锁定价，并以一行（图上一条虚线）给出下一级的触发收盘价与到达后的收盘止损；有尚待执行的收盘止损退出时标出其有效截止时刻。数值取自 P3 只读状态（S3-032），浏览器只换算距离。</li>
+<li><strong>行情图</strong>：目标合约最近的最终 K 线，叠加入场价与三条止损线。<b>v2.16.0 修订</b>：图上默认只在改变了仓位依据的研判时刻标注方向与信心，并写明动作（注入、作废原链、修订，见 S3-025）；只记录、未改变仓位的研判默认不画，勾选“显示未生效的研判”后以灰点显示；另标出本批开仓与平仓的时刻与价格（P3 动作记录）。图只显示已记录的数据，不画预测线。</li>
+<li><strong>研判时间线</strong>：每次研判的时间、方向、信心、影响时长、理由、反面因素、失效条件、引用的新闻标题与来源；失败的研判显示原因；v2.16.0 起每条研判注明是否生效：“注入 / 作废原链 / 修订”及原因，或“仅记录，未改变仓位”，依据与动作时间线相同的 P3 动作记录。</li>
+<li><strong>动作时间线</strong>：注入、失效、开仓、移动止损、收盘退出、转基线、批次结束、基线暂停/重开/归零。</li>
+<li><strong>判断链与行情基线</strong>：当前判断链方向、信心、起点与包含的研判数；基线阶段、方向与数值。</li>
+<li><strong>框架状态</strong>（P2 对象）：风险单位、再入场门与判断链亏损等框架已经公开的字段，原样显示。</li>
+<li><strong>新闻来源</strong>：各来源最近成功时间与是否中断；下次开仓的初始止损计划及所用波动表版本。</li>
+</ul>
+<p>距离、R 倍数等只是显示换算，标明所用价格与时间，不作为账务事实；账务以 P1 为准。三个来源的观测时间不同时并列各自时间，不合成为同一时点。尚无批次、尚无研判或 P3 未配置时分别显示“无持仓”“未记录”“未配置”。页面仍然不提供平仓、改止损、触发研判或修改参数的操作。E15 的假设账本尚未实现，页面显示“未实现”。</p>
+<h3 id="s4-018">S4-018 经认证隧道的远程访问（v2.10.0）</h3>
+<p>用户可以经登记的公网域名远程查看管理台，条件是：域名入口先由隧道边缘按登记邮箱认证，未认证请求到不了管理台；管理台只接受来自登记隧道主机（及本机）的连接，只认登记的公开地址作为 Origin；进入后仍需管理台本地登录，会话与权限规则不变。远程访问只开放只读页面，不新增任何写操作；隧道停止或失效时，本地访问和下层运行不受影响。隧道令牌与边缘配置属于部署私有资产，不进入仓库。</p>
+<h3 id="s4-019">S4-019 实时参考行情（v2.11.0）</h3>
+<p>依据用户 2026-10-17 的要求（页面上的 K 线和浮动盈亏每分钟才变一次，太慢，改用推送）。在“研判与止损”页增加一层实时参考：由管理台服务端订阅交易所公开行情推送（标记价，以及正在形成的 K 线），再通过同一会话推送给浏览器，正常情况下从交易所到页面在 2 秒以内。</p>
+<ul>
+<li><strong>参考标记价</strong>：最新收到的标记价，以及交易所给出的时间。</li>
+<li><strong>参考浮动盈亏</strong>：P1 当前仓位数量 ×（参考标记价 − P1 持仓均价），同时按本批风险预算换算成 R。与 P1 账本浮盈并排显示，标明“参考”。</li>
+<li><strong>止损梯</strong>：增加“参考标记价”一行，并给各价位加一列“相对参考标记价”的距离。</li>
+<li><strong>K 线图</strong>：在最终 K 线之后画出正在形成的那一根，样式与最终 K 线不同（半透明）。这根 K 线收盘后，以 P1 记录的最终 K 线为准。</li>
+</ul>
+<p>参考值只来自交易所公开行情，不需要任何账户凭据；不写入任何存储，不参与 P1 账务、P2 决策或 P3 止损判断，也不能当作账务事实。账本上的数字（P1 浮盈、权益、仓位）仍然按刷新周期读取。参考层有四种状态：连接中；实时；过期（超过登记的秒数没收到推送，数字变灰，并显示最后收到的时间）；不可用（连接失败，或该绑定不适用）。参考层不可用时，页面其余部分照常显示。只有登记了公开行情来源的绑定才启用参考层（当前为 BINANCE 永续合约），其他绑定显示“不适用”。会话失效、退出或撤权后，推送立即停止。本层不提供任何写操作。</p>
+<p>把 P1 行情采集也改成推送（让账本和 SIM 止损都按秒级行情运行）是另一项变更。它会改变正在运行的 E15 的实验条件，因此按用户决定，在 E15 中期报告（2026-10-30）之后作为新的实验段另行发布式样，本版不包含。</p>
+<h3 id="s4-020">S4-020 持仓盈亏与真实资金费（v2.15.0）</h3>
+<p>依据用户 2026-10-27 的要求，在“研判与止损”页增加“持仓盈亏”区块，数字全部来自交易层（S1-024），管理台只做展示，不自行计算账务。区块分“当前持仓”（本轮持仓开出以来）与“累计”（运行以来）两行，每个数字旁标明来源：<b>交易所</b>或<b>系统计算</b>。</p>
+<ul>
+<li><strong>系统内部模拟撮合的运行</strong>：显示“按真实资金费”的合计，下面拆成交易盈亏与真实资金费两项，均标“系统计算”。</li>
+<li><strong>模拟盘</strong>：并排显示“模拟盘实际”（交易盈亏 + 模拟盘资金费，标“交易所”）与“按真实资金费”（交易盈亏 + 真实资金费，资金费标“系统计算”），并列出两者的资金费差额。</li>
+<li><strong>实盘</strong>：显示实际盈亏（交易所）；参考资金费只用于核对，一致时不单独显示，不一致时显示告警与差额。</li>
+<li>同时显示交易所数字的观测时刻与真实资金费结算记录截至的时刻；记录过期显示“资金费待更新”。交易所数字未取得、交易层版本不提供该区块时，对应位置显示未取得或未提供，不以其他数字代替。</li>
+</ul>
+<h2 id="section-19">3 用户操作逻辑</h2>
+<ol><li>登录并选择允许查看的环境、实例和对象，确认运行绑定。</li><li>先查看总览的事实状态，再进入行情、事件或决策详情。</li><li>由事件版本定位评分和贡献，由贡献定位周期决策，再关联目标、订单和实际成交；缺失关联明确停止追溯并提示缺项。</li><li>由实际案例进入观察、归因和学习记录，对照证据及生效版本。</li><li>退出或权限撤销后清除页面数据和会话；切换环境不能携带前一环境缓存。</li></ol>
+<h2 id="section-20">4 验收效果</h2>
+<div class="table-wrap"><table><thead><tr><th>编号</th><th>场景</th><th>应达到的效果</th><th>覆盖要求</th></tr></thead><tbody>
+<tr><td>T4-01</td><td>未登录、越权和跨环境访问</td><td>服务端拒绝；没有秘密或其他实例数据泄漏</td><td>S4-001、015</td></tr>
+<tr><td>T4-02</td><td>P3 或前端停止</td><td>P1/P2 运行不受影响；已有下层事实仍可查看</td><td>S4-002、016</td></tr>
+<tr><td>T4-03</td><td>产品无历史、未闭合 K 线、参考价格陈旧</td><td>产品/时间/质量清楚，不造合约历史</td><td>S4-003</td></tr>
+<tr><td>T4-04</td><td>转载、修订、撤销与受限原文</td><td>历史版本可追溯；许可未知不展示原文</td><td>S4-004、005</td></tr>
+<tr><td>T4-05</td><td>衰减、兑现、修订及缺历史</td><td>显示已记录账本与版本，不由页面推演业务值</td><td>S4-006</td></tr>
+<tr><td>T4-06</td><td>目标 ACK、未知、拒绝、部分成交</td><td>送达/受理/实际事实分开，不重复提交</td><td>S4-007、008</td></tr>
+<tr><td>T4-07</td><td>收益含手续费、资金费和外部流</td><td>金额、单位、来源正确，风险观察与强制不混淆</td><td>S4-008</td></tr>
+<tr><td>T4-08</td><td>未成熟、删失、未知及反事实案例</td><td>不提前定标签，不混入真实收益</td><td>S4-009</td></tr>
+<tr><td>T4-09</td><td>用户离线时自动发布或回滚</td><td>下层按既有门控执行，页面展示历史而不增加批准门</td><td>S4-010</td></tr>
+<tr><td>T4-10</td><td>供应商失败和不同预算分区</td><td>显示真实状态与隔离；未实现不显示虚构成功</td><td>S4-011</td></tr>
+<tr><td>T4-11</td><td>报告、导出与审计</td><td>权限内记录可复现；无秘密、受限原文或隐藏数据</td><td>S4-012、015</td></tr>
+<tr><td>T4-12</td><td>断网、迟到响应、切环境、401/403</td><td>缓存有陈旧标记，旧响应不覆盖新范围，撤权后清空</td><td>S4-013</td></tr>
+<tr><td>T4-13</td><td>键盘与窄屏阅读</td><td>导航、表格与详情可用；文字说明完整</td><td>S4-014</td></tr>
+<tr><td>T4-14</td><td>新增虚构实例、不提供 P3 或缺私有配置</td><td>通用页面不改算法；缺项与示例状态明确</td><td>S4-002、015、016</td></tr>
+<tr><td>T4-15</td><td>有持仓、无持仓、研判失败、P3 未配置、三源时间不一致；生效与仅记录的研判（v2.16.0）</td><td>三层止损与来源、时间正确；缺项分别标注；换算不当作账务；图上默认只标生效研判与本批开平仓，勾选后才显示未生效研判；时间线的生效标注与动作记录一致；无写操作</td><td>S4-017</td></tr>
+<tr><td>T4-16</td><td>未经边缘认证、非登记主机直连、错误 Origin、隧道停止</td><td>请求被拒且无数据泄漏；登录与会话规则不变；本地访问照常</td><td>S4-015、018</td></tr>
+<tr><td>T4-17</td><td>推送正常、推送中断或过期、无持仓、会话过期、不适用的绑定</td><td>参考值按秒更新并标明“参考”；中断或过期时数字变灰或显示不可用，账本区块不受影响；会话失效后推送停止；无写操作</td><td>S4-019</td></tr>
+<tr><td>T4-19</td><td>阶梯实例与非阶梯实例、未到第 1 级、收盘止损来源三种、待执行的收盘止损退出</td><td>阶梯步长、级数、锁定价与下一级行按 P3 数字显示，图上有下一级虚线；非阶梯实例不显示阶梯；来源与待执行标记正确；动作时间线写明阶梯 / 移动与退出未执行；无写操作</td><td>S4-017</td></tr><tr><td>T4-18</td><td>内部撮合运行、模拟盘运行、实盘一致与不一致、交易所数字未取得、结算记录过期、旧版交易层</td><td>来源标签与数字对应交易层输出；模拟盘两种合计与资金费差额正确；缺项显示未取得或未提供，不以其他数字代替；过期显示待更新；无写操作</td><td>S4-020</td></tr>
+</tbody></table></div>
+<h2 id="section-21">5 与既有式样的关系</h2>
+<p>继承 S1 的交易事实与最终风控、S2 的确定性计算/学习以及 S3 的证据和分析职责。本书不改变这些业务规则；新增通用只读追溯能力见本版 S2-024，实例只读展示能力见本版 S3-018，研判与止损只读查询见 S3-032；持仓盈亏的来源与真实资金费参考见 S1-024。对应设计书将分别说明已存在和待实现的接口，验收必须以实际程序证据为准。</p>
+</article><footer>HTML 是本版唯一发布正文。图表为内嵌 SVG，无需联网或运行脚本。文档通过不代表程序实现、交易运行或实盘准入通过。</footer></main></div></body></html>

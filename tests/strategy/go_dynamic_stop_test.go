@@ -242,6 +242,79 @@ func TestT229CloseStopExitRedeliveredAfterRejectionThenExpires(t *testing.T) {
 	}
 }
 
+// v2.19.2 (S2-034 "immediately"): an exit accepted after its period's cycle
+// was decided goes out on the next scheduler tick, not one period later.
+func TestT240CloseExitAcceptedAfterCycleDeliveredBeforeNextPeriod(t *testing.T) {
+	// The fixture policy cycles every 60 s; every tick below stays in the
+	// period decided at 00:00.
+	store, clock, service, snap, o, id, at, barAt := exitFixture(t)
+	cycle := tick(t, store, clock, snap, id)
+	if sd.Has(cycle.ReasonCodes, "CLOSE_STOP_EXIT") {
+		t.Fatal("no exit yet", cycle.ReasonCodes)
+	}
+	settle(t, store, o.InstanceID)
+	clock.Advance(at.Add(10 * time.Second))
+	move(snap, o, clock.Now())
+	if _, err := service.SubmitCloseExit(context.Background(), id, exitCommand(store, o, "exit-after-cycle", barAt, nil)); err != nil {
+		t.Fatal(err)
+	}
+	clock.Advance(at.Add(20 * time.Second))
+	move(snap, o, clock.Now())
+	exit := tick(t, store, clock, snap, id)
+	if exit.TargetQuantity.Sign() != 0 || !sd.Has(exit.ReasonCodes, "CLOSE_STOP_EXIT") || exit.CycleID != "close-exit:exit-after-cycle" {
+		t.Fatal("exit between cycles", exit.TargetQuantity, exit.ReasonCodes, exit.CycleID)
+	}
+	state, _ := store.Read(context.Background(), o.InstanceID)
+	row := state.Outbox.Value(exit.DecisionID)
+	if row == nil || row.State != "PENDING" || row.TargetVersion <= state.Outbox.Value(cycle.DecisionID).TargetVersion {
+		t.Fatal("exit outbox", row)
+	}
+	if r := state.ExitRequests.Value("exit-after-cycle"); r.State != "APPLIED" || r.DecisionID != exit.DecisionID || r.BatchID != "batch-fixture" {
+		t.Fatal("applied", r.State, r.DecisionID, r.BatchID)
+	}
+	// Applied once: a further tick in the same period decides nothing.
+	clock.Advance(at.Add(30 * time.Second))
+	move(snap, o, clock.Now())
+	if out, err := (app.DecisionCycle{Store: store, Clock: clock, Trading: &compositionTrading{snap: snap}}).Tick(context.Background(), id, nil); err != nil || len(out) != 0 {
+		t.Fatal("second tick", len(out), err)
+	}
+	// Refused by the trading layer: back to ACCEPTED and sent again at once.
+	if err := (app.DecisionCycle{Store: store, Clock: clock, Trading: &rejectingTrading{compositionTrading{snap: snap}}}).Dispatch(context.Background(), id); err != nil {
+		t.Fatal(err)
+	}
+	clock.Advance(at.Add(40 * time.Second))
+	move(snap, o, clock.Now())
+	snap.Version++
+	again := tick(t, store, clock, snap, id)
+	if again.TargetQuantity.Sign() != 0 || again.DecisionID == exit.DecisionID || again.CycleID != "close-exit:exit-after-cycle" {
+		t.Fatal("redelivered between cycles", again.DecisionID, again.CycleID)
+	}
+}
+
+// Control: an exit past its validity or against the held direction is left
+// to the cycle, which expires or drops it (v2.18.0).
+func TestT240CloseExitBetweenCyclesLeavesInvalidToCycle(t *testing.T) {
+	store, clock, _, snap, o, id, at, barAt := exitFixture(t)
+	tick(t, store, clock, snap, id)
+	settle(t, store, o.InstanceID)
+	if err := store.Transaction(context.Background(), o.InstanceID, func(s *sd.StrategyState) error {
+		s.ExitRequests.Set("exit-old", &sd.ExitRequestRecord{Request: sd.ExitRequest{ExitID: "exit-old", ObjectID: o.ObjectID, PositionDirection: "LONG", BarCloseAt: barAt.Add(-sd.ExitRequestValidity - 5*time.Minute)}, State: "ACCEPTED"})
+		s.ExitRequests.Set("exit-short", &sd.ExitRequestRecord{Request: sd.ExitRequest{ExitID: "exit-short", ObjectID: o.ObjectID, PositionDirection: "SHORT", BarCloseAt: barAt}, State: "ACCEPTED"})
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	clock.Advance(at.Add(40 * time.Second))
+	move(snap, o, clock.Now())
+	if out, err := (app.DecisionCycle{Store: store, Clock: clock, Trading: &compositionTrading{snap: snap}}).Tick(context.Background(), id, nil); err != nil || len(out) != 0 {
+		t.Fatal("invalid exits decided between cycles", len(out), err)
+	}
+	state, _ := store.Read(context.Background(), o.InstanceID)
+	if state.ExitRequests.Value("exit-old").State != "ACCEPTED" || state.ExitRequests.Value("exit-short").State != "ACCEPTED" {
+		t.Fatal("left to the cycle", state.ExitRequests.Value("exit-old").State, state.ExitRequests.Value("exit-short").State)
+	}
+}
+
 // Control: a pending exit never delivered also expires, and a closed batch
 // keeps APPLIED for the batch's exit kind.
 func TestT229PendingCloseExitExpiresAppliedClosedKept(t *testing.T) {

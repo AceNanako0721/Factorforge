@@ -101,6 +101,62 @@ func (s Service) SubmitCloseExit(ctx context.Context, identity d.Identity, reque
 	})
 }
 
+// CloseExitNow delivers an accepted close-stop exit between cycles (S2-034
+// "immediately", v2.19.2). The cycle of the request's period may already have
+// been decided before the request arrived; the exit then goes out on the next
+// scheduler tick instead of waiting for the next period. Anything the cycle
+// itself must judge (expiry, direction change) is left to it. Going to zero
+// only reduces, so like the cycle it needs a valid price and the owner epoch,
+// not a NORMAL recovery state.
+func CloseExitNow(state *d.StrategyState, obj *d.ObservedObject, snap *d.TradingSnapshot, at time.Time, p *d.Policy, sample *d.MarketSample) (*d.DecisionView, error) {
+	if obj.LastCycle == nil || at.Sub(*obj.LastCycle).Seconds() >= float64(p.CycleSeconds) || sample == nil || sample.Quality != "VALID" || snap.OwnerEpochs[obj.ObjectID] != obj.OwnerEpoch {
+		return nil, nil
+	}
+	actual, pending := snap.Actual[obj.ObjectID], snap.Pending[obj.ObjectID]
+	for _, key := range state.ExitRequests.Keys() {
+		r := state.ExitRequests.Value(key)
+		if r.Request.ObjectID != obj.ObjectID || r.State != "ACCEPTED" || at.After(r.Request.BarCloseAt.Add(d.ExitRequestValidity)) || actual.Sign() == 0 || d.DirectionName(actual) != r.Request.PositionDirection {
+			continue
+		}
+		id := "decision-" + d.Digest([]any{state.InstanceID, state.Environment, obj.ObjectID, "close-exit", key, snap.Version})[:24]
+		if state.Decisions.Value(id) != nil {
+			return nil, nil
+		}
+		view, err := state.Pool(obj.ObjectID)
+		if err != nil {
+			return nil, err
+		}
+		inputs := map[string]any{"pool": d.Map(view), "snapshot": d.Map(snap), "policy": p.Version, "parameter_version": obj.ParameterVersion, "exit_request": key}
+		components, err := riskComponents(state, obj, snap, at, d.Zero(), p)
+		if err != nil {
+			return nil, err
+		}
+		if components != nil {
+			inputs["components"] = d.Map(components)
+		}
+		decision := &d.DecisionView{DecisionID: id, ObjectID: obj.ObjectID, CycleID: "close-exit:" + key, AvailableCutoff: at, PoolPlus: view.Plus, PoolMinus: view.Minus, PoolNet: view.Net, PreviousLevel: obj.Level, NewLevel: obj.Level, TargetQuantity: d.Zero(), ActualQuantity: actual, PendingQuantity: pending, ParameterVersion: obj.ParameterVersion, InputHash: d.Digest(inputs), InputSnapshot: d.CompactDecisionInput(inputs), ReasonCodes: []string{"CLOSE_STOP_EXIT"}, SourceEventVersions: map[string]int{}}
+		decision.Components = components
+		if components != nil {
+			decision.ProjectedExposure = components.Exposure
+		}
+		version := snap.TargetVersions[obj.ObjectID]
+		for _, item := range state.Outbox.Values() {
+			if item.Decision.ObjectID == obj.ObjectID && item.TargetVersion > version {
+				version = item.TargetVersion
+			}
+		}
+		state.Decisions.Set(id, decision)
+		state.Outbox.Set(id, &d.TargetOutbox{Decision: d.TargetDecision(decision), TargetVersion: version + 1, ExpiresAt: at.Add(time.Duration(p.TargetTTLSeconds) * time.Second), State: "PENDING", OwnerEpoch: obj.OwnerEpoch})
+		r.State, r.DecisionID = "APPLIED", id
+		if obj.RiskUnit != nil {
+			r.BatchID = obj.RiskUnit.BatchID
+		}
+		state.AppendAudit(map[string]any{"action": "CLOSE_EXIT_OFF_CYCLE", "request_id": key, "object_id": obj.ObjectID, "decision_id": id, "at": d.ISO(at)})
+		return decision, nil
+	}
+	return nil, nil
+}
+
 func directiveVersion(state *d.StrategyState, id string) int {
 	if r := findDirective(state, id); r != nil {
 		return r.Directive.Version
