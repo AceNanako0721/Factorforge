@@ -72,6 +72,7 @@ type BatchState struct {
 	Trailing    bool           `json:"trailing"`
 	Transferred bool           `json:"transferred"`
 	ExitID      string         `json:"exit_id,omitempty"`
+	ExitBarAt   time.Time      `json:"exit_bar_at,omitempty"`
 	CloseFrozen bool           `json:"close_frozen,omitempty"`
 }
 type InitialPlan struct {
@@ -437,15 +438,28 @@ func (m *PositionManager) manage(ctx context.Context, st *PositionState, p *subm
 			if err != nil {
 				m.alert(ctx, "CLOSE_EXIT_REJECTED", errCode(err))
 			} else {
-				b.ExitID = safeID(id)
+				b.ExitID, b.ExitBarAt = safeID(id), bar.CloseAt
 				if err = m.Store.AppendRecord(ctx, "STOP_EVENT", b.ExitID, now, map[string]any{"kind": "CLOSE_EXIT", "close": close, "close_stop": b.CloseStop}); err != nil {
 					return err
 				}
 			}
 		}
 	}
+	// v2.17.1 (B28): the batch is still open after the exit's validity, so the
+	// exit was never executed; record it and resume trailing.
 	if b.ExitID != "" {
-		return nil
+		at := b.ExitBarAt
+		if at.IsZero() && len(b.ExitID) >= 13 {
+			at, _ = time.Parse("20060102T1504", b.ExitID[len(b.ExitID)-13:])
+		}
+		if at.IsZero() || !now.After(at.Add(d.CloseExitValidity)) {
+			return nil
+		}
+		m.alert(ctx, "CLOSE_EXIT_NOT_EXECUTED", b.ExitID)
+		if err := m.Store.AppendRecord(ctx, "STOP_EVENT", b.ExitID+"-expired", now, map[string]any{"kind": "CLOSE_EXIT_EXPIRED", "exit_id": b.ExitID, "close_stop": b.CloseStop}); err != nil {
+			return err
+		}
+		b.ExitID, b.ExitBarAt = "", time.Time{}
 	}
 	m1, moved := d.Trailing(direction, b.Entry, b.BestClose, b.Geometry.R, b.Geometry.Trail, s.RoundTripCost*b.Entry, b.CloseStop)
 	reason := "DYNAMIC_STOP_TRAIL"

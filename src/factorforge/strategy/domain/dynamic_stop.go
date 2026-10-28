@@ -91,6 +91,11 @@ type ExitRequestCommand struct {
 	Command
 	ExitRequest
 }
+// ExitRequestValidity (S2-034 v2.17.1): a close-stop exit is delivered again
+// after a rejected delivery until this long after its bar closed; then it
+// expires and is not treated as a stop that happened.
+const ExitRequestValidity = 30 * time.Minute
+
 type ExitRequestRecord struct {
 	Request        ExitRequest `json:"request"`
 	State          string      `json:"state"`

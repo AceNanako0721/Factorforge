@@ -241,6 +241,10 @@ func Ladder(direction int, entry, best, step, cost, current float64) (float64, b
 	return m, true
 }
 
+// CloseExitValidity (S3-028 v2.17.1) matches the framework's exit-request
+// validity: an exit not executed this long after its bar closed has expired.
+const CloseExitValidity = 30 * time.Minute
+
 // CloseCrossed reports a completed close at or beyond the close stop.
 func CloseCrossed(direction int, close, stop float64) bool {
 	if direction > 0 {

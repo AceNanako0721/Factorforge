@@ -961,6 +961,16 @@ func (c DecisionCycle) Dispatch(ctx context.Context, identity d.Identity) error 
 					state.Objects.Value(obj.ObjectID).LastAdjustmentTradeAt = d.Ptr(now)
 				}
 			}
+			// v2.17.1 (S2-034): a refused close-stop exit goes back to ACCEPTED and
+			// is decided again next cycle, until ExitRequestValidity.
+			if status == "REJECTED" || status == "EXPIRED" {
+				for _, r := range state.ExitRequests.Values() {
+					if r.State == "APPLIED" && r.DecisionID == key {
+						r.State, r.DecisionID = "ACCEPTED", ""
+						state.AppendAudit(map[string]any{"action": "CLOSE_EXIT_REDELIVER", "request_id": r.Request.ExitID, "decision_id": key, "reason": reason, "at": d.ISO(now)})
+					}
+				}
+			}
 			if item.ReservationID != nil {
 				r := state.Reservations.Value(*item.ReservationID)
 				r.State = "UNKNOWN"

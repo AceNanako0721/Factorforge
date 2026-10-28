@@ -630,6 +630,116 @@ func TestT324PositionManagerTrailExitAndTransfer(t *testing.T) {
 	}
 }
 
+// B28 (v2.17.1): an exit request not executed within its validity is recorded
+// as expired and the batch's stop trails again; within the validity it waits.
+func TestT324CloseExitNotExecutedResumesTrailing(t *testing.T) {
+	at := time.Date(2026, 10, 15, 15, 0, 5, 0, time.UTC)
+	m, store, fw, tr, alerts := positionManager(at)
+	clock := at
+	m.Clock = func() time.Time { return clock }
+	tr.bars = []submission.CandleRead{bar(at.Truncate(time.Minute), "100")}
+	_ = store.AppendRecord(context.Background(), "JUDGMENT", "j1", at.Add(-time.Minute), judgment("j1", at.Add(-time.Minute), "LONG", 3, []string{"n1"}, false))
+	if err := m.Run(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	initial := fw.directives[0]
+	// The batch opens at 100 with the initial venue stop at 93.2.
+	tr.qty, tr.entry, tr.cycle = "10", "100", "cycle-1"
+	tr.protections = []submission.ProtectionRead{{Role: "STRATEGY", State: "ACTIVE_VERIFIED", PositionDirection: "LONG", PositionCycleID: "cycle-1", Plan: map[string]any{"trigger_price": "93.2"}}}
+	verified := at.Add(time.Minute)
+	fw.records = []dto.StopDirectiveRecord{{Directive: initial, Receipt: dto.StopDirectiveReceipt{DirectiveID: initial.DirectiveID, Version: initial.Version, ApplicationState: "VERIFIED", VerifiedAt: &verified}}}
+	clock = at.Add(5 * time.Minute)
+	tr.bars = []submission.CandleRead{bar(at.Truncate(5*time.Minute).Add(5*time.Minute), "104")}
+	if err := m.Run(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(ofKind(fw.directives, "POSITION_STOP")) != 0 || len(fw.exits) != 0 {
+		t.Fatal("no trail or exit below +1R", len(fw.directives), fw.exits)
+	}
+	// +1R (R = 6%) at a 5-minute close of 107: trailing starts at the break-even floor.
+	clock = at.Add(10 * time.Minute)
+	tr.bars = []submission.CandleRead{bar(at.Truncate(5*time.Minute).Add(10*time.Minute), "107")}
+	if err := m.Run(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(ofKind(fw.directives, "POSITION_STOP")) != 1 {
+		t.Fatal("trail directive", fw.directives)
+	}
+	trail := ofKind(fw.directives, "POSITION_STOP")[0]
+	m1, _ := tdto.ParseDecimal("102.0")
+	if trail.CloseStopPrice.Cmp(m1) <= 0 || trail.TriggerPrice.Cmp(*trail.CloseStopPrice) >= 0 {
+		t.Fatal("trail prices", trail.CloseStopPrice, trail.TriggerPrice)
+	}
+	// Once the trailing stop is verified at break-even, the batch is transferred.
+	verified2 := at.Add(11 * time.Minute)
+	fw.records = append(fw.records, dto.StopDirectiveRecord{Directive: trail, PositionCycleID: "cycle-1", Receipt: dto.StopDirectiveReceipt{DirectiveID: trail.DirectiveID, Version: trail.Version, ApplicationState: "VERIFIED", VerifiedAt: &verified2}})
+	comb, _ := tdto.ParseDecimal("0.65")
+	fw.decision = &dto.DecisionView{ObjectID: "object-soxl", Components: &dto.DecisionComponents{Combined: comb}}
+	rem, _ := tdto.ParseDecimal("0.5")
+	fw.pool = dto.PoolView{ObjectID: "object-soxl", Contributions: []dto.Contribution{{ContributionID: "contribution-score-j", Direction: 1, State: "ACTIVE", RemainingAmount: rem}}}
+	clock = at.Add(15 * time.Minute)
+	tr.bars = []submission.CandleRead{bar(at.Truncate(5*time.Minute).Add(15*time.Minute), "107")}
+	if err := m.Run(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(fw.transfers) != 1 || fw.transfers[0].ContributionIDs[0] != "contribution-score-j" || fw.transfers[0].Observation.Value.String() != "0.65" {
+		t.Fatal("transfer", fw.transfers)
+	}
+	// A completed close below the verified close stop submits one exit request.
+	clock = at.Add(20 * time.Minute)
+	tr.bars = []submission.CandleRead{bar(at.Truncate(5*time.Minute).Add(20*time.Minute), "100")}
+	if err := m.Run(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(fw.exits) != 1 || fw.exits[0].DirectiveID != trail.DirectiveID || fw.exits[0].BarInterval != 300 {
+		t.Fatal("exit", fw.exits)
+	}
+	exitBar := at.Truncate(5 * time.Minute).Add(20 * time.Minute)
+	trails := len(ofKind(fw.directives, "POSITION_STOP"))
+	// The position stays open. Within the validity a new high does not move the stop.
+	clock = exitBar.Add(10 * time.Minute)
+	tr.bars = []submission.CandleRead{bar(exitBar.Add(10*time.Minute), "120")}
+	if err := m.Run(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(ofKind(fw.directives, "POSITION_STOP")) != trails || len(alerts.codes) != 0 {
+		t.Fatal("trailed while the exit was pending", fw.directives, alerts.codes)
+	}
+	// A batch saved before v2.17.1 has no exit_bar_at: the bar time comes from the exit id.
+	var legacy workers.PositionState
+	version, _ := store.LoadState(context.Background(), "POSITION", &legacy)
+	if legacy.Batch == nil || legacy.Batch.ExitBarAt.IsZero() {
+		t.Fatal("exit bar not recorded", legacy.Batch)
+	}
+	legacy.Batch.ExitBarAt = time.Time{}
+	if err := store.SaveState(context.Background(), "POSITION", version, clock, legacy); err != nil {
+		t.Fatal(err)
+	}
+	// Past the validity the exit is recorded as not executed and trailing resumes.
+	clock = exitBar.Add(d.CloseExitValidity + 5*time.Minute)
+	tr.bars = []submission.CandleRead{bar(exitBar.Add(d.CloseExitValidity+5*time.Minute), "120")}
+	if err := m.Run(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(alerts.codes) != 1 || alerts.codes[0] != "CLOSE_EXIT_NOT_EXECUTED" {
+		t.Fatal("alert", alerts.codes)
+	}
+	if len(ofKind(fw.directives, "POSITION_STOP")) != trails+1 {
+		t.Fatal("trailing did not resume", len(ofKind(fw.directives, "POSITION_STOP")), trails)
+	}
+	expired := 0
+	for id := range store.records["STOP_EVENT"] {
+		if strings.HasSuffix(id, "-expired") {
+			expired++
+		}
+	}
+	var st workers.PositionState
+	_, _ = store.LoadState(context.Background(), "POSITION", &st)
+	if expired != 1 || st.Batch == nil || st.Batch.ExitID != "" {
+		t.Fatal("expired record / cleared exit", expired, st.Batch)
+	}
+}
+
 // ---------- store ----------
 
 func TestP3DynamicStorePostgresAppendCASAndIsolation(t *testing.T) {
