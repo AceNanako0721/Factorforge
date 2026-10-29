@@ -314,16 +314,38 @@ func (m *PositionManager) initial(ctx context.Context, st *PositionState, price,
 	if st.Initial != nil && st.Initial.Direction == direction && st.Initial.Geometry == g && st.Initial.Confidence == confidence && now.Sub(lastDirectiveAt(st.Initial.DirectiveID)) < s.DirectiveTTL/2 {
 		return nil
 	}
-	st.Versions["INITIAL_DISTANCE"]++
-	v := st.Versions["INITIAL_DISTANCE"]
+	v := m.nextVersion(ctx, st, "INITIAL_DISTANCE")
 	id := "initial-" + now.Format("20060102T150405Z")
 	plan := InitialPlan{Direction: direction, Geometry: g, Price: price, Distance: (g.R + g.Buffer) * price, CloseDist: g.R * price, Fraction: fraction, Confidence: confidence, Equity: equity, DirectiveID: id}
 	directive := dto.StopDirective{DirectiveID: id, ObjectID: s.ObjectID, Version: v, Kind: "INITIAL_DISTANCE", PositionDirection: sideName(direction), TriggerKind: s.TriggerKind, InitialStopDistance: dec(plan.Distance), EffectiveAt: now, ValidForSeconds: int(s.DirectiveTTL.Seconds()), SourceModule: s.SourceModule, ReasonCodes: []string{"DYNAMIC_STOP_INITIAL", "TIER_" + strconv.Itoa(g.Tier) + "H", "CONFIDENCE_" + strconv.Itoa(confidence)}, Mode: "VENUE", RiskFraction: dec(fraction), CloseStopDistance: dec(plan.CloseDist)}
 	if _, err = m.Framework.SubmitStopDirective(ctx, directive); err != nil {
+		// A version conflict keeps the allocated version, so the saved counter
+		// passes P2's head on the next cycle instead of repeating it (B30).
+		if errCode(err) == "FRAMEWORK_CONFLICT" {
+			m.alert(ctx, "INITIAL_REJECTED", errCode(err))
+			return nil
+		}
 		return err
 	}
 	st.Initial = &plan
 	return m.Store.AppendRecord(ctx, "STOP_EVENT", id, now, map[string]any{"kind": "INITIAL", "plan": plan, "noise_id": st.NoiseID})
+}
+
+// nextVersion allocates the next directive version of a kind (v2.19.5, B30).
+// P2 accepts only versions above its head, and a directive P2 accepted in a
+// cycle whose state save then failed is missing from the local counter, so
+// the version starts above both the counter and the newest one P2 lists.
+func (m *PositionManager) nextVersion(ctx context.Context, st *PositionState, kind string) int {
+	v := st.Versions[kind]
+	if rows, err := m.Framework.StopDirectives(ctx, m.Settings.ObjectID); err == nil {
+		for _, r := range rows {
+			if r.Directive.Kind == kind && r.Directive.SourceModule == m.Settings.SourceModule && r.Directive.Version > v {
+				v = r.Directive.Version
+			}
+		}
+	}
+	st.Versions[kind] = v + 1
+	return v + 1
 }
 
 func lastDirectiveAt(id string) time.Time {
@@ -482,9 +504,9 @@ func (m *PositionManager) manage(ctx context.Context, st *PositionState, p *subm
 	}
 	if moved && math.Abs(m1-b.CloseStop) >= s.PriceTick {
 		trigger := roundTick(m1-float64(direction)*b.Geometry.Buffer*b.Entry, s.PriceTick, direction)
-		st.Versions["POSITION_STOP"]++
-		id := safeID("trail-" + p.PositionCycleID + "-" + strconv.Itoa(st.Versions["POSITION_STOP"]))
-		directive := dto.StopDirective{DirectiveID: id, ObjectID: s.ObjectID, Version: st.Versions["POSITION_STOP"], Kind: "POSITION_STOP", PositionDirection: sideName(direction), TriggerPrice: dec(trigger), TriggerKind: s.TriggerKind, EffectiveAt: now, ValidForSeconds: int((72 * time.Hour).Seconds()), SourceModule: s.SourceModule, ReasonCodes: []string{reason}, Mode: "VENUE", CloseStopPrice: dec(m1)}
+		version := m.nextVersion(ctx, st, "POSITION_STOP")
+		id := safeID("trail-" + p.PositionCycleID + "-" + strconv.Itoa(version))
+		directive := dto.StopDirective{DirectiveID: id, ObjectID: s.ObjectID, Version: version, Kind: "POSITION_STOP", PositionDirection: sideName(direction), TriggerPrice: dec(trigger), TriggerKind: s.TriggerKind, EffectiveAt: now, ValidForSeconds: int((72 * time.Hour).Seconds()), SourceModule: s.SourceModule, ReasonCodes: []string{reason}, Mode: "VENUE", CloseStopPrice: dec(m1)}
 		if _, err := m.Framework.SubmitStopDirective(ctx, directive); err != nil {
 			m.alert(ctx, "TRAIL_REJECTED", errCode(err))
 		} else {

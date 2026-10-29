@@ -269,6 +269,8 @@ type memDynamic struct {
 	records map[string]map[string]memRecord
 	states  map[string][]byte
 	vers    map[string]int64
+	// failSave makes the next SaveState calls fail (lost save, B30).
+	failSave int
 }
 type memRecord struct {
 	at  time.Time
@@ -318,6 +320,10 @@ func (m *memDynamic) LoadState(_ context.Context, key string, target any) (int64
 	return 0, nil
 }
 func (m *memDynamic) SaveState(_ context.Context, key string, expected int64, _ time.Time, payload any) error {
+	if m.failSave > 0 {
+		m.failSave--
+		return d.Fail("FRAMEWORK_AGGREGATE_VERSION_CONFLICT", 409)
+	}
 	if m.vers[key] != expected {
 		return d.Fail("DYNAMIC_STATE_CONFLICT", 409)
 	}
@@ -351,6 +357,9 @@ type fakeFramework struct {
 	records    []dto.StopDirectiveRecord
 	pool       dto.PoolView
 	cases      []dto.CaseRecord
+	// heads, when set, applies P2's version rule: a new directive needs a
+	// version above the head of its kind, and accepted ones are listed.
+	heads map[string]int
 }
 
 func (f *fakeFramework) Version(context.Context, string) (int, error) { return 7, nil }
@@ -377,6 +386,13 @@ func (f *fakeFramework) ScheduledEvents(context.Context, string) ([]d.ScheduledE
 	return nil, nil
 }
 func (f *fakeFramework) SubmitStopDirective(_ context.Context, v dto.StopDirective) (dto.StopDirectiveReceipt, error) {
+	if f.heads != nil {
+		if v.Version <= f.heads[v.Kind] {
+			return dto.StopDirectiveReceipt{}, d.Fail("FRAMEWORK_CONFLICT", 409)
+		}
+		f.heads[v.Kind] = v.Version
+		f.records = append(f.records, dto.StopDirectiveRecord{Directive: v})
+	}
 	f.directives = append(f.directives, v)
 	return dto.StopDirectiveReceipt{DirectiveID: v.DirectiveID, Version: v.Version, State: "ACCEPTED"}, nil
 }
@@ -551,6 +567,39 @@ func TestT323PositionManagerInitialDirective(t *testing.T) {
 	m.Clock = func() time.Time { return at.Add(time.Minute) }
 	if err := m.Run(context.Background()); err != nil || len(fw.directives) != 2 || fw.directives[1].RiskFraction.String() != "0.01" {
 		t.Fatal("confidence refresh", len(fw.directives), err)
+	}
+}
+
+// B30 (v2.19.5): P2 accepted a directive in a cycle whose state save failed;
+// the next directive must not repeat the lost version.
+func TestT323DirectiveVersionAfterLostSave(t *testing.T) {
+	at := time.Date(2026, 10, 15, 15, 0, 5, 0, time.UTC)
+	m, store, fw, tr, alerts := positionManager(at)
+	fw.heads = map[string]int{}
+	tr.bars = []submission.CandleRead{bar(at.Truncate(time.Minute), "100")}
+	_ = store.AppendRecord(context.Background(), "JUDGMENT", "j1", at.Add(-time.Minute), judgment("j1", at.Add(-time.Minute), "SHORT", 3, []string{"n1"}, false))
+	store.failSave = 1
+	if err := m.Run(context.Background()); err == nil || len(fw.directives) != 1 || fw.heads["INITIAL_DISTANCE"] != 1 {
+		t.Fatal("accepted directive with lost save", err, fw.heads)
+	}
+	// The listed directive puts the next version above P2's head at once.
+	m.Clock = func() time.Time { return at.Add(5 * time.Minute) }
+	if err := m.Run(context.Background()); err != nil || len(fw.directives) != 2 || fw.directives[1].Version != 2 {
+		t.Fatal("version after lost save", err, len(fw.directives), alerts.codes)
+	}
+	// The lost directive expired from P2's list while its head stays: one
+	// conflict, the counter is saved, the cycle after passes the head.
+	fw.records, fw.heads["INITIAL_DISTANCE"] = nil, 5
+	_ = store.AppendRecord(context.Background(), "JUDGMENT", "j2", at.Add(5*time.Minute), judgment("j2", at.Add(5*time.Minute), "SHORT", 5, []string{"n2"}, false))
+	m.Clock = func() time.Time { return at.Add(6 * time.Minute) }
+	for i := 0; i < 4; i++ {
+		if err := m.Run(context.Background()); err != nil {
+			t.Fatal("conflict stops the cycle", i, err)
+		}
+	}
+	last := fw.directives[len(fw.directives)-1]
+	if last.Version != 6 || fw.heads["INITIAL_DISTANCE"] != 6 || !slices.Contains(alerts.codes, "INITIAL_REJECTED") {
+		t.Fatal("ratchet past head", last.Version, fw.heads, alerts.codes)
 	}
 }
 
