@@ -109,6 +109,24 @@ func CompactDecisionInput(inputs map[string]any) map[string]any {
 			compactPool["live_contributions_ref"] = map[string]any{"count": len(live), "digest": Digest(live)}
 			compactPool["spent_contributions_ref"] = map[string]any{"count": len(spent), "digest": Digest(spent)}
 			result["pool"] = compactPool
+			// Prepricing holds one assessment per pool contribution, spent ones
+			// included (v2.19.4, B13); only the live contributions' stay.
+			if pricing, ok := inputs["prepricing"].(map[string]any); ok {
+				scores := map[string]bool{}
+				for _, c := range live {
+					scores[Text(c["score_id"])] = true
+				}
+				kept, dropped := map[string]any{}, map[string]any{}
+				for id, v := range pricing {
+					if scores[id] {
+						kept[id] = v
+					} else {
+						dropped[id] = v
+					}
+				}
+				result["prepricing"] = kept
+				result["spent_prepricing_ref"] = map[string]any{"count": len(dropped), "digest": Digest(dropped)}
+			}
 		}
 	}
 	return result

@@ -461,3 +461,35 @@ func TestT241LiveContributionsKeepCaseFieldsOnly(t *testing.T) {
 		t.Fatal("labels differ", a.Labels, b.Labels)
 	}
 }
+
+// B13: prepricing carried one assessment for every pool contribution,
+// spent ones included, so it grew with every judgment ever scored.
+func TestT242PrepricingKeepsLiveContributionsOnly(t *testing.T) {
+	contributions, pricing := []any{}, map[string]any{}
+	for i := 0; i < 70; i++ {
+		remaining := "0"
+		if i >= 60 {
+			remaining = "0.01"
+		}
+		score := fmt.Sprintf("score-judgment-%02d", i)
+		contributions = append(contributions, map[string]any{"contribution_id": "contribution-" + score, "score_id": score, "family_id": score, "direction": 1, "remaining_amount": remaining})
+		pricing[score] = map[string]any{"fraction": "0", "mode": "NOT_ASSESSED", "reason": "PREPRICING_NOT_ASSESSED"}
+	}
+	inputs := map[string]any{"pool": map[string]any{"contributions": contributions}, "prepricing": pricing, "snapshot": map[string]any{"bars": map[string]any{}}}
+	hash := sd.Digest(inputs)
+	compact := sd.CompactDecisionInput(inputs)
+	if sd.Digest(inputs) != hash || len(pricing) != 70 {
+		t.Fatal("compaction mutated the hashed inputs")
+	}
+	kept := sd.Object(compact["prepricing"])
+	if len(kept) != 10 || kept["score-judgment-65"] == nil || kept["score-judgment-05"] != nil {
+		t.Fatal("prepricing compaction", kept)
+	}
+	ref := sd.Object(compact["spent_prepricing_ref"])
+	if sd.Number(ref["count"]) != 60 || sd.Text(ref["digest"]) == "" {
+		t.Fatal("spent prepricing ref", ref)
+	}
+	if sd.Digest(sd.CompactDecisionInput(compact)) != sd.Digest(compact) {
+		t.Fatal("compaction is not idempotent")
+	}
+}
