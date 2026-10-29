@@ -20,6 +20,7 @@ const MarketChart = lazy(() =>
   import("./market-chart").then((module) => ({ default: module.MarketChart })),
 );
 import { useSession, useVisible } from "./session";
+import { displayTime, useDisplay } from "./display-settings";
 export const pages = [
   ["overview", "总览", "◈"],
   ["dynamic", "研判与止损", "⇅"],
@@ -94,6 +95,7 @@ export function PanelView({
     !Array.isArray(envelope.data)
       ? record(envelope.data)
       : envelope;
+  const { zone } = useDisplay();
   const age = Math.max(
     0,
     Math.floor((Date.now() - Date.parse(panel.fetched_at)) / 1000),
@@ -111,14 +113,17 @@ export function PanelView({
       </div>
       <div className="metadata">
         <span>
-          读取 {panel.fetched_at} · {age} 秒前
+          读取 {displayTime(panel.fetched_at, zone)} · {age} 秒前
         </span>
-        <span>事实时间 {panel.observed_at ?? "未记录"}</span>
+        <span>
+          事实时间{" "}
+          {panel.observed_at ? displayTime(panel.observed_at, zone) : "未记录"}
+        </span>
         {panel.snapshot_version && <span>快照 {panel.snapshot_version}</span>}
         {panel.source_version && <span>来源 {panel.source_version}</span>}
       </div>
       {panel.retry_at && (
-        <p className="metadata">供应商允许重试时间 {panel.retry_at}</p>
+        <p className="metadata">供应商允许重试时间 {displayTime(panel.retry_at, zone)}</p>
       )}
       {panel.code && (
         <p role="status" className="error">

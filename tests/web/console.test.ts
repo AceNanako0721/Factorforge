@@ -21,6 +21,7 @@ import {
   zoomRange,
 } from "../../src/factorforge/applications/console/web/src/features/market-chart";
 import { chartMarkers, currentProtection, judgmentEffects, ladderInfo } from "../../src/factorforge/applications/console/web/src/features/dynamic-page";
+import { chartTick, chartTime, displayTime } from "../../src/factorforge/applications/console/web/src/features/display-settings";
 import { fundingGap, pnlRows } from "../../src/factorforge/applications/console/web/src/features/pnl-panel";
 describe("read-only browser semantics", () => {
   it("retains exact monetary strings and sorts without rounding", () => {
@@ -209,5 +210,22 @@ describe("S4-017 v2.19.0 ladder stop", () => {
     expect(l?.exitExpiresAt).toBe("2026-10-27T06:15:00Z");
     expect(ladderInfo({})?.source).toBe("未记录");
     expect(ladderInfo(null)).toBeNull();
+  });
+});
+describe("S4-003 v2.19.6 display zone", () => {
+  const sec = Date.parse("2026-10-29T22:40:00Z") / 1000;
+  it("formats chart axis and crosshair in the chosen zone, data stays UTC", () => {
+    expect(chartTime(sec, "UTC")).toBe("2026-10-29 22:40 · UTC");
+    expect(chartTime(sec, "Asia/Tokyo")).toBe("2026-10-30 07:40 · Asia/Tokyo");
+    expect(chartTime(sec, "Asia/Shanghai")).toBe("2026-10-30 06:40 · Asia/Shanghai");
+    expect(chartTick(sec, 3, "Asia/Tokyo")).toBe("07:40");
+    expect(chartTick(sec, 2, "Asia/Tokyo")).toBe("10-30");
+    expect(chartTick(sec, 2, "UTC")).toBe("10-29");
+    expect(chartTick(sec, 1, "Asia/Tokyo")).toBe("2026-10");
+    expect(chartTick(sec, 0, "Asia/Tokyo")).toBe("2026");
+  });
+  it("converts nanosecond RFC 3339 values like the panel read time", () => {
+    expect(displayTime("2026-10-29T22:52:23.748497355Z", "Asia/Tokyo")).toMatch(/07:52:23 · Asia\/Tokyo$/);
+    expect(displayTime("2026-10-29T22:52:23Z", "UTC")).toBe("2026-10-29T22:52:23Z");
   });
 });

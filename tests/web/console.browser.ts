@@ -203,6 +203,22 @@ test("S4-017 judgment and stop page on desktop and phone width", async ({
   });
   expect(errors).toEqual([]);
 });
+// Runs before the revocation test: the fixture cannot restore a revoked selection.
+test("S4-003 v2.19.6 panel times follow the display zone", async ({ page }) => {
+  await login(page);
+  const read = page.locator(".metadata span", { hasText: /^读取 / }).first();
+  const fact = page.locator(".metadata span", { hasText: /^事实时间 \d/ }).first();
+  await expect(read).toContainText(/^读取 \d{4}-\d\d-\d\dT[\d:.]+Z · /);
+  await page.getByLabel("显示时区").selectOption("Asia/Tokyo");
+  await expect(read).toContainText(/^读取 \d{4}\/\d{1,2}\/\d{1,2} \d\d:\d\d:\d\d · Asia\/Tokyo · /);
+  await expect(fact).toContainText(/ · Asia\/Tokyo$/);
+  await page.reload();
+  await expect(page.getByLabel("显示时区")).toHaveValue("Asia/Tokyo");
+  await page.getByLabel("查看范围").selectOption("fixture-selection");
+  await expect(page.locator(".metadata span", { hasText: /^读取 / }).first()).toContainText("Asia/Tokyo");
+  await page.getByLabel("显示时区").selectOption("UTC");
+  await expect(page.locator(".metadata span", { hasText: /^读取 / }).first()).toContainText(/Z · /);
+});
 test("narrow keyboard navigation and revocation clears selected data", async ({
   page,
 }) => {

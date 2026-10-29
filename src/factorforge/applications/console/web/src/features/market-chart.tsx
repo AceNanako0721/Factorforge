@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { LiveKline } from "./live-market";
+import { chartTick, chartTime, useDisplay } from "./display-settings";
 import {
   createChart,
   createSeriesMarkers,
@@ -123,6 +124,7 @@ export function MarketChart({
   const [withLines, setWithLines] = useState(false);
   const withLinesRef = useRef(withLines);
   withLinesRef.current = withLines;
+  const { zone } = useDisplay();
   const data = useMemo(() => candleData(candles), [candles]);
   // The chart is built once; data, lines and markers update in place so a
   // refresh keeps the viewer's zoom and scroll.
@@ -223,6 +225,13 @@ export function MarketChart({
       chart.remove();
     };
   }, []);
+  // v2.19.6: axis ticks and the crosshair label use the display zone.
+  useEffect(() => {
+    chartRef.current?.applyOptions({
+      localization: { timeFormatter: (t: Time) => chartTime(Number(t), zone) },
+      timeScale: { tickMarkFormatter: (t: Time, kind: number) => chartTick(Number(t), kind, zone) },
+    });
+  }, [zone]);
   useEffect(() => {
     const chart = chartRef.current;
     const series = seriesRef.current;
