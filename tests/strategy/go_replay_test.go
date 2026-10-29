@@ -103,6 +103,21 @@ func compactFrozenDecisions(v any) any {
 		if snapshot, ok := x["input_snapshot"].(map[string]any); ok && x["input_hash"] != nil {
 			out["input_snapshot"] = sd.CompactDecisionInput(snapshot)
 		}
+		// v2.19.3: cases open from the compacted decision, so their source
+		// contributions carry only the fields cases read.
+		if rows, ok := x["source_contributions"].([]any); ok {
+			slim := []any{}
+			for _, row := range rows {
+				full, kept := sd.Object(row), map[string]any{}
+				for _, k := range sd.CaseContributionFields {
+					if v, ok := full[k]; ok {
+						kept[k] = v
+					}
+				}
+				slim = append(slim, kept)
+			}
+			out["source_contributions"] = slim
+		}
 		if decision, ok := out["decision"].(map[string]any); ok && x["target_version"] != nil {
 			decision["input_snapshot"] = map[string]any{}
 		}
