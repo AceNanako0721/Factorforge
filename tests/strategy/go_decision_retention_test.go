@@ -383,3 +383,81 @@ func TestDecodeStateReusesAdmissionOnlyForUnchangedFields(t *testing.T) {
 		t.Fatal("state after a changed field differs")
 	}
 }
+
+// B13: a same-direction judgment chain adds one live contribution per
+// judgment and every retained decision carried the whole rows. The decision
+// now keeps the fields a case reads; cases opened and labelled from it are
+// the same as from the full rows.
+func TestT241LiveContributionsKeepCaseFieldsOnly(t *testing.T) {
+	at := time.Date(2026, 10, 29, 6, 0, 0, 0, time.UTC)
+	full := []any{}
+	for i := 0; i < 40; i++ {
+		full = append(full, map[string]any{"contribution_id": fmt.Sprintf("contrib-j-%02d", i), "family_id": fmt.Sprintf("fam-%d", i%3), "direction": 1, "effective_at": sd.ISO(at.Add(time.Duration(i-40) * 30 * time.Minute)), "initial_amount": "0.0123456789", "remaining_amount": "0.01", "state": "ACTIVE", "quality": "VALID", "event_id": fmt.Sprintf("event-%d", i), "score_id": fmt.Sprintf("score-j-%02d", i), "half_life": "86400", "object_id": "soxlusdt", "high_water": "0.0123456789", "fact_weights": map[string]any{"a": "0.3", "b": "0.7"}, "price_consumed": "0.002", "last_updated_at": sd.ISO(at), "reference_price": "101.12", "reference_benchmark": "5000.5", "realization_disabled": false, "frozen_parameter_version": "params-v1", "eta": "0.5"})
+	}
+	full = append(full, map[string]any{"contribution_id": "spent", "family_id": "fam-x", "remaining_amount": "0", "state": "INVALID"})
+	inputs := map[string]any{"policy": "policy-v1", "pool": map[string]any{"net": "0.4", "contributions": full}, "snapshot": map[string]any{"bars": map[string]any{}}}
+	hash := sd.Digest(inputs)
+	compact := sd.CompactDecisionInput(inputs)
+	if sd.Digest(inputs) != hash {
+		t.Fatal("compaction mutated the hashed inputs")
+	}
+	pool := sd.Object(compact["pool"])
+	slim := sd.Rows(pool["contributions"])
+	if len(slim) != 40 || sd.Number(sd.Object(pool["live_contributions_ref"])["count"]) != 40 || sd.Number(sd.Object(pool["spent_contributions_ref"])["count"]) != 1 {
+		t.Fatal("pool compaction", pool)
+	}
+	for i, row := range slim {
+		src := full[i].(map[string]any)
+		if len(row) != len(sd.CaseContributionFields) {
+			t.Fatal("slim row fields", row)
+		}
+		for _, k := range sd.CaseContributionFields {
+			if sd.Digest(row[k]) != sd.Digest(src[k]) {
+				t.Fatal("slim row value", k, row[k], src[k])
+			}
+		}
+	}
+	rawFull, _ := json.Marshal(inputs["pool"])
+	rawSlim, _ := json.Marshal(compact["pool"])
+	if len(rawSlim)*2 > len(rawFull) {
+		t.Fatal("live contributions not reduced", len(rawSlim), len(rawFull))
+	}
+	if sd.Digest(sd.CompactDecisionInput(compact)) != sd.Digest(compact) {
+		t.Fatal("compaction is not idempotent")
+	}
+	// Case opening and labelling: full rows (pre-v2.19.3 decisions) vs slim rows.
+	samples := []sd.MarketSample{}
+	for i := -48 * 60; i <= 0; i += 5 {
+		samples = append(samples, sd.MarketSample{AvailableAt: at.Add(time.Duration(i) * time.Minute), Price: sd.Math().Add(sd.Int(100), sd.Int(i/60+48)), Quality: "VALID"})
+	}
+	label := func(snapshot map[string]any) (*sd.CaseRecord, []string) {
+		s, o, p, snap, _, fillAt := stopFixture(t)
+		params := s.Parameters.Value(o.ParameterVersion)
+		snapshot = sd.Clone(snapshot)
+		snapshot["policy"] = p.Version
+		s.Decisions.Set("dec-1", &sd.DecisionView{DecisionID: "dec-1", ObjectID: o.ObjectID, ParameterVersion: o.ParameterVersion, InputSnapshot: snapshot})
+		snap.Fills = []map[string]any{{"external_fill_id": "f1", "owner_id": o.OwnerID, "instrument_key": sd.Map(o.InstrumentKey), "price": "100", "fee": "0.1", "fee_currency": "USDT", "quantity": "1", "side": "BUY", "happened_at": sd.ISO(fillAt), "source_decision_id": "dec-1"}}
+		snap.Actual[o.ObjectID] = sd.Int(1)
+		if err := sd.FeedbackCases(s, o, snap, p, params); err != nil {
+			t.Fatal(err)
+		}
+		if s.Cases.Len() != 1 {
+			t.Fatal("case not opened", s.Cases.Len())
+		}
+		c := s.Cases.Values()[0]
+		c.ExitAt, c.ObservationEnd = sd.Ptr(at.Add(-time.Hour)), sd.Ptr(at)
+		lp := &sd.Policy{CycleSeconds: 300, LabelSeconds: 3600, Gamma: sd.One(), AbsolutePriceProxyValidated: true, LifecycleFraction: sd.Math().Div(sd.One(), sd.Int(2))}
+		if err := sd.LabelCase(c, samples, at, lp, false); err != nil {
+			t.Fatal(err)
+		}
+		return c, c.EventGroups
+	}
+	a, ga := label(map[string]any{"policy": inputs["policy"], "pool": inputs["pool"]})
+	b, gb := label(compact)
+	if a.Status != "MATURE" || a.Status != b.Status || a.LabelStatus != b.LabelStatus || sd.Digest(ga) != sd.Digest(gb) || len(gb) != 3 {
+		t.Fatal("case differs", a.Status, b.Status, a.LabelStatus, b.LabelStatus, ga, gb)
+	}
+	if sd.Digest(a.Labels) != sd.Digest(b.Labels) {
+		t.Fatal("labels differ", a.Labels, b.Labels)
+	}
+}

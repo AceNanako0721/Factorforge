@@ -16,6 +16,12 @@ func TargetDecision(decision *DecisionView) DecisionView {
 	return copy
 }
 
+// CaseContributionFields are the contribution fields a case reads from its
+// source decision: opening filters on remaining_amount and groups by
+// family_id; attribution and sample retention read effective_at,
+// initial_amount and direction.
+var CaseContributionFields = []string{"contribution_id", "family_id", "direction", "effective_at", "initial_amount", "remaining_amount"}
+
 // CompactDecisionInput replaces snapshot.bars with per-object references,
 // snapshot.source_decisions, closed protections and spent pool contributions
 // with counts and digests. The
@@ -73,6 +79,9 @@ func CompactDecisionInput(inputs map[string]any) map[string]any {
 	result["snapshot"] = compact
 	// Spent contributions grow with every judgment; a case only opens from
 	// those with a remaining amount, so only their size and digest stay.
+	// Live contributions keep only the fields a case reads (v2.19.3, B13):
+	// every judgment of a same-direction chain adds one, and every retained
+	// decision used to carry the whole rows.
 	if pool, ok := inputs["pool"].(map[string]any); ok {
 		if rows, ok := pool["contributions"]; ok {
 			compactPool, live, spent := map[string]any{}, []map[string]any{}, []map[string]any{}
@@ -86,7 +95,18 @@ func CompactDecisionInput(inputs map[string]any) map[string]any {
 					spent = append(spent, c)
 				}
 			}
-			compactPool["contributions"] = live
+			slim := make([]map[string]any, 0, len(live))
+			for _, c := range live {
+				row := map[string]any{}
+				for _, k := range CaseContributionFields {
+					if v, ok := c[k]; ok {
+						row[k] = v
+					}
+				}
+				slim = append(slim, row)
+			}
+			compactPool["contributions"] = slim
+			compactPool["live_contributions_ref"] = map[string]any{"count": len(live), "digest": Digest(live)}
 			compactPool["spent_contributions_ref"] = map[string]any{"count": len(spent), "digest": Digest(spent)}
 			result["pool"] = compactPool
 		}
