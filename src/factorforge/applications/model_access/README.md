@@ -12,7 +12,7 @@ npm --prefix src/factorforge/applications/model_access run build
 go run ./tools/init-model-access
 ```
 
-`init-model-access` 在私有的 `config/config.toml` 末尾追加模型配置块；已有配置块时只补上缺少的字段。
+`init-model-access` 在本地的 `config/config.toml` 末尾追加模型配置块；已有配置块时只补上缺少的字段。
 
 ## 菜单
 

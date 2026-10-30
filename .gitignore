@@ -1,4 +1,4 @@
-# Publish only one format template in each private asset directory.
+# Local configuration and prompts; only the templates are tracked.
 /config/*
 !/config/config.example.toml
 /prompts/*
@@ -12,7 +12,7 @@
 private/
 .private/
 secrets/
-# Real analysis prompts and model traces stay private.
+# Model traces and caches.
 model_traces/
 ai_cache/
 # Local data, trading records, logs and build artifacts

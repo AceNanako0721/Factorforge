@@ -58,7 +58,7 @@ query_cursor_age_seconds = 0
 query_cursor_key = ""
 dynamic_database_url = ""
 
-# Console-only profile is derived privately; users/bindings contain only local
+# Console-only profile is derived locally; users/bindings contain only local
 # password hashes, authorized selections and scoped public read identities.
 [console]
 schema_version = 0

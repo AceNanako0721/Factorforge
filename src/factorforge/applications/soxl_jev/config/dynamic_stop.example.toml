@@ -1,5 +1,5 @@
 # News judgment worker and position manager role profile (DynamicProfile).
-# Empty public template. Real values live only in the ignored private profile.
+# Empty template; fill it in the local profile.
 instance_id = ""
 environment = "SIM"
 object_id = ""

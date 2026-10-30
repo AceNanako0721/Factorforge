@@ -964,3 +964,64 @@ func TestT329PositionManagerLadderStop(t *testing.T) {
 		t.Fatal("second level", stops)
 	}
 }
+
+// When no risk may be taken, the still-valid initial directive is replaced by
+// one without a risk fraction (P2 then opens no batch); once, with the old
+// distances. A normal directive follows when risk is allowed again.
+func TestT323WithdrawInitialWhenNoRisk(t *testing.T) {
+	at := time.Date(2026, 10, 15, 15, 0, 5, 0, time.UTC)
+	m, store, fw, tr, alerts := positionManager(at)
+	tr.bars = []submission.CandleRead{bar(at.Truncate(time.Minute), "100")}
+	_ = store.AppendRecord(context.Background(), "JUDGMENT", "j1", at.Add(-time.Minute), judgment("j1", at.Add(-time.Minute), "SHORT", 3, []string{"n1"}, false))
+	if err := m.Run(context.Background()); err != nil || len(fw.directives) != 1 {
+		t.Fatal("initial directive", len(fw.directives), err)
+	}
+	outcomes := func(r float64) {
+		var st workers.PositionState
+		v, _ := store.LoadState(context.Background(), "POSITION", &st)
+		st.Outcomes = nil
+		for i := 0; i < 30 && r != 0; i++ {
+			st.Outcomes = append(st.Outcomes, d.BatchOutcome{R: r, ClosedAt: "2026-10-01T00:00:00Z"})
+		}
+		if err := store.SaveState(context.Background(), "POSITION", v, at, st); err != nil {
+			t.Fatal(err)
+		}
+	}
+	outcomes(1) // thirty losing batches: Kelly ≤ 0
+	m.Clock = func() time.Time { return at.Add(time.Minute) }
+	if err := m.Run(context.Background()); err != nil || len(fw.directives) != 2 {
+		t.Fatal("withdrawal", len(fw.directives), err)
+	}
+	first, w := fw.directives[0], fw.directives[1]
+	if w.Kind != "INITIAL_DISTANCE" || w.RiskFraction != nil || w.Version <= first.Version || w.InitialStopDistance.String() != first.InitialStopDistance.String() || w.CloseStopDistance.String() != first.CloseStopDistance.String() || !slices.Contains(w.ReasonCodes, "DYNAMIC_STOP_WITHDRAWN") || !slices.Contains(w.ReasonCodes, "RISK_FRACTION_ZERO") || !slices.Contains(alerts.codes, "RISK_FRACTION_ZERO") {
+		t.Fatal("withdrawal shape", w)
+	}
+	m.Clock = func() time.Time { return at.Add(3 * time.Minute) }
+	if err := m.Run(context.Background()); err != nil || len(fw.directives) != 2 {
+		t.Fatal("withdrawal repeated", len(fw.directives), err)
+	}
+	outcomes(0)
+	m.Clock = func() time.Time { return at.Add(4 * time.Minute) }
+	if err := m.Run(context.Background()); err != nil || len(fw.directives) != 3 || fw.directives[2].RiskFraction == nil || fw.directives[2].Version <= w.Version {
+		t.Fatal("directive after recovery", len(fw.directives), err)
+	}
+}
+
+// Without a live directive there is nothing to withdraw.
+func TestT323NoWithdrawalWithoutLiveDirective(t *testing.T) {
+	at := time.Date(2026, 10, 15, 15, 0, 5, 0, time.UTC)
+	m, store, fw, tr, alerts := positionManager(at)
+	tr.bars = []submission.CandleRead{bar(at.Truncate(time.Minute), "100")}
+	_ = store.AppendRecord(context.Background(), "JUDGMENT", "j1", at.Add(-time.Minute), judgment("j1", at.Add(-time.Minute), "SHORT", 3, []string{"n1"}, false))
+	var st workers.PositionState
+	v, _ := store.LoadState(context.Background(), "POSITION", &st)
+	for i := 0; i < 30; i++ {
+		st.Outcomes = append(st.Outcomes, d.BatchOutcome{R: 1, ClosedAt: "2026-10-01T00:00:00Z"})
+	}
+	if err := store.SaveState(context.Background(), "POSITION", v, at, st); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Run(context.Background()); err != nil || len(fw.directives) != 0 || !slices.Contains(alerts.codes, "RISK_FRACTION_ZERO") {
+		t.Fatal("directive without risk", len(fw.directives), alerts.codes, err)
+	}
+}

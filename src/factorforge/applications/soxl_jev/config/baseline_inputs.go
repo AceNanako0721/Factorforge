@@ -124,5 +124,5 @@ func LoadBaselineInputs(path, role string) (BaselineInputConfig, BaselineInputAs
 }
 
 // Exported format template is installed beside the P3 config loader because
-// this task may not change the root config directory. Real values remain in
-// the sole private config/config.toml.
+// this task may not change the root config directory. Values are filled in
+// the local config/config.toml.

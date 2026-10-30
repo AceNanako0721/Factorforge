@@ -1,6 +1,6 @@
 # SOXLUSDT 应用实例设计书
 
-版本：2.21.1
+版本：2.22.0
 
 对应式样书：[03_SOXLUSDT应用实例式样书](03_SOXLUSDT应用实例式样书.md)。源码在 `src/factorforge/applications/soxl_jev`，测试在 `tests/applications/soxl_jev`。文中出现的数值，凡是代码里写死的照实写出；其余都是登记值，这里只说明作用，不给实际取值。
 
@@ -21,7 +21,7 @@
 | `reports` | 周期报告与通知投递 |
 | `adapters/postgres` | 实例自己的存储 |
 | `adapters/modelaccess` | 调用模型接入模块（P5）的通道 |
-| `config` | 各角色的私有配置 |
+| `config` | 各角色的本地配置 |
 | `api` | 只读接口 |
 
 ### 1.2 进程
@@ -37,7 +37,7 @@
 | `watchlist-worker` | 关注清单检索、分析、通知与只记录观测 |
 | `instance-cli` | 运维命令（第 8 章） |
 
-事件路径的工作进程各自只读本角色的派生配置（`WorkerProfile`）：配置里出现其他角色的凭据时拒绝启动（`INSTANCE_PROFILE_CONTAINS_PEER_CREDENTIALS`），文件必须是绝对路径下的普通文件，大小有上限，TOML 不接受未知字段。研判工作器与仓位管理器共用一份 `DynamicProfile`（第 2.1 节）。只读接口和日程、关注清单进程读取私有配置中的对应节。
+事件路径的工作进程各自只读本角色的派生配置（`WorkerProfile`）：配置里出现其他角色的凭据时拒绝启动（`INSTANCE_PROFILE_CONTAINS_PEER_CREDENTIALS`），文件必须是绝对路径下的普通文件，大小有上限，TOML 不接受未知字段。研判工作器与仓位管理器共用一份 `DynamicProfile`（第 2.1 节）。只读接口和日程、关注清单进程读取本地配置中的对应节。
 
 ### 1.3 存储
 
@@ -64,7 +64,7 @@
 
 ### 2.1 配置（`config/dynamic_stop.go`）
 
-研判工作器和仓位管理器读同一份私有配置 `DynamicProfile`。公开仓库只放 `dynamic_stop.example.toml` 空模板。
+研判工作器和仓位管理器读同一份本地配置 `DynamicProfile`。仓库提供空模板 `dynamic_stop.example.toml`。
 
 - **身份**：`instance_id`、`environment`、`object_id`。
 - **`access` 节**：
@@ -219,13 +219,13 @@
   - **缓冲** = `wick_multiplier` × 持有窗口内（每 15 分钟取样）各时段不利方向 5 分钟影线（多头取下影线，空头取上影线）`wick_quantile` 分位的最大值；没有数据的时段跳过。
   - 入场格、常规时段格或移动距离不可用时，跳过这一档。
   - R + 缓冲 < `insurance_fraction` − `insurance_margin` 时采用这一档。
-  - 所有档都不满足时，告警 `HARD_STOP_BEYOND_INSURANCE`，不再下发新的初始止损指令（P2 中尚未过期的旧指令仍有效，直到有效期结束）。
+  - 所有档都不满足时，告警 `HARD_STOP_BEYOND_INSURANCE`，并撤回初始止损指令（见 3.3 节“撤回”）。
 
 ### 3.3 风险比例与初始止损指令（`initial`）
 
 **风险比例（`RiskFraction`）**：
 
-- **基础比例**：最初 30 笔为 1%。之后取最近最多 60 笔，胜率 p，盈亏比 b = 平均盈利 R / 平均亏损 R，基础比例 = ¼ ×（p −（1 − p）/ b）；还没有亏损时为 ¼ × p。没有盈利，或结果不大于 0 时，告警 `RISK_FRACTION_ZERO`，不再下发新的初始止损指令（同上，旧指令到期前仍有效）。
+- **基础比例**：最初 30 笔为 1%。之后取最近最多 60 笔，胜率 p，盈亏比 b = 平均盈利 R / 平均亏损 R，基础比例 = ¼ ×（p −（1 − p）/ b）；还没有亏损时为 ¼ × p。没有盈利，或结果不大于 0 时，告警 `RISK_FRACTION_ZERO`，并撤回初始止损指令（见下文“撤回”）。
 - **信心系数（`ConfidenceFactor`）**：取最近 12 次研判中与当前方向一致的最近一次的信心，4～5 分为 1，3 分为 0.75，2 分为 0.5，其余为 0.25。
 - **回撤系数**：max（0.25，1 − 回撤 / 10%），回撤按权益峰值计算。
 - **风险比例** = min（2%，基础 × 信心 × 回撤）。
@@ -241,6 +241,12 @@
 - 版本号取本地计数与 P2 已列出的同种类、同来源模块指令的最大版本中较大的一个，再加 1（`nextVersion`）。被拒绝（版本冲突）时告警 `INITIAL_REJECTED`，计数保留。
 
 P2 用这条指令冻结批次数量（P2 设计 6.1）。
+
+**撤回（`withdraw`）**：风险比例不大于 0 或所有档的硬止损都超出保险时，不能再开新批次。P2 对每个对象只保留一条 `INITIAL_DISTANCE` 指令，新版本替换旧版本；不带风险比例的指令不能开新批次（P2 设计 6.1，`RISK_UNIT_DIRECTIVE_MISSING`）。因此：
+
+- 上一条指令还在有效期内、且没有撤回过时，立即下发一条新版本的撤回指令：不带风险比例，初始距离和收盘止损距离沿用上一条，理由码 `DYNAMIC_STOP_WITHDRAWN` 加上原因（`RISK_FRACTION_ZERO` 或 `HARD_STOP_BEYOND_INSURANCE`），有效期与版本号规则同上。
+- 本地计划标为已撤回（`withdrawn`），保留几何和预算，供撤回前刚开出的批次使用；查询接口不再把它作为下一笔入场计划返回。
+- 上一条已过期或已撤回时不再发送。条件恢复后按上面的规则下发新的初始止损指令，已撤回的计划不算“未变”。
 
 ### 3.4 批次管理（`manage`）
 
@@ -300,7 +306,7 @@ P2 用这条指令冻结批次数量（P2 设计 6.1）。
 
 ### 4.1 配置
 
-每个工作角色读一份派生出来的私有配置 `WorkerProfile`：
+每个工作角色读一份派生出来的本地配置 `WorkerProfile`：
 
 - **角色与模式**：`schema_version` 必须为 1。`role` 取 `INGEST`、`RESEARCH` 或 `TRADING`。`mode` 取 `mock`（夹具）或 `jev`。
 - **`settings`**：`PipelineSettings`，各项如下：
@@ -319,7 +325,7 @@ P2 用这条指令冻结批次数量（P2 设计 6.1）。
   - 报告读取：`report_read_url`、`report_read_token`。
   - SEC 访问身份：`sec_user_agent`。
 
-完整的私有配置把以上各角色合在一份文件里，由 `prepare-instance-profiles` 派生出各角色的配置（`instance-cli` 多数命令读它；`export-evidence` 读派生的 `INGEST` 配置）：
+完整的本地配置把以上各角色合在一份文件里，由 `prepare-instance-profiles` 派生出各角色的配置（`instance-cli` 多数命令读它；`export-evidence` 读派生的 `INGEST` 配置）：
 
 - `mode`。
 - `credentials` 节：`framework_api_token`、`trading_api_token`、`jev_api_key`、`search_api_key`。
@@ -428,7 +434,7 @@ P2 用这条指令冻结批次数量（P2 设计 6.1）。
   - 上限：`max_events`、`max_quote_bytes`。
 
   每次调用前先写下尝试记录，失败或结果未知时不会复用同一输出名。
-- **复核与导出**：`instance-cli` 的复核编译、渲染与导出命令，只处理私有运行目录下的文件（第 8 章）。
+- **复核与导出**：`instance-cli` 的复核编译、渲染与导出命令，只处理本地运行目录下的文件（第 8 章）。
 
 ## 5 日程与关注清单
 
@@ -537,7 +543,7 @@ P3 读取下层的内容：
 | `compile-calendar` | 编译交易所日历 |
 | `export-evidence` | 导出证据 |
 
-输出文件只允许在仓库的私有运行目录下，父目录和文件本身都不能是符号链接；输入文件必须是普通文件。两者都有明确的字节上限。
+输出文件只允许在仓库的本地运行目录下，父目录和文件本身都不能是符号链接；输入文件必须是普通文件。两者都有明确的字节上限。
 
 **创建 P2 对象（`Bootstrap.Run`）**：
 
@@ -554,7 +560,7 @@ P3 读取下层的内容：
 | T3-01、T3-09、T3-10 | 初始化与绑定、名义上限、实盘准入阻断 |
 | T3-02～T3-07 | 采集、来源许可、路由、事件计划、分析任务、标定映射、发件箱、故障降级 |
 | T3-08、T3-17 | 日历窗口、时段计划、官方日程与修订 |
-| T3-11～T3-14 | 报告、评测记录、私有资产校验、恢复 |
+| T3-11～T3-14 | 报告、评测记录、本地资产校验、恢复 |
 | T3-15、T3-28、T3-32 | 只读接口：分区、许可、游标、只读身份、阶梯显示 |
 | T3-16、T3-18 | 无内置基线、关注清单的去重、异常行情、通知与只记录观测 |
 | T3-19～T3-21 | 新闻采集与复述剔除、研判解析与校验、通道切换、注入决策全部分支 |

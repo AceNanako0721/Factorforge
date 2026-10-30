@@ -48,7 +48,7 @@ flowchart LR
 需要 Go（版本见 `go.mod`）和本地 PostgreSQL；P4 前端需要 Node.js 与 pnpm，P5 需要 Node.js 与 Bun。
 
 ```sh
-go run ./tools/init-private-config   # 生成被 Git 忽略的私有配置
+go run ./tools/init-private-config   # 生成被 Git 忽略的本地配置
 go run ./tools/check-layout
 go test ./...
 go run ./tools/build-trading         # P1
@@ -57,11 +57,10 @@ go run ./tools/build-strategy        # P2
 
 各层的配置和启动方式见 [构建、测试与运行](doc/engineering/DEVELOPMENT.md)。
 
-## 配置与私有资产
+## 配置
 
-- 真实配置只写在本地的 `config/config.toml`，真实提示词只放在 `prompts/` 下的私有文件；两者都被 Git 忽略。
-- 仓库中只有空模板 `config/config.example.toml` 和 `prompts/prompts.example.json`，以及使用中性示例值的样例文件。
-- 示例中的数值只用来说明格式，不是经过标定的参数。
+- 配置写在本地的 `config/config.toml`，提示词写在 `prompts/` 下的本地文件；两者都被 Git 忽略，仓库提供模板 `config/config.example.toml` 和 `prompts/prompts.example.json`。
+- 样例文件中的数值只用来说明格式，不是推荐值。
 
 ## 版本
 

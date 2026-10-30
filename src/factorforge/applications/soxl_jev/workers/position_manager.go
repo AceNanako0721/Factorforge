@@ -86,6 +86,9 @@ type InitialPlan struct {
 	Confidence  int            `json:"confidence,omitempty"`
 	Equity      float64        `json:"equity"`
 	DirectiveID string         `json:"directive_id"`
+	// Withdrawn marks a plan whose directive was replaced by one without a
+	// risk fraction; the plan stays for a batch P2 opened just before.
+	Withdrawn bool `json:"withdrawn,omitempty"`
 }
 type PositionState struct {
 	NoiseID    string           `json:"noise_id"`
@@ -304,14 +307,14 @@ func (m *PositionManager) initial(ctx context.Context, st *PositionState, price,
 	fraction := d.RiskFraction(st.Outcomes, drawdown, confidence)
 	if fraction <= 0 {
 		m.alert(ctx, "RISK_FRACTION_ZERO", "")
-		return nil
+		return m.withdraw(ctx, st, now, "RISK_FRACTION_ZERO")
 	}
 	g, ok := d.PlanStop(view, s.Stop, now, direction, horizon)
 	if !ok {
 		m.alert(ctx, "HARD_STOP_BEYOND_INSURANCE", strconv.Itoa(horizon))
-		return nil
+		return m.withdraw(ctx, st, now, "HARD_STOP_BEYOND_INSURANCE")
 	}
-	if st.Initial != nil && st.Initial.Direction == direction && st.Initial.Geometry == g && st.Initial.Confidence == confidence && now.Sub(lastDirectiveAt(st.Initial.DirectiveID)) < s.DirectiveTTL/2 {
+	if st.Initial != nil && !st.Initial.Withdrawn && st.Initial.Direction == direction && st.Initial.Geometry == g && st.Initial.Confidence == confidence && now.Sub(lastDirectiveAt(st.Initial.DirectiveID)) < s.DirectiveTTL/2 {
 		return nil
 	}
 	v := m.nextVersion(ctx, st, "INITIAL_DISTANCE")
@@ -346,6 +349,30 @@ func (m *PositionManager) nextVersion(ctx context.Context, st *PositionState, ki
 	}
 	st.Versions[kind] = v + 1
 	return v + 1
+}
+
+// withdraw stops new batches when no risk may be taken: P2 keeps one
+// INITIAL_DISTANCE directive per object and opens no batch from one without a
+// risk fraction (RISK_UNIT_DIRECTIVE_MISSING). The replacement keeps the old
+// distances, so only opening changes. Nothing is sent when the last directive
+// has already expired or was withdrawn.
+func (m *PositionManager) withdraw(ctx context.Context, st *PositionState, now time.Time, reason string) error {
+	s := m.Settings
+	p := st.Initial
+	if p == nil || p.Withdrawn || now.Sub(lastDirectiveAt(p.DirectiveID)) >= s.DirectiveTTL {
+		return nil
+	}
+	v := m.nextVersion(ctx, st, "INITIAL_DISTANCE")
+	directive := dto.StopDirective{DirectiveID: "withdraw-" + now.Format("20060102T150405Z"), ObjectID: s.ObjectID, Version: v, Kind: "INITIAL_DISTANCE", PositionDirection: sideName(p.Direction), TriggerKind: s.TriggerKind, InitialStopDistance: dec(p.Distance), EffectiveAt: now, ValidForSeconds: int(s.DirectiveTTL.Seconds()), SourceModule: s.SourceModule, ReasonCodes: []string{"DYNAMIC_STOP_WITHDRAWN", reason}, Mode: "VENUE", CloseStopDistance: dec(p.CloseDist)}
+	if _, err := m.Framework.SubmitStopDirective(ctx, directive); err != nil {
+		if errCode(err) == "FRAMEWORK_CONFLICT" {
+			m.alert(ctx, "INITIAL_REJECTED", errCode(err))
+			return nil
+		}
+		return err
+	}
+	p.Withdrawn = true
+	return nil
 }
 
 func lastDirectiveAt(id string) time.Time {

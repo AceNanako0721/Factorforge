@@ -372,6 +372,12 @@
    "change_kind": "design",
    "date": "2026-10-31",
    "summary": "Strategy store: a failed binding query reports STORE_UNAVAILABLE instead of OBJECT_BINDING_CHANGED; only a missing or different binding is a binding change."
+  },
+  {
+   "version": "2.22.0",
+   "change_kind": "specification",
+   "date": "2026-10-31",
+   "summary": "Application instance: when no new batch may open (risk fraction not above zero, or every hard stop beyond the insurance stop), the still-valid initial-distance directive is withdrawn by a newer one without a risk fraction, so the strategy layer opens no batch from the old one. Documentation describes local configuration, prompts and credentials in plain terms; unused test fixtures removed."
   }
  ]
 }
