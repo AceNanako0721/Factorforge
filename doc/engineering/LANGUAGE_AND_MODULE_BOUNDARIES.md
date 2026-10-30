@@ -49,3 +49,7 @@ OMP 整体外挂、抽出 TypeScript 模块、Go 实现，以及辅助抽取器/
 ## 2026-10-10 v2.4.0 完整 OMP 接入
 
 用户选择复用 OMP 的全部登录模块。按先行验证后定稿的第五对 HTML 实现 Bun/TypeScript 认证、原版 TUI、目录和推理；保留 Node v1。通过 AuthCredentialStore 把 OMP 状态适配到 config/config.toml，没有另建凭据库，不导入原版 CLI 凭据。第三层独立 JSONL 模块，不修改下层或恢复抽取实验。
+
+## 2026-10-30 v2.21.0 模型接入直连
+
+OMP 模型接入模块（applications/model_access，TypeScript/Bun）已退役；第三层不再有独立 TS 模型模块，P3 实例通过 applications/soxl_jev/adapters/modelapi 的 Go 标准库客户端直连单个 OpenAI 兼容端点。语言规则不变：仍允许非 Python 的上层模块，本次没有引入新语言包或新运行时，Bun 不再出现在生产镜像。历史 OMP 决策与验证记录保留，不再作为现行实现；式样/设计见 v2.21.0 05 配对。

@@ -34,9 +34,8 @@ Factorforge/
 │           ├── operations/ / reports/ # bootstrap、日历及无副作用投影
 │           ├── adapters/postgres/migrations/ # 本应用 SQL
 │           └── config/ / api/ / entrypoints/ # API、三 worker、操作者 CLI
-│       ├── model_access/        # 第三层独立 TS/Node 模型接入
-│       │   ├── api/ / config/ / adapters/ / application/ / entrypoints/
-│       │   └── package.json / package-lock.json / tsconfig.json
+│       ├── deployment/          # 基础设施：日志归档、监督、TLS 网关
+│       │   └── adapters/ / entrypoints/ff-runtime/
 │       └── console/             # 平级只读管理台，独立 Go 入口
 │           ├── domain/ / ports/ / application/ / adapters/ / api/
 │           ├── config/ / entrypoints/console-api/
@@ -62,7 +61,7 @@ P1 的正常运行入口已改为六个 Go 二进制，见 [Go 运行说明](TRA
 
 当前管理台 package.json/pnpm-lock.yaml 放 console/web；现有管理台的 Node/pnpm 用于构建和浏览器测试。产物放 runtime/web-build，再由受控步骤交给 Go BFF 同源提供。node_modules、源码图和截图不进公开树，真实 config/prompts 不在静态目录。当前管理台运行服务不依赖 Python 或 Node；该现状不限制其他上层模块使用 Node/Bun。测试放 tests/applications/console 与 tests/web；构建和操作见 [管理台说明](CONSOLE_GO.md)。
 
-P3 当前只读 API 见 [实例说明](INSTANCE_GO.md)，私有队列/工作进程与配置身份派生见 [实例链路说明](INSTANCE_PIPELINE.md)。applications 下登记 soxl_jev/console/model_access，应用领域和端口同样受纯领域检查；向下只通过公开 DTO/client 或 HTTP，同层应用也不导入对方数据库/业务实现。operations/reports/routing/submission 禁止反向依赖 API、适配器或入口；不为尚未实现的组件创建占位源码。
+P3 当前只读 API 见 [实例说明](INSTANCE_GO.md)，私有队列/工作进程与配置身份派生见 [实例链路说明](INSTANCE_PIPELINE.md)。applications 下登记 soxl_jev/console/deployment，应用领域和端口同样受纯领域检查；向下只通过公开 DTO/client 或 HTTP，同层应用也不导入对方数据库/业务实现。operations/reports/routing/submission 禁止反向依赖 API、适配器或入口；不为尚未实现的组件创建占位源码。
 
 ## 非 Python 的多语言模块
 
@@ -74,13 +73,11 @@ P3 当前只读 API 见 [实例说明](INSTANCE_GO.md)，私有队列/工作进�
 
 当前 check-layout 校验源码位置、活跃 .py 禁止及 Go AST/import 边界，不声称已覆盖 TS/JS 依赖图。实际引入非 Go 模块时同步补齐相应布局、构建、跨语言契约与运行隔离检查；本版仅修改文档，无新模块或新占位目录。详见 [语言与模块决策](LANGUAGE_AND_MODULE_BOUNDARIES.md)。
 
-模型接入模块源码/manifest/唯一 npm lockfile 位于 applications/model_access，测试位于 tests/applications/model_access，契约位于 contracts/v2/model-access，构建产物位于 runtime/model-access-build。Go 布局检查登记 TS/MJS 放置，另以 TypeScript compiler AST 校验静态导入仅限自有模块、Node 内置和固定依赖；生产源码禁止动态 require/import。详见 [模块运行说明](../../src/factorforge/applications/model_access/README.md)。
+## v2.21.0 模型接入直连
 
-模型交互菜单沿用 model_access 已登记目录：entrypoints/menu.ts 与 terminal-menu.ts 负责装配和终端；application/menu-selection.ts、fuzzy.ts 保存适配的 OMP 纯算法；adapters/official-cli.ts 启动原版官方程序。实验位于 tests/applications/model_access/experiments，生产验收位于同层 menu.test.mjs。string-width 为固定 Node 依赖；原版 CLI 和独立工作目录只放被忽略的 runtime/model-cli 与 runtime/model-cli-workspace。官方登录凭据由官方程序的私有目录/系统钥匙串管理，不复制或跟踪。
+v2.20.0 的 applications/model_access（TypeScript/Bun）、contracts/v2/model-access、tests/applications/model_access 与 tools/init-model-access 已删除，历史源文件保留在 Git。模型调用改为 P3 自有适配器 `applications/soxl_jev/adapters/modelapi`（Go 标准库），配置读取 `applications/soxl_jev/config/model_access.go`；不再有跨语言 JSONL 协议或 Bun 运行时。部署时 `tools/deploy prepare` 从主配置派生只含 `[model_access]` 的 `judgment-worker/model.toml`，容器只挂该文件。式样与设计见 v2.21.0 的 05 配对。
 
-完整 OMP 接入仍在 model_access 的 api/config/adapters/application/entrypoints 五类目录；Bun入口、TOML CredentialStore、浏览器会话适配与OMP菜单均属该模块。沿用唯一 npm lockfile；Bun为执行依赖。测试与先行实验同层归位；运行/目录缓存/独立浏览器profile位于忽略的 runtime/model-access-omp，凭据只在私有TOML。
-
-语义候选沿用 soxl_jev 的 domain/semantic.go、ports/semantic.go、evidence/semantic.go、config/semantic.go、adapters/modelaccess/client.go 和 operations/semantic_file.go；由 instance-cli 装配，只经公开 JSONL v2 调用模型模块。测试/合成回放归 tests/applications/soxl_jev，先行模型实验归 tests/applications/model_access/experiments；响应契约归 contracts/v2/model-access。私有输入、attempt与候选产物只在忽略 runtime；无新语言包或下层依赖。
+语义抽取 CLI 的 `extract-candidates` 随旧客户端的退役一并移除；tests/applications/soxl_jev/experiments 中依赖旧客户端的冻结试验与连带测试删除，源文件仍在 Git 历史。
 
 ## v2.7.0 输入工作器撤回
 

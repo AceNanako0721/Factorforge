@@ -263,22 +263,17 @@ model_budget_reviewed = false
 # BEGIN FACTORFORGE MODEL ACCESS
 [model_access]
 enabled = false
-api_base_url = ""
+channel = ""
+endpoint = ""
 api_key = ""
-prompt_file = ""
+model = ""
+thinking = false
+reasoning_effort = ""
+max_tokens = 0
 timeout_seconds = 0
-login_timeout_seconds = 0
 max_input_bytes = 0
 max_output_bytes = 0
-max_line_bytes = 0
 budget_window_seconds = 0
-api_max_requests = 0
-chatgpt_max_requests = 0
-# Local request budgets: 0 = unlimited, positive = opt-in windowed cap.
-# A positive cap requires a positive budget_window_seconds.
-claude_cli_path = ""
-antigravity_cli_path = ""
-omp_max_requests = 0
-omp_browser_path = ""
-state_json = ""
+max_requests = 0
+state_path = ""
 # END FACTORFORGE MODEL ACCESS

@@ -285,7 +285,7 @@ func (d *deployment) prepare() error {
 	if e := write(filepath.Join(d.profile, "postgres/postgres-password"), []byte(d.o.Database.Password)); e != nil {
 		return e
 	}
-	env := map[string]string{"FF_DATA_ROOT": d.o.DataRoot, "FF_PROFILE_ROOT": d.profile, "FF_CONFIG_DIR": filepath.Dir(d.config), "FF_PROMPTS_DIR": filepath.Join(d.root, "prompts"), "FF_UID": strconv.Itoa(os.Getuid()), "FF_GID": strconv.Itoa(os.Getgid()), "FF_IMAGE_TAG": d.o.ImageTag, "FF_CONSOLE_PORT": strconv.Itoa(d.o.ConsolePort), "FF_RUN_ID": d.o.RunID, "FF_INSTRUMENT": d.o.Instrument}
+	env := map[string]string{"FF_DATA_ROOT": d.o.DataRoot, "FF_PROFILE_ROOT": d.profile, "FF_PROMPTS_DIR": filepath.Join(d.root, "prompts"), "FF_UID": strconv.Itoa(os.Getuid()), "FF_GID": strconv.Itoa(os.Getgid()), "FF_IMAGE_TAG": d.o.ImageTag, "FF_CONSOLE_PORT": strconv.Itoa(d.o.ConsolePort), "FF_RUN_ID": d.o.RunID, "FF_INSTRUMENT": d.o.Instrument}
 	for _, k := range []string{"candle_interval", "lookback_seconds", "poll_seconds", "multiplier", "publication_delay_ms", "trade_limit"} {
 		env["FF_"+strings.ToUpper(k)] = d.o.Collector[k]
 	}
@@ -310,6 +310,9 @@ func (d *deployment) prepare() error {
 		return e
 	}
 	if e := d.profiles(); e != nil {
+		return e
+	}
+	if e := d.modelFile(); e != nil {
 		return e
 	}
 	return d.compose("config", "--quiet")
@@ -371,7 +374,7 @@ func (d *deployment) profiles() error {
 			p = clone(object(overrides, name))
 			p["environment"] = "SIM"
 			p["root"] = "/app"
-			p["model_config"] = "/private/config/config.toml"
+			p["model_config"] = "/private/model.toml"
 			a := object(p, "access")
 			a["database_url"] = d.dsn("ff_p3_dynamic")
 			a["framework_url"] = "https://gateway:9444"
@@ -414,6 +417,18 @@ func (d *deployment) profiles() error {
 	schema := map[string]any{"environment": "SIM", "instance_id": object(d.raw, "strategy")["instance_id"], "dsn": d.dsn("ff_admin"), "roles": d.o.Database.Roles, "version": strings.TrimSpace(string(version))}
 	b, _ = json.Marshal(schema)
 	return write(filepath.Join(d.profile, "operator/schema.json"), b)
+}
+func (d *deployment) modelFile() error {
+	access := clone(object(d.raw, "model_access"))
+	if len(access) == 0 {
+		return fail("MODEL_CONFIGURATION_INCOMPLETE")
+	}
+	access["state_path"] = "/private/runtime/model-state.json"
+	b, e := toml.Marshal(map[string]any{"model_access": access})
+	if e != nil {
+		return e
+	}
+	return write(filepath.Join(d.profile, "judgment-worker/model.toml"), b)
 }
 func (d *deployment) doctor() error {
 	missing := []string{}
@@ -461,9 +476,8 @@ func (d *deployment) doctor() error {
 			missing = append(missing, "profile."+name)
 		}
 	}
-	model := object(d.raw, "model_access")
-	if enabled, _ := model["enabled"].(bool); !enabled {
-		missing = append(missing, "model_access.enabled/accounts/models")
+	if _, e := ic.LoadModelAccess(filepath.Join(d.profile, "judgment-worker/model.toml")); e != nil {
+		missing = append(missing, "profile.judgment-worker/model.toml")
 	}
 	judgment, profileErr := ic.LoadDynamic(filepath.Join(d.profile, "judgment-worker/config.toml"))
 	if profileErr == nil {
@@ -476,33 +490,6 @@ func (d *deployment) doctor() error {
 				missing = append(missing, "private judgment prompt path")
 			} else if _, e := analysis.LoadJudgmentTemplate(path, judgment.PromptVersion, judgment.MaxBytes); e != nil {
 				missing = append(missing, "private judgment prompt contents/version")
-			}
-		}
-		var state struct {
-			OMP struct {
-				Credentials []struct {
-					ID            int64   `json:"id"`
-					Provider      string  `json:"provider"`
-					DisabledCause *string `json:"disabledCause"`
-					Credential    struct {
-						Type   string `json:"type"`
-						Key    string `json:"key"`
-						Access string `json:"access"`
-					} `json:"credential"`
-				} `json:"credentials"`
-			} `json:"omp"`
-		}
-		raw, _ := model["state_json"].(string)
-		_ = json.Unmarshal([]byte(raw), &state)
-		for _, selected := range judgment.Models {
-			found := false
-			for _, account := range state.OMP.Credentials {
-				if account.ID == selected.AccountID && account.Provider == selected.Provider && account.DisabledCause == nil && (account.Credential.Type == "api_key" && account.Credential.Key != "" || account.Credential.Type == "oauth" && account.Credential.Access != "") {
-					found = true
-				}
-			}
-			if !found {
-				missing = append(missing, "judgment model account binding/authentication")
 			}
 		}
 	}
@@ -556,7 +543,7 @@ func run() error {
 	case "doctor":
 		return d.doctor()
 	case "build":
-		for _, target := range []string{"postgres", "core", "model"} {
+		for _, target := range []string{"postgres", "core"} {
 			c := exec.Command("docker", "build", "-f", "tools/deploy/Dockerfile", "--target", target, "--build-arg", "FF_UID="+strconv.Itoa(os.Getuid()), "--build-arg", "FF_GID="+strconv.Itoa(os.Getgid()), "-t", "factorforge-"+target+":"+d.o.ImageTag, ".")
 			c.Stdout = os.Stdout
 			c.Stderr = os.Stderr

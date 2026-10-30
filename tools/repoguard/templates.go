@@ -268,6 +268,27 @@ const expectedModelAccess = `
 # BEGIN FACTORFORGE MODEL ACCESS
 [model_access]
 enabled = false
+channel = ""
+endpoint = ""
+api_key = ""
+model = ""
+thinking = false
+reasoning_effort = ""
+max_tokens = 0
+timeout_seconds = 0
+max_input_bytes = 0
+max_output_bytes = 0
+budget_window_seconds = 0
+max_requests = 0
+state_path = ""
+# END FACTORFORGE MODEL ACCESS
+`
+
+// historicalModelAccess is the frozen v2.20.0 empty shape. It is accepted only
+// for files already committed before the direct model channel existed.
+const historicalModelAccess = `
+[model_access]
+enabled = false
 api_base_url = ""
 api_key = ""
 prompt_file = ""
@@ -284,7 +305,6 @@ antigravity_cli_path = ""
 omp_max_requests = 0
 omp_browser_path = ""
 state_json = ""
-# END FACTORFORGE MODEL ACCESS
 `
 
 const expectedDeployment = `

@@ -91,6 +91,11 @@ func TemplateIssue(name string, data []byte, historical bool) string {
 				delete(expected, "deployment")
 			}
 		}
+		if historical {
+			if issue := normalizeHistoricalModel(actual, expected); issue != "" {
+				return issue
+			}
+		}
 		// Enforce a complete, exact empty shape, including short arbitrary secrets.
 		if actual["mode"] != "mock" || !equalJSON(actual["schema_version"], expected["schema_version"]) || asMap(actual["runtime"])["environment"] != "SIM" || asMap(actual["trading"])["allow_live"] != false || asMap(actual["trading"])["adapter"] != "mock" {
 			return "unsafe-config-template-defaults"
@@ -388,4 +393,40 @@ func Scan(root, revision string, history bool) ([]Issue, int, error) {
 		return result[i].Path < result[j].Path
 	})
 	return result, len(checked), nil
+}
+
+// normalizeHistoricalModel accepts only the exact empty model blocks that were
+// committed before v2.21.0 and rewrites them to the current empty shape.
+func normalizeHistoricalModel(actual, expected map[string]any) string {
+	want := asMap(expected["model_access"])
+	got, present := actual["model_access"]
+	if !present {
+		delete(expected, "model_access")
+		return ""
+	}
+	gotMap := asMap(got)
+	if equalJSON(gotMap, want) {
+		return ""
+	}
+	var legacy map[string]any
+	if toml.Unmarshal([]byte(historicalModelAccess), &legacy) != nil {
+		return "invalid-template-format"
+	}
+	base := asMap(legacy["model_access"])
+	variants := []map[string]any{base}
+	withoutOMP := cloneMap(base)
+	delete(withoutOMP, "omp_max_requests")
+	delete(withoutOMP, "omp_browser_path")
+	variants = append(variants, withoutOMP)
+	withoutCLI := cloneMap(withoutOMP)
+	delete(withoutCLI, "claude_cli_path")
+	delete(withoutCLI, "antigravity_cli_path")
+	variants = append(variants, withoutCLI)
+	for _, variant := range variants {
+		if equalJSON(gotMap, variant) {
+			actual["model_access"] = want
+			return ""
+		}
+	}
+	return "nonempty-or-invalid-model-template"
 }

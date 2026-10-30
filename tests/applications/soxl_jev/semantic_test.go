@@ -3,17 +3,12 @@ package soxl_jev_test
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	modelaccess "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/adapters/modelaccess"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/config"
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/domain"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/evidence"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/operations"
-	"io"
 	"os"
-	"os/exec"
-	"os/signal"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -22,67 +17,6 @@ import (
 
 // The subprocess fixture exercises real OS pipes, EOF, byte limits and cleanup.
 // It neither loads model credentials nor connects to a network.
-func TestMain(m *testing.M) {
-	if mode := os.Getenv("FACTORFORGE_TEST_SEMANTIC_CHILD"); mode != "" {
-		if len(os.Args) != 5 || os.Args[2] != "serve" || os.Args[3] != "--config" {
-			os.Exit(2)
-		}
-		var request struct {
-			V         int    `json:"v"`
-			ID        string `json:"id"`
-			Op        string `json:"op"`
-			Provider  string `json:"provider"`
-			AccountID int64  `json:"account_id"`
-			Model     string `json:"model"`
-			Input     string `json:"input"`
-		}
-		decoder := json.NewDecoder(os.Stdin)
-		decoder.DisallowUnknownFields()
-		if decoder.Decode(&request) != nil || decoder.Decode(new(any)) != io.EOF || request.V != 2 || request.Op != "generate" {
-			os.Exit(3)
-		}
-		if mode == "hang" {
-			signal.Ignore(os.Interrupt)
-			time.Sleep(time.Hour)
-			os.Exit(0)
-		}
-		result := map[string]any{"provider": request.Provider, "account_id": request.AccountID, "model": request.Model, "prompt_hash": strings.Repeat("a", 64), "text": `{"schema_version":1,"events":[]}`, "usage": map[string]any{"input": 2, "output": 3}}
-		reply := map[string]any{"v": 2, "id": request.ID, "ok": true, "result": result}
-		switch mode {
-		case "id":
-			reply["id"] = "other"
-		case "model":
-			result["model"] = "other"
-		case "account":
-			result["account_id"] = 2
-		case "hash":
-			result["prompt_hash"] = "missing"
-		case "usage":
-			result["usage"] = map[string]any{"input": nil}
-		case "extra":
-			result["secret"] = "fixture"
-		case "null":
-			result["text"] = nil
-		case "missing":
-			delete(result, "usage")
-		case "oversize":
-			result["text"] = strings.Repeat("x", 100000)
-		case "error", "unknown":
-			delete(reply, "result")
-			reply["ok"] = false
-			reply["error"] = map[string]any{"code": "FIXTURE_FAILED", "delivery_unknown": mode == "unknown"}
-		case "exit":
-			os.Exit(4)
-		}
-		_ = json.NewEncoder(os.Stdout).Encode(reply)
-		if mode == "multiline" {
-			fmt.Println("{}")
-		}
-		os.Exit(0)
-	}
-	os.Exit(m.Run())
-}
-
 func semanticText(quote string, occurrence int) string {
 	raw, _ := json.Marshal(map[string]any{"schema_version": 1, "events": []any{map[string]any{"paragraph_id": "p000001", "quote": quote, "occurrence": occurrence, "subject_id": "acme", "item_id": "revenue", "assertion": "NEGATED", "relation": "RETRACTION"}}})
 	return string(raw)
@@ -255,45 +189,6 @@ func TestSemanticOperatorAttemptPermissionAndReviewBoundary(t *testing.T) {
 	}
 }
 
-func TestSemanticJSONLProcessBoundary(t *testing.T) {
-	t.Setenv("GORACE", os.Getenv("GORACE")+" atexit_sleep_ms=0")
-	executable, err := os.Executable()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, mode := range []string{"success", "id", "model", "account", "hash", "usage", "extra", "null", "missing", "oversize", "error", "unknown", "exit", "multiline", "hang"} {
-		t.Run(mode, func(t *testing.T) {
-			t.Setenv("FACTORFORGE_TEST_SEMANTIC_CHILD", mode)
-			client := modelaccess.Client{Root: t.TempDir(), Config: "fixture-config", Settings: config.SemanticSettings{Enabled: true, BunPath: executable, Provider: "fixture", AccountID: 1, Model: "fixture-model", TimeoutSeconds: 1, CleanupSeconds: 1, MaxInputBytes: 2000, MaxOutputBytes: 2000, MaxLineBytes: 4000}}
-			if mode != "hang" {
-				client.Settings.TimeoutSeconds = 5
-			}
-			ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
-			defer cancel()
-			result, err := client.Generate(ctx, "fixture_id", "fixture input")
-			if mode == "success" {
-				if err != nil || !d.UTC(result.CompletedAt) || result.Model != "fixture-model" {
-					t.Fatal(err)
-				}
-			} else if err == nil {
-				t.Fatal("invalid transport admitted")
-			}
-			if mode == "unknown" || mode == "exit" || mode == "hang" {
-				var failure *d.Error
-				if !errors.As(err, &failure) || failure.Code != "DELIVERY_UNKNOWN" {
-					t.Fatal(err)
-				}
-			}
-			if d.Has([]string{"id", "model", "account", "hash", "usage", "extra", "null", "missing", "multiline"}, mode) {
-				var failure *d.Error
-				if !errors.As(err, &failure) || failure.Code != "PROTOCOL_INVALID" {
-					t.Fatal(err)
-				}
-			}
-		})
-	}
-}
-
 func TestSemanticConfigUnlimitedAndRequiredBoundaries(t *testing.T) {
 	root := t.TempDir()
 	_ = os.Mkdir(filepath.Join(root, "config"), 0700)
@@ -324,46 +219,5 @@ func TestSemanticConfigUnlimitedAndRequiredBoundaries(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
-	}
-}
-
-func TestSemanticActualBunProtocol(t *testing.T) {
-	bun, err := exec.LookPath("bun")
-	build, absErr := filepath.Abs("../../../runtime/model-access-build")
-	_, statErr := os.Stat(filepath.Join(build, "entrypoints", "omp-cli.js"))
-	if err != nil || absErr != nil || statErr != nil {
-		if os.Getenv("FACTORFORGE_REQUIRE_MODEL_PROTOCOL") == "1" {
-			t.Fatal("built Bun model module required")
-		}
-		t.Skip("model module not built")
-	}
-	root := t.TempDir()
-	_ = os.Mkdir(filepath.Join(root, "runtime"), 0700)
-	_ = os.Mkdir(filepath.Join(root, "config"), 0700)
-	// Fixture root has no real accounts; only the public executable is linked.
-	if err = os.Symlink(build, filepath.Join(root, "runtime", "model-access-build")); err != nil {
-		if os.Getenv("FACTORFORGE_REQUIRE_MODEL_PROTOCOL") == "1" {
-			t.Fatal(err)
-		}
-		t.Skip("symlink unavailable")
-	}
-	path := filepath.Join(root, "config", "config.toml")
-	template, err := os.ReadFile("../../../config/config.example.toml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	text := strings.ReplaceAll(string(template), "timeout_seconds = 0", "timeout_seconds = 2")
-	text = strings.ReplaceAll(text, "max_line_bytes = 0", "max_line_bytes = 10000")
-	if err = os.WriteFile(path, []byte(text), 0600); err != nil {
-		t.Fatal(err)
-	}
-	client := modelaccess.Client{Root: root, Config: path, Settings: config.SemanticSettings{Enabled: true, BunPath: bun, Provider: "fixture", AccountID: 1, Model: "fixture", TimeoutSeconds: 4, CleanupSeconds: 1, MaxInputBytes: 2000, MaxOutputBytes: 2000, MaxLineBytes: 10000}}
-	_, err = client.Generate(context.Background(), "fixture_bun", "fixture input")
-	var failure *d.Error
-	if !errors.As(err, &failure) || failure.Code != "MODEL_ACCESS_FAILED" {
-		t.Fatal(err)
-	}
-	if _, err = os.Lstat(filepath.Join(root, "config", ".model-access.lock")); !errors.Is(err, os.ErrNotExist) {
-		t.Fatal("actual Bun process left config lock")
 	}
 }

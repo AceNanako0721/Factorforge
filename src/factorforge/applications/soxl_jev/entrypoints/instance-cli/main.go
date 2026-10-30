@@ -4,18 +4,14 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	modelaccess "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/adapters/modelaccess"
 	pg "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/adapters/postgres"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/config"
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/domain"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/entrypoints/assembly"
-	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/evidence"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/operations"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"sort"
-	"syscall"
 	"time"
 )
 
@@ -36,24 +32,6 @@ func run() error {
 	})
 	if semanticProvided && (*action != "render-review" || *semanticInput == "") {
 		return d.Fail("SEMANTIC_REVIEW_INVALID", 422)
-	}
-	if *action == "extract-candidates" {
-		root, err := os.Getwd()
-		if err != nil {
-			return d.Fail("SEMANTIC_CONFIG_INVALID", 503)
-		}
-		path, err := filepath.Abs(*source)
-		if err != nil {
-			return d.Fail("SEMANTIC_CONFIG_INVALID", 503)
-		}
-		settings, err := config.LoadSemantic(root, path)
-		if err != nil {
-			return err
-		}
-		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-		defer cancel()
-		client := modelaccess.Client{Root: root, Config: path, Settings: settings}
-		return operations.ExtractSemanticFile(ctx, client, root, *proposalInput, *proposalOutput, *proposalBytes, evidence.SemanticLimits{MaxEvents: settings.MaxEvents, MaxQuoteBytes: settings.MaxQuoteBytes})
 	}
 	if d.Has([]string{"prepare-evidence", "compile-evidence", "prepare-review", "render-review", "compile-calendar"}, *action) {
 		root, err := os.Getwd()

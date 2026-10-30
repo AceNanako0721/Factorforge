@@ -42,7 +42,7 @@ func Check(root string) ([]string, error) {
 				failures = append(failures, name+": retired Python source in active tree")
 			}
 			if strings.HasPrefix(name, "src/") && (strings.HasSuffix(name, ".ts") || strings.HasSuffix(name, ".mjs")) {
-				if len(parts) < 6 || parts[2] != "applications" || !has([]string{"console", "model_access"}, parts[3]) {
+				if len(parts) < 6 || parts[2] != "applications" || !has([]string{"console"}, parts[3]) {
 					failures = append(failures, name+": unregistered JavaScript/TypeScript module")
 				}
 			}
@@ -83,7 +83,7 @@ func Check(root string) ([]string, error) {
 		}
 		own := module + layer + "/"
 		if layer == "applications" {
-			if len(parts) < 6 || !has([]string{"soxl_jev", "console", "model_access", "deployment"}, parts[3]) {
+			if len(parts) < 6 || !has([]string{"soxl_jev", "console", "deployment"}, parts[3]) {
 				fail("unregistered application or source area")
 				return nil
 			}

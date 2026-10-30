@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/adapters/modelaccess"
+	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/adapters/modelapi"
 	pg "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/adapters/postgres"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/analysis"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/config"
@@ -77,10 +77,24 @@ func RunDynamic(role string) error {
 		if err != nil {
 			return err
 		}
+		access, err := config.LoadModelAccess(p.ModelConfig)
+		if err != nil {
+			return err
+		}
+		if !access.Enabled {
+			return d.Fail("MODEL_CONFIGURATION_INCOMPLETE", 503)
+		}
 		models := []workers.NamedModel{}
 		for _, m := range p.Models {
-			s := config.SemanticSettings{Enabled: true, BunPath: m.BunPath, Provider: m.Provider, AccountID: m.AccountID, Model: m.Model, TimeoutSeconds: m.Timeout, CleanupSeconds: 10, MaxInputBytes: p.MaxBytes, MaxOutputBytes: 64 << 10, MaxLineBytes: 256 << 10}
-			models = append(models, workers.NamedModel{Name: m.Name, Generator: modelaccess.Client{Root: p.Root, Config: p.ModelConfig, Settings: s}})
+			modelID := m.Model
+			if modelID == "" {
+				modelID = access.Model
+			}
+			timeout := m.TimeoutSeconds
+			if timeout == 0 {
+				timeout = access.TimeoutSeconds
+			}
+			models = append(models, workers.NamedModel{Name: m.Name, Generator: modelapi.Client{Root: p.Root, Access: access, ModelID: modelID, TimeoutSeconds: timeout}})
 		}
 		w := &workers.JudgmentWorker{Store: store, Framework: framework, News: monitoring.NewsCollector{Fetcher: fetcher, Feeds: p.News.Feeds, Clock: now}, Models: models, Template: template, Clock: now, Alerts: alerts, Settings: settings}
 		return loopJudgment(ctx, w, p, *once, alerts)

@@ -1,0 +1,57 @@
+name: ff-deepseek-json-lab
+services:
+  probe:
+    image: golang:1.27.1-bookworm@sha256:8d48e12ec56735e9358640898b9d9b9fcca110612ed8a5567438c0a1baa24e66
+    working_dir: /src
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    mem_limit: 512m
+    cpus: 1
+    tmpfs:
+      - /tmp:rw,exec,size=256m
+    environment:
+      HOME: /tmp
+      GOCACHE: /tmp/gocache
+    volumes:
+      - type: bind
+        source: ${FF_DEEPSEEK_ROOT:?}/go.mod
+        target: /src/go.mod
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${FF_DEEPSEEK_ROOT:?}/go.sum
+        target: /src/go.sum
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${FF_DEEPSEEK_PKG:?}
+        target: /src/tests/engineering/experiments/deepseekjson
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${FF_DEEPSEEK_EVIDENCE:?}
+        target: /evidence
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${FF_DEEPSEEK_KEY:-/dev/null}
+        target: /private/key
+        read_only: true
+        bind: {create_host_path: false}
+    command:
+      - go
+      - run
+      - ./tests/engineering/experiments/deepseekjson
+      - --key-file
+      - /private/key
+      - --model
+      - ${FF_DEEPSEEK_MODEL:-deepseek-flash}
+      - --reps
+      - ${FF_DEEPSEEK_REPS:-4}
+      - --max-tokens
+      - ${FF_DEEPSEEK_MAX_TOKENS:-32768}
+      - --thinking
+      - ${FF_DEEPSEEK_THINKING:-on}
+      - --out
+      - /evidence

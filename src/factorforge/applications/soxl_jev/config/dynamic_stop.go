@@ -33,12 +33,9 @@ type DynamicProfile struct {
 	TimeoutSeconds int    `toml:"timeout_seconds"`
 	MaxBytes       int    `toml:"max_bytes"`
 	Models         []struct {
-		Name      string `toml:"name"`
-		BunPath   string `toml:"bun_path"`
-		Provider  string `toml:"provider"`
-		AccountID int64  `toml:"account_id"`
-		Model     string `toml:"model"`
-		Timeout   int64  `toml:"timeout_seconds"`
+		Name           string `toml:"name"`
+		Model          string `toml:"model"`
+		TimeoutSeconds int64  `toml:"timeout_seconds"`
 	} `toml:"models"`
 	News struct {
 		Hosts             []string              `toml:"hosts"`
@@ -124,7 +121,7 @@ func LoadDynamic(path string) (DynamicProfile, error) {
 
 func (p DynamicProfile) Validate() error {
 	following := p.Following()
-	bad := !d.ValidID(p.InstanceID) || !d.Has([]string{"SIM", "LIVE"}, p.Environment) || !d.ValidID(p.ObjectID) || p.TimeoutSeconds <= 0 || p.MaxBytes <= 0 || len(p.Models) == 0 && !following
+	bad := !d.ValidID(p.InstanceID) || !d.Has([]string{"SIM", "LIVE"}, p.Environment) || !d.ValidID(p.ObjectID) || p.TimeoutSeconds <= 0 || p.MaxBytes <= 0 || len(p.Models) == 0 && !following || !following && p.ModelConfig == ""
 	if following {
 		parsed, err := url.Parse(p.Follow.SourceURL)
 		bad = bad || err != nil || parsed.Host == "" || p.Follow.SourceToken == "" || !d.ValidID(p.Follow.SourceInstanceID) || p.Follow.SourceInstanceID == p.InstanceID || p.Follow.Since.IsZero()
@@ -132,6 +129,9 @@ func (p DynamicProfile) Validate() error {
 	for _, u := range []string{p.Access.FrameworkURL, p.Access.TradingReadURL} {
 		parsed, err := url.Parse(u)
 		bad = bad || err != nil || parsed.Host == ""
+	}
+	for _, m := range p.Models {
+		bad = bad || !d.ValidID(m.Name) || m.TimeoutSeconds < 0
 	}
 	bad = bad || p.Access.FrameworkToken == "" || p.Access.TradingReadToken == "" || p.Access.DatabaseURL == "" || !d.ValidID(p.Access.AccountID) || !d.ValidID(p.Access.RunID)
 	for _, f := range p.News.Feeds {

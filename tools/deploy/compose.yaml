@@ -136,15 +136,15 @@ services:
     command: ["judgment-worker","--config","/profile/config.toml"]
     depends_on:
       postgres: {condition: service_healthy}
-    image: factorforge-model:${FF_IMAGE_TAG:?}
-    mem_limit: 768m
-    pids_limit: 192
+    image: factorforge-core:${FF_IMAGE_TAG:?}
+    mem_limit: 256m
+    pids_limit: 128
     networks: [private, egress]
     volumes:
       - {type: bind, source: '${FF_PROFILE_ROOT}/judgment-worker', target: /profile, read_only: true, bind: {create_host_path: false}}
       - {type: bind, source: '${FF_DATA_ROOT}/logs/judgment-worker', target: /logs, bind: {create_host_path: false}}
       - {type: bind, source: '${FF_DATA_ROOT}/tls/trust', target: /trust, read_only: true, bind: {create_host_path: false}}
-      - {type: bind, source: '${FF_CONFIG_DIR:?}', target: /private/config, bind: {create_host_path: false}}
+      - {type: bind, source: '${FF_PROFILE_ROOT}/judgment-worker/model.toml', target: /private/model.toml, read_only: true, bind: {create_host_path: false}}
       - {type: bind, source: '${FF_DATA_ROOT}/model-runtime', target: /private/runtime, bind: {create_host_path: false}}
       - {type: bind, source: '${FF_PROMPTS_DIR:?}', target: /private/prompts, read_only: true, bind: {create_host_path: false}}
       - {type: bind, source: '${FF_DATA_ROOT}/assets', target: /assets, read_only: true, bind: {create_host_path: false}}

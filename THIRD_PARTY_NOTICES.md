@@ -125,6 +125,10 @@ The baseline references FreqUI `2e6a0907ed2e990b9e905331888dfa9824024d2d` for th
 
 The Go search adapters reference protocol and control-flow patterns from Oh My Pi (MIT), pinned at `579da1d661c5cb8d43bc2ddd429ab72e67165ad8`, and OpenCode (MIT), pinned at `388406238bd5ca15564a762840a2362c3a45bd9c`. No upstream code is copied or adapted, and neither harness is a runtime dependency. Exact files, probe evidence and limits are recorded in [P3 search review](doc/engineering/P3_SEARCH_UPSTREAM_REVIEW.md). Codex (Apache-2.0) and Gemini CLI (Apache-2.0) are comparison references only, with no copied implementation or authenticated service integration.
 
+## Retired model access module (v2.21.0)
+
+The OMP-based model access module and its Bun runtime were removed in v2.21.0 and are no longer distributed. The two oh-my-pi sections below are kept as historical attribution only. Current model calls use the Go standard library against one OpenAI-compatible endpoint; no third-party model SDK is bundled.
+
 ## oh-my-pi menu algorithms (v2.3.0)
 
 Source: https://github.com/can1357/oh-my-pi/tree/b07a1c146d0d12cfc855a2c65d52f892ef319040/packages/tui/src

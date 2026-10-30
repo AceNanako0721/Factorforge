@@ -2,11 +2,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {execFileSync,spawnSync} from 'node:child_process';
-import {createRequire} from 'node:module';
 if(process.argv[2]!=='--run')throw Error('Explicit --run required');
 const root=execFileSync('git',['rev-parse','--show-toplevel'],{encoding:'utf8'}).trim();
-const require=createRequire(path.join(root,'src/factorforge/applications/model_access/package.json'));
-const {parse,stringify}=require('smol-toml');
 const id=`${Date.now()}-${process.pid}`,project=`factorforge-lab-${id}`;
 const lab=path.join(root,'runtime',`deploy-acceptance-${id}`),repo=path.join(lab,'repo'),data=path.join(lab,'data');
 fs.mkdirSync(path.join(repo,'config'),{recursive:true,mode:0o700});fs.mkdirSync(path.join(repo,'prompts'),{recursive:true});fs.mkdirSync(path.join(repo,'tools/deploy'),{recursive:true});
@@ -17,7 +14,9 @@ const compose=(...args)=>run('docker',['compose','--env-file',path.join(repo,'ru
 const snapshot=()=>{const ids=run('docker',['ps','-q','--no-trunc']).trim().split(/\s+/).filter(Boolean);return Object.fromEntries(ids.map(id=>[id,run('docker',['inspect','--format','{{.State.StartedAt}}',id]).trim()]));};
 const before=snapshot();let started=false;
 try{
- run(tool,['init','--data-root',data]);const cfg=path.join(repo,'config/config.toml');const c=parse(fs.readFileSync(cfg,'utf8'));c.deployment.project=project;c.strategy.instance_id='deployment-fixture';fs.writeFileSync(cfg,stringify(c),{mode:0o600});
+ run(tool,['init','--data-root',data]);const cfg=path.join(repo,'config/config.toml');
+const setSection=(text,header,key,value)=>{const at=text.indexOf(header);if(at<0)throw Error('section missing '+header);const rest=text.slice(at+header.length);const next=rest.indexOf('\n[');const end=next<0?text.length:at+header.length+next+1;let section=text.slice(at,end);const line=new RegExp('^'+key+' = .*$','m');section=line.test(section)?section.replace(line,key+' = '+JSON.stringify(value)):section.replace(header,header+'\n'+key+' = '+JSON.stringify(value));return text.slice(0,at)+section+text.slice(end);};
+let cfgText=fs.readFileSync(cfg,'utf8');cfgText=setSection(cfgText,'[deployment]','project',project);cfgText=setSection(cfgText,'[strategy]','instance_id','deployment-fixture');fs.writeFileSync(cfg,cfgText,{mode:0o600});
  run(tool,['prepare']);
  const doctor=spawnSync(tool,['doctor'],{cwd:repo,encoding:'utf8'});if(doctor.status===0||!doctor.stdout.includes('MISSING profile.'))throw Error('Missing configuration was admitted');log.push('PASS missing application config refuses startup');
  started=true;run(tool,['infra-up']);run(tool,['schema']);

@@ -123,11 +123,11 @@ func TestPublicGuardTemplateShapesAndDocumentContainers(t *testing.T) {
 		{"initial_registry = {}", "initial_registry = { values = [1] }"},
 		{"query_cursor_key = \"\"", "query_cursor_key = \"short\""},
 		{"\napi_key = \"\"", "\napi_key = \"short\""},
-		{"state_json = \"\"", "state_json = \"private\""},
-		{"claude_cli_path = \"\"", "claude_cli_path = \"private\""},
-		{"antigravity_cli_path = \"\"", "antigravity_cli_path = \"private\""},
-		{"omp_browser_path = \"\"", "omp_browser_path = \"private\""},
-		{"omp_max_requests = 0", "omp_max_requests = 1"},
+		{"channel = \"\"", "channel = \"deepseek\""},
+		{"endpoint = \"\"", "endpoint = \"https://api.example.com\""},
+		{"model = \"\"", "model = \"fixture\""},
+		{"max_tokens = 0", "max_tokens = 1"},
+		{"state_path = \"\"", "state_path = \"/private/state.json\""},
 		{"", "\npassword = \"short\"\n"},
 	} {
 		body := strings.Replace(string(config), change.old, change.new, 1)

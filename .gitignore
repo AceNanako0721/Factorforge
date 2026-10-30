@@ -53,3 +53,6 @@ doc/_archive/
 .gemini/
 .antigravity/
 .credentials.json
+
+# Local build output from go build ./tools/deploy
+/deploy

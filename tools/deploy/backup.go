@@ -72,9 +72,6 @@ func (d *deployment) backup() error {
 	if e := d.stopped(); e != nil {
 		return e
 	}
-	if _, e := os.Stat(filepath.Join(filepath.Dir(d.config), ".model-access.lock")); !os.IsNotExist(e) {
-		return fail("MODEL_WRITER_LOCK_REQUIRES_REVIEW")
-	}
 	if e := d.compose("up", "-d", "--wait", "postgres"); e != nil {
 		return e
 	}

@@ -6,7 +6,7 @@
 
 ## 1. 首次准备
 
-在仓库根目录执行，需要 Docker Compose v2、根 go.mod 对应 Go 工具链，以及足够磁盘。构建会下载依赖；本机已验证 Linux ARM64 镜像。无需宿主 PostgreSQL、Node 或 Bun 来运行已构建镜像。
+在仓库根目录执行，需要 Docker Compose v2、根 go.mod 对应 Go 工具链，以及足够磁盘。构建会下载依赖；本机已验证 Linux ARM64 镜像。无需宿主 PostgreSQL 或 Node 来运行已构建镜像。
 
 ```sh
 go run ./tools/deploy init --data-root "$HOME/code/data/factorforge"
@@ -17,12 +17,12 @@ go run ./tools/deploy doctor
 
 `init` 仅创建 `config/config.toml`（0600），生成数据库随机密码，已有配置一律不覆盖。`prepare` 生成私有派生 profile 和 TLS 资产，不填风险数值、不初始化资金；业务运行中拒绝改写 profile。不要再次运行 init 来升级。
 
-唯一主配置为 `config/config.toml`。模型区块及 BEGIN/END 标记必须在文件最后；不要用会丢注释的 TOML 整体序列化工具编辑它。主配置只挂给唯一模型写入者，其他服务使用最小派生 profile。`runtime/deployment` 也含秘密，不要提交、截图或上传。
+唯一主配置为 `config/config.toml`。模型区块及 BEGIN/END 标记必须在文件最后；不要用会丢注释的 TOML 整体序列化工具编辑它。主配置不挂入容器；judgment-worker 只挂派生的 `model.toml`，其他服务使用最小派生 profile。`runtime/deployment` 也含秘密，不要提交、截图或上传。
 
 | 需要确认的配置 | 格式与要求 |
 | --- | --- |
-| 模型认证 | 本机 OMP 菜单选择供应商并输入 Key；不要发聊天。账号绑定使用 provider/account_id/model，不能把普通 API 通道的 api_key 当成 OMP 账号。镜像含 Bun OMP；凭据仍写回唯一主配置。 |
-| 调用预算 | `model_access.omp_max_requests` 为窗口请求次数，`budget_window_seconds` 为秒；0 表示无限，需明确同意。它不是人民币/美元硬金额上限；还须确认模型输入/输出字节和超时。 |
+| 模型认证 | 在私有 `config/config.toml` 的 `[model_access]` 填 `endpoint`、`api_key`、`model`、`channel`；不要把 Key 发到聊天。prepare 会派生只含该段的 `judgment-worker/model.toml`，容器只挂这一份。 |
+| 调用预算 | `model_access.max_requests` 为窗口请求次数，`budget_window_seconds` 为秒；0 表示无限。同时确认 `max_tokens`、`thinking`、`reasoning_effort`（low/high/max）、输入输出字节与超时。 |
 | 私有提示词 | JSON，schema_version=1、asset_kind=PRIVATE、prompt_version 与 profile 一致，judgment_template 为文本。6 个占位符各一次：NOW、PREVIOUS、RECENT_COUNT、RECENT、OLDER_COUNT、OLDER，均以双花括号包围。容器 prompt_path 在 `/private/prompts/` 下。 |
 | 内部模拟政策 | 初始资金、计价币、单笔亏损、日亏损/回撤停机线、名义金额/杠杆上限、手续费/滑点/成交参与率等。P3 止损/波动/信心映射需按既有设计标定；缺项不猜数值。 |
 | 绑定与资产 | 固定 run/account/instance/object ID；标的、行情源/新闻源、授权令牌、管理台用户、日历与资产文件。技术身份和随机令牌可在配置阶段生成；业务参数由用户确认。 |
@@ -91,9 +91,9 @@ go run ./tools/deploy restore --source /absolute/completed-backup --destination 
 
 备份含数据库、角色、主配置、prompts、assets、tls、model-runtime；**含秘密**，0600/0700保护。日志独立保留，不在每次备份中重复复制。备份当前为手动，同盘副本只能应对误操作/逻辑损坏，不能应对整机/磁盘损坏；另一个磁盘或离机副本尚未配置。
 
-恢复先验 SHA256，再用隔离临时 PG 导入并停止；不会接管线上目录。目标保留 `postgres`、配置与资产及 `RESTORED.json`。恢复失败不发布该标记，私有 bootstrap 目录含诊断；不要公开错误文件，重试用新的空目标。确认数据/权限/身份、更新唯一主配置与数据根、处理模型登录锁、完成业务对账后，才能人工激活恢复副本。不要把旧配置/旧账本直接覆盖到仍在运行的实例上。
+恢复先验 SHA256，再用隔离临时 PG 导入并停止；不会接管线上目录。目标保留 `postgres`、配置与资产及 `RESTORED.json`。恢复失败不发布该标记，私有 bootstrap 目录含诊断；不要公开错误文件，重试用新的空目标。确认数据/权限/身份、更新唯一主配置与数据根、核对模型状态文件、完成业务对账后，才能人工激活恢复副本。不要把旧配置/旧账本直接覆盖到仍在运行的实例上。
 
-模型锁异常不会自动删除；确认旧写入进程不存在后按模型模块原有 unlock 规则处理。备份与 prepare 只覆盖本仓库 Compose 停机的协作边界；执行操作期间不要另开宿主模型写入者或手动改配置。
+模型预算状态在 `model-runtime/model-state.json`；异常时停业务核对，不手工伪造计数。备份与 prepare 只覆盖本仓库 Compose 停机的协作边界；执行操作期间不要手动改配置。
 
 ## 5. 验证范围
 
@@ -104,4 +104,4 @@ node tests/engineering/experiments/dockerbundle/acceptance.mjs --run
 node tests/engineering/experiments/dockerbundle/runtime-acceptance.mjs --run
 ```
 
-这两组显式实验仅使用独有名称、合成数据和正式镜像。覆盖缺配置拒绝、迁移重跑、容器重建、备份/恢复实际数据及授权、坏包/覆盖拒绝、日志、停机信号、TLS和 OMP 离线加载。完整真实配置的 13 服务联调、付费模型调用及真实业务运行仍须配置阶段验收，不把这些检查视为交易准入。
+这两组显式实验仅使用独有名称、合成数据和正式镜像。覆盖缺配置拒绝、迁移重跑、容器重建、备份/恢复实际数据及授权、坏包/覆盖拒绝、日志、停机信号与 TLS 转发。完整真实配置的 13 服务联调、付费模型调用及真实业务运行仍须配置阶段验收，不把这些检查视为交易准入。
