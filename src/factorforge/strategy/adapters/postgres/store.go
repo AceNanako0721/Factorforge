@@ -465,7 +465,7 @@ func (s *Store) appendRows(ctx context.Context, tx pgx.Tx, id string, before, af
 }
 
 // archiveDecisions moves every decision the transaction removed, with its
-// target, to the append-only archive (v2.5.7). An archived identity cannot
+// target, to the append-only archive. An archived identity cannot
 // re-enter the aggregate.
 func (s *Store) archiveDecisions(ctx context.Context, tx pgx.Tx, id string, before, after *d.StrategyState) error {
 	for _, key := range before.Decisions.Keys() {

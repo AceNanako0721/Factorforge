@@ -67,7 +67,7 @@ func TestModelConfigInitializationPreservesPrivateBytesAndRespectsLock(t *testin
 	if !bytes.Equal(first, second) {
 		t.Fatal("second init changed config")
 	}
-	// Frozen v2.2.0 credentials/limits are upgraded by inserting two blank paths.
+	// Frozen credentials/limits are upgraded by inserting two blank paths.
 	legacy := bytes.ReplaceAll(first, []byte("claude_cli_path = \"\"\n"), nil)
 	legacy = bytes.ReplaceAll(legacy, []byte("antigravity_cli_path = \"\"\n"), nil)
 	legacy = bytes.Replace(legacy, []byte("state_json = \"\""), []byte("state_json = 'fixture-private-state'"), 1)

@@ -2,9 +2,9 @@ package domain
 
 import "time"
 
-// v2.9.0 (S2-033～042): risk-unit sizing, close-stop exits, re-entry gate,
+// S2-033～042: risk-unit sizing, close-stop exits, re-entry gate,
 // judgment chain loss limit, pre-event de-risking and transfer to baseline.
-// Every rule is optional; a composition without them behaves as v2.8.0.
+// Every rule is optional; a composition without them behaves as.
 
 type SizingRule struct {
 	Mode                   string  `json:"mode"`
@@ -91,7 +91,8 @@ type ExitRequestCommand struct {
 	Command
 	ExitRequest
 }
-// ExitRequestValidity (S2-034 v2.18.0): a close-stop exit is delivered again
+
+// ExitRequestValidity (S2-034): a close-stop exit is delivered again
 // after a rejected delivery until this long after its bar closed; then it
 // expires and is not treated as a stop that happened.
 const ExitRequestValidity = 30 * time.Minute

@@ -116,7 +116,7 @@ type ActiveJudgment struct {
 	Since      time.Time `json:"since"`
 }
 
-// InjectionState is the deterministic memory of S3-025 / design 28.3.
+// InjectionState is the deterministic memory of S3-025 /.
 type InjectionState struct {
 	Seen          []string                 `json:"seen"`
 	Active        *ActiveJudgment          `json:"active,omitempty"`
@@ -250,7 +250,7 @@ func itoa(v int) string {
 }
 
 // SourcedJudgment is one judgment read from another instance's read API in
-// follower mode (S3-034, v2.13.0) with the news items it cites. Items carry
+// follower mode (S3-034) with the news items it cites. Items carry
 // only what the read API publishes (no summary or link); ReceivedAt is the
 // judgment time, the latest moment the source can have held them.
 type SourcedJudgment struct {

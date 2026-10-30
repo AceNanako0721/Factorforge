@@ -2,7 +2,7 @@ package domain
 
 import "time"
 
-// MarketEvent is one accepted public market message (S4-019, P4 design 17.1).
+// MarketEvent is one accepted public market message (S4-019).
 // Prices stay decimal strings; nothing here is an accounting fact.
 type MarketEvent struct {
 	At    time.Time

@@ -256,34 +256,34 @@ func TestVersionAndPRClassification(t *testing.T) {
 	}
 }
 
-func TestFrozenBaselineAndDesignSemantics(t *testing.T) {
-	root := fixtureRepo(t)
-	put(t, root, "doc/v2.0/sample式样书.md", "版本：2.0\n功能要求保持。\n")
-	put(t, root, "VERSION", "2.0.0\n")
-	old := guard.Manifest{Schema: 1, Releases: []guard.Release{{Version: "2.0.0", Directory: "doc/v2.0", Kind: "framework"}}}
+func TestReleaseTransitionAndDesignSemantics(t *testing.T) {
+	root := docsFixture(t, "2.21.0")
+	git(t, root, "init", "-q", "--initial-branch=main")
+	git(t, root, "config", "user.name", "Repository Guard Tests")
+	git(t, root, "config", "user.email", "tests@example.invalid")
+	put(t, root, "VERSION", "2.21.0\n")
+	old := guard.Manifest{Schema: 2, Releases: []guard.Release{{Version: "2.21.0", Kind: "specification", Date: "2026-10-30", Summary: "baseline"}}}
 	raw, _ := json.Marshal(old)
 	put(t, root, "doc/releases.json", string(raw))
 	base := commit(t, root)
-	if err := guard.CheckTransition(root, base, "code-only", "2.0.0", old); err != nil {
+	if err := guard.CheckTransition(root, base, "code-only", "2.21.0", old); err != nil {
 		t.Fatal(err)
 	}
-	if err := guard.CheckTransition(root, base, "code-only", "2.0.1", old); err == nil {
+	if err := guard.CheckTransition(root, base, "code-only", "2.21.1", old); err == nil {
 		t.Fatal("code-only bump accepted")
 	}
-	put(t, root, "doc/v2.0.1/sample式样书.md", "版本：2.0.1\n功能要求保持。\n")
-	fresh := guard.Manifest{Schema: 1, Releases: append(append([]guard.Release{}, old.Releases...), guard.Release{Version: "2.0.1", Directory: "doc/v2.0.1", Kind: "design"})}
-	if err := guard.CheckDirectories(root, old.Releases); err == nil {
-		t.Fatal("unregistered version directory accepted")
-	}
-	if err := guard.CheckTransition(root, base, "design", "2.0.1", fresh); err != nil {
+	fresh := guard.Manifest{Schema: 2, Releases: append(append([]guard.Release{}, old.Releases...), guard.Release{Version: "2.21.1", Kind: "design", Date: "2026-10-31", Summary: "design"})}
+	spec := "doc/" + guard.DocumentPairs[0] + "式样书.md"
+	put(t, root, spec, "# "+guard.DocumentPairs[0]+"式样书\n\n版本：2.21.1\n\n## 目的\n\n要求。\n")
+	if err := guard.CheckTransition(root, base, "design", "2.21.1", fresh); err != nil {
 		t.Fatal(err)
 	}
-	put(t, root, "doc/v2.0.1/sample式样书.md", "版本：2.0.1\n功能要求已改变。\n")
-	if err := guard.CheckTransition(root, base, "design", "2.0.1", fresh); err == nil {
-		t.Fatal("changed specification accepted")
+	put(t, root, spec, "# "+guard.DocumentPairs[0]+"式样书\n\n版本：2.21.1\n\n## 目的\n\n要求已改变。\n")
+	if err := guard.CheckTransition(root, base, "design", "2.21.1", fresh); err == nil {
+		t.Fatal("changed specification accepted as design")
 	}
-	put(t, root, "doc/v2.0/sample式样书.md", "历史被改写。\n")
-	if err := guard.CheckTransition(root, base, "code-only", "2.0.0", old); err == nil {
-		t.Fatal("frozen baseline rewrite accepted")
+	rewritten := guard.Manifest{Schema: 2, Releases: []guard.Release{{Version: "2.21.0", Kind: "specification", Date: "2026-10-30", Summary: "rewritten"}}}
+	if err := guard.CheckTransition(root, base, "code-only", "2.21.0", rewritten); err == nil {
+		t.Fatal("published release record overwritten")
 	}
 }

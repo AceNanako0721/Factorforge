@@ -143,7 +143,7 @@ type BatchOutcome struct {
 }
 
 // ConfidenceFactor maps judgment confidence 1～5 to 0.25/0.5/0.75/1/1
-// (S3-027, v2.11.6). Anything outside 1～5 takes the lowest factor.
+// (S3-027). Anything outside 1～5 takes the lowest factor.
 func ConfidenceFactor(confidence int) float64 {
 	switch {
 	case confidence >= 4 && confidence <= 5:
@@ -217,7 +217,7 @@ func Trailing(direction int, entry, best, r, trail, cost, current float64) (floa
 	return m, true
 }
 
-// Ladder implements S3-033 (v2.13.0): each full step of favourable move of the
+// Ladder implements S3-033: each full step of favourable move of the
 // best close over entry raises the close stop one level; the first level is
 // break-even plus round-trip cost, level k locks (k-1) steps. It returns
 // ok=false while the move is below one step or step is zero (rule off). Like
@@ -241,7 +241,7 @@ func Ladder(direction int, entry, best, step, cost, current float64) (float64, b
 	return m, true
 }
 
-// LadderNext is the display counterpart of Ladder (S3-033, v2.19.0): the
+// LadderNext is the display counterpart of Ladder (S3-033): the
 // current rung k (0 below the first step), the close stop rung k locks
 // ((k−1) steps, at least break-even plus cost; 0 when k is 0), the best close
 // that reaches rung k+1 and the close stop that rung locks.
@@ -267,7 +267,7 @@ func LadderNext(direction int, entry, best, step, cost float64) (rung int, rungS
 	return int(k), rungStop, entry * (1 + d*step*(k+1)), lock(k)
 }
 
-// CloseExitValidity (S3-028 v2.18.0) matches the framework's exit-request
+// CloseExitValidity (S3-028) matches the framework's exit-request
 // validity: an exit not executed this long after its bar closed has expired.
 const CloseExitValidity = 30 * time.Minute
 

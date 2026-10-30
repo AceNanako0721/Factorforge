@@ -13,8 +13,8 @@ import (
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/domain"
 )
 
-// JudgmentSourceOptions bind the follower to one source instance's v2.10.0
-// read API (S3-032) with a read-only token (S3-034, P3 design 34).
+// JudgmentSourceOptions bind the follower to one source instance's
+// read API (S3-032) with a read-only token (S3-034).
 type JudgmentSourceOptions struct {
 	BaseURL, Token, InstanceID string
 	Client                     *http.Client
@@ -69,7 +69,7 @@ type sourcePage struct {
 // After returns the source's judgments recorded strictly after since, oldest
 // first. The read API pages newest first; every page of the window is read.
 // It reports times to the second, so the judgment at the cursor itself comes
-// back again; entries not after since are skipped as that boundary (v2.14.1).
+// back again; entries not after since are skipped as that boundary.
 func (c *JudgmentSourceHTTP) After(ctx context.Context, since time.Time) ([]d.SourcedJudgment, error) {
 	o := c.options
 	from := since.UTC().Add(time.Nanosecond).Format(time.RFC3339Nano)
@@ -130,7 +130,7 @@ func (c *JudgmentSourceHTTP) After(ctx context.Context, since time.Time) ([]d.So
 					x.PublishedAt = n.PublishedAt.UTC()
 				}
 				// A cited item the source no longer holds cannot back evidence.
-				// Quick news carries no headline, so the title may be empty (v2.14.4).
+				// Quick news carries no headline, so the title may be empty.
 				if x.Source != "" && !x.PublishedAt.IsZero() {
 					items = append(items, x)
 				}

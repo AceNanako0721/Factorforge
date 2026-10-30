@@ -295,7 +295,7 @@ func (w *Protection) Tick(ctx context.Context, key d.RunKey) (bool, error) {
 		}
 	}
 	// A replacement verified outside this worker's confirmation (the venue
-	// sync before v2.14.10) still retires the generation it replaces (23.4).
+	// account sync) still retires the generation it replaces.
 	for _, n := range run.Protections.Values() {
 		if n.State != "ACTIVE_VERIFIED" || n.CancelRequested || n.ReplacesID == nil {
 			continue

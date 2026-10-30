@@ -24,11 +24,11 @@ type Market struct {
 	Multipliers      map[string]string
 	PublicationDelay time.Duration
 	// SimCapabilities declares simulator-provided protection, reduce-only and
-	// short for SIM (REPLAY) runs; the rule version gets a -sim suffix (v2.6.3).
+	// short for SIM (REPLAY) runs; the rule version gets a -sim suffix.
 	SimCapabilities bool
 	// DemoCapabilities declares the same three capabilities for a SIM run on
 	// the exchange demo account, verified there by the testnet acceptance
-	// suite (T1-18, 2026-10-16); the rule version gets a -demo suffix (v2.14.0).
+	// suite (T1-18, 2026-10-16); the rule version gets a -demo suffix.
 	DemoCapabilities bool
 	Now              func() time.Time
 	mu               sync.Mutex
@@ -437,7 +437,7 @@ func AccountProbe(ctx context.Context, t Transport) (map[string]any, error) {
 }
 
 // MainnetPublicEndpoint is the fixed source of reference funding settlements
-// (design 24.2). It is a program constant so a demo run cannot be pointed at
+// . It is a program constant so a demo run cannot be pointed at
 // another source by configuration; the market reading it carries no keys.
 const MainnetPublicEndpoint = "https://fapi.binance.com"
 

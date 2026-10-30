@@ -24,5 +24,5 @@ func main() {
 		fmt.Fprintln(os.Stderr, "BLOCKED:", err)
 		os.Exit(1)
 	}
-	fmt.Printf("OK: v%s; paired documents; immutable releases and specification rules\n", version)
+	fmt.Printf("OK: v%s; release manifest, current baseline and version rules\n", version)
 }

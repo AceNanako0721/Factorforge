@@ -9,10 +9,9 @@ import (
 	_ "time/tzdata"
 )
 
-// v2.9.0 S3-026: the normal-noise table describes ordinary price movement by
+// S3-026: the normal-noise table describes ordinary price movement by
 // session × holding horizon × side. It is used only to size stops; it never
-// produces a direction or trading signal. The arithmetic mirrors the E15b
-// experiment script (stop-noise-v2) and adds the 72h horizon.
+// produces a direction or trading signal.
 
 // MinuteBar is one completed 1-minute candle keyed by its close time.
 type MinuteBar struct {

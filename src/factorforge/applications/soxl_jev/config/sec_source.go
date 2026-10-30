@@ -11,7 +11,7 @@ import (
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/monitoring"
 )
 
-// NewSECSource assembles the v2.5.3 SEC 8-K source after the same licence
+// NewSECSource assembles the SEC 8-K source after the same licence
 // checks as RSS. SEC requires a declared operator identity ending in a contact
 // address; the value comes only from the private canonical configuration.
 func NewSECSource(r SECRegistration, sources map[string]d.SourceRegistration, userAgent string, timeout time.Duration, maxInputBytes int, fixtureOnly bool, now func() time.Time) (*monitoring.SECFilingSource, error) {

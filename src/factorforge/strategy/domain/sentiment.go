@@ -136,7 +136,7 @@ func AdvanceContributions(state *SentimentState, objectID string, at time.Time, 
 			return err
 		}
 		c.LastUpdatedAt = at
-		// v2.9.0: a registered fraction of the initial amount acts as a time stop.
+		// a registered fraction of the initial amount acts as a time stop.
 		relative := policy.CleanupFractionOfInitial != nil && c.RemainingAmount.Cmp(m.Mul(*policy.CleanupFractionOfInitial, c.InitialAmount)) <= 0
 		if at.Sub(c.EffectiveAt).Seconds() >= float64(policy.EventTTLSeconds) || c.RemainingAmount.Cmp(policy.CleanupThreshold) <= 0 || relative {
 			if _, err = AppendEntry(&work, c, LedgerEntry{At: at, Reason: "EXPIRED", Invalidation: c.RemainingAmount}); err != nil {

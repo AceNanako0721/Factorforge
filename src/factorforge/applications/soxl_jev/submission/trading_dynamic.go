@@ -11,7 +11,7 @@ import (
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/domain"
 )
 
-// v2.9.0 position manager reads (S3-027～030). Read-only GETs against the
+// position manager reads (S3-027～030). Read-only GETs against the
 // bound run; no trading write is reachable from this client.
 
 type AccountRead struct {

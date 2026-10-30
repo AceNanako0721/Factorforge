@@ -122,7 +122,7 @@ func (f *Fetcher) Get(ctx context.Context, endpoint string) ([]byte, string, err
 
 // RSSSource reads only items published inside [cutoff-Lookback, cutoff] and
 // fetches each item link once per process. The evidence identity is the
-// source and item link (v2.5.6): pages behind bot protection change bytes on
+// source and item link: pages behind bot protection change bytes on
 // every fetch, so the first durable capture of a link is the original.
 type RSSSource struct {
 	Fetcher                       *Fetcher

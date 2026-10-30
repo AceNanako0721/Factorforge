@@ -350,7 +350,7 @@ func (b *playback) ReplaceProtectionAtomic(_ context.Context, _ *d.Aggregate, ol
 	return &p, nil
 }
 
-// Frozen snapshots did not enumerate conditionals; the v2.8.0 controller has
+// Frozen snapshots did not enumerate conditionals; the controller has
 // dedicated ownership/unknown/restart tests in go_lower_compat_test.go.
 func (b *playback) ListOpenConditionals(_ context.Context, run *d.Aggregate, key d.InstrumentKey) ([]d.ConditionalOrderFact, error) {
 	rows := []d.ConditionalOrderFact{}

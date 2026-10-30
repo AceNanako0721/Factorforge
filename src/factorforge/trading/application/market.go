@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// v2.5.5 design chapter 13: the run snapshot keeps public trades of the last
+// : the run snapshot keeps public trades of the last
 // hour, at most MarketTradeLimit per instrument. Older trades stay only in the
 // append-only market_trade projection.
 const (
@@ -225,7 +225,7 @@ func (s *Service) IngestSnapshot(ctx context.Context, p d.Principal, body d.Mark
 				run.Funding.Set(code, &copy)
 			}
 		}
-		// v2.15.0: settled mainnet funding feeds only the account view's
+		// settled mainnet funding feeds only the account view's
 		// reference funding. A repeat is skipped; a differing repeat keeps the
 		// first record and raises an alert instead of rejecting the snapshot.
 		for i := range body.FundingSettlements {

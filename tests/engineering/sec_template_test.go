@@ -15,7 +15,7 @@ func preSECTemplate(text string) string {
 	return strings.Replace(text, secTemplateBlock, "", 1)
 }
 
-// The v2.5.3 SEC identity stays an empty public field; the exact earlier
+// The SEC identity stays an empty public field; the exact earlier
 // template is accepted only as frozen history, never as the current shape.
 func TestSECIdentityTemplateBoundary(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "config/config.example.toml"))

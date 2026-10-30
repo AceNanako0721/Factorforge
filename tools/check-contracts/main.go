@@ -7,10 +7,10 @@ import (
 )
 
 func main() {
-	operations, fixtures, err := contractguard.Check(".")
+	operations, documents, err := contractguard.Check(".")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "BLOCKED:", err)
 		os.Exit(1)
 	}
-	fmt.Printf("OK: OpenAPI 3.1, %d schema fixtures, frozen surface, %d native stubs and v2 schemas\n", fixtures, operations)
+	fmt.Printf("OK: %d OpenAPI 3.1 contracts, %d operations with typed stubs and compiled schemas\n", documents, operations)
 }

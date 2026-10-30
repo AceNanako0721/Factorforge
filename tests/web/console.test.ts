@@ -75,7 +75,7 @@ describe("read-only browser semantics", () => {
     expect(bars).toHaveLength(2);
     expect(Number(bars[1].time) - Number(bars[0].time)).toBe(180);
   });
-  // v2.14.8: the chart showed a CLOSED stop left from the earlier short
+  // the chart showed a CLOSED stop left from the earlier short
   // (105.20 above a long) instead of the generation guarding the position.
   it("draws the protection generation still guarding the position", () => {
     const rows = [
@@ -164,7 +164,7 @@ describe("read-only browser semantics", () => {
   });
 });
 
-describe("S4-017 v2.16.0 effective judgment markers", () => {
+describe("S4-017 effective judgment markers", () => {
   const judgments = [
     { judgment_id: "j-20261025T173110Z", at: "2026-10-25T17:31:10Z", ok: true, direction: "LONG", confidence: 3 },
     { judgment_id: "j-20261025T180102Z", at: "2026-10-25T18:01:02Z", ok: true, direction: "LONG", confidence: 3 },
@@ -194,7 +194,7 @@ describe("S4-017 v2.16.0 effective judgment markers", () => {
   });
 });
 
-describe("S4-017 v2.19.0 ladder stop", () => {
+describe("S4-017 ladder stop", () => {
   it("reads rung, next trigger and stop source from P3's batch view", () => {
     const l = ladderInfo({
       stop_source: "LADDER",
@@ -212,7 +212,7 @@ describe("S4-017 v2.19.0 ladder stop", () => {
     expect(ladderInfo(null)).toBeNull();
   });
 });
-describe("S4-003 v2.19.6 display zone", () => {
+describe("S4-003 display zone", () => {
   const sec = Date.parse("2026-10-29T22:40:00Z") / 1000;
   it("formats chart axis and crosshair in the chosen zone, data stays UTC", () => {
     expect(chartTime(sec, "UTC")).toBe("2026-10-29 22:40 · UTC");

@@ -10,7 +10,7 @@ import (
 
 // Historical fixtures must actually remove the newer semantic section.
 func preSemanticTemplate(text string) string {
-	// Every pre-v2.5.1 shape also predates the v2.5.3 SEC identity block.
+	// Every pre- shape also predates the SEC identity block.
 	text = preSECTemplate(text)
 	start, end := strings.Index(text, "[application.semantic_extraction]"), strings.Index(text, "[application.read_api]")
 	if start >= 0 && end > start {

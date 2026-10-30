@@ -49,7 +49,7 @@ type StopDirectiveCommand = d.StopDirectiveCommand
 type StopDirective = d.StopDirective
 type StopDirectiveReceipt = d.StopDirectiveReceipt
 
-// v2.9.0 (S2-033～042) value contract.
+// (S2-033～042) value contract.
 type SizingRule = d.SizingRule
 type ReentryRule = d.ReentryRule
 type ChainLossRule = d.ChainLossRule

@@ -184,7 +184,7 @@ func Combined(core, adjustment, eventOnlyCap Decimal) Decimal {
 	return clip(x, One())
 }
 
-// v2.7.0: composition uses liquidity only. Confidence has already entered A;
+// composition uses liquidity only. Confidence has already entered A;
 // historical volatility and regime state do not scale actual or shadow exposure.
 func CompositionExposure(x Decimal, level int, sample *MarketSample, equity Decimal, c *Composition, p *Policy) (Decimal, error) {
 	if level == 0 || x.Sign() == 0 || sample == nil || sample.Quality != "VALID" || sample.Liquidity == nil {
@@ -380,7 +380,7 @@ func Compose(s *StrategyState, obj *ObservedObject, at time.Time, view PoolView,
 		if o := read(f.FactorID, f.MaxAgeSeconds, "BASELINE"); o != nil {
 			value = m.Mul(f.Weight, o.Value)
 		} else if f.State == "ENABLED" {
-			// v2.6.1: HOLD_REDUCE_ONLY keeps the last value for one more
+			// HOLD_REDUCE_ONLY keeps the last value for one more
 			// max_age, reduce-only; afterwards the factor counts as zero.
 			if c.MissingPolicy == "HOLD_REDUCE_ONLY" {
 				if o := read(f.FactorID, 2*f.MaxAgeSeconds, "BASELINE"); o != nil {
@@ -584,7 +584,7 @@ func RebalanceReason(obj *ObservedObject, at time.Time, current, target, funding
 	if m.Sub(target, current).Abs().Cmp(band) < 0 {
 		return "NO_TRADE_BAND", nil
 	}
-	// v2.9.0: under RISK_UNIT the target is Q × level ratio, so an unchanged
+	// under RISK_UNIT the target is Q × level ratio, so an unchanged
 	// level already yields an unchanged target; comparing with the last
 	// executed level would wrongly hold a batch whose opening a gate delayed.
 	onlyAdjustment := p.Composition.Sizing == nil && previous != nil && components.Core.Cmp(previous.Core) == 0 && components.Baseline.Cmp(previous.Baseline) == 0 && components.Assessment.Cmp(previous.Assessment) == 0 && components.Scheduled.Cmp(previous.Scheduled) == 0 && components.Adjustment.Cmp(previous.Adjustment) != 0

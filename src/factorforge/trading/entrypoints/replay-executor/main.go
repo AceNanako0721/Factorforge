@@ -11,7 +11,7 @@ import (
 )
 
 // Command replay-executor drives internal-matching runs (REPLAY/SHADOW). Since
-// v2.14.0 it is a test and replay tool only, not an experiment run mode
+// it is a test and replay tool only, not an experiment run mode
 // (S1-002); experiments run on the demo account (execution-sim) or LIVE.
 func main() { r.Exit(run()) }
 func run() error {

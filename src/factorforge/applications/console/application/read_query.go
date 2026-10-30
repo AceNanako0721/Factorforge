@@ -25,7 +25,7 @@ var Views = map[string][]string{
 	"learning":   {"parameters", "learning", "activations", "validation"},
 	"operations": {"trading.operations", "alerts", "object", "instance.health", "sources", "jobs", "budgets"},
 	"reports":    {"reports"}, "audit": {"trading.audit", "strategy.audit", "instance.audit"},
-	// v2.10.0 (S4-017): judgment, stop and baseline page.
+	// S4-017: judgment, stop and baseline page.
 	"dynamic": {"dynamic.status", "dynamic.judgments", "dynamic.actions", "account", "positions", "protections", "object", "candles"},
 }
 
@@ -164,7 +164,7 @@ func (q ReadQuery) Read(ctx context.Context, u d.User, selection, view, id strin
 			p := Panel{Source: resource, FetchedAt: q.Now().UTC(), State: "AVAILABLE"}
 			window := f.Limit
 			if view == "dynamic" && resource == "candles" {
-				// The chart needs the whole requested range (P4 design 16.3).
+				// The chart needs the whole requested range.
 				window = q.Policy.MaxLimit
 			}
 			route := d.Routes[resource]
@@ -197,8 +197,10 @@ func (q ReadQuery) Read(ctx context.Context, u d.User, selection, view, id strin
 			if f.Revision > 0 && d.Has(route.Query, "revision") {
 				filter["revision"] = strconv.Itoa(f.Revision)
 			}
+			// The cursor binds its resource itself, so the next page of one
+			// panel can be asked with a source the first page did not carry.
 			fixed := f
-			fixed.Cursor = ""
+			fixed.Cursor, fixed.Source = "", ""
 			binding := digest([]any{s, u.ID, u.AuthorizationVersion, view, id, fixed})
 			var cur pageCursor
 			if f.Cursor != "" {

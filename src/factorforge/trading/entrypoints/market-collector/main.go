@@ -28,7 +28,7 @@ func run() error {
 	simCapabilities := flag.Bool("sim-capabilities", false, "declare simulator protection/short capabilities (REPLAY runs only)")
 	simFrames := flag.Bool("sim-frames", false, "submit a simulation frame after each snapshot (SIM with --sim-capabilities only)")
 	demoCapabilities := flag.Bool("demo-capabilities", false, "declare demo-account protection/short capabilities (SIM demo runs only)")
-	referenceFunding := flag.Bool("reference-funding", false, "also read settled mainnet funding records for the reference funding (v2.15.0)")
+	referenceFunding := flag.Bool("reference-funding", false, "also read settled mainnet funding records for the reference funding (S1-024)")
 	flag.Parse()
 	multiplier, err := decimal.Parse(*multiple)
 	if err != nil || multiplier.Sign() <= 0 || *poll <= 0 || *lookback <= 0 || *delay < 0 || *limit < 1 || *limit > 1000 || *id == "" || *instrument == "" || *interval == "" {

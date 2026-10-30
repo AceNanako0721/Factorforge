@@ -58,7 +58,7 @@ func executionEqual(t *testing.T, expected json.RawMessage, actual any) {
 	if err = b.Decode(&right); err != nil {
 		t.Fatal(err)
 	}
-	// v2.5.8 stores audit externally and adds retention metadata. Frozen
+	// stores audit externally and adds retention metadata. Frozen
 	// fixtures stay unchanged; history is checked separately by store/service tests.
 	var project func(any)
 	project = func(value any) {
@@ -73,7 +73,7 @@ func executionEqual(t *testing.T, expected json.RawMessage, actual any) {
 					delete(v, "create_run")
 				}
 			}
-			// v2.15.0 adds the account view's pnl block (design chapter 24),
+			// adds the account view's pnl block,
 			// checked by go_pnl_reference_test.go; frozen fixtures predate it.
 			if _, ok := v["fx_revaluation"]; ok {
 				delete(v, "pnl")
@@ -298,7 +298,7 @@ func TestExecutionOracleTraces(t *testing.T) {
 					}
 					if step.Error != nil && step.Error.Code == "PROTECTION_CANNOT_LOOSEN" {
 						if err != nil {
-							t.Fatal("v2.8.0 loosen rejected", err)
+							t.Fatal("loosen rejected", err)
 						}
 						if p, ok := result.(*d.Protection); !ok || p.Plan.TriggerPrice.Cmp(input.Stop) != 0 {
 							t.Fatal("new stop not recorded")

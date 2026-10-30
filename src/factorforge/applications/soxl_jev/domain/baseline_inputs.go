@@ -30,7 +30,7 @@ type FactorObservation struct {
 	InputsHash    string    `json:"inputs_hash"`
 	EvidenceRef   string    `json:"evidence_ref"`
 	Supersedes    *string   `json:"supersedes,omitempty"`
-	// v2.9.0 S2-035/S2-038: re-confirmation marker and reason code.
+	// S2-035/S2-038: re-confirmation marker and reason code.
 	Reconfirm  bool   `json:"reconfirm,omitempty"`
 	ReasonCode string `json:"reason_code,omitempty"`
 }
@@ -49,7 +49,7 @@ type ScheduledEvent struct {
 	SourceRef  string    `json:"source_ref"`
 	Revision   int       `json:"revision"`
 	Status     string    `json:"status"`
-	// WindowTimes are trading-day spans computed here (framework v2.6.1);
+	// WindowTimes are trading-day spans computed here (framework);
 	// the framework echoes them back as window_times.
 	WindowTimes map[string]WindowTimes `json:"window_times,omitempty"`
 }

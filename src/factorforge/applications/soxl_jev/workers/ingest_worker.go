@@ -51,7 +51,7 @@ func (w IngestWorker) Process(ctx context.Context, raw d.RawEvidence) (d.Routing
 	}
 	var extracted d.ExtractedEvidence
 	if saved != nil {
-		// Identity is decided by the source (v2.5.6). A later fetch of the same
+		// Identity is decided by the source. A later fetch of the same
 		// identity with different bytes never replaces the first durable capture.
 		if saved.Raw.SourceID != raw.SourceID || saved.Raw.LicenceRef != raw.LicenceRef {
 			return empty, d.Fail("EVIDENCE_ID_CONFLICT", 409)

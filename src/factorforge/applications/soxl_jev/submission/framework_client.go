@@ -87,7 +87,7 @@ func (c *HTTPClient) call(ctx context.Context, method, path string, query url.Va
 				CorrelationID *string `json:"correlation_id"`
 				Retryable     bool    `json:"retryable"`
 			}
-			// v2.14.3: P2 also reports a P1 snapshot that moved while it was
+			// P2 also reports a P1 snapshot that moved while it was
 			// read (TRADING_SNAPSHOT_CONFLICT); re-reading it is safe.
 			if d.DecodePrivate(data, &problem) == nil && problem.Message == problem.Code && d.Has([]string{"AGGREGATE_VERSION_CONFLICT", "TRADING_SNAPSHOT_CONFLICT"}, problem.Code) {
 				code = "FRAMEWORK_" + problem.Code

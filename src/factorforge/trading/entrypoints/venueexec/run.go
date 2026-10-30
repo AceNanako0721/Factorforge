@@ -1,5 +1,5 @@
 // Package venueexec is the venue executor shared by the two run modes of
-// S1-002 (v2.14.0): the demo account (SIM, execution-sim) and real trading
+// S1-002: the demo account (SIM, execution-sim) and real trading
 // (LIVE, execution-live). Both submit real venue orders and record venue facts;
 // they differ only in the bound environment, the endpoint lock and the LIVE
 // admission gates. Internal matching is not reachable from here.
@@ -262,9 +262,9 @@ func Main(environment string) error {
 // is margin, so other assets are ignored and reported.
 // Capabilities is what the venue executor declares to the protection worker.
 // LIVE takes the reviewed readiness record. The demo account has no readiness
-// gate; the venue fact verified on Binance (design ch. 18: several reduceOnly
+// gate; the venue fact verified on Binance (: several reduceOnly
 // STOP_MARKET algo orders coexist on one position) lets a replacement be placed
-// before the old one is cancelled (P1 design ch. 23, v2.14.7).
+// before the old one is cancelled.
 func Capabilities(environment string, readiness d.Readiness) map[string]any {
 	verified := map[string]any{"ordinary_and_conditional_verified": true, "overlapping_protections": readiness.OverlappingProtections, "atomic_protection_modify": readiness.AtomicProtectionModify}
 	if environment == "SIM" {

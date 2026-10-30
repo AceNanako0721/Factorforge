@@ -71,7 +71,7 @@ daily_licence = "RESEARCH_ONLY"
 	if _, _, e = config.LoadBaselineInputs(path, "WATCHLIST"); inputCode(e) != "BASELINE_SOURCE_NOT_LICENSED" {
 		t.Fatal("research source LIVE watch config accepted", e)
 	}
-	// v2.7.0 rejects the retired worker role and parameter asset.
+	// rejects the retired worker role and parameter asset.
 	if _, _, e = config.LoadBaselineInputs(path, "BASELINE"); inputCode(e) != "BASELINE_INPUT_CONFIG_REQUIRED" {
 		t.Fatal("retired role accepted", e)
 	}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-// S4-019 / P4 design 17.5. Reference values from the venue's public push;
+// S4-019: Reference values from the venue's public push;
 // never accounting facts and never sent anywhere.
 export type LiveState =
   | "OFF"

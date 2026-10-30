@@ -114,7 +114,7 @@ func InitializePipeline(ctx context.Context, dsn string, b d.Binding) error {
 			}
 		}
 	}
-	// v2.9.0: the DYNAMIC worker only reads its grant and owns dynamic tables.
+	// the DYNAMIC worker only reads its grant and owns dynamic tables.
 	role := pipelineRole(b, "DYNAMIC")
 	var exists bool
 	if err = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM pg_roles WHERE rolname=$1)", role).Scan(&exists); err != nil {
@@ -136,7 +136,7 @@ func InitializePipeline(ctx context.Context, dsn string, b d.Binding) error {
 			return safe(err)
 		}
 	}
-	// v2.10.0: DYNAMIC_READ serves the instance read API and never writes.
+	// DYNAMIC_READ serves the instance read API and never writes.
 	role = pipelineRole(b, "DYNAMIC_READ")
 	if err = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM pg_roles WHERE rolname=$1)", role).Scan(&exists); err != nil {
 		return safe(err)

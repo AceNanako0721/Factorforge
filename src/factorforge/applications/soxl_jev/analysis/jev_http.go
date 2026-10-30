@@ -378,7 +378,7 @@ func validateAnswer(q Question, a jevAnswer) error {
 		v, _ := dec.ParseDecimal(string(n))
 		sum = math.Add(sum, v)
 	}
-	// v2.5.4: the provider rounds published probabilities, so the exact decimal
+	// the provider rounds published probabilities, so the exact decimal
 	// sum may differ from 1 by one unit of the second decimal place.
 	if math.Err() != nil || math.Sub(sum, one).Abs().Cmp(distributionTolerance) > 0 {
 		return fmt.Errorf("distribution")

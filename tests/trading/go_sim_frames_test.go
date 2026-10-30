@@ -35,7 +35,7 @@ func (r *recordingAPI) Call(ctx context.Context, method, path string, query map[
 	return r.next.Call(ctx, method, path, query, body)
 }
 
-// Design v2.6.4 chapter 17: in SIM frame mode every accepted snapshot is
+// Design chapter 17: in SIM frame mode every accepted snapshot is
 // followed by a REPLAY_FRAME 1ms later carrying new trade volume as liquidity
 // and each newly closed candle once.
 func TestSimFramesCollector(t *testing.T) {

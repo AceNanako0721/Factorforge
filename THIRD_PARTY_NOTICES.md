@@ -123,13 +123,13 @@ The baseline references FreqUI `2e6a0907ed2e990b9e905331888dfa9824024d2d` for th
 
 ## Search harness implementation references
 
-The Go search adapters reference protocol and control-flow patterns from Oh My Pi (MIT), pinned at `579da1d661c5cb8d43bc2ddd429ab72e67165ad8`, and OpenCode (MIT), pinned at `388406238bd5ca15564a762840a2362c3a45bd9c`. No upstream code is copied or adapted, and neither harness is a runtime dependency. Exact files, probe evidence and limits are recorded in [P3 search review](doc/engineering/P3_SEARCH_UPSTREAM_REVIEW.md). Codex (Apache-2.0) and Gemini CLI (Apache-2.0) are comparison references only, with no copied implementation or authenticated service integration.
+The Go search adapters reference protocol and control-flow patterns from Oh My Pi (MIT), pinned at `579da1d661c5cb8d43bc2ddd429ab72e67165ad8`, and OpenCode (MIT), pinned at `388406238bd5ca15564a762840a2362c3a45bd9c`. No upstream code is copied or adapted, and neither harness is a runtime dependency. Codex (Apache-2.0) and Gemini CLI (Apache-2.0) are comparison references only, with no copied implementation or authenticated service integration.
 
-## oh-my-pi menu algorithms (v2.3.0)
+## oh-my-pi menu algorithms
 
 Source: https://github.com/can1357/oh-my-pi/tree/b07a1c146d0d12cfc855a2c65d52f892ef319040/packages/tui/src
 
-In v2.3.0, adapted components/menu-selection.ts and fuzzy.ts into the model_access application directory; import paths and strict TypeScript compatibility only. That baseline used Factorforge terminal rendering, orchestration and native CLI handoff, without importing the full TUI or provider OAuth implementation.
+components/menu-selection.ts and fuzzy.ts are adapted into the model_access application directory; the changes are import paths and strict TypeScript compatibility only.
 
 ```text
 MIT License
@@ -158,7 +158,7 @@ SOFTWARE.
 
 ```
 
-## oh-my-pi complete model access (v2.4.0)
+## oh-my-pi model access
 
 Direct runtime dependencies @oh-my-pi/pi-ai, @oh-my-pi/pi-tui, @oh-my-pi/pi-catalog and @oh-my-pi/pi-utils are fixed at 18.8.7 in the npm lockfile. Source reference: OMP commit b07a1c146d0d12cfc855a2c65d52f892ef319040. The unchanged upstream provider registry, login/refresh, stream parsers, catalogue factories and TUI components execute under Bun. Installed packages retain their licences. The complete MIT notice above applies to this reuse and to the browser-session adapter.
 

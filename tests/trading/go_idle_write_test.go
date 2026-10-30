@@ -10,9 +10,9 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// v2.20.1 (P1 design ch.25): a transaction that leaves the aggregate unchanged
+// a transaction that leaves the aggregate unchanged
 // writes no row at all; a real change still rewrites the run row.
-func TestV2201IdleTransactionWritesNothing(t *testing.T) {
+func TestIdleTransactionWritesNothing(t *testing.T) {
 	ctx := context.Background()
 	server, err := postgres.StartTemporary(ctx, t.TempDir(), nativePostgresBin(t))
 	if err != nil {
@@ -71,9 +71,9 @@ func TestV2201IdleTransactionWritesNothing(t *testing.T) {
 	}
 }
 
-// v2.20.1: the holder renews only after half the lease has elapsed; the lease
+// the holder renews only after half the lease has elapsed; the lease
 // never lapses for a holder polling at a quarter of the lease.
-func TestV2201LeaseRenewsAfterHalf(t *testing.T) {
+func TestLeaseRenewsAfterHalf(t *testing.T) {
 	at := time.Date(2026, 10, 30, 0, 0, 0, 0, time.UTC)
 	var lease d.ExecutorLease
 	epoch, err := lease.Acquire("worker-a", at, time.Minute)

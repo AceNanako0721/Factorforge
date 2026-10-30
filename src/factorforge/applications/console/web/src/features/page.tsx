@@ -248,6 +248,17 @@ export function Page({ name }: { name: string }) {
         : ((capabilities?.refresh_seconds ?? 1) * 1000 * 2 ** attempt) /
           Math.max(1, (capabilities?.max_retries ?? 0) + 1),
   });
+  // A failed request keeps the last successful panels, marked as stale with
+  // their own fetch time; they are never shown as current (S4-013).
+  const panels: Panel[] = data.data
+    ? data.error
+      ? data.data.panels.map((p) =>
+          p.state === "AVAILABLE" || p.state === "EMPTY"
+            ? { ...p, state: "STALE", cursor: null }
+            : p,
+        )
+      : data.data.panels
+    : [];
   useEffect(() => {
     const e = data.error;
     if (e instanceof ApiError && e.status === 401) invalidate();
@@ -281,7 +292,7 @@ export function Page({ name }: { name: string }) {
     if (!selection) return;
     try {
       const params = new URLSearchParams({
-        ...filters,
+        ...(name === "dynamic" ? { ...dynamicRange(), ...filters } : filters),
         selection_id: selection.selection_id,
         view: name,
         format,
@@ -479,7 +490,7 @@ export function Page({ name }: { name: string }) {
             ["net", "情绪净值"],
             ["recovery_state", "恢复状态"],
           ].map(([key, title]) => {
-            const panel = data.data.panels.find((p) => key in record(p.data));
+            const panel = panels.find((p) => key in record(p.data));
             const value = panel ? record(panel.data)[key] : null;
             return (
               <div className="summary-card" key={key}>
@@ -505,7 +516,7 @@ export function Page({ name }: { name: string }) {
           <Suspense fallback={<p role="status">正在装载图表…</p>}>
             <MarketChart
               candles={rows(
-                data.data.panels.find((p) => p.source === "candles")?.data ??
+                panels.find((p) => p.source === "candles")?.data ??
                   null,
               )}
             />
@@ -513,10 +524,10 @@ export function Page({ name }: { name: string }) {
         </section>
       )}
       {name === "dynamic" && data.data && (
-        <DynamicView panels={data.data.panels} selection={selection} />
+        <DynamicView panels={panels} selection={selection} />
       )}
       <div className="panel-grid">
-        {data.data?.panels
+        {panels
           .filter((p) => name !== "dynamic" || !["candles", "dynamic.judgments", "dynamic.actions"].includes(p.source))
           .map((p) => (
           <PanelView

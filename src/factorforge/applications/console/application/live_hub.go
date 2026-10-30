@@ -13,8 +13,8 @@ type LiveSource interface {
 	Run(ctx context.Context, instrument, interval string, maxAge time.Duration, emit func(d.MarketEvent)) (int, error)
 }
 
-// LiveSnapshot is the newest reference value of one instrument (S4-019, P4
-// design 17.2). Seq numbers let a reader skip values it already sent.
+// LiveSnapshot is the newest reference value of one instrument (S4-019).
+// Seq numbers let a reader skip values it already sent.
 type LiveSnapshot struct {
 	State             string // CONNECTING, LIVE, STALE or UNAVAILABLE
 	Code              string

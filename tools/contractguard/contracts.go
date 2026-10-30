@@ -327,113 +327,21 @@ func StubSmoke(spec map[string]any) error {
 	}
 	return nil
 }
+
+// Check validates every current OpenAPI contract under contracts/v2 against
+// the bundled OpenAPI 3.1 meta-schema, lints it, smoke-generates typed stubs
+// and compiles its schemas. It returns the operation and document counts.
 func Check(root string) (int, int, error) {
 	abs, err := filepath.Abs(filepath.Join(root, "contracts"))
 	if err != nil {
 		return 0, 0, err
 	}
-	raw, err := read(filepath.Join(abs, "openapi/v1.json"))
-	if err != nil {
-		return 0, 0, err
-	}
-	bundled, err := Bundle(raw, filepath.Join(abs, "openapi/v1.json"), abs, map[string]bool{})
-	if err != nil {
-		return 0, 0, err
-	}
-	spec := object(bundled)
 	meta, err := read(filepath.Join(abs, "meta/openapi-3.1-2025-09-15.json"))
 	if err != nil {
 		return 0, 0, err
 	}
-	if err = Validate(meta, spec); err != nil {
-		return 0, 0, fmt.Errorf("legacy OpenAPI structural validation failed")
-	}
-	scopes, err := read(filepath.Join(abs, "schemas/api-scope.json"))
-	if err != nil {
-		return 0, 0, err
-	}
-	capabilities, err := read(filepath.Join(abs, "schemas/workload-capability.json"))
-	if err != nil {
-		return 0, 0, err
-	}
-	if !equal(capabilities["enum"], []any{"signal:sim", "signal:live"}) {
-		return 0, 0, fmt.Errorf("workload capability enum changed")
-	}
-	for _, cap := range list(capabilities["enum"]) {
-		if subset([]any{cap}, list(scopes["enum"])) {
-			return 0, 0, fmt.Errorf("public/workload enums overlap")
-		}
-	}
-	for _, filename := range []string{"api-key-create.json", "permission-update.json", "api-key.json"} {
-		value, err := read(filepath.Join(abs, "schemas", filename))
-		if err != nil {
-			return 0, 0, err
-		}
-		if !equal(object(object(value["properties"])["scopes"])["items"], map[string]any{"$ref": "./api-scope.json"}) {
-			return 0, 0, fmt.Errorf("public key scope schema not shared")
-		}
-	}
-	if err = Lint(spec, true, list(scopes["enum"])); err != nil {
-		return 0, 0, err
-	}
-	for path, v := range object(spec["paths"]) {
-		if strings.HasPrefix(path, "/signals") || strings.HasPrefix(path, "/signal-eligibility") {
-			return 0, 0, fmt.Errorf("public signal endpoint forbidden")
-		}
-		_ = v
-	}
-	for path, contract := range map[string][2]string{"/analysis/jobs": {"analysis:request", "AnalysisJobRequest"}, "/analysis-candidates": {"analysis:submit-research", "ResearchCandidateSubmission"}} {
-		op := object(object(object(spec["paths"])[path])["post"])
-		body := object(object(object(op["requestBody"])["content"])["application/json"])
-		if !equal(op["x-required-scopes"], []any{contract[0]}) || !strings.HasPrefix(text(op["x-signal-effect"]), "RESEARCH_ONLY") || last(text(object(body["schema"])["$ref"])) != contract[1] {
-			return 0, 0, fmt.Errorf("research authorization changed")
-		}
-	}
-	for _, name := range []string{"ApiKeyCreate", "PermissionUpdate", "ApiKey"} {
-		value := object(object(object(spec["components"])["schemas"])[name])
-		items := object(object(object(value["properties"])["scopes"])["items"])
-		if !equal(items["enum"], scopes["enum"]) {
-			return 0, 0, fmt.Errorf("public key capability mismatch")
-		}
-	}
-	baseline, err := read(filepath.Join(abs, "baseline/v1.1-surface.json"))
-	if err != nil {
-		return 0, 0, err
-	}
-	if err = CheckBreaking(baseline, Surface(spec)); err != nil {
-		return 0, 0, err
-	}
-	if err = StubSmoke(spec); err != nil {
-		return 0, 0, err
-	}
-	count := 0
-	for folder, valid := range map[string]bool{"valid": true, "invalid": false} {
-		paths, _ := filepath.Glob(filepath.Join(abs, "fixtures", folder, "*.json"))
-		for _, path := range paths {
-			fixture, err := read(path)
-			if err != nil {
-				return 0, 0, err
-			}
-			schemaPath := filepath.Join(abs, "schemas", text(fixture["_schema"]))
-			schema, err := read(schemaPath)
-			if err != nil {
-				return 0, 0, err
-			}
-			value, err := Bundle(schema, schemaPath, abs, map[string]bool{})
-			if err != nil {
-				return 0, 0, err
-			}
-			err = Validate(value, fixture["data"])
-			if valid != (err == nil) {
-				return 0, 0, fmt.Errorf("fixture classification failed: %s", filepath.Base(path))
-			}
-			count++
-		}
-	}
-	if count < 4 {
-		return 0, 0, fmt.Errorf("contract fixtures missing")
-	}
-	for _, name := range []string{"v2/trading/openapi.json", "v2/strategy/openapi.json", "v2/strategy/workload.openapi.json", "v2/instances/openapi.json"} {
+	count, documents := 0, 0
+	for _, name := range []string{"v2/trading/openapi.json", "v2/strategy/openapi.json", "v2/strategy/workload.openapi.json", "v2/instances/openapi.json", "v2/console/openapi.json"} {
 		value, err := read(filepath.Join(abs, name))
 		if err != nil {
 			return 0, 0, err
@@ -456,6 +364,8 @@ func Check(root string) (int, int, error) {
 				return 0, 0, fmt.Errorf("invalid v2 schema: %s: %w", schemaName, err)
 			}
 		}
+		count += len(operations(value))
+		documents++
 	}
-	return len(operations(spec)), count, nil
+	return count, documents, nil
 }

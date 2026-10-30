@@ -21,7 +21,7 @@ import (
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/workers"
 )
 
-// Design v2.6.0 chapter 15: funding rides on MARKET_SNAPSHOT, P1 keeps the
+// Design chapter 15: funding rides on MARKET_SNAPSHOT, P1 keeps the
 // latest per instrument, and the instruments projection exposes it.
 func TestFundingObservationThroughCollector(t *testing.T) {
 	ctx := context.Background()

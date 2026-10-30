@@ -1,1061 +1,371 @@
 {
-  "schema_version": 1,
-  "releases": [
-    {
-      "version": "2.0.0",
-      "directory": "doc/v2.0",
-      "change_kind": "framework",
-      "date": "2026-10-04",
-      "reason": "三层框架文档基线；原 v2.0 按三段版本规则登记为 v2.0.0，正文保持不变。"
-    },
-    {
-      "version": "2.1.0",
-      "directory": "doc/v2.1.0",
-      "change_kind": "specification",
-      "date": "2026-10-05",
-      "reason": "追加第三层Web管理台仕様/设计与下层只读追溯，发布文档自本版起统一HTML。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台"
-      ]
-    },
-    {
-      "version": "2.1.1",
-      "directory": "doc/v2.1.1",
-      "change_kind": "design",
-      "date": "2026-10-05",
-      "reason": "业务式样不变；四本设计改为 Go 后端、浏览器 JavaScript，开始 P1/P2 数值域重构并登记迁移切换门槛。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台"
-      ]
-    },
-    {
-      "version": "2.1.2",
-      "directory": "doc/v2.1.2",
-      "change_kind": "design",
-      "date": "2026-10-08",
-      "reason": "业务式样保持；细化通用 UTC 窗口注册与双计数运行接入，以及实例周期报告有限明细和管理台投影。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台"
-      ]
-    },
-    {
-      "version": "2.1.3",
-      "directory": "doc/v2.1.3",
-      "change_kind": "design",
-      "date": "2026-10-08",
-      "reason": "先完成 JEV 实际认证、固定模型与目标事实绑定对照试验，再设计逐事实问题绑定；业务式样保持，抽取选型和生产标定仍需独立验证。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台"
-      ]
-    },
-    {
-      "version": "2.1.4",
-      "directory": "doc/v2.1.4",
-      "change_kind": "design",
-      "date": "2026-10-09",
-      "reason": "先完成机械抽取/目录匹配离线试验，再细化完整原文候选准备与独立审阅边界；业务式样和生产准入不变。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台"
-      ]
-    },
-    {
-      "version": "2.1.5",
-      "directory": "doc/v2.1.5",
-      "change_kind": "design",
-      "date": "2026-10-09",
-      "reason": "先验证开源搜索候选链与 Exa/Parallel 匿名协议，再设计多后端回退、持久额度预占/暂停和查询缓存；业务式样保持。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台"
-      ]
-    },
-    {
-      "version": "2.1.6",
-      "directory": "doc/v2.1.6",
-      "change_kind": "design",
-      "date": "2026-10-09",
-      "reason": "先完成语义支持/关系开发对照，再细化逐段审阅、原文跨度编译和独立不可改审阅摄入；业务式样保持。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台"
-      ]
-    },
-    {
-      "version": "2.1.7",
-      "directory": "doc/v2.1.7",
-      "change_kind": "design",
-      "date": "2026-10-09",
-      "reason": "先验证完整HTML字节映射，再设计已采集原文的绑定导出与离线审阅视图；业务式样保持。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台"
-      ]
-    },
-    {
-      "version": "2.1.8",
-      "directory": "doc/v2.1.8",
-      "change_kind": "design",
-      "date": "2026-10-09",
-      "reason": "先验证实际SOXL产品与EQUITY日历，再细化通用TradFi永续映射和绑定快照编译；业务式样保持。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台"
-      ]
-    },
-    {
-      "version": "2.1.9",
-      "directory": "doc/v2.1.9",
-      "change_kind": "design",
-      "date": "2026-10-09",
-      "reason": "先完成官方跨来源事实与分数词面原型试验，再设计显式算法版本及旧审阅产物兼容；业务式样保持。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台"
-      ]
-    },
-    {
-      "version": "2.1.10",
-      "directory": "doc/v2.1.10",
-      "change_kind": "design",
-      "date": "2026-10-09",
-      "reason": "先完成实际JEV小负载、队列反例与共享SQL原型，再设计跨实例账户预算预占；业务式样保持。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台"
-      ]
-    },
-    {
-      "version": "2.1.11",
-      "directory": "doc/v2.1.11",
-      "change_kind": "design",
-      "date": "2026-10-09",
-      "reason": "先复现同一原文的多事件审阅冲突，再设计审阅ID成对索引与旧资产兼容；业务式样保持。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台"
-      ]
-    },
-    {
-      "version": "2.1.12",
-      "directory": "doc/v2.1.12",
-      "change_kind": "design",
-      "date": "2026-10-09",
-      "reason": "先以完整测试政策和实际P2 HTTP隔离时间错误，再设计原文可用与抽取/评分时钟映射；业务式样保持。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台"
-      ]
-    },
-    {
-      "version": "2.1.13",
-      "directory": "doc/v2.1.13",
-      "change_kind": "design",
-      "date": "2026-10-09",
-      "reason": "先复现评分并发版本永久拒绝及不可改幂等边界，再设计投递时CAS协调；业务式样保持。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台"
-      ]
-    },
-    {
-      "version": "2.1.14",
-      "directory": "doc/v2.1.14",
-      "change_kind": "design",
-      "date": "2026-10-10",
-      "reason": "先复现排队跨越来源有效期仍调用模型，再设计不可延长的任务/outbox窗口及旧未决记录阻断；业务式样保持。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台"
-      ]
-    },
-    {
-      "version": "2.1.15",
-      "directory": "doc/v2.1.15",
-      "change_kind": "design",
-      "date": "2026-10-10",
-      "reason": "澄清禁止Python但上层不必统一Go；保留P1/P2核心，允许非Python模块通过契约协作；三层职责、四组业务式样与现有接口保持，OMP/抽取选型未定。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台"
-      ]
-    },
-    {
-      "version": "2.2.0",
-      "directory": "doc/v2.2.0",
-      "change_kind": "specification",
-      "date": "2026-10-10",
-      "reason": "追加第三层模型接入模块，支持 API Key 与官方 ChatGPT 登录；非 Python 独立接口，抽取选型仍暂停。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.3.0",
-      "directory": "doc/v2.3.0",
-      "change_kind": "specification",
-      "date": "2026-10-10",
-      "reason": "追加交互式模型接入菜单及 Claude/Antigravity 原版官方终端登录入口；敏感信息上传边界保持，三层和现有 JSONL 通道不变。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.4.0",
-      "directory": "doc/v2.4.0",
-      "change_kind": "specification",
-      "date": "2026-10-10",
-      "reason": "完整复用 OMP 登录注册表、原版交互组件与认证刷新/模型调用；追加 JSONL v2，保留 v1，凭据仍集中于私有配置。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.5.0",
-      "directory": "doc/v2.5.0",
-      "change_kind": "specification",
-      "date": "2026-10-11",
-      "reason": "模型调用本地次数预算默认不设上限，0改为不限次数；保留可选正数限额、单次边界及供应商额度/限流处理。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.5.1",
-      "directory": "doc/v2.5.1",
-      "change_kind": "design",
-      "date": "2026-10-11",
-      "reason": "Antigravity候选抽取经先行验证后落实公开JSONL适配、原文跨度核验与明确审阅路径；业务规格及默认无限预算保持。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.5.2",
-      "directory": "doc/v2.5.2",
-      "change_kind": "design",
-      "date": "2026-10-11",
-      "reason": "先完成外部金融事件对照及既有审阅衔接探针，再设计严格绑定的可选语义候选旁注；业务式样不变，候选不获得事实或交易资格。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.5.3",
-      "directory": "doc/v2.5.3",
-      "change_kind": "design",
-      "date": "2026-10-12",
-      "reason": "先完成新闻来源调研与 SEC EDGAR 带身份探针，再设计 8-K 新闻稿附件来源适配器；业务式样不变，不改变抽取、评分资格或首发时间规则。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.5.4",
-      "directory": "doc/v2.5.4",
-      "change_kind": "design",
-      "date": "2026-10-12",
-      "reason": "复查 94 份真实 JEV 响应发现 18% 概率和因舍入不等于 1，定稿 ±0.01 十进制容差与分数期望归一化；业务式样、题目、量表、标定与路由资格不变。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.5.5",
-      "directory": "doc/v2.5.5",
-      "change_kind": "design",
-      "date": "2026-10-12",
-      "reason": "本地影子运行发现公开成交在 P1 运行快照中无界累积、执行器高频事务整表重写投影导致 CPU 满载；定稿公开成交保留窗口、增量投影写入与 SIM 执行器空闲退避，补登记既有投影表；业务式样不变。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.5.6",
-      "directory": "doc/v2.5.6",
-      "change_kind": "design",
-      "date": "2026-10-12",
-      "reason": "本地影子运行发现 RSS 来源无时间下限且证据 ID 含内容哈希，防护页面字节每次变化导致同一公告每轮重复收录；定稿 RSS 回看窗口与进程内去重、按来源与链接确定证据身份、同一身份以首次捕获为准；业务式样不变。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.5.7",
-      "directory": "doc/v2.5.7",
-      "change_kind": "design",
-      "date": "2026-10-12",
-      "reason": "本地影子运行发现 P2 决策内嵌完整 K 线快照、目标再复制一份，状态 4.5 小时超过 4 MiB 解码上限导致调度停止；定稿决策输入 K 线摘要引用与已取代过期决策归档表；业务式样不变。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.5.8",
-      "directory": "doc/v2.5.8",
-      "change_kind": "design",
-      "date": "2026-10-12",
-      "reason": "影子运行发现交易所修正 K 线导致行情写入停摆、P1 运行聚合审计与幂等记录无界增长、P2 调度与反馈快照冲突、审计全量加载与查询上限、决策保留容量估计偏低和价格样本无界；定稿 K 线修订号赋予、运行聚合有界化、冲突有限重试、审计外置、决策 6 小时保留与样本按趋势窗口裁剪；业务式样不变。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.6.0",
-      "directory": "doc/v2.6.0",
-      "change_kind": "specification",
-      "date": "2026-10-13",
-      "reason": "使用者要求事件只调整仓位而不决定仓位：应持仓位改为行情基线、研判与预排事件构成核心方向，事件做有界调整（上限满仓，反向最多到空仓）；新增预排事件模板标定、成本感知调仓、分层归因与权重学习（w 允许为负）；P3 新增行情基线、预排日程、关注清单通知与按证据的初始启用范围；P1 公开资金费率观测。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.6.1",
-      "directory": "doc/v2.6.1",
-      "change_kind": "design",
-      "date": "2026-10-13",
-      "reason": "v2.6.0 实现中发现：新增的四个只读查询需登记到管理台设计；按交易日计算的预排窗口无法用固定秒偏移表达；基线缺失时 HOLD_REDUCE_ONLY 会直接平仓。补充管理台展示、逐事件窗口时刻与基线缺失的沿用规则；业务式样不变。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.6.2",
-      "directory": "doc/v2.6.2",
-      "change_kind": "design",
-      "date": "2026-10-13",
-      "reason": "影子部署发现价格样本的 σ 与流动性只来自静态价格代理清单，未登记时目标暴露恒为 0；SIM 环境改为由已完成 K 线估计 σ、流动性按策略预算计，LIVE 仍须登记价格代理；业务式样不变。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.6.3",
-      "directory": "doc/v2.6.3",
-      "change_kind": "design",
-      "date": "2026-10-13",
-      "reason": "影子部署发现公开采集器只声明限价与市价，SIM 运行缺少条件保护能力而从未下单；新增 SIM 能力模式，为 REPLAY 运行声明模拟器提供的保护、只减仓与做空能力，规则版本带 -sim 后缀且只允许 REPLAY 运行登记；SIM 环境允许 EXPERIMENT_ONLY 策略与参数增险，LIVE 仍须 VALIDATED；业务式样不变。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.6.4",
-      "directory": "doc/v2.6.4",
-      "change_kind": "design",
-      "date": "2026-10-13",
-      "reason": "影子部署发现模拟器只在回放帧中撮合，而公开采集器只提交行情快照，SIM 订单从未成交；新增 SIM 前向帧模式，采集器在每次快照后提交一帧模拟撮合帧；业务式样不变。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.6.5",
-      "directory": "doc/v2.6.5",
-      "change_kind": "design",
-      "date": "2026-10-13",
-      "reason": "开发规划书自 v2.5.4 前后未随进度更新，与 v2.6.0 主线改向及影子前向检验阶段不符；按实际进度重写阶段表、当前阶段与出口，并加入规划维护规则；式样与设计不变。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.7.0",
-      "directory": "doc/v2.7.0",
-      "change_kind": "specification",
-      "date": "2026-10-14",
-      "reason": "依据用户决定禁止历史 K 线判断或预测行情：撤回 SOXX 趋势/波动基线因子、合成路径 f_vol 与 UNKNOWN 状态乘数、SIM BarSigma 暴露估计及财报 E1 历史先验；保留基线框架与 S2-014 止损噪声机制，关注清单历史波动仅作正常幅度标尺用于检索与通知、不判断方向或影响仓位，所有方向分量只记录，前向检验未登记、暂停。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.8.0",
-      "directory": "doc/v2.8.0",
-      "change_kind": "specification",
-      "date": "2026-10-15",
-      "reason": "下层兼容式样与配对设计：P1 一笔反手、双层止损、VENUE/UPPER_MANAGED 上层保护模式、持仓期声明更新与条件单清理；P2 直接反向目标、止损指令/模式/收盘超出余量透传及重发保留计划；代码与契约待后续 PR，上层模块留至 v2.9.0。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.9.0",
-      "directory": "doc/v2.9.0",
-      "change_kind": "specification",
-      "date": "2026-10-16",
-      "reason": "新闻研判、动态止损与行情基线管理式样与配对设计：P2 风险单位仓位、收盘止损退出与收盘止损价、止损后再入场门、判断链亏损上限、预排事件前降险、事件贡献转入基线；P3 新闻采集、模型研判按新编号/方向改变注入并按半衰期衰减、正常波动表、三层止损与移动止损、兑现转基线与基线状态机、E15 前向检验六套规则；代码与契约待后续 PR。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.10.0",
-      "directory": "doc/v2.10.0",
-      "change_kind": "specification",
-      "date": "2026-10-16",
-      "reason": "管理台“研判与止损”页与远程访问式样与配对设计：P3 研判、注入、止损与基线状态的只读查询（S3-032）；P4 研判与止损页（S4-017）、经认证隧道的远程访问（S4-018，修订 S4-015 部署范围）；第 8 章业务规则不变，页面只读；代码与契约待后续 PR。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.11.0",
-      "directory": "doc/v2.11.0",
-      "change_kind": "specification",
-      "date": "2026-10-17",
-      "reason": "管理台实时参考行情式样与配对设计（S4-019）：研判与止损页由管理台订阅交易所公开行情推送，经 SSE 推给浏览器，显示参考标记价、参考浮盈与正在形成的 K 线，不参与账务与决策；P1 行情采集改推送在 E15 中期报告后另行发布；代码与契约待后续 PR。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.11.1",
-      "directory": "doc/v2.11.1",
-      "change_kind": "design",
-      "date": "2026-10-20",
-      "reason": "补登 P2 设计第 16 章：只增数据的读取上限与增量读取（决策输入只增列表换成数量与摘要、已存聚合 16 MiB 解码上限、P1 审计增量读取、情绪账本增量加载、按字段复用 schema 校验、账本前缀逐条比较），修正影子 E15 两次停摆与 P2 CPU 偏高；代码已由 PR #116～#119 合并，业务式样不变。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.11.2",
-      "directory": "doc/v2.11.2",
-      "change_kind": "design",
-      "date": "2026-10-21",
-      "reason": "新增 P2 设计第 17 章：分层账本的迟到成交与数量对账（迟到的成交与资金费在上次结算时刻补记并审计 LAYER_FACT_LATE；数量与 P1 不一致时采用 P1 数量、审计 LAYER_QUANTITY_RECONCILED 并只冻结当轮；冻结增险每次结算重新判定），修正影子 E15 第三次中断；代码同 PR 实现，业务式样不变。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.11.3",
-      "directory": "doc/v2.11.3",
-      "change_kind": "design",
-      "date": "2026-10-21",
-      "reason": "新增 P3 设计第 30 章：收盘止损的冻结与单向移动（开仓时按 entry − close_distance 冻结，只由已核验的 POSITION_STOP 向有利方向推进，续报的 INITIAL_DISTANCE 不再改写；旧批次从开仓记录恢复），修正 E15 收盘止损漂移；代码同 PR 实现，业务式样不变。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.11.4",
-      "directory": "doc/v2.11.4",
-      "change_kind": "design",
-      "date": "2026-10-21",
-      "reason": "新增 P1 设计第 19 章：采集器的版本冲突重试与单轮失败（409 时重新读取运行版本重试，最多 3 次；常驻模式下单轮失败记录 COLLECT_FAILED 后等待下一轮，不退出进程），修正 E15 采集器因 409 退出、约 90 秒无行情与模拟帧；代码同 PR 实现，业务式样不变。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.11.5",
-      "directory": "doc/v2.11.5",
-      "change_kind": "design",
-      "date": "2026-10-22",
-      "reason": "新增 P3 设计第 31 章：停机恢复后补读收盘价（有持仓批次时 K 线查询从 last_bar_at 起，最多 7 天，逐根按原规则更新 best_close、收盘退出与移动止损），修正停机超过 40 分钟时错过移动止损与转基线；代码同 PR 实现，业务式样不变。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.12.0",
-      "directory": "doc/v2.12.0",
-      "change_kind": "specification",
-      "date": "2026-10-22",
-      "reason": "修订 P3 式样 S3-027 并新增 P3 设计第 32 章：单笔风险比例乘信心系数（1～5 → 0.25/0.5/0.75/1/1，取与持仓同方向的最近一次研判），补上 2026-10-15 已定参数；凯利维持原规则不冻结；代码同 PR 实现。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.12.1",
-      "directory": "doc/v2.12.1",
-      "change_kind": "design",
-      "date": "2026-10-22",
-      "reason": "新增 P3 设计第 33 章：INITIAL_DISTANCE 指令只在方向、几何、信心变化或过半 TTL 时重报，修正 v2.12.0 把回撤系数的逐轮浮动当成风险比例变化、每 5 分钟重报（P2 写入与幂等记录翻倍、抢写冲突）；代码同 PR 实现，业务式样不变。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.13.0",
-      "directory": "doc/v2.13.0",
-      "change_kind": "specification",
-      "date": "2026-10-23",
-      "reason": "新增 P3 式样第 10 章与设计第 34 章：S3-033 阶梯止损（每满一个步长收盘止损上移一级，第 1 级保本）、S3-034 研判跟随（经只读查询逐条跟随另一实例的研判），登记实验 E20（SOXLUSDT、4% 阶梯、跟随 E15，计划在币安模拟盘真实下单）；两条均由实例开关控制，E15 不启用；代码同 PR 实现。标签 v2.13.0-beta（实验性版本）。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.14.0",
-      "directory": "doc/v2.14.0",
-      "change_kind": "specification",
-      "date": "2026-10-23",
-      "reason": "新增 P1 式样第 6 章 S1-023 与设计第 20 章：系统只有模拟盘（交易所模拟账户，SIM）与实盘（LIVE）两种运行方式，两者共用交易所执行器、下单、对账、保护与恢复规则，模拟盘地址固定在程序中，实盘准入只对实盘生效；内部撮合改为测试与回放工具（原执行器改名 replay-executor）。更新 P3 S3-005 与 E20 登记。代码同 PR 实现。标签 v2.14.0-beta（实验性版本）。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.14.1",
-      "directory": "doc/v2.14.1",
-      "change_kind": "design",
-      "date": "2026-10-23",
-      "reason": "P3 设计 34.2：研判跟随者跳过只读查询在游标处再次返回的研判（时刻精度为秒），不再整页判为 JUDGMENT_SOURCE_RESPONSE_INVALID；记载 FOLLOW 状态键由迁移 009 允许。E20 启动后发现，代码同 PR。标签 v2.14.1-beta。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.14.2",
-      "directory": "doc/v2.14.2",
-      "change_kind": "design",
-      "date": "2026-10-23",
-      "reason": "P1 设计第 21 章：模拟盘运行的时钟由交易所执行器的账户同步推进，采集器快照可能落后于时钟被拒（MARKET_CLOCK_INVALID）；采集器以新时刻重提一次，交易接口客户端带回 P1 问题码。E20 运行中发现，代码同 PR。标签 v2.14.2-beta。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.14.3",
-      "directory": "doc/v2.14.3",
-      "change_kind": "design",
-      "date": "2026-10-24",
-      "reason": "P3 设计第 35 章：position-manager 的止损指令/平仓请求与 P2 决策周期、P1 采集器在同一 5 分钟边界竞争，同轮连续两次版本冲突或交易快照冲突使整轮失败；改为两种冲突最多 3 次重提。E15 影子运行中发现，代码同 PR。标签 v2.14.3-beta。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.14.4",
-      "directory": "doc/v2.14.4",
-      "change_kind": "design",
-      "date": "2026-10-24",
-      "reason": "P3 设计第 36 章：跟随模式复制的研判没有输入清单哈希，方向研判的评分被 P2 以 INVALID_REQUEST 拒绝、跟随停住；研判没有输入哈希时以研判记录的 SHA-256 作为输入清单哈希，停住的跟随者重启后重放已存副本即恢复；引用的快讯没有标题时读 API 返回 null，跟随者曾丢弃该条目并停在 JUDGMENT_ITEM_UNAVAILABLE，现标题可为空、先存条目再重放。E20/E21/E22 运行中发现，代码同 PR。标签 v2.14.4-beta。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.14.5",
-      "directory": "doc/v2.14.5",
-      "change_kind": "design",
-      "date": "2026-10-24",
-      "reason": "P1 设计第 22 章：模拟盘运行建仓后，交易所权益按交易所标记价、运行权益按采集的标记价计算，对账总差几个跳动，执行器报 EXTERNAL_ACCOUNT_DIFFERENCE 并使运行停在 RECOVERY_CHECK；权益比较改为按运行标记价重估交易所持仓，钱包余额、数量、均价仍按原容差严格比较。E20 运行中发现，代码同 PR。标签 v2.14.5-beta。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.14.6",
-      "directory": "doc/v2.14.6",
-      "change_kind": "design",
-      "date": "2026-10-24",
-      "reason": "P2 设计第 18 章：调度器在读交易快照之前取周期时刻，模拟盘运行的时钟由交易所账户同步约每 16.7 秒推进，读取期间提交时快照晚于周期时刻，本轮以 FUTURE_TRADING_SNAPSHOT 跳过；调度与同步相位锁住时连续失败并漏掉周期。未指定时刻的周期改为读完快照后取时刻，指定时刻的周期不变。E20 运行中发现，代码同 PR。标签 v2.14.6-beta。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.14.7",
-      "directory": "doc/v2.14.7",
-      "change_kind": "design",
-      "date": "2026-10-26",
-      "reason": "P1 设计第 23 章：交易所执行器对模拟盘也从就绪记录取保护重叠能力，模拟盘没有就绪记录，于是声明不支持；E20 加仓后覆盖新数量的保险与上层止损每次替换都被拒、关闭后重新生成（170 代），交易所只剩覆盖旧数量的止损，运行 DEGRADED 并停在 RECOVERY_CHECK。模拟盘执行器按第 18 章已核验的交易所事实声明支持重叠，实盘不变。23.2：账户同步把已请求撤销、交易所上仍有效的旧单写回 ACTIVE_VERIFIED，工作池不再撤销，改为保持 CANCEL_PENDING。E20 运行中发现，代码同 PR。标签 v2.14.7-beta。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.14.8",
-      "directory": "doc/v2.14.8",
-      "change_kind": "design",
-      "date": "2026-10-26",
-      "reason": "P4 设计第 18 章：“研判与止损”页 K 线图纵轴原先放宽到包含全部止损横线，止损离价格远时 K 线被压扁；改为与 TradingView 默认一致只按 K 线缩放，范围外横线列在图下、可勾选放宽；右侧价格轴上滚轮缩放纵轴；图表只建一次，刷新不重置缩放；止损横线原先会取已 CLOSED 的旧保护代次（E15 显示空单时期的 105.20 / 97.84），改为只取仍保护持仓的代次。用户 2026-10-26 反馈，代码同 PR。标签 v2.14.8-beta。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.14.9",
-      "directory": "doc/v2.14.9",
-      "change_kind": "design",
-      "date": "2026-10-26",
-      "reason": "P4 设计 18.6：“研判与止损”页 K 线图默认纵轴自动缩放时，图表库只左右平移；拖动在纵向移动 4 像素后关闭自动缩放并按指针平移价格范围，按住拖动可向任意方向平移；“纵轴自动”或双击价格轴恢复。用户 2026-10-26 要求，代码同 PR。标签 v2.14.9-beta。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.14.10",
-      "directory": "doc/v2.14.10",
-      "change_kind": "design",
-      "date": "2026-10-27",
-      "reason": "P1 设计 23.4：E20 上层止损 72.71 换成 84.05 时，新单提交后的首次查询未确认，新代次为 UNKNOWN；账户同步查到新单有效后写成 ACTIVE_VERIFIED，工作池不再处理，撤销旧代次的步骤没有执行，交易所同时挂着两张上层止损。账户同步对 UNKNOWN / DISPATCHING 的保护保持原状态，确认与撤销旧代次留给工作池。E20 运行中发现，代码同 PR。标签 v2.14.10-beta。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.15.0",
-      "directory": "doc/v2.15.0",
-      "change_kind": "specification",
-      "date": "2026-10-27",
-      "reason": "P1 式样 S1-024 / 设计第 24 章：连接交易所账户的运行账面盈亏只取交易所数字；所有运行按真实盘资金费结算记录另算参考资金费（不入账）。P4 式样 S4-020 / 设计第 19 章：“研判与止损”页持仓盈亏区块，标明来源。起因：模拟盘资金费率多次顶到 +0.75%，E20 账上 +5.87 按真实盘仅 +0.03；内部撮合不结算资金费。用户 2026-10-27 要求，代码同 PR。标签 v2.15.0-beta。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.16.0",
-      "directory": "doc/v2.16.0",
-      "change_kind": "specification",
-      "date": "2026-10-27",
-      "reason": "P4 式样 S4-017 修订 / 设计第 20 章：“研判与止损”页 K 线图默认只标改变了仓位依据的研判（注入、作废原链、修订）与本批开仓、平仓，只记录的研判勾选后以灰点显示，研判时间线逐条注明是否生效。起因：每 30 分钟的研判都画在图上，与实际开仓时点对不上（用户 2026-10-27）。代码同 PR。标签 v2.16.0-beta。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.17.0",
-      "directory": "doc/v2.17.0",
-      "change_kind": "specification",
-      "date": "2026-10-27",
-      "reason": "P1 式样 S1-024 修订 / 设计 24.6：品种信息给出最近一次真实盘资金费结算记录作为参考费率，交易层自身不用。P2 式样 S2-043 / 设计第 19 章：实例可登记 funding_source=REFERENCE，以参考费率作为框架的资金费估计（无交易带与分层账本），缺失时用备用年化费率；账务不变。起因：模拟盘费率顶到 +0.75%/8h 撑大 E20 无交易带，加仓晚约 9.5 小时（B27），用户 2026-10-27 决定改。代码同 PR。标签 v2.17.0-beta。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.18.0",
-      "directory": "doc/v2.18.0",
-      "change_kind": "specification",
-      "date": "2026-10-28",
-      "reason": "P2 式样 S2-034 修订 / 设计第 20 章：收盘止损退出的归零目标被 P1 拒绝或过期时，请求回到已受理并在下一周期重发；自该 K 线收盘起 30 分钟有效，过时仍未执行（同一批次仍持仓）记为已过期。P3 式样 S3-027 修订 / 设计第 37 章：退出请求过期后仓位仍在同一周期时告警并恢复移动与阶梯止损。起因：E20 10-27 05:55Z 收盘止损退出下发被版本冲突拒绝且未重发，仓位未平，阶梯止损停在 87.33（B28）。代码同 PR。标签 v2.18.0-beta。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.19.0",
-      "directory": "doc/v2.19.0",
-      "change_kind": "specification",
-      "date": "2026-10-28",
-      "reason": "P3 式样 S3-032 修订 / 设计第 38 章：只读状态给出收盘止损的来源（初始 / 移动 / 阶梯）、阶梯步长与当前级数、锁定价、下一级触发收盘价与上移后的收盘止损、尚待执行的收盘止损退出及有效截止。P4 式样 S4-017 修订 / 设计第 21 章：“研判与止损”页的止损表与 K 线图显示阶梯下一级与来源，待执行退出加标记，动作时间线写明阶梯 / 移动与退出未执行。起因：用户 2026-10-28 指出管理台完全看不到阶梯止损。只读显示，交易逻辑不变。代码同 PR。标签 v2.19.0-beta。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.19.1",
-      "directory": "doc/v2.19.1",
-      "change_kind": "design",
-      "date": "2026-10-28",
-      "reason": "P3 设计第 38 章 / P4 设计第 21 章补充：batch 的 stop_source、ladder、exit_pending 改为可省略字段。管理台按契约校验下层返回，v2.19.0 列为必填会使旧版实例接口（E15 在 10-30 升级前）的状态被判为无效；部署前发现，对照测试确认。式样不变。代码同 PR。标签 v2.19.1-beta。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.19.2",
-      "directory": "doc/v2.19.2",
-      "change_kind": "design",
-      "date": "2026-10-29",
-      "reason": "P2 设计第 21 章补充：S2-034 规定收盘止损退出“通过后立即下发归零”，原实现要等下一决策周期，请求在本周期决策之后受理时晚 5 分钟（E22 10-29 05:35 JST，B29）。改为调度器下一次轮询即在周期外下发归零。式样不变。代码同 PR。标签 v2.19.2-beta。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.19.3",
-      "directory": "doc/v2.19.3",
-      "change_kind": "design",
-      "date": "2026-10-29",
-      "reason": "P2 设计第 22 章补充：决策输入压缩只把用完的贡献换成摘要，生效贡献整行保留，同向研判链越长、每条决策越大，P2 状态持续增长（B13，E15 内部状态 5.95 MB、每 3 小时约 +0.3 MB）。改为生效贡献只保留开案与归因读取的 6 个字段，完整行换成数量与摘要。input_hash 不变，式样不变。代码同 PR。标签 v2.19.3-beta。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.19.4",
-      "directory": "doc/v2.19.4",
-      "change_kind": "design",
-      "date": "2026-10-29",
-      "reason": "P2 设计第 22.1 节补充：决策输入的 prepricing 为池中每条贡献（含已用完的）各存一条评估，随历史研判只增不减（E22 66 条、7.9 KB，B13）。改为只保留生效贡献对应评分的评估，其余换成数量与摘要。input_hash 不变，领域层不读该字段，式样不变。代码同 PR。标签 v2.19.4-beta。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.19.5",
-      "directory": "doc/v2.19.5",
-      "change_kind": "design",
-      "date": "2026-10-30",
-      "reason": "P3 设计第 39 章：position-manager 的止损指令版本号原按状态计数自增，指令被 P2 接受而整轮状态未保存时，此后每轮重复已用版本、被拒，仓位管理停滞（E15 10-30 00:06 起，B30）。改为取本地计数与 P2 现列同类指令最大版本中的较大者加一；初始距离指令遇非 CAS 409 时告警并保存计数。式样不变。代码同 PR。标签 v2.19.5-beta。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.19.6",
-      "directory": "doc/v2.19.6",
-      "change_kind": "design",
-      "date": "2026-10-30",
-      "reason": "P4 设计第 22 章：管理台显示时区切换此前只作用于表格值与研判页部分时间，区块元信息（读取/事实时间/重试时间）与 K 线图时间轴、十字线标签始终为 UTC，用户反馈切换失效。改为页面显示的绝对时间全部按所选时区格式化，查询、传输与图表数据仍用 UTC。式样不变。代码同 PR。标签 v2.19.6-beta。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.20.0",
-      "directory": "doc/v2.20.0",
-      "change_kind": "specification",
-      "date": "2026-10-30",
-      "reason": "P3 式样 S3-031 / T3-27 修订、设计第 40 章：E15 的 5 套假设账本一直未实现，阶梯步长比较已由 E20/E21/E22 实际运行承担，原 6 套规则按 v2.9.0 离场规则登记已不是待选方案，E15 批次少且集中在同一段行情。改为不实现常驻假设账本，实际实例覆盖不到的规则在结论期离线回放、作为报告附表。P4 式样 S4-017 修订 / 设计第 23 章：页面去掉“E15 假设账本 / 未实现”一行。交易规则与参数不变。代码同 PR。标签 v2.20.0。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    },
-    {
-      "version": "2.20.1",
-      "directory": "doc/v2.20.1",
-      "change_kind": "design",
-      "date": "2026-10-30",
-      "reason": "P1 设计第 25 章：每次事务末尾整行重写运行快照（每账户约 2.5 MB），E15 执行器空闲轮询每 2 秒写一次不变的内容，E21/E22 每 2 秒续租也整行重写，影子库约 160 MB WAL/分钟。改为内容不变（且无新审计、无待写 K 线）时不写任何行；同一持有者租约剩余不足一半才续租。P3 设计第 41 章：新增完整的 E15 策略公开样例 e15_policy.example.json（旧片段缺 RISK_UNIT sizing，按它登记初始止损全部被拒），测试保证通过 P2 校验。式样不变。代码同 PR。标签 v2.20.1。",
-      "format": "html",
-      "document_pairs": [
-        "01_交易系统层",
-        "02_策略化框架层",
-        "03_SOXLUSDT_JEV应用实例",
-        "04_Web管理台",
-        "05_模型接入模块"
-      ]
-    }
-  ]
+ "schema_version": 2,
+ "releases": [
+  {
+   "version": "2.0.0",
+   "change_kind": "framework",
+   "date": "2026-10-04"
+  },
+  {
+   "version": "2.1.0",
+   "change_kind": "specification",
+   "date": "2026-10-05"
+  },
+  {
+   "version": "2.1.1",
+   "change_kind": "design",
+   "date": "2026-10-05"
+  },
+  {
+   "version": "2.1.2",
+   "change_kind": "design",
+   "date": "2026-10-08"
+  },
+  {
+   "version": "2.1.3",
+   "change_kind": "design",
+   "date": "2026-10-08"
+  },
+  {
+   "version": "2.1.4",
+   "change_kind": "design",
+   "date": "2026-10-09"
+  },
+  {
+   "version": "2.1.5",
+   "change_kind": "design",
+   "date": "2026-10-09"
+  },
+  {
+   "version": "2.1.6",
+   "change_kind": "design",
+   "date": "2026-10-09"
+  },
+  {
+   "version": "2.1.7",
+   "change_kind": "design",
+   "date": "2026-10-09"
+  },
+  {
+   "version": "2.1.8",
+   "change_kind": "design",
+   "date": "2026-10-09"
+  },
+  {
+   "version": "2.1.9",
+   "change_kind": "design",
+   "date": "2026-10-09"
+  },
+  {
+   "version": "2.1.10",
+   "change_kind": "design",
+   "date": "2026-10-09"
+  },
+  {
+   "version": "2.1.11",
+   "change_kind": "design",
+   "date": "2026-10-09"
+  },
+  {
+   "version": "2.1.12",
+   "change_kind": "design",
+   "date": "2026-10-09"
+  },
+  {
+   "version": "2.1.13",
+   "change_kind": "design",
+   "date": "2026-10-09"
+  },
+  {
+   "version": "2.1.14",
+   "change_kind": "design",
+   "date": "2026-10-10"
+  },
+  {
+   "version": "2.1.15",
+   "change_kind": "design",
+   "date": "2026-10-10"
+  },
+  {
+   "version": "2.2.0",
+   "change_kind": "specification",
+   "date": "2026-10-10"
+  },
+  {
+   "version": "2.3.0",
+   "change_kind": "specification",
+   "date": "2026-10-10"
+  },
+  {
+   "version": "2.4.0",
+   "change_kind": "specification",
+   "date": "2026-10-10"
+  },
+  {
+   "version": "2.5.0",
+   "change_kind": "specification",
+   "date": "2026-10-11"
+  },
+  {
+   "version": "2.5.1",
+   "change_kind": "design",
+   "date": "2026-10-11"
+  },
+  {
+   "version": "2.5.2",
+   "change_kind": "design",
+   "date": "2026-10-11"
+  },
+  {
+   "version": "2.5.3",
+   "change_kind": "design",
+   "date": "2026-10-12"
+  },
+  {
+   "version": "2.5.4",
+   "change_kind": "design",
+   "date": "2026-10-12"
+  },
+  {
+   "version": "2.5.5",
+   "change_kind": "design",
+   "date": "2026-10-12"
+  },
+  {
+   "version": "2.5.6",
+   "change_kind": "design",
+   "date": "2026-10-12"
+  },
+  {
+   "version": "2.5.7",
+   "change_kind": "design",
+   "date": "2026-10-12"
+  },
+  {
+   "version": "2.5.8",
+   "change_kind": "design",
+   "date": "2026-10-12"
+  },
+  {
+   "version": "2.6.0",
+   "change_kind": "specification",
+   "date": "2026-10-13"
+  },
+  {
+   "version": "2.6.1",
+   "change_kind": "design",
+   "date": "2026-10-13"
+  },
+  {
+   "version": "2.6.2",
+   "change_kind": "design",
+   "date": "2026-10-13"
+  },
+  {
+   "version": "2.6.3",
+   "change_kind": "design",
+   "date": "2026-10-13"
+  },
+  {
+   "version": "2.6.4",
+   "change_kind": "design",
+   "date": "2026-10-13"
+  },
+  {
+   "version": "2.6.5",
+   "change_kind": "design",
+   "date": "2026-10-13"
+  },
+  {
+   "version": "2.7.0",
+   "change_kind": "specification",
+   "date": "2026-10-14"
+  },
+  {
+   "version": "2.8.0",
+   "change_kind": "specification",
+   "date": "2026-10-15"
+  },
+  {
+   "version": "2.9.0",
+   "change_kind": "specification",
+   "date": "2026-10-16"
+  },
+  {
+   "version": "2.10.0",
+   "change_kind": "specification",
+   "date": "2026-10-16"
+  },
+  {
+   "version": "2.11.0",
+   "change_kind": "specification",
+   "date": "2026-10-17"
+  },
+  {
+   "version": "2.11.1",
+   "change_kind": "design",
+   "date": "2026-10-20"
+  },
+  {
+   "version": "2.11.2",
+   "change_kind": "design",
+   "date": "2026-10-21"
+  },
+  {
+   "version": "2.11.3",
+   "change_kind": "design",
+   "date": "2026-10-21"
+  },
+  {
+   "version": "2.11.4",
+   "change_kind": "design",
+   "date": "2026-10-21"
+  },
+  {
+   "version": "2.11.5",
+   "change_kind": "design",
+   "date": "2026-10-22"
+  },
+  {
+   "version": "2.12.0",
+   "change_kind": "specification",
+   "date": "2026-10-22"
+  },
+  {
+   "version": "2.12.1",
+   "change_kind": "design",
+   "date": "2026-10-22"
+  },
+  {
+   "version": "2.13.0",
+   "change_kind": "specification",
+   "date": "2026-10-23"
+  },
+  {
+   "version": "2.14.0",
+   "change_kind": "specification",
+   "date": "2026-10-23"
+  },
+  {
+   "version": "2.14.1",
+   "change_kind": "design",
+   "date": "2026-10-23"
+  },
+  {
+   "version": "2.14.2",
+   "change_kind": "design",
+   "date": "2026-10-23"
+  },
+  {
+   "version": "2.14.3",
+   "change_kind": "design",
+   "date": "2026-10-24"
+  },
+  {
+   "version": "2.14.4",
+   "change_kind": "design",
+   "date": "2026-10-24"
+  },
+  {
+   "version": "2.14.5",
+   "change_kind": "design",
+   "date": "2026-10-24"
+  },
+  {
+   "version": "2.14.6",
+   "change_kind": "design",
+   "date": "2026-10-24"
+  },
+  {
+   "version": "2.14.7",
+   "change_kind": "design",
+   "date": "2026-10-26"
+  },
+  {
+   "version": "2.14.8",
+   "change_kind": "design",
+   "date": "2026-10-26"
+  },
+  {
+   "version": "2.14.9",
+   "change_kind": "design",
+   "date": "2026-10-26"
+  },
+  {
+   "version": "2.14.10",
+   "change_kind": "design",
+   "date": "2026-10-27"
+  },
+  {
+   "version": "2.15.0",
+   "change_kind": "specification",
+   "date": "2026-10-27"
+  },
+  {
+   "version": "2.16.0",
+   "change_kind": "specification",
+   "date": "2026-10-27"
+  },
+  {
+   "version": "2.17.0",
+   "change_kind": "specification",
+   "date": "2026-10-27"
+  },
+  {
+   "version": "2.18.0",
+   "change_kind": "specification",
+   "date": "2026-10-28"
+  },
+  {
+   "version": "2.19.0",
+   "change_kind": "specification",
+   "date": "2026-10-28"
+  },
+  {
+   "version": "2.19.1",
+   "change_kind": "design",
+   "date": "2026-10-28"
+  },
+  {
+   "version": "2.19.2",
+   "change_kind": "design",
+   "date": "2026-10-29"
+  },
+  {
+   "version": "2.19.3",
+   "change_kind": "design",
+   "date": "2026-10-29"
+  },
+  {
+   "version": "2.19.4",
+   "change_kind": "design",
+   "date": "2026-10-29"
+  },
+  {
+   "version": "2.19.5",
+   "change_kind": "design",
+   "date": "2026-10-30"
+  },
+  {
+   "version": "2.19.6",
+   "change_kind": "design",
+   "date": "2026-10-30"
+  },
+  {
+   "version": "2.20.0",
+   "change_kind": "specification",
+   "date": "2026-10-30"
+  },
+  {
+   "version": "2.20.1",
+   "change_kind": "design",
+   "date": "2026-10-30"
+  },
+  {
+   "version": "2.21.0",
+   "change_kind": "specification",
+   "date": "2026-10-30",
+   "summary": "Rewrite the specification and design books from the current code as Markdown; keep only the current baseline in the tree (earlier versions via tags); neutral example values; retire the v1.1 contracts. Fixes: kept protection plans count in the portfolio stress limit; console next-page cursors, stale panels after a failed request and judgment-page export; oversized provider responses are delivery-unknown."
+  }
+ ]
 }

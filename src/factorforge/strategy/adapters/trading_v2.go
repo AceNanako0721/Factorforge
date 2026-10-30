@@ -385,7 +385,7 @@ func (t *TradingV2) Snapshot(ctx context.Context, objects []*d.ObservedObject) (
 			copy["source_decision_id"] = origin
 			copy["protection_exit"] = d.Flag(copy["protection_exit"]) || d.Has(exits, d.Text(fact["external_order_id"]))
 			if d.Flag(copy["protection_exit"]) {
-				// v2.9.0: the protection role distinguishes venue and insurance stops.
+				// the protection role distinguishes venue and insurance stops.
 				role := roles[d.Text(order["order_id"])]
 				if role == "" {
 					role = roles[d.Text(fact["external_order_id"])]

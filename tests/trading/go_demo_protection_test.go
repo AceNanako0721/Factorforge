@@ -13,11 +13,10 @@ import (
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/workers"
 )
 
-// v2.14.7 (P1 design ch. 23): E20 added 0.72 to a 2.13 long on the demo
-// account. The demo executor declared no overlapping protections, so each
-// replacement covering 2.85 was refused, closed and regenerated every pass
-// (170 generations); the venue kept only the 2.13 stops, the run went
-// DEGRADED with the position UNPROTECTED.
+// Adding to a long on a demo account: when the demo executor declared no
+// overlapping protections, each replacement covering the larger position was
+// refused, closed and regenerated every pass; the venue kept only the old
+// stops and the run went DEGRADED with the position UNPROTECTED.
 type capVenue struct {
 	*compatVenue
 	caps map[string]any
@@ -74,7 +73,7 @@ func TestT122DemoReplacementPlacedBeforeCancel(t *testing.T) {
 }
 
 func TestT122DemoWithoutOverlapReproducesChurn(t *testing.T) {
-	// Control: the capability E20 ran with before v2.14.7.
+	// Control: the capability without overlapping protections.
 	current, n := demoAddAfterCover(t, map[string]any{"ordinary_and_conditional_verified": true, "overlapping_protections": false})
 	if p := activeRole(current, "INSURANCE"); p != nil && p.Plan.CoveredQuantity.Cmp(cv("2")) == 0 {
 		t.Fatal("control unexpectedly resized")
@@ -86,7 +85,7 @@ func TestT122DemoWithoutOverlapReproducesChurn(t *testing.T) {
 		}
 	}
 	if refused != 2 || n != 4 || current.State != "DEGRADED" || current.Positions.Values()[0].ProtectionState != "UNPROTECTED" {
-		t.Fatal("control differs from E20", refused, n, current.State, current.Positions.Values()[0].ProtectionState)
+		t.Fatal("control differs from the churn case", refused, n, current.State, current.Positions.Values()[0].ProtectionState)
 	}
 }
 
@@ -153,9 +152,8 @@ func TestT122SyncKeepsRequestedCancellation(t *testing.T) {
 	}
 }
 
-// v2.14.10 (P1 design 23.4): on 10-27 00:05 JST E20 raised its strategy stop
-// 72.71 -> 84.05. The query right after the submit did not confirm it, so the
-// worker left the new generation UNKNOWN; the venue sync then found it live
+// A raised strategy stop that the query right after the submit did not
+// confirm: the worker left the new generation UNKNOWN; the venue sync then found it live
 // and wrote ACTIVE_VERIFIED. The worker only picks UNKNOWN, so the handoff
 // that cancels the replaced generation never ran and both stops stayed live.
 type flakyVenue struct {
@@ -226,7 +224,7 @@ func TestT122SyncLeavesUnconfirmedReplacementToWorker(t *testing.T) {
 	}
 }
 
-// E20 kept both generations ACTIVE_VERIFIED after the sync took over; the
+// Both generations stayed ACTIVE_VERIFIED after the sync took over; the
 // worker retires the replaced one once the replacement covers the position.
 func TestT122WorkerRetiresGenerationLeftBySync(t *testing.T) {
 	run := demoRun()
@@ -251,7 +249,7 @@ func TestT122WorkerRetiresGenerationLeftBySync(t *testing.T) {
 	}
 	drainProtection(t, w, run.RunKey, 1)
 	var replaced string
-	// Recreate the E20 snapshot: the replaced generation was never marked.
+	// Recreate that snapshot: the replaced generation was never marked.
 	if err = store.Transaction(context.Background(), run.RunKey, func(r *d.Aggregate) error {
 		for _, p := range r.Protections.Values() {
 			if p.ReplacesID != nil && p.State == "ACTIVE_VERIFIED" {

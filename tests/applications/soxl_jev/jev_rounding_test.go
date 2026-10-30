@@ -12,7 +12,7 @@ import (
 	dec "github.com/AceNanako0721/Factorforge/src/factorforge/trading/api/dto"
 )
 
-// v2.5.4 design chapter 26: real JEV responses round probabilities, so the exact
+// : real JEV responses round probabilities, so the exact
 // decimal sum may differ from 1 by at most 0.01; larger deviations still fail.
 func TestJevProbabilityRoundingTolerance(t *testing.T) {
 	_, r, _, now := pipelineFixture()

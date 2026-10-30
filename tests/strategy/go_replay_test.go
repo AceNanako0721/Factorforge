@@ -86,7 +86,7 @@ func replayIdentity(t *testing.T, value any) sd.Identity {
 	return p
 }
 
-// compactFrozenDecisions projects frozen pre-v2.5.7 decisions through the
+// compactFrozenDecisions projects frozen pre- decisions through the
 // documented bar compaction. input_hash is untouched and still compared.
 func compactFrozenDecisions(v any) any {
 	switch x := v.(type) {
@@ -103,7 +103,7 @@ func compactFrozenDecisions(v any) any {
 		if snapshot, ok := x["input_snapshot"].(map[string]any); ok && x["input_hash"] != nil {
 			out["input_snapshot"] = sd.CompactDecisionInput(snapshot)
 		}
-		// v2.19.3: cases open from the compacted decision, so their source
+		// cases open from the compacted decision, so their source
 		// contributions carry only the fields cases read.
 		if rows, ok := x["source_contributions"].([]any); ok {
 			slim := []any{}
@@ -221,7 +221,7 @@ func (r *replayTrading) Snapshot(_ context.Context, objects []*sd.ObservedObject
 	}
 	var snap sd.TradingSnapshot
 	decodeRecord(r.t, value, &snap)
-	snap.LowerCompat = true // explicit synthetic v2.8.0 lower contract
+	snap.LowerCompat = true // explicit synthetic lower contract
 	return &snap, nil
 }
 func (r *replayTrading) Prepare(obj *sd.ObservedObject, item *sd.TargetOutbox, snap *sd.TradingSnapshot) (map[string]any, error) {
@@ -376,7 +376,7 @@ func TestFrozenP2StateTransitions(t *testing.T) {
 	}
 }
 
-// v2.8.0 intentionally changes execution targets, retained stop plans, input
+// intentionally changes execution targets, retained stop plans, input
 // hashes and risk reservations. The frozen transition oracle still compares
 // sentiment, cases, policies, levels, learning and audit; T2-23..27 check execution.
 func projectLegacyTick(v any) any {

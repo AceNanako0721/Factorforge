@@ -1,9 +1,0 @@
-{
-  "_schema": "analysis-job-request.json",
-  "data": {
-    "schema_version": "1.1",
-    "evidence_ids": ["evidence-001"],
-    "target_instrument": "SOXLUSDT",
-    "reason": "Research fixture"
-  }
-}

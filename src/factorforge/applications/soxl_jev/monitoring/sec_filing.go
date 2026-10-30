@@ -14,7 +14,7 @@ import (
 )
 
 // SECFilingSource obtains 8-K press-release exhibits from SEC EDGAR for the
-// registered companies (v2.5.3 design chapter 25). EDGAR acceptance is only the
+// registered companies. EDGAR acceptance is only the
 // provider publication time; it never becomes a verified first-public time.
 type SECFilingSource struct {
 	Fetcher               *Fetcher

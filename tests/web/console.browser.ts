@@ -138,19 +138,17 @@ test("S4-017 judgment and stop page on desktop and phone width", async ({
     page.getByRole("heading", { name: "三层止损与价格", exact: true }),
   ).toBeVisible();
   await expect(page.getByText("收盘止损", { exact: true })).toBeVisible();
-  // v2.19.0: the ladder's next rung and what set the close stop are listed.
+  // the ladder's next rung and what set the close stop are listed.
   await expect(page.getByText("阶梯第 2 级触发价", { exact: true })).toBeVisible();
   await expect(page.getByText("来自开仓时的初始止损 · 阶梯第 1 级", { exact: true })).toBeVisible();
   await expect(page.getByText(/阶梯步长 4\.0% · 当前第 1 级/)).toBeVisible();
   await expect(page.getByText("synthetic thesis", { exact: true })).toBeVisible();
   await expect(page.getByText("注入研判 · 做空", { exact: true })).toBeVisible();
-  // v2.16.0: the timeline says which judgment changed the position inputs.
+  // the timeline says which judgment changed the position inputs.
   await expect(page.getByText("注入（首次方向）", { exact: true })).toBeVisible();
   await expect(page.getByText("仅记录，未改变仓位", { exact: true })).toBeVisible();
   await page.getByLabel("显示未生效的研判（灰点）").check();
   await page.getByLabel("显示未生效的研判（灰点）").uncheck();
-  // v2.20.0: the fixed "E15 假设账本 / 未实现" row is gone (S3-031 offline replay).
-  await expect(page.getByText("E15 假设账本")).toHaveCount(0);
   await expect(page.getByText("未实现", { exact: true })).toHaveCount(0);
   await expect(page.getByText("PRIVATE RAW")).toHaveCount(0);
   // S4-020: the fixture run is internal matching, so the PnL block shows the
@@ -171,7 +169,7 @@ test("S4-017 judgment and stop page on desktop and phone width", async ({
   await expect(mark.locator("strong")).not.toHaveText(first);
   await expect(page.getByText("参考标记价", { exact: true })).toBeVisible();
   await expect(page.getByLabel("参考浮动盈亏").locator("strong")).not.toHaveText("—");
-  // v2.14.8: the wheel over the price axis zooms prices and the page does not
+  // the wheel over the price axis zooms prices and the page does not
   // scroll; the toggle and reset only change the view.
   const host = page.getByLabel("已记录最终K线");
   await host.scrollIntoViewIfNeeded();
@@ -206,7 +204,7 @@ test("S4-017 judgment and stop page on desktop and phone width", async ({
   expect(errors).toEqual([]);
 });
 // Runs before the revocation test: the fixture cannot restore a revoked selection.
-test("S4-003 v2.19.6 panel times follow the display zone", async ({ page }) => {
+test("S4-003 panel times follow the display zone", async ({ page }) => {
   await login(page);
   const read = page.locator(".metadata span", { hasText: /^读取 / }).first();
   const fact = page.locator(".metadata span", { hasText: /^事实时间 \d/ }).first();

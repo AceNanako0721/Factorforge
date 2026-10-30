@@ -10,8 +10,8 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
-// DynamicProfile is the private role profile of the v2.9.0 judgment worker
-// and position manager (P3 design 28.1). Credentials and real values live
+// DynamicProfile is the private role profile of the judgment worker and
+// position manager. Credentials and real values live
 // only in the ignored profile; dynamic_stop.example.toml is an empty template.
 type DynamicProfile struct {
 	InstanceID  string `toml:"instance_id"`
@@ -67,7 +67,7 @@ type DynamicProfile struct {
 		MinHalfLifeHours   int       `toml:"min_half_life_hours"`
 		MaxHalfLifeHours   int       `toml:"max_half_life_hours"`
 	} `toml:"judgment"`
-	// Follow selects follower mode (S3-034, v2.13.0): judgments are read from
+	// Follow selects follower mode (S3-034): judgments are read from
 	// the source instance's read API instead of being generated here.
 	Follow struct {
 		SourceURL        string    `toml:"source_url"`
@@ -95,7 +95,7 @@ type DynamicProfile struct {
 		BaselineRenewMin    int      `toml:"baseline_renew_minutes"`
 		RoundTripCost       float64  `toml:"round_trip_cost"`
 		PriceTick           float64  `toml:"price_tick"`
-		LadderStep          float64  `toml:"ladder_step"` // S3-033 (v2.13.0); 0 or absent = off
+		LadderStep          float64  `toml:"ladder_step"` // S3-033; 0 or absent = off
 		NoiseMaxAgeHours    int      `toml:"noise_max_age_hours"`
 		NoiseLookbackDays   int      `toml:"noise_lookback_days"`
 		NoiseSymbol         string   `toml:"noise_symbol"`

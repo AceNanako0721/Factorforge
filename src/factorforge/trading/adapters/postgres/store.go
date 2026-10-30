@@ -293,7 +293,7 @@ func (s *Store) Transaction(ctx context.Context, key d.RunKey, apply func(*d.Agg
 	if err != nil {
 		return failure("STORE_SNAPSHOT_INVALID", 503)
 	}
-	// v2.20.1: a transaction that changed nothing (an idle executor tick, a
+	// a transaction that changed nothing (an idle executor tick, a
 	// lease that needs no renewal) writes nothing; rewriting the whole run row
 	// every poll cost about 160 MB of WAL a minute across four shadow runs.
 	if before != nil && len(run.Audit) == 0 && len(candles) == 0 && len(run.CandleWrites) == 0 && run.AuditCount == auditCount && bytes.Equal(before, data) {

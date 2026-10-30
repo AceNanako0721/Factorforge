@@ -193,7 +193,7 @@ func (t *rejectingTrading) Deliver(_ context.Context, _ *sd.ObservedObject, _ *s
 	return nil, &sd.Error{Code: "VERSION_CONFLICT", Status: 409}
 }
 
-// B28 (v2.18.0): a refused close-stop exit is decided again, and expires once
+// A refused close-stop exit is decided again, and expires once
 // its validity has passed with the batch still open.
 func TestT229CloseStopExitRedeliveredAfterRejectionThenExpires(t *testing.T) {
 	store, clock, service, snap, o, id, at, barAt := exitFixture(t)
@@ -242,7 +242,7 @@ func TestT229CloseStopExitRedeliveredAfterRejectionThenExpires(t *testing.T) {
 	}
 }
 
-// v2.19.2 (S2-034 "immediately"): an exit accepted after its period's cycle
+// S2-034 "immediately": an exit accepted after its period's cycle
 // was decided goes out on the next scheduler tick, not one period later.
 func TestT240CloseExitAcceptedAfterCycleDeliveredBeforeNextPeriod(t *testing.T) {
 	// The fixture policy cycles every 60 s; every tick below stays in the
@@ -292,7 +292,7 @@ func TestT240CloseExitAcceptedAfterCycleDeliveredBeforeNextPeriod(t *testing.T) 
 }
 
 // Control: an exit past its validity or against the held direction is left
-// to the cycle, which expires or drops it (v2.18.0).
+// to the cycle, which expires or drops it.
 func TestT240CloseExitBetweenCyclesLeavesInvalidToCycle(t *testing.T) {
 	store, clock, _, snap, o, id, at, barAt := exitFixture(t)
 	tick(t, store, clock, snap, id)
@@ -476,7 +476,7 @@ func TestT232PreEventWindowBlocksAndReducesOnce(t *testing.T) {
 func transferFixture(t *testing.T) (*adapters.MemoryStore, app.Service, *sd.ObservedObject, sd.WorkloadIdentity, time.Time) {
 	t.Helper()
 	s, o, p, snap, id, at := riskUnitFixture(t)
-	p.Composition.Baseline = []sd.BaselineFactor{{FactorID: "news-baseline", Weight: sd.One(), State: "ENABLED", MaxAgeSeconds: 3600, EvidenceRef: "E15-registration"}}
+	p.Composition.Baseline = []sd.BaselineFactor{{FactorID: "news-baseline", Weight: sd.One(), State: "ENABLED", MaxAgeSeconds: 3600, EvidenceRef: "example-registration"}}
 	p.Composition.Adjustment.EventOnlyCap = sd.One()
 	p.Composition.Transfer = &sd.TransferRule{FactorID: "news-baseline", CombinedTolerance: compDecimal("0.05")}
 	s.FactorSeries.Set("news-baseline", &sd.FactorSeries{Definition: sd.FactorDefinition{FactorID: "news-baseline", Purpose: "BASELINE", ValueMin: sd.Int(-1), ValueMax: sd.One(), CadenceSeconds: 1800, SourceManifest: "fixture"}, Observations: []sd.FactorObservation{}})
@@ -633,7 +633,7 @@ func TestT237DynamicShapesAdmitAndLegacyHashesStable(t *testing.T) {
 	}
 	var back sd.StrategyState
 	if err := sd.DecodeJSON(raw, &back); err != nil {
-		t.Fatal("stored v2.9.0 state rejected", err)
+		t.Fatal("stored older state rejected", err)
 	}
 	for _, body := range []struct {
 		target any
@@ -651,7 +651,7 @@ func TestT237DynamicShapesAdmitAndLegacyHashesStable(t *testing.T) {
 	if cmd.RequestID != "r" || cmd.ExitID != "e1" {
 		t.Fatal("embedded command and exit identifiers must both survive", cmd.RequestID, cmd.ExitID)
 	}
-	// Legacy records without v2.9.0 fields keep their canonical hash.
+	// Legacy records without fields keep their canonical hash.
 	legacy := sd.StopDirective{DirectiveID: "d", ObjectID: "o", Version: 1, Kind: "POSITION_STOP", PositionDirection: "LONG", TriggerPrice: sd.Ptr(sd.Int(95)), TriggerKind: "MARK", EffectiveAt: at, ValidForSeconds: 60, SourceModule: "stops", ReasonCodes: []string{"X"}, Mode: "VENUE"}
 	if _, ok := sd.Map(legacy)["risk_fraction"]; ok {
 		t.Fatal("optional field leaked into legacy hash")

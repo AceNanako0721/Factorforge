@@ -18,8 +18,8 @@ const Prefix = "/api/v2/instances/{instance_id}"
 type Options struct {
 	Query  operations.QueryService
 	Tokens map[string]d.ReadPrincipal
-	// Dynamic serves the v2.10.0 /dynamic routes; nil answers
-	// DYNAMIC_READ_NOT_CONFIGURED (P3 design 29.2).
+	// Dynamic serves the /dynamic routes; nil answers
+	// DYNAMIC_READ_NOT_CONFIGURED.
 	Dynamic *operations.DynamicQuery
 }
 type Problem struct {

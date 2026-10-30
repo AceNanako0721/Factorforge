@@ -6,7 +6,7 @@ import (
 )
 
 // DecisionRetention is how long a superseded, settled decision stays in the
-// aggregate before it moves to the append-only archive (v2.5.7).
+// aggregate before it moves to the append-only archive.
 const DecisionRetention = 6 * time.Hour
 
 // TargetDecision retains delivery inputs without duplicating the audit snapshot.
@@ -79,7 +79,7 @@ func CompactDecisionInput(inputs map[string]any) map[string]any {
 	result["snapshot"] = compact
 	// Spent contributions grow with every judgment; a case only opens from
 	// those with a remaining amount, so only their size and digest stay.
-	// Live contributions keep only the fields a case reads (v2.19.3, B13):
+	// Live contributions keep only the fields a case reads:
 	// every judgment of a same-direction chain adds one, and every retained
 	// decision used to carry the whole rows.
 	if pool, ok := inputs["pool"].(map[string]any); ok {
@@ -110,7 +110,7 @@ func CompactDecisionInput(inputs map[string]any) map[string]any {
 			compactPool["spent_contributions_ref"] = map[string]any{"count": len(spent), "digest": Digest(spent)}
 			result["pool"] = compactPool
 			// Prepricing holds one assessment per pool contribution, spent ones
-			// included (v2.19.4, B13); only the live contributions' stay.
+			// included; only the live contributions' stay.
 			if pricing, ok := inputs["prepricing"].(map[string]any); ok {
 				scores := map[string]bool{}
 				for _, c := range live {

@@ -17,7 +17,7 @@ import (
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/workers"
 )
 
-// ---------- v2.14.0 demo account run mode (S1-002, T1-20) ----------
+// ---------- demo account run mode (S1-002, T1-20) ----------
 
 // demoVenue is the LIVE fixture venue bound to the SIM environment, as the
 // binance broker is when it drives the demo account.

@@ -247,7 +247,7 @@ const expectedPrompts = `{
 }
 `
 
-// Exact empty template published before v2.1.3. Historical commits are frozen;
+// Exact empty template of the earliest public history. Historical commits are frozen;
 // accepting this known shape must not admit arbitrary old prompt contents.
 const historicalPrompts = `{
   "schema_version": 1,

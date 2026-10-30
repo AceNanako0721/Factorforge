@@ -18,8 +18,8 @@ type ReadStore interface {
 	Original(context.Context, string, int64, int) ([]byte, error)
 }
 
-// DynamicReadStore is the read-only DYNAMIC_READ view of v2.9.0 records and
-// state (P3 design 29.1). It has no write method.
+// DynamicReadStore is the read-only DYNAMIC_READ view of records and
+// state. It has no write method.
 type DynamicReadStore interface {
 	Binding() d.Binding
 	StateWithVersion(ctx context.Context, key string) (json.RawMessage, int64, time.Time, error)

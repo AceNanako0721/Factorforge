@@ -98,7 +98,7 @@ func TemplateIssue(name string, data []byte, historical bool) string {
 			return "nonempty-template-service-settings"
 		}
 		if historical {
-			// Pre-v2.10.0 templates lack the two empty v2.10.0 fields; treat
+			// Pre- templates lack the two empty fields; treat
 			// their absence as the empty value so older shapes stay exact.
 			actual = cloneMap(actual)
 			application := cloneMap(asMap(actual["application"]))
@@ -116,7 +116,7 @@ func TemplateIssue(name string, data []byte, historical bool) string {
 					console["trusted_peers"] = []any{}
 					actual["console"] = console
 				}
-				// Pre-v2.11.0 templates lack the empty live_market block.
+				// Pre- templates lack the empty live_market block.
 				if _, has := console["live_market"]; !has {
 					console = cloneMap(console)
 					console["live_market"] = map[string]any{"enabled": false, "url": "", "interval": "", "stale_seconds": int64(0), "heartbeat_seconds": int64(0), "idle_seconds": int64(0), "max_streams": int64(0)}
@@ -129,7 +129,7 @@ func TemplateIssue(name string, data []byte, historical bool) string {
 		}
 		if historical {
 			old := cloneMap(expected)
-			// Exact pre-v2.5.3 empty template, before the SEC identity block.
+			// Exact pre- empty template, before the SEC identity block.
 			secApplication := cloneMap(asMap(old["application"]))
 			secPipeline := cloneMap(asMap(secApplication["pipeline"]))
 			delete(secPipeline, "sec")
@@ -138,14 +138,14 @@ func TemplateIssue(name string, data []byte, historical bool) string {
 			if equalJSON(actual, old) {
 				return ""
 			}
-			// Exact pre-v2.5.1 empty template; populated semantic blocks are never accepted.
+			// Exact pre- empty template; populated semantic blocks are never accepted.
 			legacyApplication := cloneMap(asMap(old["application"]))
 			delete(legacyApplication, "semantic_extraction")
 			old["application"] = legacyApplication
 			if equalJSON(actual, old) {
 				return ""
 			}
-			// Exact v2.3.0 empty model template, before the OMP adapter fields.
+			// Exact empty model template, before the OMP adapter fields.
 			legacyModel := cloneMap(asMap(old["model_access"]))
 			delete(legacyModel, "omp_max_requests")
 			delete(legacyModel, "omp_browser_path")
@@ -153,14 +153,14 @@ func TemplateIssue(name string, data []byte, historical bool) string {
 			if equalJSON(actual, old) {
 				return ""
 			}
-			// Exact v2.2.0 empty model template, without native CLI paths.
+			// Exact empty model template, without native CLI paths.
 			delete(legacyModel, "claude_cli_path")
 			delete(legacyModel, "antigravity_cli_path")
 			old["model_access"] = legacyModel
 			if equalJSON(actual, old) {
 				return ""
 			}
-			// Exactly the frozen pre-v2.2.0 shape; never accept a partially
+			// Exactly the frozen pre- shape; never accept a partially
 			// populated model block via the historical compatibility path.
 			if _, exists := actual["model_access"]; exists {
 				return "nonempty-or-invalid-model-template"
@@ -169,7 +169,7 @@ func TemplateIssue(name string, data []byte, historical bool) string {
 			if equalJSON(actual, old) {
 				return ""
 			}
-			// The exact pre-v2.1.5 empty format is accepted only in history.
+			// The exact pre- empty format is accepted only in history.
 			application := cloneMap(asMap(old["application"]))
 			pipeline := cloneMap(asMap(application["pipeline"]))
 			delete(pipeline, "search_backends")

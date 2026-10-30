@@ -130,7 +130,7 @@ func cleanupRun(ctx context.Context, root, profile, path string) error {
 }
 
 // protectionByClientID maps a venue clientAlgoId to this run's protection.
-// v2.8.0 role-based IDs differ from protection IDs; legacy records still match.
+// role-based IDs differ from protection IDs; legacy records still match.
 func protectionByClientID(run *d.Aggregate, id string) *d.Protection {
 	if id == "" {
 		return nil

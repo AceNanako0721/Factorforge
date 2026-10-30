@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// PnL sources (design chapter 24): a venue-backed run reports the venue's
+// PnL sources: a venue-backed run reports the venue's
 // own account figures; an internal-matching run reports system figures. Every
 // run also gets a reference funding from settled mainnet records, which never
 // enters Equity(), risk, sizing or reconciliation.
@@ -279,7 +279,7 @@ func firstFill(run *Aggregate) *time.Time {
 }
 
 // ReferenceFundingObservation is the latest settled reference record of one
-// instrument as a rate observation (S1-024 v2.17.0): the interval is the gap
+// instrument as a rate observation (S1-024): the interval is the gap
 // to the previous record (8 h before two exist), the next settlement is one
 // interval later, and nothing is returned once the next record is overdue by
 // 30 minutes, matching ReferenceStatus.Stale.

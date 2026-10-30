@@ -15,7 +15,7 @@ type Broker struct {
 	Verified  map[string]any
 	Admitted  bool
 	// Demo binds the broker to the SIM environment: orders go to the
-	// exchange demo account through a DemoOnly transport (S1-002, v2.14.0).
+	// exchange demo account through a DemoOnly transport (S1-002).
 	Demo bool
 }
 
@@ -368,7 +368,7 @@ func (b *Broker) GetAccount(ctx context.Context, run *d.Aggregate) (map[string]a
 		}
 		result[field] = amount
 	}
-	// v2.15.0: the venue's own unrealized profit per registered instrument
+	// the venue's own unrealized profit per registered instrument
 	// (one-way mode, positionSide BOTH), reported instead of recomputed.
 	positions := map[string]any{}
 	if raw, ok := item["positions"]; ok {
