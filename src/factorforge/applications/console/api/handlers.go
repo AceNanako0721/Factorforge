@@ -32,10 +32,10 @@ type Options struct {
 	Origin, StaticDir          string
 	FixtureOnly                bool
 	RefreshSeconds, MaxRetries int
-	// TrustedPeers admits a registered tunnel host besides loopback (S4-018,
-	// P4 design 16.4); empty keeps the previous behaviour.
+	// TrustedPeers admits a registered tunnel host besides loopback (S4-018);
+	// empty admits loopback only.
 	TrustedPeers []netip.Prefix
-	// Live serves the S4-019 reference push (P4 design 17.3); nil disables
+	// Live serves the S4-019 reference push; nil disables
 	// GET /live. LiveHeartbeat is the state/heartbeat and session recheck period.
 	Live          *app.LiveHub
 	LiveHeartbeat time.Duration
@@ -241,7 +241,7 @@ func New(o Options) (http.Handler, error) {
 		}
 		for page := range app.Views {
 			state := "AVAILABLE"
-			if selection != nil && selection.ObjectID == "" && d.Has([]string{"events", "event", "sentiment", "cases", "case", "learning"}, page) {
+			if selection != nil && selection.ObjectID == "" && d.Has([]string{"events", "event", "sentiment", "cases", "case", "learning", "reports"}, page) {
 				state = "NOT_APPLICABLE"
 			}
 			pages[page] = state

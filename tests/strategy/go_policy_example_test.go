@@ -9,12 +9,12 @@ import (
 	sd "github.com/AceNanako0721/Factorforge/src/factorforge/strategy/domain"
 )
 
-// v2.20.1: the public E15 policy example is a complete P2 policy that the
-// dynamic stack accepts. Without composition.sizing every INITIAL_DISTANCE
-// carrying risk_fraction is rejected (STOP_DIRECTIVE_INVALID) and no order is
-// ever produced; an outdated fragment led a fork into exactly that.
-func TestV2201E15PolicyExampleIsComplete(t *testing.T) {
-	data, err := os.ReadFile("../../src/factorforge/applications/soxl_jev/config/e15_policy.example.json")
+// The public policy example is a complete P2 policy that the news-judgment
+// and stop-management stack accepts. Without composition.sizing every
+// INITIAL_DISTANCE carrying risk_fraction is rejected (STOP_DIRECTIVE_INVALID)
+// and no order is ever produced.
+func TestDynamicStopPolicyExampleIsComplete(t *testing.T) {
+	data, err := os.ReadFile("../../src/factorforge/applications/soxl_jev/config/dynamic_stop_policy.example.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -31,6 +31,6 @@ func TestV2201E15PolicyExampleIsComplete(t *testing.T) {
 		t.Fatal("example lacks RISK_UNIT sizing")
 	}
 	if p.LearningMode != "FROZEN" || len(p.JudgmentEventTypes) == 0 {
-		t.Fatal("example lacks the E15 registration (FROZEN learning, judgment event type)")
+		t.Fatal("example lacks FROZEN learning or a judgment event type")
 	}
 }

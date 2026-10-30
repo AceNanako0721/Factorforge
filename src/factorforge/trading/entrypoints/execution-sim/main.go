@@ -1,5 +1,5 @@
 // Command execution-sim runs a SIM run on the exchange demo account: real
-// venue orders, endpoint locked to the demo URL (S1-002, v2.14.0).
+// venue orders, endpoint locked to the demo URL (S1-002).
 package main
 
 import (

@@ -11,7 +11,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -213,62 +212,6 @@ func TestP3InputWatchJevExistingProtocolAndResearchBudget(t *testing.T) {
 	if e != nil || len(result.Events) != 1 || result.SectorView.Direction != -1 || result.SectorView.ForceReduce || admission.calls != 1 || admission.finishes != 1 {
 		t.Fatal(result, e, admission)
 	}
-}
-
-// v2.7.0: no built-in baseline or historical-return prior.
-func TestP3InputZeroPriorAndInitialScope(t *testing.T) {
-	raw, e := os.ReadFile("../../../src/factorforge/applications/soxl_jev/config/initial_strategy.example.json")
-	if e != nil {
-		t.Fatal(e)
-	}
-	var example struct {
-		Composition struct {
-			Baseline []struct {
-				State  string
-				Weight string
-			}
-			AllowShort bool `json:"allow_short_baseline"`
-			Assessment struct {
-				State string
-				Force bool `json:"force_reduce"`
-			}
-			Scheduled  struct{ State string }
-			Adjustment struct {
-				State        string
-				Cap          string
-				EventOnlyCap string `json:"event_only_cap"`
-			}
-		}
-		FactorSeries []struct{ Definition struct{ Purpose string } } `json:"factor_series"`
-		Templates    map[string]struct {
-			State string
-			Cap   string
-			Prior struct {
-				Mean        string
-				N0          int
-				EvidenceRef string `json:"evidence_ref"`
-			}
-			PriorN0 int `json:"prior_n0"`
-		} `json:"templates_registration_notes"`
-	}
-	if json.Unmarshal(raw, &example) != nil || example.Composition.Baseline == nil || len(example.Composition.Baseline) != 0 || example.Composition.AllowShort || example.Composition.Assessment.State != "SHADOW" || example.Composition.Assessment.Force || example.Composition.Scheduled.State != "SHADOW" || example.Composition.Adjustment.State != "SHADOW" || example.Composition.Adjustment.Cap != "1.0" || example.Composition.Adjustment.EventOnlyCap != "0" {
-		t.Fatal("initial composition scope changed")
-	}
-	for _, f := range example.FactorSeries {
-		if f.Definition.Purpose == "BASELINE" {
-			t.Fatal("built-in baseline remains registered")
-		}
-	}
-	prior := example.Templates["EARNINGS_LEADER/pre20"]
-	if prior.State != "SHADOW" || prior.Prior.Mean != "0" || prior.Prior.N0 != 0 || prior.Prior.EvidenceRef != "" {
-		t.Fatal("historical prior remains", prior)
-	}
-	for id, template := range example.Templates {
-		if id != "EARNINGS_LEADER/pre20" && (template.Cap != "0" || template.PriorN0 != 0 || template.State != "SHADOW") {
-			t.Fatal("macro scope", id)
-		}
-	}
-
 }
 
 func TestP3InputClientRejectsCursorLoopAndMalformedObservation(t *testing.T) {

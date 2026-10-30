@@ -96,7 +96,7 @@ func OpenAPI() []byte {
 	}
 	add("/capabilities", "get", object(map[string]any{"schema_version": str, "pages": object(pages), "refresh_seconds": integer, "max_retries": integer}, "schema_version", "pages", "refresh_seconds", "max_retries"), true, []any{param("selection_id", false, id)}, nil, "200")
 	// S4-019: the reference push is text/event-stream (events mark, kline,
-	// state and end, P4 design 17.3), not a JSON document.
+	// state and end), not a JSON document.
 	add("/live", "get", str, true, []any{param("selection_id", true, id)}, nil, "200")
 	paths[Prefix+"/live"].(map[string]any)["get"].(map[string]any)["responses"].(map[string]any)["200"] = map[string]any{"description": "Server-sent events", "content": map[string]any{"text/event-stream": map[string]any{"schema": str}}}
 	for _, path := range []string{"overview", "market", "events", "events/{event_id}", "evidence/{evidence_id}", "sentiment", "decisions", "execution", "cases", "cases/{case_id}", "learning", "operations", "reports", "audit", "dynamic", "export"} {

@@ -19,8 +19,8 @@ import (
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/ports"
 )
 
-// DynamicQuery serves the v2.10.0 read-only views of v2.9.0 judgment, stop
-// and baseline records (S3-032, P3 design 29). It reads recorded state only:
+// DynamicQuery serves the read-only views of judgment, stop
+// and baseline records (S3-032). It reads recorded state only:
 // it never calls a model, the framework or the trading layer.
 type DynamicQuery struct {
 	Store  ports.DynamicReadStore
@@ -46,9 +46,9 @@ type DynamicBatchView struct {
 	Trailing           bool       `json:"trailing"`
 	Transferred        bool       `json:"transferred"`
 	TrailTrigger       string     `json:"trail_trigger"`
-	// v2.19.0 (S3-032): what set the current close stop, the ladder rungs
-	// and a close-stop exit still waiting to be executed. Optional (v2.19.1):
-	// instance APIs older than v2.19.0 omit them and stay readable.
+	// S3-032: what set the current close stop, the ladder rungs
+	// and a close-stop exit still waiting to be executed. Optional:
+	// instance APIs without them stay readable.
 	StopSource  string               `json:"stop_source,omitempty"`
 	Ladder      *DynamicLadderView   `json:"ladder,omitempty"`
 	ExitPending *DynamicExitPendView `json:"exit_pending,omitempty"`
@@ -164,7 +164,7 @@ type DynamicActionView struct {
 	Reconfirm    *bool     `json:"reconfirm"`
 }
 
-// Stored shapes (P3 design 28.1), decoded independently of the workers so
+// Stored shapes, decoded independently of the workers so
 // the read path cannot change what workers persist.
 type storedGeometry struct {
 	Tier          int     `json:"tier"`
@@ -336,7 +336,7 @@ func (q DynamicQuery) Status(ctx context.Context, p d.ReadPrincipal) (Record, er
 		v.Batch = &DynamicBatchView{CycleID: b.CycleID, Direction: direction(b.Direction), Entry: decimal(b.Entry), OpenedAt: b.OpenedAt.UTC(), TierHours: b.Geometry.Tier, RequestedTierHours: b.Geometry.RequestedTier, Session: b.Geometry.Session,
 			R: decimal(b.Geometry.R), Buffer: decimal(b.Geometry.Buffer), Trail: decimal(b.Geometry.Trail), Budget: decimal(b.Budget), BestClose: decimal(b.BestClose), LastBarAt: optionalTime(b.LastBarAt),
 			CloseStop: decimal(b.CloseStop), Trailing: b.Trailing, Transferred: b.Transferred,
-			// The same +1R condition as domain.Trailing (P3 design 28), shown only.
+			// The same +1R condition as domain.Trailing, shown only.
 			TrailTrigger: decimal(b.Entry * (1 + dir*b.Geometry.R))}
 		v.Batch.StopSource = stopSource(b, pos.Ladder)
 		if l := pos.Ladder; l != nil && l.Step > 0 {
@@ -652,7 +652,7 @@ func (q DynamicQuery) Actions(ctx context.Context, p d.ReadPrincipal, f Filter) 
 }
 
 // stopSource names what set the batch's close stop: the recorded reason of
-// the last accepted POSITION_STOP, or, for batches saved before v2.19.0, the
+// the last accepted POSITION_STOP, or, for batches saved without it, the
 // ladder when its current rung equals the close stop (display only).
 func stopSource(b *storedBatch, ladder *struct {
 	Step          float64 `json:"step"`

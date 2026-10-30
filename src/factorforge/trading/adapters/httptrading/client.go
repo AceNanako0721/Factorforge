@@ -49,7 +49,7 @@ func (c *Client) Call(ctx context.Context, method, path string, query map[string
 		return fail(503)
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		// v2.14.2: carry P1's problem code so callers can tell rejections apart.
+		// carry P1's problem code so callers can tell rejections apart.
 		var problem struct {
 			Code string `json:"code"`
 		}

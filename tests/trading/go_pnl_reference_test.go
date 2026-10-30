@@ -373,7 +373,7 @@ func TestS124SyncKeepsVenueAccountFigures(t *testing.T) {
 	}
 }
 
-// S1-024 v2.17.0: the instrument view's reference rate is the latest settled
+// S1-024: the instrument view's reference rate is the latest settled
 // record; interval from the previous record, gone once the next is overdue.
 func TestS124ReferenceFundingObservation(t *testing.T) {
 	run, key, t0 := pnlRun(t)

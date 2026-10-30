@@ -95,7 +95,7 @@ func TestNativeP2FrozenHTTPContracts(t *testing.T) {
 	}
 }
 
-// frozenPolicyContract checks the v2.5.8 optional policy field; the exported
+// frozenPolicyContract checks the optional policy field; the exported
 // contract under contracts/v2 already contains it, so raw is returned as-is.
 func frozenPolicyContract(t *testing.T, raw []byte) []byte {
 	t.Helper()

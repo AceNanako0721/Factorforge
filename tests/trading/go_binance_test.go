@@ -88,7 +88,7 @@ func TestSignedBinanceBoundary(t *testing.T) {
 	if err != nil || account["observed_at"] != run.Clock {
 		t.Fatal("account mapping failed", err)
 	}
-	// v2.15.0: the venue's unrealized profit is kept per registered instrument only.
+	// the venue's unrealized profit is kept per registered instrument only.
 	if positions, ok := account["position_unrealized"].(map[string]any); !ok || len(positions) != 1 || fmt.Sprint(positions[request.InstrumentKey.Code()]) != "1.25" {
 		t.Fatal("venue unrealized mapping failed", account["position_unrealized"])
 	}

@@ -56,7 +56,7 @@ export function displayTime(value: string, zone: Zone): string {
     return value;
   return `${new Intl.DateTimeFormat("zh-CN", { timeZone: zone, dateStyle: "short", timeStyle: "medium", hourCycle: "h23" }).format(new Date(value))} · ${zone}`;
 }
-// v2.19.6: chart labels follow the display zone too. Chart data stays in UTC
+// chart labels follow the display zone too. Chart data stays in UTC
 // seconds; only the axis ticks and the crosshair label are formatted here.
 function parts(seconds: number, zone: Zone): Record<string, string> {
   const out: Record<string, string> = {};

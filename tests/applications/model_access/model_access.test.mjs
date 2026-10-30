@@ -18,6 +18,7 @@ import {
   OAuthAdapter,
   ISSUER,
   RESOURCE,
+  boundedFetch,
 } from "../../../runtime/model-access-build/adapters/oauth.js";
 import {
   decode,
@@ -346,6 +347,13 @@ test("byte limits reject input before inference and oversized completed output",
     (await new ModelService(f.store, p.fetcher).handle(request())).error.code,
     "OUTPUT_LIMIT_EXCEEDED",
   );
+});
+test("an oversized provider response is a possibly delivered failure", async () => {
+  const big = async () => new Response("x".repeat(64), { status: 200 });
+  const response = await boundedFetch(big, 1000, 16)("https://provider.invalid/v1/responses");
+  await assert.rejects(response.text(), (e) => e.code === "PROVIDER_RESPONSE_TOO_LARGE" && e.deliveryUnknown === true);
+  const small = await boundedFetch(big, 1000, 64)("https://provider.invalid/v1/responses");
+  assert.equal((await small.text()).length, 64);
 });
 test("expired window renews local quota; backwards clock is rejected", async (t) => {
   const f = await fixture(t);

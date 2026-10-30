@@ -18,12 +18,12 @@ type Collector struct {
 	Key        d.RunKey
 	TradeLimit int
 	Now        func() time.Time
-	// SimFrames (v2.6.4) follows each accepted snapshot with a REPLAY_FRAME so
+	// SimFrames follows each accepted snapshot with a REPLAY_FRAME so
 	// the simulator matches resting orders and protections on live data.
 	SimFrames  bool
 	lastFrame  time.Time
 	lastCandle time.Time
-	// Reference (v2.15.0) reads settled mainnet funding every ReferenceEvery
+	// Reference reads settled mainnet funding every ReferenceEvery
 	// (10 minutes by default). A failed read only leaves this round without
 	// settlements and records ReferenceIssue; the snapshot is posted as usual.
 	Reference      ports.FundingHistory
@@ -207,7 +207,7 @@ func (c *Collector) Collect(ctx context.Context, instrument, interval string, st
 		})
 	}
 	err = snapshot()
-	// v2.14.2: on venue-backed runs the executor advances the run clock with
+	// on venue-backed runs the executor advances the run clock with
 	// account and fill observations; one landing between this round's stamp
 	// and its POST makes the snapshot older than the clock. Everything in the
 	// body was available at the old stamp, so it is re-stamped once.

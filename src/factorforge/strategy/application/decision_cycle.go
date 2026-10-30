@@ -105,7 +105,7 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 	}
 	// A venue-backed run's clock follows the executor's account sync, which
 	// may commit while the snapshot is read. An unrequested cycle is stamped
-	// once the read is done, so everything it read was available (v2.14.6).
+	// once the read is done, so everything it read was available.
 	if requested == nil {
 		at = c.Clock.Now()
 	}
@@ -166,7 +166,7 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 					}
 				}
 				bindings := state.FactorManifests.Value(obj.PriceProxyBinding)
-				// v2.7.0: completed candles may supply a SIM price point, never sigma.
+				// completed candles may supply a SIM price point, never sigma.
 				if sample == nil && p.Composition != nil && state.Environment == "SIM" && !d.ValidManifest(bindings, "PRICE_PROXY", at) {
 					var latest *d.Bar
 					for _, b := range snap.Bars[obj.ObjectID] {
@@ -208,7 +208,7 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 						}
 					}
 					if p.Composition != nil && !d.ValidManifest(bindings, "PRICE_PROXY", at) && state.Environment == "SIM" {
-						// v2.7.0: no historical-volatility estimate or sigma requirement.
+						// no historical-volatility estimate or sigma requirement.
 						sample.Liquidity = d.Ptr(p.LiquidityBudget)
 						liquidityAssumed = true
 					}
@@ -363,7 +363,7 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 				if err != nil {
 					return err
 				}
-				// v2.7.0: the historical-price regime engine is legacy-only.
+				// the historical-price regime engine is legacy-only.
 				regime := state.Regimes.Value(obj.ObjectID)
 				if p.Composition == nil {
 					var err error
@@ -478,9 +478,9 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 						}
 						saved := PreservedStopPlan(state, obj, snap, target)
 						if d.Has(reasons, "REVERSE_CONFIRMING") || d.Has(reasons, "REVERSE_CONFIRM_POLICY_REQUIRED") {
-							result = d.StopResult{Quantity: m.Add(actual, pending), Plan: saved, Reason: "TARGET_INTENT_PRESERVED"}
+							result = d.StopResult{Quantity: m.Add(actual, pending), Plan: saved, Reason: "TARGET_INTENT_PRESERVED", Fraction: PreservedStress(sample.Price, saved, p.MaxStopFraction)}
 						} else if saved != nil && (target.Cmp(m.Add(actual, pending)) == 0 || pending.Sign() != 0 && target.Sign() == m.Add(actual, pending).Sign()) {
-							result = d.StopResult{Quantity: target, Plan: saved, Reason: "TARGET_PLAN_PRESERVED"}
+							result = d.StopResult{Quantity: target, Plan: saved, Reason: "TARGET_PLAN_PRESERVED", Fraction: PreservedStress(sample.Price, saved, p.MaxStopFraction)}
 						} else if initial != nil {
 							result, err = SizeDirective(target, sample.Price, rules, initial, p)
 							sizingDirective = initial
@@ -832,7 +832,7 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 		}
 		audit := map[string]any{"action": "CYCLE_COMMITTED", "at": d.ISO(at), "decisions": ids, "snapshot_version": before.Version}
 		// The store writes removed decisions to the append-only archive in this
-		// transaction (v2.5.7); the aggregate keeps only what the runtime reads.
+		// transaction; the aggregate keeps only what the runtime reads.
 		if archived := d.ArchivableDecisions(state, at); len(archived) > 0 {
 			for _, id := range archived {
 				state.Decisions.Delete(id)
@@ -972,7 +972,7 @@ func (c DecisionCycle) Dispatch(ctx context.Context, identity d.Identity) error 
 					state.Objects.Value(obj.ObjectID).LastAdjustmentTradeAt = d.Ptr(now)
 				}
 			}
-			// v2.18.0 (S2-034): a refused close-stop exit goes back to ACCEPTED and
+			// S2-034: a refused close-stop exit goes back to ACCEPTED and
 			// is decided again next cycle, until ExitRequestValidity.
 			if status == "REJECTED" || status == "EXPIRED" {
 				for _, r := range state.ExitRequests.Values() {

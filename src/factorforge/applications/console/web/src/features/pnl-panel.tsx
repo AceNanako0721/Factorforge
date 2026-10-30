@@ -1,6 +1,6 @@
 import { record, type Json } from "../api/client";
 
-// S4-020 / P4 design 19. Every figure comes from P1's account view (design
+// S4-020: Every figure comes from P1's account view (design
 // chapter 24); the browser only subtracts to show the funding difference.
 export type PnlLayout = "SYSTEM" | "DEMO" | "LIVE" | "MISSING";
 export type PnlRow = {

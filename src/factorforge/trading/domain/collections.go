@@ -70,7 +70,7 @@ func (run *Aggregate) applyLease(l ExecutorLease) {
 }
 
 // VenueBacked reports a run whose orders go to a real venue account: every LIVE
-// run and, since v2.14.0 (S1-002), a SIM run on the exchange demo account. Both
+// run and a SIM run on the exchange demo account (S1-002). Both
 // are created by the venue executor with execution mode LIVE. Internal matching
 // (REPLAY/SHADOW) remains only as a test and replay tool.
 func (run *Aggregate) VenueBacked() bool {

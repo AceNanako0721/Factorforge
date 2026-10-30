@@ -216,7 +216,7 @@ func TestP3ScheduleEstimatedConfirmedChangedCancelled(t *testing.T) {
 	if e != nil || start >= end || end >= 0 {
 		t.Fatal("trading-day offsets", start, end, e)
 	}
-	// The confirmed revision carries the per-event trading-day span (v2.6.1).
+	// The confirmed revision carries the per-event trading-day span.
 	span := f.writes[1].WindowTimes["pre20"]
 	if !span.StartAt.Equal(confirmed.Add(time.Duration(start)*time.Second)) || !span.EndAt.Equal(confirmed.Add(time.Duration(end)*time.Second)) {
 		t.Fatal("pre20 span not submitted", f.writes[1].WindowTimes)

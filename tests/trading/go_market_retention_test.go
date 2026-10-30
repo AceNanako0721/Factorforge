@@ -18,7 +18,7 @@ import (
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/workers"
 )
 
-// v2.5.5 design chapter 13: the run snapshot keeps public trades observed in
+// : the run snapshot keeps public trades observed in
 // the last hour, at most 1000 newest per instrument.
 func TestMarketTradeRetention(t *testing.T) {
 	ctx := context.Background()

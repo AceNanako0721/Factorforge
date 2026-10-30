@@ -46,7 +46,7 @@ type FundingMarket interface {
 	LatestPointsWithFunding(context.Context, d.InstrumentKey) ([]*d.MarketPoint, *d.FundingObservation, error)
 }
 
-// FundingHistory (v2.15.0) reads settled funding records from the reference
+// FundingHistory reads settled funding records from the reference
 // venue for the account view's reference funding; never accounting.
 type FundingHistory interface {
 	FundingSettlements(context.Context, d.InstrumentKey, time.Time) ([]d.FundingSettlement, error)

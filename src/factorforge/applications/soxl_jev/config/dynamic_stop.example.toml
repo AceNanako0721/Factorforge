@@ -1,4 +1,4 @@
-# v2.9.0 news judgment / position manager role profile (P3 design 28.1).
+# News judgment worker and position manager role profile (DynamicProfile).
 # Empty public template. Real values live only in the ignored private profile.
 instance_id = ""
 environment = "SIM"
@@ -54,7 +54,7 @@ licence = ""
 min_half_life_hours = 0
 max_half_life_hours = 0
 
-# Follower mode (S3-034, v2.13.0) only: read judgments from another instance.
+# Follower mode only: copy judgments from another instance instead of calling a model.
 # [follow]
 # source_url = ""
 # source_token = ""
@@ -81,7 +81,7 @@ baseline_max_share = 0.0
 baseline_renew_minutes = 0
 round_trip_cost = 0.0
 price_tick = 0.0
-# S3-033 ladder step (v2.13.0); 0 keeps S3-028 only.
+# Ladder step as a fraction of the entry price; 0 turns the ladder off and keeps trailing only.
 ladder_step = 0.0
 noise_max_age_hours = 0
 noise_lookback_days = 0

@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// v2.9.0 dynamic-stop records (P3 design 28.1). Records are append-only;
+// dynamic-stop records. Records are append-only;
 // state advances only by version compare-and-set so a restart resumes from
 // the last committed step and never re-applies an earlier one.
 
@@ -22,8 +22,8 @@ func (s *PipelineStore) dynamic(ctx context.Context) error {
 	return s.VerifyRole(ctx)
 }
 
-// dynamicRead admits the worker and the v2.10.0 read-only identity (P3
-// design 29.1). Writers keep calling dynamic, so DYNAMIC_READ never writes.
+// dynamicRead admits the worker and the read-only identity.
+// Writers keep calling dynamic, so DYNAMIC_READ never writes.
 func (s *PipelineStore) dynamicRead(ctx context.Context) error {
 	if s.kind != "DYNAMIC" && s.kind != "DYNAMIC_READ" {
 		return d.Fail("DYNAMIC_SCOPE_FORBIDDEN", 403)

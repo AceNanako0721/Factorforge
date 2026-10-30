@@ -87,7 +87,7 @@ type MarketSnapshot struct {
 	Trades        []MarketTrade       `json:"trades"`
 	InstrumentKey *InstrumentKey      `json:"instrument_key,omitempty"`
 	Funding       *FundingObservation `json:"funding,omitempty"`
-	// FundingSettlements (v2.15.0) carries settled mainnet funding records for
+	// FundingSettlements carries settled mainnet funding records for
 	// the reference funding in the account view.
 	FundingSettlements []FundingSettlement `json:"funding_settlements,omitempty"`
 }

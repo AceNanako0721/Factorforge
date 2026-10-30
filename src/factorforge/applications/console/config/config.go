@@ -65,14 +65,14 @@ type Profile struct {
 	CursorKey         string    `toml:"cursor_key" json:"cursor_key"`
 	Users             []d.User  `toml:"users" json:"users"`
 	Bindings          []Binding `toml:"bindings" json:"bindings"`
-	// v2.10.0 (S4-018): tunnel hosts allowed besides loopback, as IP or CIDR.
+	// S4-018: tunnel hosts allowed besides loopback, as IP or CIDR.
 	TrustedPeers []string `toml:"trusted_peers" json:"trusted_peers"`
-	// v2.11.0 (S4-019): venue public push for the reference layer; absent
-	// or disabled keeps the v2.10.0 behaviour.
+	// S4-019: venue public push for the reference layer; absent
+	// or disabled turns the reference layer off.
 	LiveMarket LiveMarket `toml:"live_market" json:"live_market"`
 }
 
-// LiveMarket configures the reference push (P4 design 17.4).
+// LiveMarket configures the reference push.
 type LiveMarket struct {
 	Enabled          bool   `toml:"enabled" json:"enabled"`
 	URL              string `toml:"url" json:"url"`

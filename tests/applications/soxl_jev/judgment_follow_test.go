@@ -16,7 +16,7 @@ import (
 	dto "github.com/AceNanako0721/Factorforge/src/factorforge/strategy/api/dto"
 )
 
-// ---------- v2.13.0 judgment follower (S3-034) ----------
+// ---------- judgment follower (S3-034) ----------
 
 type fakeSource struct {
 	rows   []d.SourcedJudgment
@@ -103,10 +103,10 @@ func TestT330JudgmentSourceReadsAllPagesOldestFirst(t *testing.T) {
 		conf, hz, prev := 3, 24, false
 		return map[string]any{"judgment_id": id, "at": at, "ok": true, "direction": dir, "confidence": conf, "horizon_hours": hz, "previous_invalidated": prev, "thesis": "t", "key_items": []any{ref}, "invalidation_items": []any{}, "error_codes": []string{}}
 	}
-	auth, instance := "", "soxl-e15"
+	auth, instance := "", "soxl-example"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		auth = r.Header.Get("Authorization")
-		if r.URL.Path != "/api/v2/instances/soxl-e15/dynamic/judgments" || r.URL.Query().Get("from") == "" {
+		if r.URL.Path != "/api/v2/instances/soxl-example/dynamic/judgments" || r.URL.Query().Get("from") == "" {
 			w.WriteHeader(404)
 			return
 		}
@@ -117,7 +117,7 @@ func TestT330JudgmentSourceReadsAllPagesOldestFirst(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(page)
 	}))
 	defer server.Close()
-	src, err := submission.NewJudgmentSource(submission.JudgmentSourceOptions{BaseURL: server.URL, Token: "read-token", InstanceID: "soxl-e15", Client: &http.Client{Timeout: time.Second}, MaxResponseBytes: 1 << 20, MaxPages: 4})
+	src, err := submission.NewJudgmentSource(submission.JudgmentSourceOptions{BaseURL: server.URL, Token: "read-token", InstanceID: "soxl-example", Client: &http.Client{Timeout: time.Second}, MaxResponseBytes: 1 << 20, MaxPages: 4})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,7 +128,7 @@ func TestT330JudgmentSourceReadsAllPagesOldestFirst(t *testing.T) {
 	if rows[0].Judgment.Output.KeyItemIDs[0] != "item0000000001" || len(rows[0].Items) != 1 || !rows[0].Items[0].ReceivedAt.Equal(at) {
 		t.Fatal("items", rows[0])
 	}
-	// v2.14.1: the read API reports seconds, so the judgment at the cursor
+	// the read API reports seconds, so the judgment at the cursor
 	// comes back; it is skipped as the boundary, not a reason to refuse.
 	rows, err = src.After(context.Background(), at)
 	if err != nil || len(rows) != 1 || rows[0].Judgment.JudgmentID != "j-2" {
@@ -139,7 +139,7 @@ func TestT330JudgmentSourceReadsAllPagesOldestFirst(t *testing.T) {
 	if _, err = src.After(context.Background(), at.Add(-time.Hour)); err == nil {
 		t.Fatal("foreign instance accepted")
 	}
-	if _, err = submission.NewJudgmentSource(submission.JudgmentSourceOptions{BaseURL: server.URL, InstanceID: "soxl-e15", Client: &http.Client{Timeout: time.Second}, MaxResponseBytes: 1, MaxPages: 1}); err == nil {
+	if _, err = submission.NewJudgmentSource(submission.JudgmentSourceOptions{BaseURL: server.URL, InstanceID: "soxl-example", Client: &http.Client{Timeout: time.Second}, MaxResponseBytes: 1, MaxPages: 1}); err == nil {
 		t.Fatal("missing token accepted")
 	}
 }
@@ -154,7 +154,7 @@ func TestT330FollowerProfileValidation(t *testing.T) {
 		p.Judgment.MinHalfLifeHours, p.Judgment.MaxHalfLifeHours = 4, 72
 		p.Position.CloseMinutes, p.Position.InsuranceFraction, p.Position.WickMultiplier, p.Position.BaselineMaxShare = 5, 0.25, 2, 0.5
 		p.Position.DirectiveTTLMinutes, p.Position.NoiseLookbackDays, p.Position.PriceTick, p.Position.LadderStep = 15, 28, 0.01, 0.04
-		p.Follow.SourceURL, p.Follow.SourceToken, p.Follow.SourceInstanceID = "http://127.0.0.1:18311", "read", "soxl-e15"
+		p.Follow.SourceURL, p.Follow.SourceToken, p.Follow.SourceInstanceID = "http://127.0.0.1:18311", "read", "soxl-example"
 		p.Follow.Since = time.Date(2026, 10, 23, 0, 0, 0, 0, time.UTC)
 		return p
 	}
@@ -176,7 +176,7 @@ func TestT330FollowerProfileValidation(t *testing.T) {
 	}
 }
 
-// v2.14.4: a followed directional judgment carries no rendered prompt, so the
+// a followed directional judgment carries no rendered prompt, so the
 // score's input manifest hash was empty and P2 refused it (INVALID_REQUEST).
 // The score built from a judgment read over HTTP must pass P2's wire schema.
 func TestT330FollowedScorePassesFrameworkSchema(t *testing.T) {
@@ -186,10 +186,10 @@ func TestT330FollowedScorePassesFrameworkSchema(t *testing.T) {
 		return map[string]any{"judgment_id": id, "at": at, "ok": true, "direction": "SHORT", "confidence": 3, "horizon_hours": 48, "previous_invalidated": false, "thesis": "t", "key_items": []any{ref}, "invalidation_items": []any{}, "error_codes": []string{}}
 	}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_ = json.NewEncoder(w).Encode(map[string]any{"instance_id": "soxl-e15", "items": []any{view("j-20261023T200113Z", at), view("j-20261023T203101Z", at.Add(30*time.Minute))}, "cursor": nil})
+		_ = json.NewEncoder(w).Encode(map[string]any{"instance_id": "soxl-example", "items": []any{view("j-20261023T200113Z", at), view("j-20261023T203101Z", at.Add(30*time.Minute))}, "cursor": nil})
 	}))
 	defer server.Close()
-	src, err := submission.NewJudgmentSource(submission.JudgmentSourceOptions{BaseURL: server.URL, Token: "read-token", InstanceID: "soxl-e15", Client: &http.Client{Timeout: time.Second}, MaxResponseBytes: 1 << 20, MaxPages: 4})
+	src, err := submission.NewJudgmentSource(submission.JudgmentSourceOptions{BaseURL: server.URL, Token: "read-token", InstanceID: "soxl-example", Client: &http.Client{Timeout: time.Second}, MaxResponseBytes: 1 << 20, MaxPages: 4})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -230,19 +230,19 @@ func TestT330FollowedScorePassesFrameworkSchema(t *testing.T) {
 	admit(fw2.scores[0])
 }
 
-// v2.14.4: quick news has no headline. The read API reports its title as
+// Quick news has no headline. The read API reports its title as
 // null; the follower used to drop the cited item and then stop on
-// JUDGMENT_ITEM_UNAVAILABLE at every retry (E20-E22, 10-24 07:31 JST).
+// JUDGMENT_ITEM_UNAVAILABLE at every retry.
 func TestT330FollowerKeepsUntitledCitedItem(t *testing.T) {
 	at := time.Date(2026, 10, 23, 22, 31, 8, 0, time.UTC)
 	titled := map[string]any{"item_id": "item0000000001", "source": "wscn-us", "title": "Tanker hit near Hormuz", "published_at": at.Add(-time.Hour), "license_scope": "SIM_ONLY"}
 	untitled := map[string]any{"item_id": "item0000000002", "source": "wscn-us", "title": nil, "published_at": at.Add(-10 * time.Minute), "license_scope": "SIM_ONLY"}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		view := map[string]any{"judgment_id": "j-20261023T223108Z", "at": at, "ok": true, "direction": "SHORT", "confidence": 3, "horizon_hours": 60, "previous_invalidated": false, "thesis": "t", "key_items": []any{titled, untitled}, "invalidation_items": []any{}, "error_codes": []string{}}
-		_ = json.NewEncoder(w).Encode(map[string]any{"instance_id": "soxl-e15", "items": []any{view}, "cursor": nil})
+		_ = json.NewEncoder(w).Encode(map[string]any{"instance_id": "soxl-example", "items": []any{view}, "cursor": nil})
 	}))
 	defer server.Close()
-	src, err := submission.NewJudgmentSource(submission.JudgmentSourceOptions{BaseURL: server.URL, Token: "read-token", InstanceID: "soxl-e15", Client: &http.Client{Timeout: time.Second}, MaxResponseBytes: 1 << 20, MaxPages: 4})
+	src, err := submission.NewJudgmentSource(submission.JudgmentSourceOptions{BaseURL: server.URL, Token: "read-token", InstanceID: "soxl-example", Client: &http.Client{Timeout: time.Second}, MaxResponseBytes: 1 << 20, MaxPages: 4})
 	if err != nil {
 		t.Fatal(err)
 	}

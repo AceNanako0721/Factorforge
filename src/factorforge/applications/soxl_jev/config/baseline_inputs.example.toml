@@ -1,5 +1,4 @@
 # 合并到唯一私有 config/config.toml。该片段不包含真实地址、凭据或提示词。
-# 策略登记另见 initial_strategy.example.json；它不会自动发送注册命令。
 [application.baseline_inputs]
 environment = "SIM"
 instance_id = ""

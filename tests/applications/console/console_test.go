@@ -257,6 +257,28 @@ func TestSchemaPrivacyUnknownDuplicateUTCAndCursor(t *testing.T) {
 	if _, e = w.Client.Get(ctx, w.Selection, "reports", "", map[string]string{"from": "x", "url": "https://other.invalid"}); e == nil {
 		t.Fatal("unregistered query")
 	}
+	// The page reads the first page of every panel without a source and asks
+	// for the next page of one panel with its source and cursor.
+	all, e := query(w).Read(ctx, w.User, w.Selection.ID, "audit", "", app.Filter{Limit: 1}, false)
+	if e != nil {
+		t.Fatal(e)
+	}
+	var first *app.Panel
+	for i := range all.Panels {
+		if all.Panels[i].Source == "trading.audit" {
+			first = &all.Panels[i]
+		}
+	}
+	if first == nil || first.Cursor == nil {
+		t.Fatal("first-page cursor missing")
+	}
+	next, e := query(w).Read(ctx, w.User, w.Selection.ID, "audit", "", app.Filter{Source: "trading.audit", Limit: 1, Cursor: *first.Cursor}, false)
+	if e != nil || len(next.Panels) != 1 || bytes.Equal(next.Panels[0].Data.Bytes(), first.Data.Bytes()) {
+		t.Fatal("next page from the all-panel first page", e)
+	}
+	if _, e = query(w).Read(ctx, w.User, w.Selection.ID, "audit", "", app.Filter{Source: "strategy.audit", Limit: 1, Cursor: *first.Cursor}, false); e == nil {
+		t.Fatal("cursor accepted for another panel")
+	}
 }
 
 func TestLegacyObjectScopeAndFiniteCaseMasks(t *testing.T) {

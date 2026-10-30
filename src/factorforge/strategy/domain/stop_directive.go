@@ -136,7 +136,7 @@ func ValidateStopDirective(v StopDirective) error {
 	if v.Kind == "POSITION_STOP" && (v.TriggerPrice == nil || v.TriggerPrice.Sign() <= 0 || v.InitialStopDistance != nil) || v.Kind == "INITIAL_DISTANCE" && (v.InitialStopDistance == nil || v.InitialStopDistance.Sign() <= 0 || v.TriggerPrice != nil) {
 		return &Error{"STOP_DIRECTIVE_INVALID", 422}
 	}
-	// v2.9.0 S2-033/S2-034 optional fields.
+	// S2-033/S2-034 optional fields.
 	if v.RiskFraction != nil && (v.Kind != "INITIAL_DISTANCE" || v.RiskFraction.Sign() <= 0 || v.RiskFraction.Cmp(One()) > 0) {
 		return &Error{"STOP_DIRECTIVE_INVALID", 422}
 	}

@@ -128,7 +128,7 @@ func Synchronize(ctx context.Context, store ports.Store, key d.RunKey, broker po
 		return nil, err
 	}
 	// The venue's own equity is checked for format only; it is marked at the
-	// venue's price and is not compared (v2.14.5).
+	// venue's price and is not compared.
 	if _, err := venueAmount(account["equity"]); err != nil {
 		return nil, problem("VENUE_ACCOUNT_FORMAT_INVALID", 503)
 	}
@@ -182,13 +182,13 @@ func Synchronize(ctx context.Context, store ports.Store, key d.RunKey, broker po
 			}
 			oldExit := prior.ExitOrderID
 			// The query reports the order still live; a requested cancellation
-			// stays pending for the protection worker (P1 design 23.2, v2.14.7).
+			// stays pending for the protection worker.
 			if prior.CancelRequested && p.State == "ACTIVE_VERIFIED" {
 				p.CancelRequested = true
 				p.State = "CANCEL_PENDING"
 			}
 			// A generation the worker has not confirmed stays with the worker,
-			// whose confirmation cancels the generation it replaces (23.4, v2.14.10).
+			// whose confirmation cancels the generation it replaces.
 			if (prior.State == "UNKNOWN" || prior.State == "DISPATCHING") && p.State == "ACTIVE_VERIFIED" {
 				p.State = prior.State
 			}
@@ -331,7 +331,7 @@ func Synchronize(ctx context.Context, store ports.Store, key d.RunKey, broker po
 		// The venue marks its equity at its own mark price, which differs from
 		// the run's collected mark by a few ticks. Equity is compared with the
 		// venue's positions revalued at the run's mark, so only wallet balance,
-		// quantity and entry price have to agree (v2.14.5).
+		// quantity and entry price have to agree.
 		venueEquity, priced := cash, true
 		for _, code := range codes {
 			p := remote[code]
@@ -442,7 +442,7 @@ func Recover(ctx context.Context, store ports.Store, key d.RunKey, broker ports.
 }
 
 // venueAccountFigures keeps the venue's own margin balance and unrealized
-// profit for the account view (v2.15.0). A broker that does not report them
+// profit for the account view. A broker that does not report them
 // leaves the last observation in place.
 func venueAccountFigures(account map[string]any, cash decimal.Value, at time.Time) (*d.VenueAccount, error) {
 	rawUnrealized, ok := account["unrealized"]

@@ -190,7 +190,7 @@ func TestGoServiceFrozenOracle(t *testing.T) {
 			}
 			if row.Error != nil && row.Error.Code == "PROTECTION_CANNOT_LOOSEN" {
 				if failure != nil {
-					t.Fatal("v2.8.0 legal loosening rejected", failure)
+					t.Fatal("legal loosening rejected", failure)
 				}
 				actual, err := store.Read(ctx, key)
 				if err != nil {

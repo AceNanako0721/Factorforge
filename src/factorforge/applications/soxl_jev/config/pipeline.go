@@ -233,7 +233,7 @@ type RSSRegistration struct {
 	PublicationTimeVerified bool     `json:"publication_time_verified"`
 }
 
-// SECRegistration is a private asset entry for the v2.5.3 SEC 8-K source.
+// SECRegistration is a private asset entry for the SEC 8-K source.
 // FixtureBase is accepted only in fixture mode; production uses EDGAR hosts.
 type SECRegistration struct {
 	SourceID         string                  `json:"source_id"`

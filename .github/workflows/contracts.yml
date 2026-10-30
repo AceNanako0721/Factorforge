@@ -35,13 +35,12 @@ jobs:
           else
             go run ./tools/check-repository
           fi
-      - name: Exercise index, history, version, HTML and contract rejection guards
+      - name: Exercise index, version, document and contract rejection guards
         run: go test ./tests/engineering -count=1
-      - name: Verify layer placement, historical documents and static analysis
+      - name: Verify layer placement, documents and static analysis
         run: |
           go run ./tools/check-layout
-          go run ./tools/check-html-documents
-          go run ./tools/check-document-history
+          go run ./tools/check-documents
           go vet ./...
 
   contract-checks:
@@ -55,7 +54,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
-      - name: Validate offline OpenAPI, fixtures, frozen surface and typed stubs
+      - name: Validate offline OpenAPI contracts, typed stubs and schemas
         run: go run ./tools/check-contracts
       - name: Check generated public and workload API contracts
         run: |
@@ -142,8 +141,6 @@ jobs:
           npm exec --yes --package=pnpm@10.33.0 -- pnpm test:browser
       - name: Build native BFF and validate public static artifacts
         run: go run ./tools/build-console --web-build runtime/web-build
-      - name: Verify current documentation at desktop and narrow widths offline
-        run: node tools/check-model-access-docs.mjs
 
   model-access-checks:
     name: model-access-checks (${{ matrix.os }})
@@ -171,10 +168,8 @@ jobs:
           node tools/check-model-access.mjs
           npm --prefix src/factorforge/applications/model_access test
           npm --prefix src/factorforge/applications/model_access run test:omp
-          bun test tests/applications/model_access/experiments/structured-json-trial.test.ts tests/applications/model_access/experiments/luna-transport-trial.test.ts
       - name: Verify Go semantic candidates and public Bun protocol without accounts
         run: |
           go test ./tests/applications/soxl_jev -run Semantic -count=1
-          go test ./tests/applications/soxl_jev/experiments -run 'Test(FinancialExtraction(MetricBoundaries|AccountBinding)|StructuredTimestampHashBoundary|DirectNews(ComparatorAndArticleBoundaries|OfflineArtifactEvaluation)|VenueReferenceArtifactIsPrivateAndImmutable)$' -count=1
         env:
           FACTORFORGE_REQUIRE_MODEL_PROTOCOL: ${{ runner.os == 'Linux' && '1' || '0' }}

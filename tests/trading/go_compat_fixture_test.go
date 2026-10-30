@@ -62,7 +62,7 @@ func upgradeTradingFixture(run *d.Aggregate) {
 }
 
 // Compare the inherited accounting/market/order behavior after projecting out
-// v2.8.0-only metadata. New role, ownership and ID semantics have direct tests.
+// -only metadata. New role, ownership and ID semantics have direct tests.
 func projectCompatGolden(value any) any {
 	switch v := value.(type) {
 	case map[string]any:

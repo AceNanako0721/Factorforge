@@ -27,6 +27,6 @@ type InstrumentView struct {
 	InstrumentSpec
 	Funding *FundingObservation `json:"funding,omitempty"`
 	// ReferenceFunding is the latest settled reference-venue (mainnet) rate
-	// (S1-024 v2.17.0); upper layers may use it as their funding estimate.
+	// (S1-024); upper layers may use it as their funding estimate.
 	ReferenceFunding *FundingObservation `json:"reference_funding,omitempty"`
 }

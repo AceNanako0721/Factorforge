@@ -17,7 +17,7 @@ import (
 	tdto "github.com/AceNanako0721/Factorforge/src/factorforge/trading/api/dto"
 )
 
-// DynamicStore is the v2.9.0 append-only record and CAS state store.
+// DynamicStore is the append-only record and CAS state store.
 type DynamicStore interface {
 	AppendRecord(ctx context.Context, kind, id string, at time.Time, payload any) error
 	Records(ctx context.Context, kind string, since, until time.Time, limit int) ([]json.RawMessage, error)
@@ -39,6 +39,7 @@ type JudgmentFramework interface {
 	RegisterEvent(ctx context.Context, request dto.EventCommand, revision bool) (dto.Event, error)
 	Submit(ctx context.Context, request dto.ScoreCommand) (dto.AdmissionReceipt, error)
 }
+
 // JudgmentSource reads another instance's judgments in follower mode
 // (S3-034): strictly after since, oldest first.
 type JudgmentSource interface {
@@ -48,7 +49,7 @@ type Alerter interface {
 	Alert(ctx context.Context, code, detail string)
 }
 
-// JudgmentSettings are registered experiment values (P3 design 28.2/28.3).
+// JudgmentSettings are the registered judgment settings.
 type JudgmentSettings struct {
 	ObjectID, SubjectID, EventType        string
 	RecentWindow, OlderWindow, MaxNewsAge time.Duration
@@ -76,7 +77,7 @@ type JudgmentWorker struct {
 	Clock     func() time.Time
 	Alerts    Alerter
 	Settings  JudgmentSettings
-	// Source and FollowSince select follower mode (S3-034, v2.13.0): Follow
+	// Source and FollowSince select follower mode (S3-034): Follow
 	// replaces Collect and Judge; no feed is polled and no model is called.
 	Source      JudgmentSource
 	FollowSince time.Time
@@ -114,7 +115,7 @@ func (w *JudgmentWorker) Follow(ctx context.Context) error {
 		return err
 	}
 	// Cited items are stored before resume, so a copy left unapplied for want
-	// of an item recovers once the source serves it (v2.14.4).
+	// of an item recovers once the source serves it.
 	for _, row := range rows {
 		for _, item := range row.Items {
 			if err := w.Store.AppendRecord(ctx, "NEWS", item.ItemID, item.ReceivedAt, item); err != nil {
@@ -361,7 +362,7 @@ func (w *JudgmentWorker) score(id, event string, version int, previous *string, 
 		kind = "REVISION"
 	}
 	sort.Strings(evidence)
-	// v2.14.4 (P3 design 36): a followed judgment is copied without the
+	// a followed judgment is copied without the
 	// source's rendered prompt, so it has no input hash; P2 requires 64 hex
 	// digits. Its input is the copied judgment record itself.
 	manifest := j.InputHash

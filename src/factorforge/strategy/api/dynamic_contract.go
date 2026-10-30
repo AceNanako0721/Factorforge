@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// addDynamicContract publishes the v2.9.0 commands, records and read view.
+// addDynamicContract publishes the commands, records and read view.
 func addDynamicContract(paths, schemas map[string]any) {
 	convert := func(v any) any {
 		raw, _ := json.Marshal(v)

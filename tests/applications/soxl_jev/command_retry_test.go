@@ -14,7 +14,7 @@ import (
 	dto "github.com/AceNanako0721/Factorforge/src/factorforge/strategy/api/dto"
 )
 
-// v2.14.3: a stop directive meets P2's decision cycle and P1's collector at
+// a stop directive meets P2's decision cycle and P1's collector at
 // the same 5-minute boundary. Two CAS conflicts in one round, or a P1 snapshot
 // that moved while P2 read it, used to fail the whole position-manager round.
 func commandServer(t *testing.T, rejections []string) (*submission.HTTPClient, *int) {

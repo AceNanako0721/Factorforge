@@ -1,16 +1,13 @@
-# Factorforge Core API contracts (design v1.1)
+# 接口契约
 
-`openapi/v1.json` and `schemas/*.json` are the canonical v1.1 interface definitions. The OpenAPI file references the schemas by relative path. `doc/v1.0/api/openapi-v1.json` is the preserved v1.0 design artifact and is not used by these checks. The v2.0 three-layer documents are in `doc/v2.0`; these v1 contracts are retained for historical validation and do not implement the v2.0 layer interfaces.
+`v2/` 下是当前各层公开接口的契约，由代码导出，CI 核对它们与代码一致：
 
-`schemas/api-scope.json` defines the complete public `ApiScope` type used by API key create, read, and permission update. `schemas/workload-capability.json` defines the separate internal `WorkloadCapability` type. The two enums are disjoint; internal capabilities are absent from OpenAPI authorization scopes and cannot be written to the `key_scope` PostgreSQL enum column. The database role and internal grant-table design are specified in the detailed design. `POST /analysis/jobs` only enters the bounded research queue; the trading queue is fed by a versioned internal dispatcher.
+| 目录 | 内容 | 导出 |
+|---|---|---|
+| `v2/trading` | P1 交易层接口 | `go run ./tools/export-trading-contract` |
+| `v2/strategy` | P2 公开接口与工作负载接口 | `go run ./tools/export-strategy-contract` |
+| `v2/instances` | P3 应用实例的只读接口 | `go run ./tools/export-instance-contract` |
+| `v2/console` | P4 管理台接口 | `go run ./tools/export-console-contract` |
+| `v2/model-access` | P5 的 JSONL 协议与响应结构 | 手工维护 |
 
-Run locally:
-
-```bash
-python -m pip install -r contracts/requirements.txt
-python contracts/check_contract.py
-```
-
-The check validates OpenAPI 3.1, validates JSON Schema 2020-12 examples, detects changes that break the frozen v1.1 surface, and generates/imports server function stubs in a temporary directory. The stub check verifies code generation from operation IDs; it does not implement routes. After deliberate API version review, refresh the baseline with `python contracts/check_contract.py --write-baseline` and review the baseline diff.
-
-The remaining generic `Record` query projections must receive specific schemas before their server routes are implemented. A Python DTO must be generated from these schemas or pass a field-by-field contract test. Schema validity alone does not establish evidence truth, provider provenance, SIM/LIVE eligibility, or trading authorization; those are application checks described in the detailed design.
+`go run ./tools/check-contracts` 离线检查全部 OpenAPI 文档：按 `meta/` 中的官方 OpenAPI 3.1 元模式校验结构，检查操作编号与路径参数，生成类型桩，并以 JSON Schema 2020-12 编译所有组件。检查不访问网络，也不允许引用 `contracts/` 之外的文件。

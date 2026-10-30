@@ -18,7 +18,7 @@ import (
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/workers"
 )
 
-// v2.6.3: SIM capability mode declares simulator protection/short only when
+// SIM capability mode declares simulator protection/short only when
 // the venue lists STOP_MARKET, under a -sim rule version, for REPLAY runs.
 func TestSimCapabilitiesCollector(t *testing.T) {
 	for _, test := range []struct {
@@ -34,7 +34,7 @@ func TestSimCapabilitiesCollector(t *testing.T) {
 		{"sim", true, false, []string{"MARKET", "LIMIT", "STOP_MARKET"}, "REPLAY", []string{"CONDITIONAL_PROTECTION", "LIMIT", "MARKET", "REDUCE_ONLY", "SHORT"}, ""},
 		{"sim-without-stop", true, false, []string{"MARKET", "LIMIT"}, "REPLAY", []string{"LIMIT", "MARKET"}, ""},
 		{"sim-on-shadow-run", true, false, []string{"MARKET", "LIMIT", "STOP_MARKET"}, "SHADOW", nil, "SIM_CAPABILITIES_FORBIDDEN"},
-		// v2.14.0 (S1-023): the demo account declares the same capabilities
+		// S1-023: the demo account declares the same capabilities
 		// under a -demo version, accepted only by a SIM demo-account run.
 		{"demo", false, true, []string{"MARKET", "LIMIT", "STOP_MARKET"}, "LIVE", []string{"CONDITIONAL_PROTECTION", "LIMIT", "MARKET", "REDUCE_ONLY", "SHORT"}, ""},
 		{"demo-on-replay-run", false, true, []string{"MARKET", "LIMIT", "STOP_MARKET"}, "REPLAY", nil, "DEMO_CAPABILITIES_FORBIDDEN"},

@@ -10,7 +10,7 @@ import (
 	sd "github.com/AceNanako0721/Factorforge/src/factorforge/strategy/domain"
 )
 
-// v2.14.6 (B9): a venue-backed run's clock follows the executor's account
+// a venue-backed run's clock follows the executor's account
 // sync, which can commit while P2 reads the snapshot. A cycle stamped before
 // the read then saw a snapshot from its future and was skipped.
 type advancingTrading struct {

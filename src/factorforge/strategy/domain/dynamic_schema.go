@@ -8,9 +8,9 @@ import (
 	"time"
 )
 
-// DynamicSchemas is the single source for v2.9.0 admission shapes and the
+// DynamicSchemas is the single source for admission shapes and the
 // exported contract. Fields tagged omitempty are optional, so records written
-// before v2.9.0 keep validating and hashing unchanged.
+// before keep validating and hashing unchanged.
 func DynamicSchemas() map[string]any {
 	models := []any{SizingRule{}, ReentryRule{}, ChainLossRule{}, PreEventRule{}, TransferRule{}, RiskUnitState{}, ReentryState{}, ChainState{}, BatchRecord{}, ExitRequest{}, ExitRequestRecord{}, TransferObservation{}, BaselineTransfer{}, BaselineTransferRecord{}}
 	schemas := map[string]any{}
@@ -55,7 +55,7 @@ func DynamicSchemas() map[string]any {
 	return schemas
 }
 
-// DynamicExtensions lists optional v2.9.0 properties added to existing models.
+// DynamicExtensions lists optional properties added to existing models.
 func DynamicExtensions() map[string]map[string]any {
 	ref := func(n string) any { return map[string]any{"$ref": "#/$defs/" + n} }
 	nullable := func(v any) any { return map[string]any{"anyOf": []any{v, map[string]any{"type": "null"}}} }

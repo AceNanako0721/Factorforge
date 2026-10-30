@@ -29,7 +29,7 @@ type ReadAPI struct {
 	QueryMaxOriginalBytes int      `toml:"query_max_original_bytes"`
 	QueryCursorAgeSeconds int64    `toml:"query_cursor_age_seconds"`
 	QueryCursorKey        string   `toml:"query_cursor_key"`
-	// v2.10.0: optional DYNAMIC_READ login for the /dynamic routes (P3 design 29.2).
+	// optional DYNAMIC_READ login for the /dynamic routes.
 	DynamicDatabaseURL string `toml:"dynamic_database_url"`
 }
 

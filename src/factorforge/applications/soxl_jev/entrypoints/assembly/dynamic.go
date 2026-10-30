@@ -30,7 +30,7 @@ func (l logAlerts) Alert(_ context.Context, code, detail string) {
 	fmt.Fprintln(os.Stderr, string(raw))
 }
 
-// RunDynamic starts the v2.9.0 judgment worker (JUDGMENT) or position
+// RunDynamic starts the judgment worker (JUDGMENT) or position
 // manager (POSITION). Both use the DYNAMIC database identity and the
 // workload signal identity of the bound SIM object.
 func RunDynamic(role string) error {

@@ -10,14 +10,13 @@ import (
 	"strings"
 )
 
+// Release is one published document version. Earlier versions are reachable
+// through their Git tags; only the current baseline lives in doc/.
 type Release struct {
-	Version   string   `json:"version"`
-	Directory string   `json:"directory"`
-	Kind      string   `json:"change_kind"`
-	Date      string   `json:"date"`
-	Reason    string   `json:"reason"`
-	Format    string   `json:"format"`
-	Pairs     []string `json:"document_pairs,omitempty"`
+	Version string `json:"version"`
+	Kind    string `json:"change_kind"`
+	Date    string `json:"date"`
+	Summary string `json:"summary,omitempty"`
 }
 type Manifest struct {
 	Schema   int       `json:"schema_version"`
@@ -101,23 +100,10 @@ func ParseKind(body string) (string, error) {
 	}
 	return kind, nil
 }
-func CheckDirectories(root string, records []Release) error {
-	registered := map[string]bool{"doc/v0.1": true, "doc/v1.0": true, "doc/v1.1": true}
-	for _, r := range records {
-		registered[r.Directory] = true
-	}
-	entries, err := os.ReadDir(filepath.Join(root, "doc"))
-	if err != nil {
-		return err
-	}
-	pattern := regexp.MustCompile(`^v\d+(?:\.\d+)+$`)
-	for _, entry := range entries {
-		if entry.IsDir() && pattern.MatchString(entry.Name()) && !registered["doc/"+entry.Name()] {
-			return fmt.Errorf("unregistered version directory")
-		}
-	}
-	return nil
-}
+
+// CheckTransition validates a pull request against its base: the version
+// increment matches the Change-Type, published release records are kept, and a
+// design change leaves every specification's requirements untouched.
 func CheckTransition(root, base, kind, current string, manifest Manifest) error {
 	raw, err := Git(root, "show", base+":VERSION")
 	if err != nil {
@@ -135,8 +121,14 @@ func CheckTransition(root, base, kind, current string, manifest Manifest) error 
 	if json.Unmarshal(raw, &old) != nil {
 		return fmt.Errorf("invalid base release manifest")
 	}
-	if len(manifest.Releases) < len(old.Releases) || !equalJSON(manifest.Releases[:len(old.Releases)], old.Releases) {
-		return fmt.Errorf("published release records cannot be overwritten")
+	if len(manifest.Releases) < len(old.Releases) {
+		return fmt.Errorf("published release records cannot be removed")
+	}
+	for i, r := range old.Releases {
+		n := manifest.Releases[i]
+		if n.Version != r.Version || n.Kind != r.Kind || n.Date != r.Date || (old.Schema == 2 && n.Summary != r.Summary) {
+			return fmt.Errorf("published release records cannot be overwritten")
+		}
 	}
 	if kind == "code-only" && len(manifest.Releases) != len(old.Releases) {
 		return fmt.Errorf("code-only cannot append a release")
@@ -144,70 +136,28 @@ func CheckTransition(root, base, kind, current string, manifest Manifest) error 
 	if kind != "code-only" && (len(manifest.Releases) != len(old.Releases)+1 || manifest.Releases[len(manifest.Releases)-1].Kind != kind) {
 		return fmt.Errorf("document change requires matching appended release")
 	}
-	frozen := []string{"doc/v0.1", "doc/v1.0", "doc/v1.1"}
-	for _, r := range old.Releases {
-		frozen = append(frozen, r.Directory)
+	if kind != "design" || old.Schema != 2 {
+		return nil
 	}
-	raw, err = Git(root, "diff", "--name-only", "-z", base, "--")
-	if err != nil {
-		return err
-	}
-	for _, name := range strings.Split(string(raw), "\x00") {
-		for _, dir := range frozen {
-			if strings.HasPrefix(name, dir+"/") {
-				return fmt.Errorf("published document baseline is immutable")
-			}
-		}
-	}
-	if kind == "design" {
-		oldDir, newDir := old.Releases[len(old.Releases)-1].Directory, manifest.Releases[len(manifest.Releases)-1].Directory
-		raw, err = Git(root, "ls-tree", "-r", "--name-only", "-z", base, oldDir)
+	for _, pair := range DocumentPairs {
+		name := "doc/" + pair + "式样书.md"
+		before, err := Git(root, "show", base+":"+name)
 		if err != nil {
 			return err
 		}
-		names := map[string]bool{}
-		for _, name := range strings.Split(string(raw), "\x00") {
-			if !strings.HasSuffix(name, "式样书.md") && !strings.HasSuffix(name, "式样书.html") {
-				continue
-			}
-			stem := strings.TrimSuffix(filepath.Base(name), filepath.Ext(name))
-			names[stem] = true
-			fresh := filepath.Join(root, newDir, filepath.Base(name))
-			data, err := os.ReadFile(fresh)
-			if os.IsNotExist(err) {
-				fresh = strings.TrimSuffix(fresh, filepath.Ext(fresh)) + ".html"
-				data, err = os.ReadFile(fresh)
-			}
-			if err != nil {
-				return fmt.Errorf("design release removes a specification")
-			}
-			before, err := Git(root, "show", base+":"+name)
-			if err != nil {
-				return err
-			}
-			if SpecSemantics(string(before), filepath.Ext(name)) != SpecSemantics(string(data), filepath.Ext(fresh)) {
-				return fmt.Errorf("design release changes specification")
-			}
-		}
-		entries, err := os.ReadDir(filepath.Join(root, newDir))
+		after, err := os.ReadFile(filepath.Join(root, name))
 		if err != nil {
-			return err
-		}
-		count := 0
-		for _, entry := range entries {
-			if strings.HasSuffix(entry.Name(), "式样书.md") || strings.HasSuffix(entry.Name(), "式样书.html") {
-				count++
-				if !names[strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))] {
-					return fmt.Errorf("design release adds a specification")
-				}
-			}
-		}
-		if count != len(names) {
 			return fmt.Errorf("design release removes a specification")
+		}
+		if SpecSemantics(string(before)) != SpecSemantics(string(after)) {
+			return fmt.Errorf("design release changes specification %s", pair)
 		}
 	}
 	return nil
 }
+
+// CheckRepository validates VERSION, the release manifest and the current
+// document baseline; with a base commit it also validates the transition.
 func CheckRepository(root, base, kind string) (string, error) {
 	data, err := os.ReadFile(filepath.Join(root, "VERSION"))
 	if err != nil {
@@ -222,56 +172,27 @@ func CheckRepository(root, base, kind string) (string, error) {
 		return "", err
 	}
 	var manifest Manifest
-	if json.Unmarshal(data, &manifest) != nil || manifest.Schema != 1 || len(manifest.Releases) == 0 || manifest.Releases[len(manifest.Releases)-1].Version != current {
+	if json.Unmarshal(data, &manifest) != nil || manifest.Schema != 2 || len(manifest.Releases) == 0 || manifest.Releases[len(manifest.Releases)-1].Version != current {
 		return "", fmt.Errorf("release manifest must match VERSION")
 	}
-	seen := map[string]bool{}
-	for index, r := range manifest.Releases {
+	previous := "0.0.0"
+	for _, r := range manifest.Releases {
 		if _, err = Version(r.Version); err != nil {
 			return "", err
 		}
-		if seen[r.Version] || r.Kind == "code-only" {
-			return "", fmt.Errorf("invalid or duplicate document release")
+		if r.Kind == "code-only" || r.Date == "" || versionAtLeast(previous, r.Version) {
+			return "", fmt.Errorf("release records must be ordered, dated document releases")
 		}
 		if _, err = ExpectedVersion("0.0.0", r.Kind); err != nil {
 			return "", err
 		}
-		seen[r.Version] = true
-		if !(index == 0 && r.Version == "2.0.0" && r.Directory == "doc/v2.0") && r.Directory != "doc/v"+r.Version {
-			return "", fmt.Errorf("new baseline requires three-part directory")
-		}
-		info, err := os.Stat(filepath.Join(root, r.Directory))
-		if err != nil || !info.IsDir() || r.Reason == "" || r.Date == "" {
-			return "", fmt.Errorf("release directory, reason and date required")
-		}
+		previous = r.Version
 	}
-	if err = CheckDirectories(root, manifest.Releases); err != nil {
+	if strings.TrimSpace(manifest.Releases[len(manifest.Releases)-1].Summary) == "" {
+		return "", fmt.Errorf("current release requires a summary")
+	}
+	if _, err = CheckDocuments(root, current); err != nil {
 		return "", err
-	}
-	last := manifest.Releases[len(manifest.Releases)-1]
-	if versionAtLeast(current, "2.1.0") {
-		if last.Format != "html" || len(last.Pairs) == 0 {
-			return "", fmt.Errorf("current release must declare HTML pairs")
-		}
-		for _, prefix := range []string{"01_交易系统层", "02_策略化框架层", "03_SOXLUSDT_JEV应用实例"} {
-			found := false
-			for _, p := range last.Pairs {
-				found = found || prefix == p
-			}
-			if !found {
-				return "", fmt.Errorf("original layer pairs must remain")
-			}
-		}
-		if _, err = CheckHTML(root, last.Directory, current, last.Pairs); err != nil {
-			return "", err
-		}
-		if _, err = os.Stat(filepath.Join(root, last.Directory, "开发规划书.html")); err != nil {
-			return "", fmt.Errorf("phase plan missing")
-		}
-	} else {
-		if err = CheckLegacyWords(root, last.Directory); err != nil {
-			return "", err
-		}
 	}
 	if base != "" {
 		if err = CheckTransition(root, base, kind, current, manifest); err != nil {

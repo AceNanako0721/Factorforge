@@ -78,7 +78,7 @@ func exitKind(state *d.StrategyState, obj *d.ObservedObject, snap *d.TradingSnap
 	return "TARGET"
 }
 
-// dynamicResult carries the v2.9.0 adjustments back into the decision cycle.
+// dynamicResult carries the adjustments back into the decision cycle.
 type dynamicResult struct {
 	target   d.Decimal
 	force    bool
@@ -87,7 +87,7 @@ type dynamicResult struct {
 	intended d.Decimal
 }
 
-// DynamicTarget applies the optional v2.9.0 rules in the design order:
+// DynamicTarget applies the optional rules in the design order:
 // close-stop exit → chain limit → pre-event de-risking → re-entry gate →
 // risk-unit quantity. Prices never open the re-entry gate.
 func (c DecisionCycle) DynamicTarget(ctx context.Context, state *d.StrategyState, obj *d.ObservedObject, snap *d.TradingSnapshot, at time.Time, p *d.Policy, components *d.DecisionComponents, level int, sample *d.MarketSample, rules d.ProductRules, target d.Decimal, composeForce bool, prior []string) (dynamicResult, error) {
@@ -104,7 +104,7 @@ func (c DecisionCycle) DynamicTarget(ctx context.Context, state *d.StrategyState
 		if r.Request.ObjectID != obj.ObjectID {
 			continue
 		}
-		// v2.18.0: an exit still pending, or applied but never executed (the
+		// an exit still pending, or applied but never executed (the
 		// same batch is still open in its direction), ends at its validity.
 		open := actual.Sign() != 0 && d.DirectionName(actual) == r.Request.PositionDirection && (r.BatchID == "" || obj.RiskUnit != nil && obj.RiskUnit.BatchID == r.BatchID)
 		if (r.State == "ACCEPTED" || r.State == "APPLIED" && open) && at.After(r.Request.BarCloseAt.Add(d.ExitRequestValidity)) {

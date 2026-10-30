@@ -14,7 +14,7 @@ const MarketChart = lazy(() =>
   import("./market-chart").then((module) => ({ default: module.MarketChart })),
 );
 
-// S4-017 / P4 design 16.3. Every value is a recorded lower-layer value; the
+// S4-017: Every value is a recorded lower-layer value; the
 // distances and R multiples below are display conversions only.
 export const dynamicSources = [
   "dynamic.status",
@@ -28,7 +28,7 @@ export const dynamicSources = [
 ];
 
 // Rolling default range: 5-minute bars over 24 hours, timelines over 72 hours.
-// v2.14.8: P1 keeps replaced generations as CLOSED; only the generation
+// P1 keeps replaced generations as CLOSED; only the generation
 // still guarding the position is drawn, verified first, then the newest.
 export function currentProtection(protections: Record<string, Json>[], role: string) {
   return protections
@@ -51,7 +51,7 @@ export function dynamicRange(now = Date.now()): Record<string, string> {
   };
 }
 
-// v2.16.0 (S4-017 / P4 design 20): only judgments that changed the position
+// S4-017: only judgments that changed the position
 // inputs are marked by default. P3 records an injection action under the id
 // "<judgment_id>-<kind>-…" at the judgment's own time, so a judgment took
 // effect when an INJECTION action carries both its id prefix and its time.
@@ -116,7 +116,7 @@ export function chartMarkers(
   return out;
 }
 
-// S4-017 v2.19.0: the ladder and what set the close stop, from P3's batch
+// S4-017: the ladder and what set the close stop, from P3's batch
 // view (P3 S3-032); the browser only formats.
 export type LadderInfo = {
   source: string;

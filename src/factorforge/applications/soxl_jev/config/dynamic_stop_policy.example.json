@@ -1,0 +1,180 @@
+{
+  "absolute_price_proxy_validated": true,
+  "beta": "0",
+  "calibrations": [
+    "example-calibration-v1"
+  ],
+  "claim_weights": {
+    "NEWS_JUDGMENT": "1"
+  },
+  "cleanup_fraction_of_initial": "0.2",
+  "cleanup_threshold": "0.002",
+  "composition": {
+    "adjustment": {
+      "cap": "1",
+      "event_only_cap": "1",
+      "scale": "1",
+      "state": "ENABLED"
+    },
+    "allow_short_baseline": true,
+    "assessment": null,
+    "baseline": [
+      {
+        "evidence_ref": "example-registration",
+        "factor_id": "example-baseline",
+        "max_age_seconds": 7200,
+        "state": "ENABLED",
+        "weight": "1"
+      }
+    ],
+    "chain_loss": {
+      "max_loss_r": "2",
+      "profit_offsets": false
+    },
+    "levels": [
+      {
+        "enter": "0.25",
+        "exit": "0.15",
+        "exposure": "0.3"
+      },
+      {
+        "enter": "0.5",
+        "exit": "0.4",
+        "exposure": "0.6"
+      },
+      {
+        "enter": "0.75",
+        "exit": "0.65",
+        "exposure": "1"
+      }
+    ],
+    "missing_policy": "ZERO",
+    "pre_event": [
+      {
+        "after_seconds": 900,
+        "before_seconds": 3600,
+        "certainty_required": "CONFIRMED",
+        "event_type": "EXAMPLE_MACRO_RELEASE",
+        "reduce_factor": "0.4"
+      }
+    ],
+    "rebalance": {
+      "adjust_interval_seconds": 0,
+      "band_floor": "0.02",
+      "band_ratio_of_unit": "0.25",
+      "expected_hold_seconds": 43200,
+      "funding_fallback_annual": "0.05",
+      "reverse_confirm_seconds": 0
+    },
+    "reentry": {
+      "cooldown_seconds": 3600,
+      "qualifying_inputs": [
+        "NEW_CONTRIBUTION",
+        "BASELINE_RECONFIRM"
+      ]
+    },
+    "scheduled": {
+      "cap": "0",
+      "state": "DISABLED"
+    },
+    "sizing": {
+      "max_risk_fraction": "0.01",
+      "mode": "RISK_UNIT",
+      "require_initial_distance": true
+    },
+    "transfer": {
+      "combined_tolerance": "0.1",
+      "factor_id": "example-baseline"
+    }
+  },
+  "cooldown_seconds": 600,
+  "cycle_seconds": 600,
+  "epsilon": "1E-10",
+  "event_cap": "1",
+  "event_half_life_approved": true,
+  "event_ttl_seconds": 432000,
+  "experiment_calibrations": [
+    "example-calibration-v1"
+  ],
+  "family_cap": "1",
+  "fee_rate": "0.0005",
+  "gamma": "0.002",
+  "gap_fraction": "0.002",
+  "group_limits": {
+    "DEFAULT": "1000"
+  },
+  "half_life_bounds": [
+    "3600",
+    "172800"
+  ],
+  "judgment_event_types": [
+    "NEWS_JUDGMENT"
+  ],
+  "label_cost_band": "0.004",
+  "label_noise_band": "0.008",
+  "label_seconds": 43200,
+  "learning_mode": "FROZEN",
+  "levels": [
+    {
+      "enter": "0.25",
+      "exit": "0.15",
+      "exposure": "0.3"
+    },
+    {
+      "enter": "0.5",
+      "exit": "0.4",
+      "exposure": "0.6"
+    },
+    {
+      "enter": "0.75",
+      "exit": "0.65",
+      "exposure": "1"
+    }
+  ],
+  "lifecycle_fraction": "0.5",
+  "liquidity_budget": "50000",
+  "max_bar_gap_seconds": 1200,
+  "max_loss_cases": 100,
+  "max_new_risk": 100,
+  "max_noise_fraction": "0.2",
+  "max_price_age_seconds": 900,
+  "max_stop_fraction": "0.2",
+  "micro_distance": "0.003",
+  "min_adjustment": "0.1",
+  "noise_quantile": "0.8",
+  "noise_window": 36,
+  "numerical_tolerance": "1E-10",
+  "object_cap": "2",
+  "object_loss_budget": "20",
+  "observation_max_seconds": 259200,
+  "observation_min_seconds": 7200,
+  "observation_multiplier": "3",
+  "portfolio_gross_limit": "1000",
+  "portfolio_net_limit": "1000",
+  "portfolio_stress_limit": "200",
+  "prepricing_modes": {
+    "NEWS_JUDGMENT": "NOT_ASSESSED"
+  },
+  "quality_state": "EXPERIMENT_ONLY",
+  "realization_disabled_types": [
+    "NEWS_JUDGMENT"
+  ],
+  "regime_confirmations": 2,
+  "regime_dwell_seconds": 7200,
+  "regime_enter": "2",
+  "regime_exit": "1",
+  "rubrics": [
+    "example-rubric-v1"
+  ],
+  "sigma_ref": "0.003",
+  "slippage_fraction": "0.001",
+  "source_manifest": "example-registration",
+  "target_ttl_seconds": 900,
+  "unknown_regime_multiplier": "1",
+  "verification_manifests": [
+    "example-verification-v1"
+  ],
+  "version": "example-policy-v1",
+  "window_anchor": "2026-01-01T00:00:00Z",
+  "window_seconds": 86400
+}

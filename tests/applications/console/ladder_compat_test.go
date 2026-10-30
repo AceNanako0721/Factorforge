@@ -10,13 +10,12 @@ import (
 	iope "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/operations"
 )
 
-// v2.19.1 (P3 design 38): the batch's ladder fields are optional, so the
-// console still reads an instance API older than v2.19.0 (E15 until its
-// upgrade), and reads the new fields when present.
+// The batch's ladder fields are optional, so the console still reads an
+// instance API without them, and reads the fields when present.
 func TestS417LadderFieldsOptionalForOlderInstanceAPI(t *testing.T) {
 	at := time.Date(2026, 10, 28, 2, 0, 0, 0, time.UTC)
 	status := func(b *iope.DynamicBatchView) []byte {
-		raw, err := json.Marshal(iope.Record{Metadata: iope.Metadata{SchemaVersion: "instance-2.0", Environment: "SIM", InstanceID: "soxl-e15", SourceVersion: "fixture", ObservedAt: &at, SnapshotVersion: "1"},
+		raw, err := json.Marshal(iope.Record{Metadata: iope.Metadata{SchemaVersion: "instance-2.0", Environment: "SIM", InstanceID: "soxl-example", SourceVersion: "fixture", ObservedAt: &at, SnapshotVersion: "1"},
 			Data: iope.DynamicStatusView{Batch: b, Baseline: iope.DynamicBaselineView{Phase: "NONE"}, Sources: []iope.DynamicSourceView{}, Outcomes: []iope.DynamicOutcomeView{}, EquityPeak: "4000"}})
 		if err != nil {
 			t.Fatal(err)

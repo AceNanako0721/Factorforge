@@ -276,6 +276,21 @@ func PreservedStopPlan(state *d.StrategyState, obj *d.ObservedObject, snap *d.Tr
 	}
 	return nil
 }
+
+// PreservedStress is the stop fraction a kept protection plan puts on the
+// portfolio stress limit. Without a usable trigger it is max_stop_fraction,
+// the same as a target without a stop.
+func PreservedStress(price d.Decimal, plan *d.StopPlan, fallback d.Decimal) d.Decimal {
+	if plan == nil || price.Sign() <= 0 || plan.TriggerPrice.Sign() <= 0 {
+		return fallback
+	}
+	m := d.Math()
+	fraction := m.Div(m.Abs(m.Sub(price, plan.TriggerPrice)), price)
+	if m.Err() != nil {
+		return fallback
+	}
+	return fraction
+}
 func StopAlreadyEffective(snap *d.TradingSnapshot, obj *d.ObservedObject, plan *d.StopPlan) bool {
 	pos := snap.Positions[obj.ObjectID]
 	mode := d.Text(pos["effective_mode"])

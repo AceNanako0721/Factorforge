@@ -253,7 +253,7 @@ func TestCompositionTemplateWindowsRevisionCancelAndCalibration(t *testing.T) {
 	if err = sd.AdvanceScheduled(s, o, end.AvailableAt, p); err != nil {
 		t.Fatal(err)
 	}
-	if event.WindowsState["post"] != "CLOSED" || s.Cases.Len() != 1 || s.Templates.Value("earnings/post").Stats.N != 0 { // v2.9.0 S2-042: returns no longer update templates
+	if event.WindowsState["post"] != "CLOSED" || s.Cases.Len() != 1 || s.Templates.Value("earnings/post").Stats.N != 0 { // S2-042: returns no longer update templates
 		t.Fatal("closure", event, s.Cases.Len())
 	}
 	if err = sd.AdvanceScheduled(s, o, end.AvailableAt, p); err != nil || s.Cases.Len() != 1 {
@@ -308,7 +308,7 @@ func TestCompositionTemplateWindowsRevisionCancelAndCalibration(t *testing.T) {
 	s.Samples.Set(o.ObjectID, nil)
 	sd.AdvanceScheduled(s, o, req.ExpectedAt.Add(time.Minute), p)
 	last := s.Cases.Values()[s.Cases.Len()-1]
-	if last.Status != "CENSORED" || s.Templates.Value("earnings/post").Stats.N != 0 { // v2.9.0 S2-042: returns no longer update templates
+	if last.Status != "CENSORED" || s.Templates.Value("earnings/post").Stats.N != 0 { // S2-042: returns no longer update templates
 		t.Fatal("missing price was learned")
 	}
 	t0 := templateFixture()
@@ -472,7 +472,7 @@ func TestCompositionShadowLayersConfidenceRiskAndCertainty(t *testing.T) {
 	if r.Force || r.Components.Shadow["ASSESSMENT"].Exposure.Sign() >= 0 || r.Components.Shadow["ADJUSTMENT"].Exposure.Sign() != 0 || r.Components.Shadow["SCHEDULED"].Value.Sign() <= 0 {
 		t.Fatal("shadow effects", r.Components.Shadow)
 	}
-	// v2.7.0: only liquidity scales exposure; sigma no longer scales it.
+	// only liquidity scales exposure; sigma no longer scales it.
 	m.Sigma = sd.Ptr(compDecimal("0.02"))
 	m.Liquidity = sd.Ptr(sd.Int(2500))
 	r = compose(t, s, o, p, m, at, "0", "0")
@@ -530,7 +530,7 @@ func TestCompositionFirstCoreAgainstExistingPositionConfirms(t *testing.T) {
 	assertAmount(t, r.Raw, "-0.5")
 }
 
-// v2.6.1: explicit per-event window times override template offsets.
+// explicit per-event window times override template offsets.
 func TestCompositionExplicitWindowTimes(t *testing.T) {
 	s, o, p, m, at := compositionBase(t)
 	s.Templates.Set("earnings/post", templateFixture())
@@ -602,7 +602,7 @@ func TestCompositionCensoredScheduledCaseRoundTrips(t *testing.T) {
 	}
 }
 
-// v2.7.0 / T2-22: sigma and sigma_ref do not participate in composition sizing.
+// / T2-22: sigma and sigma_ref do not participate in composition sizing.
 func TestCompositionExposureUsesLiquidityWithoutSigma(t *testing.T) {
 	_, _, p, sample, _ := compositionBase(t)
 	for _, sigma := range []*sd.Decimal{nil, sd.Ptr(sd.Zero()), sd.Ptr(sd.Int(1000))} {
@@ -631,7 +631,7 @@ func TestCompositionExposureUsesLiquidityWithoutSigma(t *testing.T) {
 	}
 }
 
-// v2.7.0 / T2-22: no baseline plus all remaining layers SHADOW means zero core.
+// / T2-22: no baseline plus all remaining layers SHADOW means zero core.
 func TestCompositionEmptyBaselineKeepsAllShadowAtZeroTarget(t *testing.T) {
 	s, o, p, sample, at := compositionBase(t)
 	p.Composition.Baseline = []sd.BaselineFactor{}

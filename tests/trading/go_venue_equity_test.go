@@ -10,7 +10,7 @@ import (
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/trading/domain"
 )
 
-// v2.14.5 (B20): the venue marks its equity at its own mark price. A demo run
+// The venue marks its equity at its own mark price. A demo run
 // holding a position stayed in RECOVERY_CHECK because the run's collected mark
 // differed from the venue's by a few ticks.
 type markedVenue struct {

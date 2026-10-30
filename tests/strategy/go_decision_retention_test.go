@@ -15,7 +15,7 @@ import (
 )
 
 // retentionBase returns a frozen state that already holds a dispatched
-// decision, projected through the v2.5.7 bar compaction.
+// decision, projected through the bar compaction.
 func retentionBase(t *testing.T) (*sd.StrategyState, *sd.DecisionView, *sd.TargetOutbox) {
 	t.Helper()
 	states, cases := loadReplay(t)
@@ -73,8 +73,7 @@ func TestCompactDecisionInputKeepsHashAndDropsBars(t *testing.T) {
 }
 
 // The delivered-decision list in the trading snapshot only grows; a decision
-// keeps its count and digest so 72 retained decisions stay small (E15 stall
-// of 2026-10-18 at 4 MiB).
+// keeps its count and digest so 72 retained decisions stay small.
 func TestCompactDecisionInputReferencesSourceDecisions(t *testing.T) {
 	ids := []any{}
 	for i := 0; i < 5000; i++ {
@@ -384,7 +383,7 @@ func TestDecodeStateReusesAdmissionOnlyForUnchangedFields(t *testing.T) {
 	}
 }
 
-// B13: a same-direction judgment chain adds one live contribution per
+// A same-direction judgment chain adds one live contribution per
 // judgment and every retained decision carried the whole rows. The decision
 // now keeps the fields a case reads; cases opened and labelled from it are
 // the same as from the full rows.
@@ -425,7 +424,7 @@ func TestT241LiveContributionsKeepCaseFieldsOnly(t *testing.T) {
 	if sd.Digest(sd.CompactDecisionInput(compact)) != sd.Digest(compact) {
 		t.Fatal("compaction is not idempotent")
 	}
-	// Case opening and labelling: full rows (pre-v2.19.3 decisions) vs slim rows.
+	// Case opening and labelling: full rows (pre- decisions) vs slim rows.
 	samples := []sd.MarketSample{}
 	for i := -48 * 60; i <= 0; i += 5 {
 		samples = append(samples, sd.MarketSample{AvailableAt: at.Add(time.Duration(i) * time.Minute), Price: sd.Math().Add(sd.Int(100), sd.Int(i/60+48)), Quality: "VALID"})
@@ -462,7 +461,7 @@ func TestT241LiveContributionsKeepCaseFieldsOnly(t *testing.T) {
 	}
 }
 
-// B13: prepricing carried one assessment for every pool contribution,
+// Prepricing carried one assessment for every pool contribution,
 // spent ones included, so it grew with every judgment ever scored.
 func TestT242PrepricingKeepsLiveContributionsOnly(t *testing.T) {
 	contributions, pricing := []any{}, map[string]any{}

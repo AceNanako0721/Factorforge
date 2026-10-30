@@ -48,7 +48,7 @@ export function boundedFetch(
           count += n.value.byteLength;
           if (count > maxBytes) {
             await reader.cancel();
-            controller.error(new ModelError("PROVIDER_RESPONSE_TOO_LARGE"));
+            controller.error(new ModelError("PROVIDER_RESPONSE_TOO_LARGE", true));
             return;
           }
           controller.enqueue(n.value);

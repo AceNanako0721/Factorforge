@@ -102,7 +102,7 @@ func (s Service) SubmitCloseExit(ctx context.Context, identity d.Identity, reque
 }
 
 // CloseExitNow delivers an accepted close-stop exit between cycles (S2-034
-// "immediately", v2.19.2). The cycle of the request's period may already have
+// "immediately"). The cycle of the request's period may already have
 // been decided before the request arrived; the exit then goes out on the next
 // scheduler tick instead of waiting for the next period. Anything the cycle
 // itself must judge (expiry, direction change) is left to it. Going to zero

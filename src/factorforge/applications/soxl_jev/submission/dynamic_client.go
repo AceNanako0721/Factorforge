@@ -11,8 +11,8 @@ import (
 	dto "github.com/AceNanako0721/Factorforge/src/factorforge/strategy/api/dto"
 )
 
-// v2.9.0 workload writes (S3-024～030). Each command reads the aggregate
-// version first and retries a CAS or P1 snapshot conflict (v2.14.3); idempotency keys are
+// workload writes (S3-024～030). Each command reads the aggregate
+// version first and retries a CAS or P1 snapshot conflict; idempotency keys are
 // derived from the business identifier so a replay never duplicates.
 
 func (c *HTTPClient) command(ctx context.Context, path, key, reason string, payload func(dto.Command) any, target any) error {
@@ -45,7 +45,7 @@ func (c *HTTPClient) command(ctx context.Context, path, key, reason string, payl
 	return err
 }
 
-// v2.14.3 (P3 design chapter 35): a command competes with P2's decision cycle
+// a command competes with P2's decision cycle
 // and P1's collector at the same 5-minute boundary, so one retry was not
 // always enough; three attempts with a short growing pause clear the burst.
 const commandAttempts = 3
@@ -85,7 +85,7 @@ func (c *HTTPClient) TransferToBaseline(ctx context.Context, v dto.BaselineTrans
 	return record, err
 }
 
-// ObjectState returns the observed object including the v2.9.0 risk unit,
+// ObjectState returns the observed object including the risk unit,
 // re-entry gate and chain fields.
 func (c *HTTPClient) ObjectState(ctx context.Context, id string) (*dto.ObservedObject, error) {
 	return c.Object(ctx, id)

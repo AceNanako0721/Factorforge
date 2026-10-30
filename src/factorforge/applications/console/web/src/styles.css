@@ -903,7 +903,7 @@ tbody tr:hover {
   }
 }
 
-/* v2.10.0 S4-017 研判与止损页 */
+/* S4-017 研判与止损页 */
 .dynamic {
   display: grid;
   gap: 18px;
@@ -998,7 +998,7 @@ tbody tr:hover {
   background: transparent;
 }
 
-/* v2.11.0 S4-019 实时参考行情 */
+/* S4-019 实时参考行情 */
 @media (min-width: 1001px) {
   .dynamic .summary-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1060,7 +1060,7 @@ table.pnl .neg {
 table.pnl td small {
   color: var(--muted);
 }
-/* S4-017 v2.16.0: whether a judgment changed the position inputs. */
+/* S4-017: whether a judgment changed the position inputs. */
 .effect-tag {
   display: inline-block;
   padding: 0 6px;

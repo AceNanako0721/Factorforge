@@ -1,4 +1,4 @@
-// Persisted trading types retain the v2.1.0 JSON field names and nullable values.
+// Persisted trading types retain the JSON field names and nullable values.
 // HTTP presence, defaults and validation are handled separately at admission.
 package domain
 
@@ -109,7 +109,7 @@ type FundingObservation struct {
 
 // FundingSettlement is a settled funding event published by the reference
 // venue (mainnet public records), independent of the account's own venue. It
-// only feeds the account view's reference funding (v2.15.0), never accounting.
+// only feeds the account view's reference funding, never accounting.
 type FundingSettlement struct {
 	InstrumentKey InstrumentKey `json:"instrument_key"`
 	SettledAt     time.Time     `json:"settled_at"`
@@ -124,7 +124,7 @@ func (s FundingSettlement) Key() string {
 }
 
 // VenueAccount keeps the venue's own account figures from the last sync
-// (v2.15.0); the account view reports them instead of recomputing.
+// ; the account view reports them instead of recomputing.
 type VenueAccount struct {
 	WalletBalance      decimal.Value          `json:"wallet_balance"`
 	MarginBalance      decimal.Value          `json:"margin_balance"`

@@ -73,7 +73,7 @@ type BatchState struct {
 	Transferred bool           `json:"transferred"`
 	ExitID      string         `json:"exit_id,omitempty"`
 	ExitBarAt   time.Time      `json:"exit_bar_at,omitempty"`
-	StopReason  string         `json:"stop_reason,omitempty"` // v2.19.0: reason of the last accepted POSITION_STOP
+	StopReason  string         `json:"stop_reason,omitempty"` // reason of the last accepted POSITION_STOP
 	CloseFrozen bool           `json:"close_frozen,omitempty"`
 }
 type InitialPlan struct {
@@ -99,7 +99,7 @@ type PositionState struct {
 	EquityPeak float64          `json:"equity_peak"`
 	Outcomes   []d.BatchOutcome `json:"outcomes"`
 	SeenCases  []string         `json:"seen_cases"`
-	// v2.19.0 (S3-032): the registered ladder, recorded for the read view.
+	// S3-032: the registered ladder, recorded for the read view.
 	Ladder *LadderSetting `json:"ladder,omitempty"`
 }
 
@@ -320,7 +320,7 @@ func (m *PositionManager) initial(ctx context.Context, st *PositionState, price,
 	directive := dto.StopDirective{DirectiveID: id, ObjectID: s.ObjectID, Version: v, Kind: "INITIAL_DISTANCE", PositionDirection: sideName(direction), TriggerKind: s.TriggerKind, InitialStopDistance: dec(plan.Distance), EffectiveAt: now, ValidForSeconds: int(s.DirectiveTTL.Seconds()), SourceModule: s.SourceModule, ReasonCodes: []string{"DYNAMIC_STOP_INITIAL", "TIER_" + strconv.Itoa(g.Tier) + "H", "CONFIDENCE_" + strconv.Itoa(confidence)}, Mode: "VENUE", RiskFraction: dec(fraction), CloseStopDistance: dec(plan.CloseDist)}
 	if _, err = m.Framework.SubmitStopDirective(ctx, directive); err != nil {
 		// A version conflict keeps the allocated version, so the saved counter
-		// passes P2's head on the next cycle instead of repeating it (B30).
+		// passes P2's head on the next cycle instead of repeating it.
 		if errCode(err) == "FRAMEWORK_CONFLICT" {
 			m.alert(ctx, "INITIAL_REJECTED", errCode(err))
 			return nil
@@ -331,7 +331,7 @@ func (m *PositionManager) initial(ctx context.Context, st *PositionState, price,
 	return m.Store.AppendRecord(ctx, "STOP_EVENT", id, now, map[string]any{"kind": "INITIAL", "plan": plan, "noise_id": st.NoiseID})
 }
 
-// nextVersion allocates the next directive version of a kind (v2.19.5, B30).
+// nextVersion allocates the next directive version of a kind.
 // P2 accepts only versions above its head, and a directive P2 accepted in a
 // cycle whose state save then failed is missing from the local counter, so
 // the version starts above both the counter and the newest one P2 lists.
@@ -382,7 +382,7 @@ func (m *PositionManager) view(ctx context.Context, now time.Time) (int, int, in
 const ConfidenceLookback = 12
 
 // viewConfidence is the confidence of the latest judgment that points the
-// same way as the position (S3-027, v2.11.6); 0 when none does, which
+// same way as the position (S3-027); 0 when none does, which
 // ConfidenceFactor sizes at its lowest step.
 func viewConfidence(recent []d.Judgment, direction int) int {
 	for i := len(recent) - 1; i >= 0; i-- {
@@ -479,7 +479,7 @@ func (m *PositionManager) manage(ctx context.Context, st *PositionState, p *subm
 			}
 		}
 	}
-	// v2.18.0 (B28): the batch is still open after the exit's validity, so the
+	// The batch is still open after the exit's validity, so the
 	// exit was never executed; record it and resume trailing.
 	if b.ExitID != "" {
 		at := b.ExitBarAt
@@ -497,7 +497,7 @@ func (m *PositionManager) manage(ctx context.Context, st *PositionState, p *subm
 	}
 	m1, moved := d.Trailing(direction, b.Entry, b.BestClose, b.Geometry.R, b.Geometry.Trail, s.RoundTripCost*b.Entry, b.CloseStop)
 	reason := "DYNAMIC_STOP_TRAIL"
-	// S3-033 ladder (v2.13.0, off when LadderStep is 0): the more favourable of
+	// S3-033 ladder (off when LadderStep is 0): the more favourable of
 	// the two candidate stops is issued through the same POSITION_STOP channel.
 	if m2, stepped := d.Ladder(direction, b.Entry, b.BestClose, s.LadderStep, s.RoundTripCost*b.Entry, b.CloseStop); stepped && (!moved || float64(direction)*(m2-m1) > 0) {
 		m1, moved, reason = m2, true, "DYNAMIC_STOP_LADDER"

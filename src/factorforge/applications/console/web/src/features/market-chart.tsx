@@ -61,7 +61,7 @@ export type TimeMarker = {
   shape: "arrowUp" | "arrowDown" | "circle" | "square";
   size?: number;
 };
-// v2.14.8: like TradingView, the price axis fits the bars by default; the
+// like TradingView, the price axis fits the bars by default; the
 // stop lines join the range only when the viewer asks for it.
 export function scaleRange(info: AutoscaleInfo | null, lines: PriceLine[]): AutoscaleInfo | null {
   const prices = lines.map((l) => l.price).filter((p) => Number.isFinite(p) && p > 0);
@@ -83,7 +83,7 @@ export function zoomRange(range: IRange<number>, anchor: number, deltaY: number)
   if (!Number.isFinite(from) || !Number.isFinite(to) || to - from <= 1e-9) return null;
   return { from, to };
 }
-// v2.14.9: dragging inside the chart pans prices with the cursor; the
+// dragging inside the chart pans prices with the cursor; the
 // content follows the mouse, so dragging down shows higher prices.
 export function panRange(range: IRange<number>, dy: number, paneHeight: number): IRange<number> | null {
   if (!(paneHeight > 1)) return null;
@@ -225,7 +225,7 @@ export function MarketChart({
       chart.remove();
     };
   }, []);
-  // v2.19.6: axis ticks and the crosshair label use the display zone.
+  // axis ticks and the crosshair label use the display zone.
   useEffect(() => {
     chartRef.current?.applyOptions({
       localization: { timeFormatter: (t: Time) => chartTime(Number(t), zone) },

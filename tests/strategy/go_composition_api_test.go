@@ -259,7 +259,7 @@ func TestCompositionTradingAdapterFundingOptionalAndIntegerInterval(t *testing.T
 	}
 }
 
-// S2-043 (v2.17.0): funding_source REFERENCE takes P1's reference_funding as
+// S2-043: funding_source REFERENCE takes P1's reference_funding as
 // the funding estimate; a missing reference falls back to the registered
 // annual rate instead of the run's own venue rate.
 func TestS243ReferenceFundingSource(t *testing.T) {
@@ -357,7 +357,7 @@ func TestAccountCurrencyFromTradingSnapshot(t *testing.T) {
 	}
 }
 
-// v2.6.3: SIM may add risk under EXPERIMENT_ONLY thresholds; LIVE may not.
+// SIM may add risk under EXPERIMENT_ONLY thresholds; LIVE may not.
 func TestRiskQualityGateBySimAndLive(t *testing.T) {
 	for _, c := range []struct {
 		env, quality string
@@ -386,7 +386,7 @@ func TestRiskQualityGateBySimAndLive(t *testing.T) {
 	}
 }
 
-// v2.7.0 / T2-22: the historical regime engine and UNKNOWN multiplier are
+// / T2-22: the historical regime engine and UNKNOWN multiplier are
 // excluded from both actual and hypothetical composition exposure.
 func TestCompositionCycleIgnoresUnknownRegimeAndSigma(t *testing.T) {
 	for _, multiplier := range []string{"0", "0.1", "1"} {
@@ -418,7 +418,7 @@ func TestCompositionCycleIgnoresUnknownRegimeAndSigma(t *testing.T) {
 	}
 }
 
-// v2.7.0: SIM fallback supplies price/liquidity only; stop noise is independent.
+// SIM fallback supplies price/liquidity only; stop noise is independent.
 func TestCompositionSimPriceLiquidityFallbackAndStopGate(t *testing.T) {
 	for _, test := range []struct {
 		name, environment        string
@@ -480,7 +480,7 @@ func TestCompositionSimPriceLiquidityFallbackAndStopGate(t *testing.T) {
 	}
 }
 
-// v2.7.0 / T2-22: even registered nonzero shadow inputs cannot create a target.
+// / T2-22: even registered nonzero shadow inputs cannot create a target.
 func TestCompositionCycleEmptyBaselineAndOnlyShadowHasZeroTarget(t *testing.T) {
 	s, _, p, snap, id, at := compositionCycleBase(t)
 	p.Composition.Baseline = []sd.BaselineFactor{}

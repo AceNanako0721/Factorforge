@@ -179,7 +179,7 @@ func TestIngestWorkerAndAnalysisResponseLossDoNotReanalyzeOrDuplicate(t *testing
 	if _, err := ingest.Process(context.Background(), later); err != nil || store.enqueues != 1 {
 		t.Fatal("duplicate ingestion", err, store.enqueues)
 	}
-	// v2.5.6: a refetch of the same identity with changed bytes keeps the first
+	// a refetch of the same identity with changed bytes keeps the first
 	// capture; another source or licence under the same identity still conflicts.
 	refetched := later
 	refetched.Content = e.Raw.Content + " <!-- rotating token -->"

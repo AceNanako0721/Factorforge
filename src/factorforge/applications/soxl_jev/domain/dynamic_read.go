@@ -6,7 +6,7 @@ import (
 )
 
 // DynamicRecordKey orders dynamic records newest first for keyset pagination
-// of the v2.10.0 read API (P3 design 29.1).
+// of the read API.
 type DynamicRecordKey struct {
 	At   time.Time `json:"at"`
 	Kind string    `json:"kind"`

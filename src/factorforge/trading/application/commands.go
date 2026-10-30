@@ -21,7 +21,7 @@ import (
 const CommandDedupRetention = 24 * time.Hour
 
 // retainDedup drops command dedup records whose retain_until has passed.
-// Records written before v2.5.8 have no retain_until; they are stamped with
+// Records written before have no retain_until; they are stamped with
 // legacyBase + CommandDedupRetention, where legacyBase is the clock the
 // command transaction started from.
 func retainDedup(run *d.Aggregate, legacyBase time.Time) {

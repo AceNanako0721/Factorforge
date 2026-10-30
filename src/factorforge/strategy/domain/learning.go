@@ -5,7 +5,7 @@ import (
 )
 
 // RiskQuality reports whether a policy or parameter quality state may add
-// risk: SIM accepts EXPERIMENT_ONLY thresholds (v2.6.3), LIVE needs VALIDATED.
+// risk: SIM accepts EXPERIMENT_ONLY thresholds, LIVE needs VALIDATED.
 func RiskQuality(environment, quality string) bool {
 	return quality == "VALIDATED" || environment == "SIM" && quality == "EXPERIMENT_ONLY"
 }

@@ -104,7 +104,7 @@ function settings(raw: string): Settings {
   split(raw);
   const all = parse(raw),
     m = all.model_access as unknown as Settings;
-  // v2.2.0 configs need no credential migration. Only the two new paths
+  // configs need no credential migration. Only the two new paths
   // default to empty; unknown fields and missing original fields stay invalid.
   if (m && typeof m === "object") {
     if (!Object.hasOwn(m, "claude_cli_path")) m.claude_cli_path = "";

@@ -269,7 +269,7 @@ type memDynamic struct {
 	records map[string]map[string]memRecord
 	states  map[string][]byte
 	vers    map[string]int64
-	// failSave makes the next SaveState calls fail (lost save, B30).
+	// failSave makes the next SaveState calls fail (lost save).
 	failSave int
 }
 type memRecord struct {
@@ -542,7 +542,7 @@ func TestT323PositionManagerInitialDirective(t *testing.T) {
 	}
 	v := fw.directives[0]
 	// 24h tier at US regular: R 6%, buffer 2×0.4% → distance 6.8, close distance 6.
-	// Confidence 3 sizes the 1% base at 0.75 (S3-027, v2.11.6).
+	// Confidence 3 sizes the 1% base at 0.75 (S3-027).
 	if v.Kind != "INITIAL_DISTANCE" || v.PositionDirection != "SHORT" || v.InitialStopDistance.String() != "6.8" || v.CloseStopDistance.String() != "6" || v.RiskFraction.String() != "0.0075" || v.Mode != "VENUE" || !slices.Contains(v.ReasonCodes, "CONFIDENCE_3") {
 		t.Fatal("initial shape", v.InitialStopDistance, v.CloseStopDistance, v.RiskFraction)
 	}
@@ -551,7 +551,7 @@ func TestT323PositionManagerInitialDirective(t *testing.T) {
 		t.Fatal("refresh too early", len(fw.directives), err)
 	}
 	// Equity drift moves only the drawdown factor: no resubmission before
-	// half the TTL (S3-027, v2.12.1 P3 design 33).
+	// half the TTL (S3-027).
 	tr.equity = "9800"
 	if err := m.Run(context.Background()); err != nil || len(fw.directives) != 1 {
 		t.Fatal("drawdown drift resubmitted", len(fw.directives), err)
@@ -570,7 +570,7 @@ func TestT323PositionManagerInitialDirective(t *testing.T) {
 	}
 }
 
-// B30 (v2.19.5): P2 accepted a directive in a cycle whose state save failed;
+// P2 accepted a directive in a cycle whose state save failed;
 // the next directive must not repeat the lost version.
 func TestT323DirectiveVersionAfterLostSave(t *testing.T) {
 	at := time.Date(2026, 10, 15, 15, 0, 5, 0, time.UTC)
@@ -679,7 +679,7 @@ func TestT324PositionManagerTrailExitAndTransfer(t *testing.T) {
 	}
 }
 
-// B28 (v2.18.0): an exit request not executed within its validity is recorded
+// An exit request not executed within its validity is recorded
 // as expired and the batch's stop trails again; within the validity it waits.
 func TestT324CloseExitNotExecutedResumesTrailing(t *testing.T) {
 	at := time.Date(2026, 10, 15, 15, 0, 5, 0, time.UTC)
@@ -754,7 +754,7 @@ func TestT324CloseExitNotExecutedResumesTrailing(t *testing.T) {
 	if len(ofKind(fw.directives, "POSITION_STOP")) != trails || len(alerts.codes) != 0 {
 		t.Fatal("trailed while the exit was pending", fw.directives, alerts.codes)
 	}
-	// A batch saved before v2.18.0 has no exit_bar_at: the bar time comes from the exit id.
+	// A batch saved before has no exit_bar_at: the bar time comes from the exit id.
 	var legacy workers.PositionState
 	version, _ := store.LoadState(context.Background(), "POSITION", &legacy)
 	if legacy.Batch == nil || legacy.Batch.ExitBarAt.IsZero() {
@@ -789,7 +789,7 @@ func TestT324CloseExitNotExecutedResumesTrailing(t *testing.T) {
 	}
 }
 
-// v2.19.0: LadderNext agrees with Ladder for every rung, long and short.
+// LadderNext agrees with Ladder for every rung, long and short.
 func TestT329LadderNextMatchesLadder(t *testing.T) {
 	for _, dir := range []int{1, -1} {
 		entry, step, cost := 100.0, 0.04, 0.1
@@ -891,7 +891,7 @@ func TestP3DynamicStorePostgresAppendCASAndIsolation(t *testing.T) {
 	}
 }
 
-// ---------- v2.13.0 ladder (S3-033) ----------
+// ---------- ladder (S3-033) ----------
 
 func TestT329LadderStepsFromBreakEven(t *testing.T) {
 	if _, ok := d.Ladder(1, 100, 110, 0, 0.18, 95); ok {

@@ -25,7 +25,7 @@ type conflictOnce struct {
 	path  string
 	fail  int
 	posts int
-	// clock (v2.14.2) moves the run clock before the first POST, as the
+	// clock moves the run clock before the first POST, as the
 	// venue executor's account sync does on a demo run.
 	clock func(context.Context)
 }

@@ -94,7 +94,7 @@ type Policy struct {
 	AbsolutePriceProxyValidated bool               `json:"absolute_price_proxy_validated"`
 	HalfLifeBounds              [2]Decimal         `json:"half_life_bounds"`
 	EventHalfLifeApproved       bool               `json:"event_half_life_approved"`
-	// v2.9.0 S2-039～041; omitted fields keep legacy policy hashes.
+	// S2-039～041; omitted fields keep legacy policy hashes.
 	JudgmentEventTypes       []string          `json:"judgment_event_types,omitempty"`
 	PrepricingModes          map[string]string `json:"prepricing_modes,omitempty"`
 	ExperimentCalibrations   []string          `json:"experiment_calibrations,omitempty"`

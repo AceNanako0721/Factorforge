@@ -23,7 +23,7 @@ func TestLegacyNumericArtifactsGolden(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	// Captured from v2.1.8 before changing the production algorithm/schema.
+	// Captured before changing the production algorithm/schema.
 	if d.Digest(p) != "d59bb4f8e2d5cd270cb8a49ee8fb66627ae02e6089001be83b9b2fe2bc1c4be7" || d.Digest(a) != "a93f6afc478d2d725eefe599379a84f728c74c0e57fd28540add9ca6d2817cea" || d.Digest(b) != "548aa317c6070999077e9402199fa9771a311b5f09616c5ef5fd9041e2d1ec02" {
 		t.Fatal("legacy numeric artifacts changed")
 	}

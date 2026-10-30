@@ -1,4 +1,4 @@
-// Field constraints transcribed from frozen v2.1.0 models.
+// Field constraints transcribed from frozen models.
 package domain
 
 import "strconv"
