@@ -1,6 +1,6 @@
 -- Public trades are a bounded projection: keep the configured window and
 -- delete older rows through a definer function so the API role never gains
--- table-level DELETE (v2.21.2, design 25). The observed_at column is added
+-- table-level DELETE (v2.21.0, design 26). The observed_at column is added
 -- after the generic relation exists; Initialize applies this file last.
 DO $$
 BEGIN

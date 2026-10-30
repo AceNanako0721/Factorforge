@@ -10,7 +10,7 @@ import (
 )
 
 // pruneMarketTrades keeps the public-trade projection inside the registered
-// window (v2.21.2, design 25). It runs hourly and never blocks the API; a
+// window (v2.21.0, design 26). It runs hourly and never blocks the API; a
 // failure is reported and retried on the next tick.
 func pruneMarketTrades(ctx context.Context, store *postgres.Store, days int) {
 	if days <= 0 {
