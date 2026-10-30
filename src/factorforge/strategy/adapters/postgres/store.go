@@ -222,6 +222,9 @@ func (s *Store) binding(ctx context.Context, tx pgx.Tx, state *d.StrategyState, 
 		if persist {
 			status = 409
 		}
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return dbError(err)
+		}
 		if err != nil || d.Digest(a) != d.Digest(b) {
 			return failure("OBJECT_BINDING_CHANGED", status)
 		}
