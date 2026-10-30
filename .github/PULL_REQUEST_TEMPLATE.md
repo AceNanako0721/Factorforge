@@ -4,11 +4,11 @@ Change-Type: code-only
 
 ## 变更内容
 
-<!-- What changes, why, affected S/T IDs. Never paste credentials or real prompts. -->
+<!-- What changes, why, affected S/T IDs. Never paste API keys, tokens or database connections. -->
 
 ## 版本影响
 
-<!-- Code-only keeps VERSION; other types name old/new version and baseline folder. -->
+<!-- Code-only keeps VERSION; other types name the old and new version. -->
 
 ## 验证
 
