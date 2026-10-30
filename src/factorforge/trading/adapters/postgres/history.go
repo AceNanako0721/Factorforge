@@ -15,7 +15,7 @@ func (s *Store) View(ctx context.Context, key d.RunKey, read func(*d.Aggregate, 
 		return sqlError(err)
 	}
 	defer tx.Rollback(ctx)
-	run, _, _, err := s.load(ctx, tx, key, false)
+	run, _, err := s.load(ctx, tx, key, false)
 	if err != nil {
 		return err
 	}

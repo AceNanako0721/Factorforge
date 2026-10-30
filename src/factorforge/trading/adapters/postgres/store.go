@@ -48,10 +48,10 @@ func Open(ctx context.Context, dsn, environment string) (*Store, error) {
 	}
 	return &Store{pool: pool, environment: environment, schema: schema, candleBackfilled: map[string]bool{}}, nil
 }
-func (s *Store) Close() { s.pool.Close() }
+func (s *Store) Close()              { s.pool.Close() }
 
 // PruneMarketTrades deletes at most batch rows older than before through the
-// definer function; the API role has no table-level DELETE (design 25).
+// definer function; the API role has no table-level DELETE (design 26).
 func (s *Store) PruneMarketTrades(ctx context.Context, before time.Time, batch int) (int64, error) {
 	var removed int64
 	if err := s.pool.QueryRow(ctx, "SELECT "+s.table("prune_market_trade")+"($1,$2)", before, batch).Scan(&removed); err != nil {
@@ -171,12 +171,12 @@ func loginAllowed(ctx context.Context, connection reader) error {
 	return nil
 }
 
-func (s *Store) load(ctx context.Context, connection reader, key d.RunKey, lock bool) (*d.Aggregate, bool, []byte, error) {
+func (s *Store) load(ctx context.Context, connection reader, key d.RunKey, lock bool) (*d.Aggregate, bool, error) {
 	if err := s.key(key); err != nil {
-		return nil, false, nil, err
+		return nil, false, err
 	}
 	if err := loginAllowed(ctx, connection); err != nil {
-		return nil, false, nil, err
+		return nil, false, err
 	}
 	query := "SELECT snapshot_text IS NOT NULL AND snapshot_text::jsonb=payload, CASE WHEN snapshot_text IS NOT NULL AND snapshot_text::jsonb=payload THEN snapshot_text ELSE payload::text END FROM " + s.table("trading_run") + " WHERE account_id=$1 AND run_id=$2"
 	if lock {
@@ -186,41 +186,41 @@ func (s *Store) load(ctx context.Context, connection reader, key d.RunKey, lock 
 	var data []byte
 	if err := connection.QueryRow(ctx, query, key.AccountID, key.RunID).Scan(&ordered, &data); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, false, nil, failure("RUN_NOT_FOUND", 404)
+			return nil, false, failure("RUN_NOT_FOUND", 404)
 		}
-		return nil, false, nil, sqlError(err)
+		return nil, false, sqlError(err)
 	}
 	var run d.Aggregate
 	if json.Unmarshal(data, &run) != nil || d.Validate(run) != nil {
-		return nil, false, nil, failure("STORE_SNAPSHOT_INVALID", 503)
+		return nil, false, failure("STORE_SNAPSHOT_INVALID", 503)
 	}
 	var count, last int64
 	if err := connection.QueryRow(ctx, "SELECT count(*),COALESCE(max(sequence),0) FROM "+s.table("audit_event")+" WHERE account_id=$1", key.AccountID).Scan(&count, &last); err != nil {
-		return nil, false, nil, sqlError(err)
+		return nil, false, sqlError(err)
 	}
 	if count != last {
-		return nil, false, nil, failure("AUDIT_MUTATION_FORBIDDEN", 503)
+		return nil, false, failure("AUDIT_MUTATION_FORBIDDEN", 503)
 	}
 	// Only pre-upgrade payloads carry an audit prefix. Verify it before dropping
 	// it; normal reads never load historical audit payloads.
 	if run.Audit != nil {
 		if int64(len(run.Audit)) != count {
-			return nil, false, nil, failure("AUDIT_MUTATION_FORBIDDEN", 503)
+			return nil, false, failure("AUDIT_MUTATION_FORBIDDEN", 503)
 		}
 		for i, event := range run.Audit {
 			var data []byte
 			if err := connection.QueryRow(ctx, "SELECT payload FROM "+s.table("audit_event")+" WHERE account_id=$1 AND sequence=$2", key.AccountID, i+1).Scan(&data); err != nil {
-				return nil, false, nil, sqlError(err)
+				return nil, false, sqlError(err)
 			}
 			var stored d.Object
 			if json.Unmarshal(data, &stored) != nil || !equalJSON(stored, event) {
-				return nil, false, nil, failure("AUDIT_MUTATION_FORBIDDEN", 503)
+				return nil, false, failure("AUDIT_MUTATION_FORBIDDEN", 503)
 			}
 		}
 	}
 	run.Audit = []d.Object{}
 	run.AuditCount = count
-	return &run, ordered, data, nil
+	return &run, ordered, nil
 }
 func (s *Store) Read(ctx context.Context, key d.RunKey) (*d.Aggregate, error) {
 	var run *d.Aggregate
@@ -285,7 +285,7 @@ func (s *Store) Transaction(ctx context.Context, key d.RunKey, apply func(*d.Agg
 		return sqlError(err)
 	}
 	defer tx.Rollback(ctx)
-	run, ordered, stored, err := s.load(ctx, tx, key, true)
+	run, ordered, err := s.load(ctx, tx, key, true)
 	if err != nil {
 		return err
 	}
@@ -321,14 +321,9 @@ func (s *Store) Transaction(ctx context.Context, key d.RunKey, apply func(*d.Agg
 	if err = s.persist(ctx, tx, run, prior, auditCount, candles); err != nil {
 		return err
 	}
-	// Idle executor ticks must not rewrite a multi-megabyte snapshot. The row is
-	// locked above and the bytes already equal the serialized aggregate, so the
-	// update is a no-op; skipping it preserves every projection and audit write.
-	if !ordered || !bytes.Equal(stored, data) {
-		_, err = tx.Exec(ctx, "UPDATE "+s.table("trading_run")+" SET version=$1,payload=$2::jsonb,snapshot_text=$3 WHERE account_id=$4", run.Version, data, string(data), key.AccountID)
-		if err != nil {
-			return sqlError(err)
-		}
+	_, err = tx.Exec(ctx, "UPDATE "+s.table("trading_run")+" SET version=$1,payload=$2::jsonb,snapshot_text=$3 WHERE account_id=$4", run.Version, data, string(data), key.AccountID)
+	if err != nil {
+		return sqlError(err)
 	}
 	if err = tx.Commit(ctx); err != nil {
 		return sqlError(err)
@@ -430,13 +425,7 @@ func (s *Store) persist(ctx context.Context, tx pgx.Tx, run *d.Aggregate, prior 
 					continue
 				}
 			}
-			query := "INSERT INTO " + s.table(table) + "(account_id,resource_id,payload) VALUES($1,$2,$3::jsonb) " + conflict(table)
-			if table == "market_trade" {
-				// v2.21.2 retention reads a real timestamp column; keep it in
-				// step with the validated payload on every insert.
-				query = "INSERT INTO " + s.table(table) + "(account_id,resource_id,payload,observed_at) VALUES($1,$2,$3::jsonb,(($3::jsonb)->>'observed_at')::timestamptz) " + conflict(table)
-			}
-			if _, err := tx.Exec(ctx, query, run.RunKey.AccountID, identity, []byte(value)); err != nil {
+			if _, err := tx.Exec(ctx, "INSERT INTO "+s.table(table)+"(account_id,resource_id,payload) VALUES($1,$2,$3::jsonb) "+conflict(table), run.RunKey.AccountID, identity, []byte(value)); err != nil {
 				return sqlError(err)
 			}
 		}
