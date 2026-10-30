@@ -286,3 +286,37 @@ omp_browser_path = ""
 state_json = ""
 # END FACTORFORGE MODEL ACCESS
 `
+
+const expectedDeployment = `
+[deployment]
+data_root = ""
+mode = ""
+image_tag = ""
+console_port = 0
+run_id = ""
+instrument = ""
+[deployment.database]
+password = ""
+[deployment.database.roles]
+ff_p1 = ""
+ff_p2_public = ""
+ff_p2_worker = ""
+ff_p3_read = ""
+ff_p3_dynamic = ""
+ff_p3_dynamic_read = ""
+[deployment.collector]
+candle_interval = ""
+lookback_seconds = ""
+poll_seconds = ""
+multiplier = ""
+publication_delay_ms = ""
+trade_limit = ""
+[deployment.confirmed]
+prompt_reviewed = false
+risk_policy_reviewed = false
+model_budget_reviewed = false
+# DynamicProfile tables are nested under deployment.profiles.judgment-worker
+# and deployment.profiles.position-manager; see the deployment operator guide.
+[deployment.profiles]
+
+`

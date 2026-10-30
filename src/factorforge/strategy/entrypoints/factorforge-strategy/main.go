@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/strategy/adapters"
 	config "github.com/AceNanako0721/Factorforge/src/factorforge/strategy/adapters/configuration"
+	"github.com/AceNanako0721/Factorforge/src/factorforge/strategy/adapters/postgres"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/strategy/api"
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/strategy/domain"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/strategy/entrypoints/assembly"
@@ -53,6 +54,12 @@ func run() error {
 	ctx, cancel := assembly.Context()
 	defer cancel()
 	command := args.Arg(0)
+	if command == "migrate" {
+		if c.MigrationDatabaseURL == "" {
+			return &d.Error{Code: "STRATEGY_CONFIGURATION_INCOMPLETE", Status: 503}
+		}
+		return postgres.Initialize(ctx, c.MigrationDatabaseURL, c.Environment)
+	}
 	if command == "initialize" {
 		if err = assembly.Initialize(ctx, c); err != nil {
 			return err

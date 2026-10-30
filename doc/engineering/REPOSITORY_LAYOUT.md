@@ -85,3 +85,9 @@ P3 当前只读 API 见 [实例说明](INSTANCE_GO.md)，私有队列/工作进�
 ## v2.7.0 输入工作器撤回
 
 P3 删除 operations/market_baseline.go、entrypoints/market-baseline-worker 和对应 service 模板；不再登记行情基线进程。日程与关注清单入口保留在原层，assembly/baseline_inputs.go 仅装配 CALENDAR/WATCHLIST；关注清单的 daily_bars/watch_moves 适配器、日线/报价端口和配置保留，仅为新闻检索和通知提供正常幅度标尺，不参与方向或仓位计算。测试仍归 tests/applications/soxl_jev，旧公开夹具只读保留。
+
+## v2.20.0 部署运维
+
+新增 applications/deployment/{adapters,entrypoints/ff-runtime}，仅提供通用日志分段/压缩、信号监督、健康检查和固定TLS代理，不导入其他层业务代码。P1/P2不导入此应用；独立监督进程执行既有二进制。测试在tests/applications/deployment，隔离先行实验在tests/engineering/experiments/dockerbundle。沿用根Go模块。
+
+部署资产与操作者工具在tools/deploy（Dockerfile、compose.yaml和Go入口）；tools/deploy-schema为显式管理员初始化/迁移工具，只装配各层既有Initialize及数据库角色，不创建业务运行或绕过API写账。真实配置仍为config/config.toml，最小权限派生文件在runtime/deployment，运行数据根由私有配置给出；镜像和Git均不含这些私有资产。部署式样/设计见v2.20.0的06配对。

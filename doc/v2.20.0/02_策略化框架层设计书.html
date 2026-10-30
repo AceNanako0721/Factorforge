@@ -1,0 +1,757 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="ff:version" content="2.20.0"><meta name="ff:kind" content="design"><meta name="ff:pair" content="02_策略化框架层式样书.html"><title>02_策略化框架层设计书 · Factorforge v2.20.0</title><style>
+:root{--ink:#172d40;--muted:#587083;--accent:#006e82;--line:#cfdee5;--paper:#fff;--bg:#edf3f6}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.8 system-ui,'Microsoft YaHei',sans-serif}
+a{color:var(--accent);text-underline-offset:3px;overflow-wrap:anywhere}header{background:#15384a;color:white;padding:28px max(24px,calc((100vw - 1320px)/2));border-bottom:5px solid #2eb6ad}
+header p{margin:0}header strong{font-size:23px}header a{color:#a9eee9}.shell{display:grid;grid-template-columns:245px minmax(0,1fr);gap:26px;max-width:1320px;margin:28px auto;padding:0 24px}
+nav{position:sticky;top:16px;align-self:start;max-height:calc(100vh - 32px);overflow:auto;padding:18px;background:var(--paper);border:1px solid var(--line);border-radius:12px;font-size:14px}
+nav a{display:block;padding:6px 0;text-decoration:none}main{overflow-wrap:anywhere;min-width:0;background:var(--paper);padding:30px 38px;border:1px solid var(--line);border-radius:12px}
+h1{font-size:30px;line-height:1.35;margin:0 0 18px}h2{font-size:23px;border-bottom:2px solid var(--line);padding:10px 0;margin:34px 0 18px;scroll-margin-top:20px}h3{font-size:18px;margin:25px 0 10px;scroll-margin-top:20px}p{margin:12px 0}
+.meta,.note{background:#eef7f8;border-left:4px solid var(--accent);padding:12px 16px;margin:18px 0;color:#294c60}.warning{background:#fff7e9;border-color:#d09b39}.table-wrap{overflow:auto;margin:18px 0}
+table{width:100%;border-collapse:collapse;font-size:14px}th{background:#e8f1f4;text-align:left}th,td{padding:11px 13px;border:1px solid var(--line);vertical-align:top;overflow-wrap:anywhere}td code{white-space:normal;overflow-wrap:anywhere}
+pre{padding:16px;background:#102d3d;color:#d8f2ed;border-radius:8px;overflow:auto;font:13px/1.7 Consolas,monospace}code{overflow-wrap:anywhere;font-family:Consolas,monospace;font-size:.9em;background:#edf3f6;padding:1px 4px;border-radius:3px}pre code{background:none;color:inherit;padding:0}
+figure{margin:24px 0;border:1px solid var(--line);border-radius:10px;padding:16px;background:#f8fbfc;overflow:auto}figure svg{display:block;width:100%;height:auto;min-width:520px}figcaption{font-size:14px;color:var(--muted);margin-top:12px}details{margin:12px 0}footer{color:var(--muted);font-size:13px;margin-top:28px;border-top:1px solid var(--line);padding-top:15px}li{margin:5px 0}.badge{display:inline-block;background:#d6eee8;color:#15564b;border-radius:5px;padding:0 7px;font-size:13px}
+@media(max-width:900px){.shell{display:block;padding:0 12px;margin:16px auto}nav{position:static;max-height:220px;margin-bottom:16px}main{padding:22px 18px}h1{font-size:25px}}
+@media print{body{background:white;font-size:11pt}.shell{display:block;margin:0;padding:0;max-width:none}nav,header{display:none}main{padding:0;border:0}h2,h3{break-after:avoid}figure,tr{break-inside:avoid}figure svg{min-width:0}pre{white-space:pre-wrap;overflow-wrap:anywhere}a{color:inherit}table{font-size:9pt}}
+</style></head><body><header><strong>Factorforge / 文档基线</strong><p>v2.20.0 · 2026-10-30 · 三层架构 · HTML 正文</p></header><div class="shell"><nav aria-label="文档目录"><a href="index.html">版本索引</a><a href="#section-1">1 包、边界与启动</a><a href="#section-2">2 接口数据契约</a><a href="#section-3">3 API与数据所有权</a><a href="#section-4">4 事件准入、去重与时间</a><a href="#section-5">5 情绪核心算法</a><a href="#section-6">5.1 注入及账本</a><a href="#section-7">5.2 时间、兑现与失效</a><a href="#section-8">6 周期、仓位、止损与时段</a><a href="#section-9">6.1 持久周期顺序</a><a href="#section-10">6.2 状态、等级与风险投影</a><a href="#section-11">6.3 止损计算</a><a href="#section-12">6.4 通用时间门</a><a href="#section-13">7 案例、标签与归因</a><a href="#section-14">8 固定步长学习及版本</a><a href="#section-15">9 研究、指标与恢复</a><a href="#section-16">10 式样与验收映射</a><a href="#section-17">11 v2.1.0 追加：S2-024 只读 API</a><a href="#section-18">12 Go 框架用例、数值及持久化实现</a><a href="#section-19">13 P2 参考、固定对照与本版落地状态</a><a href="#section-20">Go 迁移共同约束与切换门槛</a><a href="#native-intervals">v2.1.6 运行接入细化</a>
+<a href="#decision-retention">v2.5.7 决策输入外置与归档</a>
+<a href="#workload-capacity">v2.5.8 工作负载并发与状态容量</a>
+<a href="#baseline-composition-design">v2.6.0 行情基线、预排事件与有界调整</a>
+<a href="#baseline-composition-patch">v2.6.1 合成路径的两处补充</a>
+<a href="#bar-sigma-fallback">v2.6.2 无价格代理时的波动估计（SIM）</a>
+<a href="#sim-experiment-quality">v2.6.3 SIM 环境允许 EXPERIMENT_ONLY 增险</a><a href="#withdraw-kline-design">v2.7.0 撤回 K 线行情判断</a><a href="#lower-compat-design">14 v2.8.0 下层兼容</a><a href="#upper-managed-design">追加修订 1：上层管理止损</a><a href="#dynamic-stop-design">15 v2.9.0 风险单位与退出</a><a href="#judgment-input-design">15.8 判断型输入</a><a href="#state-growth-design">16 v2.11.1 只增数据的读取</a><a href="#layer-late-design">17 v2.11.2 迟到成交与数量对账</a><a href="#cycle-time-design">18 v2.14.6 决策周期时刻与快照读取</a><a href="#funding-source-design">19 v2.17.0 资金费估计来源</a><a href="#exit-redeliver-design">20 v2.18.0 收盘止损退出的重发与有效期</a><a href="#exit-immediate-design">21 v2.19.2 收盘止损退出的周期外下发</a><a href="#live-contribution-design">22 v2.19.3 决策输入中生效贡献的精简</a><a href="#prepricing-compact-design">22.1 v2.19.4 预定价评估的精简</a></nav><main><div class="meta">02_策略化框架层设计书 · <a href="02_策略化框架层式样书.html">对应仕様书</a></div><article id="document-body"><p class="note">追加修订 1：R11 支持 VENUE / UPPER_MANAGED，见<a href="#upper-managed-design">本章追加设计</a>；单张 STRATEGY 条件单及缺失降级规则仅适用于 VENUE。源码与生成契约仍待后续 PR。</p><p class="note">历史 K 线方向判断边界见 <a href="#withdraw-kline-design">v2.7.0 撤回修订</a>；继承章节中涉及历史 K 线行情判断、波动/状态仓位乘数、历史先验和旧前向启用安排的条款按本次修订取代。</p><div class="note">v2.5.1 追加第三层独立模型接入模块（第五对仕様与设计）：API Key 与官方 ChatGPT 登录经显式选择提供候选文本。保留无 Python、三层接口及原四组业务式样；新模块不自动接入事件抽取、JEV 决策或交易。（v2.9.0 注：P3 第 8 章新闻研判经本模块调用模型，结果由 P3 登记为判断型事件后进入 SIM 交易；上句只约束事件抽取与 JEV 路径。）暂停的本地模型实验保持停止，账号验收与 P3/LIVE 准入分别记录。</div><div data-source-sha256="b421edc5545daf17abf967876a3d17a1fa98af6e1b0e4b0fe411274616ee1b36" data-source-document="02_策略化框架层设计书.md"><h1>策略化框架层设计书</h1>
+<p>版本：2.19.6；日期：2026年10月27日。唯一对应式样书：<a href="02_%E7%AD%96%E7%95%A5%E5%8C%96%E6%A1%86%E6%9E%B6%E5%B1%82%E5%BC%8F%E6%A0%B7%E4%B9%A6.html">策略化框架层式样书</a>。本文实现 S2，数学核心继承 v1.1，其具体对象及模型选择留给应用。</p>
+<h2 id="section-1">1 包、边界与启动</h2>
+<p>实现 src/factorforge/strategy，子包 domain/{events,sentiment,regime,position,stop,case,attribution,learning,validation}、application/{object_service,event_service,score_admission,decision_cycle,case_service}、ports/{trading,store,clock,attribution_input}、adapters/{trading_v2,postgres}、api、workers。仅依赖 trading 公共DTO/客户端，禁止导入 trading 的数据库/执行实现，也禁止导入 applications、搜索SDK或模型SDK。</p>
+<p>启动入口 strategy-api、strategy-scheduler、strategy-feedback；scheduler 通过 ClockPort 运行，每个对象独立持久周期。手工/夹具 CLI 实现 create-object、create-event、submit-score、advance-clock、show-pool、show-target、show-case，可在只有本层和交易层时完成闭环。归因输入缺失时按确定性证据生成可识别标签或UNKNOWN；不要求外部模型存在。</p>
+<p>TradingPort调用交易设计第3章的市场/账户查询、owner绑定、目标、保护、对账和事实订阅。实例特定时段、价源、基准、参数族由配置注入。持仓保护的下单和最终账户风险属于交易层；框架计算风险匹配的目标与保护计划，不持有BrokerPort或交易凭据。</p>
+<h2 id="section-2">2 接口数据契约</h2>
+<p>schema_version为strategy-2.0；安全关键字段未知时拒绝。各写命令含request_id、idempotency_key、expected_version、reason；运行/对象绑定由认证范围核实，不以正文授予权限。十进制数学参数序列化为字符串；时间为UTC，缺值显式null及unknown_fields。以下DTO是本层设计真源，实施时生成 contracts/v2/strategy 的机器契约并逐字段测试。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>类型</th>
+<th>字段</th>
+<th>关键校验</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ObservedObject</td>
+<td>object_id, instance_id, environment, trading_run_key, instrument_key, owner_id, state, parameter_version, price_proxy_binding, regime_binding, time_policy_version?, aggregate_version</td>
+<td>一对象一个owner；状态ACTIVE/PAUSED/ARCHIVED；有未平仓/未成熟案例不能删除</td>
+</tr>
+<tr>
+<td>Event</td>
+<td>event_id, family_id, fact_version, parent_event_id?, relation, subject_id, event_type, occurred_at, first_public_at, evidence_refs, claims, object_ids, state</td>
+<td>relation=NEW/CONFIRMATION/NEW_FACT/CORRECTION/RETRACTION；event只登记事实，不含可执行订单</td>
+</tr>
+<tr>
+<td>EvidenceRef</td>
+<td>evidence_id, content_hash, source_id, licence_ref, first_public_at, received_at, available_at, span_refs, verification_ref</td>
+<td>原文由应用或外部档案保存；框架保存可核验引用，不执行正文指令</td>
+</tr>
+<tr>
+<td>Claim</td>
+<td>claim_id, normalized_fact, subject_id, economic_item, period, fact_time, numbers_with_units, evidence_refs, supersedes_claim_id?, verified_at</td>
+<td>引用及数字/单位核验；经济主体/事项/期间确定事件族候选</td>
+</tr>
+<tr>
+<td>ScoreVector</td>
+<td>direction, impact_points, credibility, relevance, novelty, expectation_coverage, prepricing_fraction?, expected_half_life, quality_score, unknown_fields</td>
+<td>direction=-1/0/+1；impact非负；概率/比例在[0,1]；半衰期正；不完整保留研究状态</td>
+</tr>
+<tr>
+<td>ScoreSubmission</td>
+<td>event_id, fact_version, object_id, score_version, previous_score_id?, revision_kind, vector, evidence_refs, producer_id, producer_version, rubric_version, calibration_version, completed_at, input_manifest_hash</td>
+<td>REVISION明确替换对象/事实/前版本；方向影响只是最低输入，交易准入需完整安全字段</td>
+</tr>
+<tr>
+<td>Contribution</td>
+<td>contribution_id, object_id, event_id, family_id, direction, initial_amount, remaining_amount, effective_at, last_updated_at, half_life, eta, high_water, reference_price, frozen_parameter_version, score_id, state</td>
+<td>m非负；H不下降；effective_at不因纯修订改变；失效贡献不能复活</td>
+</tr>
+<tr>
+<td>DecisionView</td>
+<td>decision_id, object_id, cycle_id, available_cutoff, pool_plus/minus/net, previous_level, new_level, raw_exposure, projected_exposure, target_quantity, actual_quantity, pending_quantity, stop_plan, parameter_version, input_hash, reason_codes</td>
+<td>实际来自交易事实；无交易也保存全部理由</td>
+</tr>
+<tr>
+<td>ParameterSnapshot</td>
+<td>version, parent_version?, scope, valid_from, values, bounds, steps, evidence_gates, source_manifest, applicability, quality_state</td>
+<td>quality_state=VALIDATED/REQUIRED_UNSET/EXPERIMENT_ONLY；生产不允许隐式默认</td>
+</tr>
+</tbody>
+</table></div>
+<p>ScoreVector.direction 与impact构成最低“方向、影响程度”矢量；允许只提交这两项创建DRAFT评分。缺少其他字段不可交易，不默认为1。expected_half_life必须符合已登记类型量表及界限；没有获准逐事件期限量表时使用已验证类型h，外部期限只作为候选特征。模型原始confidence不直接填credibility，必须有有效calibration_version及核验来源。基础影响b、质量c、相关r由评分输入，类型w与状态g由框架参数，提交者不能覆盖w/g或硬风险。</p>
+<p>交易资格不在ScoreVector字段中。身份输入分成PublicPrincipal和WorkloadIdentity两种语言类型，PublicPrincipal的ApiScope只允许研究评分/查询；WorkloadIdentity内部另授权signal:sim或signal:live。schema、数据库enum、表、授权函数及数据库角色物理分离：api_scope/key_scope与workload_capability/workload_capability_grant不能互相写入。公开key创建、读取、轮换、权限修改均使用ApiScope，无强制字符串转换。生产实例评分进程获得受限WorkloadIdentity；手工离线CLI可用SIM工作身份，运行不依赖应用包。未知身份或生产资格不明则RESEARCH_ONLY。</p>
+<p>AdmissionReceipt={submission_id,state,contribution_id?,eligible_from?,reason_codes,current_version}；state为DRAFT/RESEARCH_ONLY/QUARANTINED/READY/APPLIED/SUPERSEDED。外部请求不能自填READY或实盘资格；通过schema、范围、证据引用/时间、校准版本、事实版本、重复、类型启用、环境和内部身份门后才READY。</p>
+<h2 id="section-3">3 API与数据所有权</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>HTTP/命令</th>
+<th>语义</th>
+<th>返回</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>POST /api/v2/strategy/objects</td>
+<td>指定通用InstrumentKey、RunKey及配置，创建对象并绑定owner</td>
+<td>ObservedObject；冲突409</td>
+</tr>
+<tr>
+<td>GET /objects/{id}, PATCH /objects/{id}/state</td>
+<td>查询、暂停或归档；保持存量处置</td>
+<td>ObservedObject</td>
+</tr>
+<tr>
+<td>POST /events</td>
+<td>创建事实及对象关联；未评分不注入</td>
+<td>Event</td>
+</tr>
+<tr>
+<td>POST /events/{id}/revisions</td>
+<td>事实确认、新增、修订或撤销；CAS检查前版本</td>
+<td>Event新版本</td>
+</tr>
+<tr>
+<td>POST /events/{id}/scores</td>
+<td>给对象首次评分或补充DRAFT评分</td>
+<td>AdmissionReceipt</td>
+</tr>
+<tr>
+<td>POST /events/{id}/scores/{score}/revisions</td>
+<td>重评分已有对象/事实；明确差额修订</td>
+<td>AdmissionReceipt</td>
+</tr>
+<tr>
+<td>GET /objects/{id}/pool, /decisions, /targets, /cases</td>
+<td>具体类型的只读投影</td>
+<td>PoolView、DecisionView、TargetView、CaseView</td>
+</tr>
+<tr>
+<td>POST /cases/{id}/attribution-candidates</td>
+<td>接受外部解释候选；不能自授学习资格</td>
+<td>AttributionView及证据门状态</td>
+</tr>
+<tr>
+<td>GET /parameters, /learning-decisions, /validation-runs</td>
+<td>查询参数/门控/验证</td>
+<td>具体投影及游标</td>
+</tr>
+</tbody>
+</table></div>
+<p>上述短路径均带同一完整前缀。PoolView={object_id,plus,minus,net,contributions,ledger_version,quality}；CaseView={case_id,object_id,direction,risk_lots,event_groups,entry_snapshot,exit_at?,observation_end?,pnl_components,status,label_status,attribution_ids,parameter_decision_ids}。错误沿用交易层Problem语义，另增加422 SCORE_INCOMPLETE/INVALID_EVIDENCE、409 FACT_VERSION_CONFLICT、423 MODEL_LEDGER_BROKEN/RECOVERY_REQUIRED。写事件成功只证明登记，必须查询AdmissionReceipt判断评分是否应用。</p>
+<p>本层拥有observed_object、event_family、event_fact_version、object_event_link、score_submission、contribution、sentiment_entry、decision_cycle、decision、target_outbox、time_window_counter/reservation、case_record、observation、label、attribution_candidate/verified、counterfactual、sample_group、parameter_snapshot/candidate/activation、consumed_evidence、learning_decision、validation_run、audit及command_dedup。全部按instance/object/environment约束；不复写交易层fill/risk_lock真源，读取事实保存带来源版本的本层投影。</p>
+<h2 id="section-4">4 事件准入、去重与时间</h2>
+<p>EventService先以(subject,economic_item,period,关键事实)及显式supersedes关系匹配事件族，再考虑文本相似建议。正文相似不是唯一依据；无法判定族关系则隔离待核。事实权重来自冻结类型量表，新颖度 n=本次新增可核验事实权重/本次总可核验事实权重，分母0隔离；同一事实增加报道数量n=0。输入n是候选，框架用claim集合重新核对，不能只相信提交者说“全新”。</p>
+<p>首次有效时间τ=max(必要证据可用时间,评分完成时间,框架接收及校验完成时间)。原始发生、首次公开及系统接收分别保存。事件虽早已发生，晚到的首次评分不能回填τ。绑定的有效基准价格尚不可得则保持READY_PENDING_PRICE，待价格可用时确定τ及初始价格。decision_cutoff之前READY的评分才能参与周期，迟到留下一周期。</p>
+<p>首次注入冻结 b,c,r,n,u、w,g,h,eta、量表及模型/生产者版本。完全重复的(submission_id或规范正文hash)幂等返回原回执；同一事实新模型重评必须显式REVISION，不自动建立新贡献。可信度确认/纯修订保留原τ、参考价和H，将新版评分按历史时间因子及已记录价格消耗重放到当前，得到m_revised；以delta=m_revised-m_current追加修订，不改旧决策/旧消耗。相关贡献已撤销则不能因旧消息再激活；真正新事实另建子贡献并受事件族上限。</p>
+<p>为避免修订重复计入新颖度，初次NEW_FACT贡献只包含新增claim；CONFIRMATION/CORRECTION按原贡献的事实集合和原新颖度背景重新核验，不能把新n=0直接当作原贡献必须归零。撤销先记失效清除；新反向事实需单独证据，不以“撤销正面”自动生成等量负面。</p>
+<p>提前计价采用 u=(1-e)×(1-p)。e来自可核验事前预期；p只用尚未被e覆盖的价格证据。r_pre=ln(P_available/P_pre)-βr_benchmark，p=clip(max(0,d×r_pre)/ρ_pre,0,1)，ρ_pre&gt;0、基准及β在训练段冻结。未知e/p形成[u_low,u_high]，执行用可靠u_low；无法建立则不增险。基准缺失可使用已验证的绝对收益代理并标明，不把其当因果证据。</p>
+<h2 id="section-5">5 情绪核心算法</h2>
+<h3 id="section-6">5.1 注入及账本</h3>
+<p>A=min(A_cap,b×c×r×n×u×w×g)，d∈{-1,0,+1}；全部乘数非负，c/r/n/u∈[0,1]。单事件、事件族及对象幅度上限分别检查，以保留既有贡献为顺序，超额作为rejected_amount账项，不能以后自动补注入。d=0或任一乘数0不建立方向幅度。每个贡献m≥0，S_plus=Σ正向m，S_minus=Σ负向m，S=S_plus-S_minus。</p>
+<p>每次周期保持：m_end=m_start+injection+revision_delta-time_consumption-price_consumption-invalidation。反向通过新负向贡献合计，不对正向额外扣减；因此+60与-30组成仍为60/30，净值30。账差超过PAR-NUM即MODEL_LEDGER_BROKEN，冻结目标增险和学习，重放一致后才恢复。</p>
+<h3 id="section-7">5.2 时间、兑现与失效</h3>
+<p>每旧贡献先执行 m_time=m_previous×2^(-Δt/h)，Δt按真实自然经过时间；默认含停盘/停机，不以“循环执行次数”衰减。m_after=max(0,m_time-C_price)。h&gt;0，数值容差只处理计算误差，不代替清理阈值。</p>
+<p>每贡献从τ累计经批准价格代理的异常对数收益R_i。H_new=max(H_old,max(0,d_i×R_i))，deltaH=H_new-H_old。H只前进；价格回撤不返还消耗，重复快照deltaH=0。新贡献在本周期旧贡献更新后注入，冻结τ时已经可用的批准参考价，H初值0；下一次旧贡献更新计算自τ以来的高水位，不消费早于τ的涨跌。首次评分到周期注入之间的时间按τ计算衰减，并登记该段时间消耗。提前计价独立使用截至评分可用时的事前资料，不通过重放历史周期补造交易。</p>
+<p>同向本周期唯一预算 B_d=κ_object,regime×max_i(deltaH_i)。可分配集合为同向有效且deltaH&gt;0贡献，权重ω_i=m_time_i×eta_i×deltaH_i；Σω=0则消耗0。按权重分配，C_i≤m_time_i；命中上限后将余量在剩余集合重新分配，直到B用完或集合为空。ΣC_i≤B，不对每条新闻分别生成完整价格预算。eta_ref=1作为不可学习锚点；单类型独占时eta不可识别，禁止更新。预算与高水位、权重、封顶和拒收均入账，可重放。</p>
+<p>价格缺失继续时间衰减，暂停兑现和依赖价格的新风险；恢复后只处理尚未记录的高水位增量，历史决策不回写。撤销、证伪、TTL或已登记清理阈值清除相应剩余量并记录原因；部分撤销绑定claim比例。止损不是失效条件。失效贡献状态INVALID/EXPIRED永久保留，不能由旧ID复活。</p>
+<p>夹具：60经过一个半衰期变30，价格预算10后变20，新增-12后净8；撤销正向变-12。两个同向40/20、相同eta及deltaH，预算12分8/4；重复同价格再消耗0。该组数字只用于T2-05，不是生产参数。</p>
+<h2 id="section-8">6 周期、仓位、止损与时段</h2>
+<h3 id="section-9">6.1 持久周期顺序</h3>
+<p>cycle_id=(object_id,scheduled_at_utc)，唯一索引避免双执行。每周期顺序：交易成交/收入及外部变更投影 → 保护/风险结果 → 截止时间数据快照 → 事件撤销及修订 → 旧贡献时间与价格更新 → 新贡献注入 → 情绪与状态 → 滞回 → 风险匹配目标/保护 → 时段预占 → 决策和target_outbox。所有本层账项及目标outbox同事务提交；事务失败没有可发送目标。</p>
+<p>AccountDecisionCoordinator按trading_run_key收集同一截止时点已到期对象的候选，先按object_id固定排序并锁定，再统一执行组合α投影；不同频率的未到期对象保留当前目标/实际及待成交风险。这样“同时候选”有确定含义，不由线程抢先顺序选仓位；跨框架或手工订单变化仍由交易层最终原子检查拒绝过期风险快照。并发冲突后重新查询，不重复消费情绪账项。</p>
+<p>交易层和本层数据库无跨服务原子事务，target_outbox至少一次投递，用decision_id及target_version幂等；未查询交易层ACK前状态DELIVERY_UNKNOWN，不生成第二个增险目标。对账结果按外部订单/成交ID及投影游标去重，遗漏则进入RECOVERY_CHECK。漏周期记录SKIPPED，恢复用真实Δt计算，过期目标丢弃；重启不补发历史订单。止损通知即时使本周期新风险BLOCKED，不在同周期因利好重开。</p>
+<h3 id="section-10">6.2 状态、等级与风险投影</h3>
+<p>RegimeEngine输出多维trend/volatility/risk_appetite/sector/extreme及UNKNOWN，趋势T=完成窗基准收益/波动尺度、W=当前稳健波动/长窗波动，阈值、确认、驻留与滞回来自PAR-REG。状态切换不回溯放大原贡献；旧状态证据降权、新状态缺样本冻结学习。FactorRegistry每因子带用途、可用时间、缺数政策、验证manifest及依赖，防止同价格虚构独立证据。</p>
+<p>等级L=0..K，0=v0&lt;v1&lt;…&lt;vK；进入U_l，退出D_l，满足0≤D_l&lt;U_l且两组递增。E=abs(S)，升级仅E≥U_next，降级仅E&lt;D_current，E=D维持，跨级迭代到稳定等级。方向翻转旧目标归0，查询实际及待成交旧方向均无暴露后才评新方向。</p>
+<p>x_raw=sign(S)×vL×f_vol×f_liq×f_conf；f_vol=min(1,σ_ref/max(σ_current,ε))，f_liq=min(1,B_liq/max(V×vL,ε))，f_conf=Q_pool×abs(S)/(S_plus+S_minus+ε)。Q按剩余幅度加权核验质量；可靠成交额/质量缺失相应折扣0。修正因子在[0,1]，低波动不放大上限。</p>
+<p>先逐对象裁剪通用流动性、止损风险、卖空及对象预算，再对同一账户新增候选以最大合格α∈[0,1]统一缩减，满足账户总/净/分组敞口和压力约束。只依赖交易AccountView及已登记组合政策；最终仍由交易RiskEngine原子检查。OBSERVE账户亏损阈值不进入此可行域；已有风险即使α=0仍超限则提交减险，不用新增对冲隐藏硬限。</p>
+<p>q_target=toward_zero(x_target×V/(P×contract_multiplier),quantity_step)，币种先用有效FX统一。没有卖空能力时负目标只平多到0，记录SHORT_UNAVAILABLE；最小单位不足可得到0实际目标。普通调整受min_adjustment/cooldown；强制减险豁免。不要在框架再减去pending后把“差额”当目标传入交易层，TargetRequest传最终q_target，差额归交易层计算。</p>
+<h3 id="section-11">6.3 止损计算</h3>
+<p>TR=max(high-low,abs(high-prev_close),abs(low-prev_close))，N为最近W根已完成且有效K线的TR/prev_close稳健分位数。公司行动、缺数和异常跳空先标记；极端值不直接用于放宽正常噪声。δ=max(k_stop×N,δ_micro)，D=P_entry×δ；超过批准距离上限则缩数量或不交易，不缩距离假装安全。</p>
+<p>L_trade=abs(q)×multiplier×D+退出费用+滑点/跳空准备金，约束新批次数量及组合压力预算。多头参考P_entry-D，空头P_entry+D，转为交易ProtectionPlan中的已验证trigger_kind及价格步长，舍入后重验风险；不因为向不利方向舍入而隐式突破预算。新成交均价与预估入场价不同时重算并核验保护，交易层仍即时保护真实成交。存量保护维持或收紧；新k_stop不扩大旧风险批次距离。</p>
+<h3 id="section-12">6.4 通用时间门</h3>
+<p>TimePolicy输入版本化日历、窗口及max_new_risk/max_loss_cases两个独立阈值。新增业务意图在本层事务预占window_slot，派发使用reservation_id；拆单/重试/部分成交同ID不再占额。明确交易层未受理才释放，UNKNOWN继续占额。止损/减仓/保护不占增险额；反向新开仓占额。亏损按完整净成本后案例只计一次，窗口归属入场冻结；迟到成熟案例记评测，不追溯改变旧订单。具体常规/非传统市场窗口只来自实例配置。</p>
+<h2 id="section-13">7 案例、标签与归因</h2>
+<p>CaseService按方向持仓周期建案例，风险批次独立关联；以交易层实际归零关闭，partial_exit未关闭。入场冻结H_obs=clip(λ_obs×h_ref,H_min,H_max)，退出后截止=exit+H_obs，多事件主导不清按已登记组合规则。缺数/退市/观察未完标CENSORED/IMMATURE，不当零收益；成熟标签才进入学习。</p>
+<p>方向标签从事件τ到事前H_label，Y=ln(P_end/P_τ)-βr_benchmark；abs(Y)≤成本门槛+噪声带则中性。正确率分母只可判定非中性，覆盖率分母包含所有。强度Y_hat=d×γ×A，误差abs(Y_hat)-max(0,d×Y)，方向错误先标方向问题；γ与w不得同时在线学。</p>
+<p>生命周期用事前分桶正向异常收益累加，达到观察窗总正向量比例χ的时间为H_proxy；H_hat=-h×log2(1-χ)。运动不足、末端持续或新事件主导为UNKNOWN/右删失，不更新h。兑现代理Z_post=d×(ln(P_exit+Hobs/P_exit)-βr_benchmark_post)，只有可分离旧事件的观察段用于推断；不把新消息归给旧模型。</p>
+<p>AttributionPipeline固定数据/执行 → 外部异常/制度 → 去重/提前计价 → 方向/强度 → 生命周期/兑现 → 时机 → 止损。允许多个原因和UNKNOWN，不强迫最可能原因成为唯一答案。C_attr=min(C_data,C_label,C_isolation,C_stability)，每分量为已登记核验项加权通过率，关键项失败即0；量表需盲标审核校准，不是模型原始概率。外部AttributionCandidate只提供category、evidence_refs、alternative_causes、producer_version和候选信心，不可覆盖verified分量。</p>
+<p>共同经济驱动、重叠观察窗、多资产或重复入场组成sample_group，独立单位为组而非交易数。可识别时按冻结基准和逐簇移除估计边际影响，总分配≤可分配观测运动，余量为市场/未知；排列或合理基准改变修正方向则降低稳定性。无法识别只簇级评价，不生成单参数学习证据。</p>
+<p>CounterfactualRunner调用交易SimBroker，用同一信息、费用、延迟、流动性和预算，仅改无策略止损/延迟入场/预设提前或延迟退出/更宽止损且降数量之一；硬账户约束保留。scenario_id与真实run_id分离，不能写真实fill/equity。OHLC顺序不清且影响归因则保存区间并冻结更新，不选事后最优点。</p>
+<h2 id="section-14">8 固定步长学习及版本</h2>
+<p>白名单w/h/κ/非锚点eta/k_stop，ParameterRegistry每参数有初值、单位、上下限、Δ&gt;0、来源、适用分组、证据门槛、漂移/冷却和回滚点。无样本分组继承已验证上层参数并标继承，不为每笔亏损创建新组。硬限、权限、额度、阶段、评分校准、模型及Prompt版本不能进入此白名单。</p>
+<p>证据只用成熟、归因合格、对应参数可识别的组g。a_g=C_attr×Q_g×2^(-age/H_forget)×R_regime，R在[0,1]；E_j=Σa_g e_jg/max(Σa_g,ε)，N_eff=(Σa_g)^2/max(Σa_g²,ε)，独立组数另计。e有界[-1,1]：abs(z)≤deadband为0，否则sign(z)×min(1,(abs(z)-deadband)/scale)。w的z为实际方向运动-预测幅度，h为H_proxy-H_hat，κ/eta为负的可归属Z_post，k_stop为同风险预算、更宽保护后的含尾部损失效用改善；未知敏感性就不生成e。</p>
+<p>生成门同时满足成熟、校准归因及无主要替代解释、独立组/N_eff/重复数、误差死区及区块置信区间、稳定状态、冷却/漂移/边界、新证据消费要求。然后candidate=clip(current+sign(E)×Δ,lower,upper)；置信决定能否更新，不扩大Δ。实际变化0不发布；同证据不可同时更新相关w/h/κ，无法区分则冻结。</p>
+<p>候选状态PROPOSED → VALIDATING → SHADOW/TRIAL → APPROVED → ACTIVE → MONITORING；失败REJECTED或ROLLED_BACK/FROZEN。验证证据与提出证据隔离，同期冻结对照及同风险费用比较，最小改善、风险不劣化、稳定和覆盖全部合格才自动批准。按下个规定cycle边界CAS切参数版本并写audit；用户离线无需逐次审批。发布失败不部分更新参数。旧证据标consumed，仍可监测但不能独自推动下一更新；反向阈值、漂移预算和振荡检测失效则冻结。</p>
+<p>w/g/h/eta在贡献创建时冻结，新版本只用于新贡献；纯评分修订仍按原τ。κ为对象级周期预算系数，新版本下一周期前瞻作用于存量余额，不重算旧周期。k_stop仅新风险批次，旧保护不放宽。回滚只换未来适用版本，历史评分/成交/损益/消耗与消费标记不变；相关参数冻结等待新证据。合理性任务检查边界、变差、反向、重复证据、分状态效果及冻结对照，间隔配置，不把初始“24小时试验”变生产常数。</p>
+<h2 id="section-15">9 研究、指标与恢复</h2>
+<p>ValidationRunner登记数据许可、时点manifest、假设H01事件方向/H02强度/H03寿命/H04兑现/H05类型速度/H06动态仓位/H07学习/H08漂移，及主指标、最小效应、功效、窗口和成本压力。严格训练→候选验证→后续测试，按最大标签/影响跨度及发布延迟purge/embargo，共同驱动组不能跨边界；封存集仅方案定稿后一次使用。测试自适应只使用当时成熟证据和真实发布延迟，不能测试完重学重跑。</p>
+<p>分别报告未知/缺失/删失、独立样本及区间；方向正确率/覆盖、强度MAE、寿命/兑现代理误差、预设时机对照、止损触发与尾损、去重错率、更新变差及反向次数；真实成本后收益/平均盈亏/回撤/换手/成本/风险利用按交易层事实核算，Sharpe频率、年化和自相关处理事前登记。因子消融至少无学习、仅时间衰减、无兑现、无滞回及完整模型，同期同预算比较。全记录失败尝试和多重比较；不支持核心假设则不升级。</p>
+<p>确定性重放固定AI/外部评分首次输出，不重新抽样。框架重启先重建账本、周期、目标派发、观察/标签/已消费证据与参数，再查询交易层账户/owner_epoch和外部变更；不一致禁止增险。模型/数据异常仅冻结受影响对象；实际持仓的底层保护不依赖框架健康。审计或事务失效不能发新目标。</p>
+<h2 id="section-16">10 式样与验收映射</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>式样</th>
+<th>章节与组件</th>
+<th>验收</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>S2-001</td>
+<td>1～3；ObjectService/owner绑定</td>
+<td>T2-01、T2-15</td>
+</tr>
+<tr>
+<td>S2-002</td>
+<td>2～4；EventService</td>
+<td>T2-02</td>
+</tr>
+<tr>
+<td>S2-003</td>
+<td>2～4；ScoreAdmission</td>
+<td>T2-02、T2-15</td>
+</tr>
+<tr>
+<td>S2-004</td>
+<td>4；事件族及差额修订</td>
+<td>T2-03</td>
+</tr>
+<tr>
+<td>S2-005</td>
+<td>4；新颖度及提前计价</td>
+<td>T2-04</td>
+</tr>
+<tr>
+<td>S2-006</td>
+<td>5.1；ContributionLedger</td>
+<td>T2-05</td>
+</tr>
+<tr>
+<td>S2-007</td>
+<td>5.2、6.1；时间衰减</td>
+<td>T2-05、T2-06</td>
+</tr>
+<tr>
+<td>S2-008</td>
+<td>5.2；方向高水位及预算分配</td>
+<td>T2-05</td>
+</tr>
+<tr>
+<td>S2-009</td>
+<td>5、9；失效及守恒恢复</td>
+<td>T2-05、T2-06</td>
+</tr>
+<tr>
+<td>S2-010</td>
+<td>6.1；Cycle/Outbox</td>
+<td>T2-06</td>
+</tr>
+<tr>
+<td>S2-011</td>
+<td>6.2；Regime/FactorRegistry</td>
+<td>T2-07、T2-14</td>
+</tr>
+<tr>
+<td>S2-012</td>
+<td>6.2；Hysteresis/PositionMapper</td>
+<td>T2-07</td>
+</tr>
+<tr>
+<td>S2-013</td>
+<td>3、6.1～2；TradingPort</td>
+<td>T2-07、T2-15</td>
+</tr>
+<tr>
+<td>S2-014</td>
+<td>6.3；StopEstimator/RiskLot</td>
+<td>T2-08</td>
+</tr>
+<tr>
+<td>S2-015</td>
+<td>6.4；TimePolicy/Reservation</td>
+<td>T2-09</td>
+</tr>
+<tr>
+<td>S2-016</td>
+<td>7；CaseService/Observation</td>
+<td>T2-10</td>
+</tr>
+<tr>
+<td>S2-017</td>
+<td>7；Label/AttributionPipeline</td>
+<td>T2-10</td>
+</tr>
+<tr>
+<td>S2-018</td>
+<td>7；SampleGroup/CounterfactualRunner</td>
+<td>T2-10、T2-11</td>
+</tr>
+<tr>
+<td>S2-019</td>
+<td>8；EvidenceGate/FixedDelta</td>
+<td>T2-12</td>
+</tr>
+<tr>
+<td>S2-020</td>
+<td>8；消费/冷却/漂移/可识别门</td>
+<td>T2-12</td>
+</tr>
+<tr>
+<td>S2-021</td>
+<td>8；AutoActivation/Monitor/Rollback</td>
+<td>T2-13</td>
+</tr>
+<tr>
+<td>S2-022</td>
+<td>9；ValidationRunner/Metrics</td>
+<td>T2-14</td>
+</tr>
+<tr>
+<td>S2-023</td>
+<td>2、6.1、9；Auth/Recovery/Reasons</td>
+<td>T2-15、T2-06</td>
+</tr>
+</tbody>
+</table></div>
+<p>必须用序列/属性测试验证账本守恒、非负、H单调、预算不超额、滞回等号及OBSERVE不间接冻结；用事务/重启测试验证目标幂等和时段预占，隔离成熟证据验证自动发布/回滚。把应用目录从测试安装中移除，T2-01仍须完成，才证明本层没有隐含上层依赖。</p>
+</div><h2 id="section-17">11 v2.1.0 追加：S2-024 只读 API</h2><p>实现在strategy/application/query_service.py、api/read_dto.py和公共api/app.py，通过本层存储事务读取，禁止调用周期/准入/学习写用例。PublicPrincipal必须具有ApiScope.QUERY；内部WorkloadIdentity不因读取需要改为公共身份。所有资源根据principal.instance_id及environment定位，object_id/case_id/event_id二次核验所属对象。</p><p>全部GET，前缀/api/v2/strategy：/objects，/events，/events/{event_id}，/events/{event_id}/scores，/objects/{object_id}/ledger，/cases/{case_id}/attributions，/cases/{case_id}/counterfactuals，/parameter-activations，/audit。列表支持cursor/limit；事件、激活及审计按object_id/from/to过滤，账本可增加contribution_id；event详情可传revision。limit由登记配置上限约束，时间均UTC。</p><p>ReadPage[T]={items,cursor,snapshot_version,observed_at}。事务读取取得StrategyState.version作为snapshot_version并保留每项实际时间；observed_at只用于真正有相应事实时点的数据，没有则null。游标由服务端签名，绑定principal实例/环境、过滤hash、snapshot_version和稳定排序键；不一致/过期返回409，不回退到其他实例。分页快照保留与大小必须有资源上限，不能无限复制全量状态。</p><p>ObjectSummary保留object_id/state/instrument_key及绑定版本；EventReadView保留event_id/family_id/fact_version/claim和各可用时间；ScoreReadView使用显式字段投影并配对AdmissionReceipt，剔除workload身份/完整routing内部数据/Prompt。LedgerEntry直接取持久ledger；AttributionReadView与CounterfactualReadView分别标记候选/验证、研究manifest与真实case引用。ActivationReadView={activation_id,object_id,previous_version,new_version,state,recorded_at,effective_at,evidence_refs,reason_codes,source_record_id}，state限定PUBLISHED/REJECTED/FROZEN/ROLLED_BACK；字段只能来自已保存发布/拒绝/冻结/回滚记录，旧记录不够则报告NOT_RECORDED，不能以参数值变化推断。AuditReadView按事件字段白名单公开。</p><p>更新本层生成OpenAPI和查询DTO测试，使用交易/框架已安装包验证，不导入console。T2-16验证查询前后业务状态及outbox无变化、错误身份和跨对象请求、分页乱序/过期、自由字典脱敏、缺激活记录与未知归因。对应S2-024，既有S2-001～023与计算规则保持。</p><h2 id="section-18">12 Go 框架用例、数值及持久化实现</h2>
+<p>domain/{sentiment,position,stop,events,case,attribution,learning,validation,regime,time_policy,performance}.go 与原域函数对应，不导入交易层执行/账务/存储或绑定标的/模型。本版首先落地 numerical_types.go 定义纯算法输入，不宣称已经替换完整 StrategyState 或 HTTP 请求 DTO。身份使用 identity.go 中独立 ApiScope 与 WorkloadCapability 命名类型，各自 JSON 枚举校验；PublicPrincipal 不能解码 signal:sim/live，WorkloadIdentity 不使用公共 scope 代替内部能力。</p>
+<p>sentiment.Decay 沿用局部 40 位上下文；seconds/half_life → 负号 → ln(2) → 乘法 → exp → amount 的逐步舍入保持。apd 默认同精度 Exp 在前期样例有末位差异，Math.Exp 使用 2×/3×输出精度的工作计算，再分别舍入到原精度；两者不一致则返回数值错误，不注入情绪。额外位数是实现工作精度，不是业务容差/标定参数，原 numerical_tolerance 不改。较大指数、下溢/异常和长期停机仍需对照，不能用少量样例覆盖整个输入域。</p>
+<p>sentiment.{AppendEntry,VerifyLedger,Waterfill,AdvanceContributions,Pool} 保留逐贡献账本、真实时间消耗、共同价格预算、high_water 与过期原因。Advance 在局部副本计算，通过数值错误及账本守恒检查才提交。原 Python 集合迭代顺序不稳定；Go 分配使用稳定键顺序，完整多贡献回放须在登记容差内核验且逐条保存差异；不能因此扩大业务容差。停机时间使用原 elapsed-time 转换语义，时间戳因果与极长时段由专门边界测试验证。</p>
+<p>position 保留 Financier 来源的滞回等号规则、理论暴露、数量趋零舍入、先降险后增险的共同 alpha 投影。ExistingRiskScale 保留净额对冲可行区间下界和上界，未管理风险已经超限或区间为空仍要求核验，不能宣称归零已解决。二分使用原 numerical_tolerance；无法继续表示中点时报数值故障，不无限循环。stop 保留已完成且当时可用 K 线、鲁棒噪声、异常缺口不放宽止损、价格向入场方向取 tick、费用/滑点/缺口的单笔风险以及实际已核验保护减险。</p>
+<p>application/{commands,injection,decision_cycle,cases,validation_runner}.go 通过 ports.Store 的事务计算周期并写 Decision/TargetOutbox/账本/审计，原 clock cutoff、TTL、owner_epoch 与目标反馈保持。adapters/trading_v2.go 仅用 P1 /api/v2/trading：市场/账户/仓位/所有权/成交/保护/外部事实 GET 与 owner 目标/保护写契约，不直接复用 P1 执行或数据库。写目标保留请求版本及期限；DELIVERY_UNKNOWN 查询回执后才能决定续接。</p>
+<p>api/http.go、api/dto/models.go 用 net/http 注册原两个 listener，公共写研究/对象权限与内部 signal 资格分别校验；SIM/LIVE 身份固定到部署、实例和对象。adapters/postgres/store.go 用 pgx/v5、独立角色与原 migrations/001_strategy.sql；保留公开/工作负载隔离、交易账本与研究回执分表及追加审计。case/learning/validation 的去重、污染隔离、封存数据、固定步长、候选/验证/激活/回滚状态不因 Go 迁移改变。完整持久化模型、数据库重开/权限/并发和独立进程已完成本地验收。</p>
+<p>entrypoints/{strategy-api,strategy-scheduler,strategy-feedback,factorforge-strategy}/main.go 独立装配；执行保护仍由 P1 负责。S2-024 查询由 application/query_service.go 和 api/read_dto.go 提供有限只读投影；管理台仍通过公开 HTTP 调用，不能直接连接下层数据库。workers 明确取消/关闭生命周期，不能以 goroutine 数量冒充研究/交易及 SIM/LIVE 的资源隔离。</p><figure id="go-p2"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 500" role="img" aria-labelledby="go-p2-title go-p2-desc"><title id="go-p2-title">图 D2-Go：资格、账本、投影与执行事实</title><desc id="go-p2-desc">public listener / workload listener，独立身份类型 → score_admission；研究不授予信号；decision_cycle → 前周期成交 / 保护反馈，sentiment 衰减 / 兑现 → VerifyLedger；position + stop → 先降险 / 目标投影，登记容差 / hard risk / owner_epoch；Store.Transaction → 决策 + TargetOutbox，trading_v2 HTTP → ACK / UNKNOWN / REJECTED；案例观察 → 归因 / 验证 → 固定步长学习，激活 / 监测 / 回滚保持原控制流</desc><defs><marker id="go-p2-arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L9,3 L0,6" fill="#39768a"/></marker></defs><path d="M450.0,85 L450.0,100.0 L450.0,100.0 L450.0,115" fill="none" stroke="#39768a" stroke-width="2" marker-end="url(#go-p2-arrow)"/><path d="M450.0,185 L450.0,200.0 L450.0,200.0 L450.0,215" fill="none" stroke="#39768a" stroke-width="2" marker-end="url(#go-p2-arrow)"/><path d="M450.0,285 L450.0,300.0 L450.0,300.0 L450.0,315" fill="none" stroke="#39768a" stroke-width="2" marker-end="url(#go-p2-arrow)"/><path d="M450.0,385 L450.0,400.0 L450.0,400.0 L450.0,415" fill="none" stroke="#39768a" stroke-width="2" marker-end="url(#go-p2-arrow)"/><rect x="100" y="15" width="700" height="70" rx="9" fill="#e5f2f3" stroke="#72a4b2"/><text x="450.0" y="44.5" text-anchor="middle" font-size="15" fill="#17384a">public listener / workload listener</text><text x="450.0" y="65.5" text-anchor="middle" font-size="15" fill="#17384a">独立身份类型 → score_admission；研究不授予信号</text><rect x="100" y="115" width="700" height="70" rx="9" fill="#e5f2f3" stroke="#72a4b2"/><text x="450.0" y="144.5" text-anchor="middle" font-size="15" fill="#17384a">decision_cycle → 前周期成交 / 保护反馈</text><text x="450.0" y="165.5" text-anchor="middle" font-size="15" fill="#17384a">sentiment 衰减 / 兑现 → VerifyLedger</text><rect x="100" y="215" width="700" height="70" rx="9" fill="#e5f2f3" stroke="#72a4b2"/><text x="450.0" y="244.5" text-anchor="middle" font-size="15" fill="#17384a">position + stop → 先降险 / 目标投影</text><text x="450.0" y="265.5" text-anchor="middle" font-size="15" fill="#17384a">登记容差 / hard risk / owner_epoch</text><rect x="100" y="315" width="700" height="70" rx="9" fill="#e5f2f3" stroke="#72a4b2"/><text x="450.0" y="344.5" text-anchor="middle" font-size="15" fill="#17384a">Store.Transaction → 决策 + TargetOutbox</text><text x="450.0" y="365.5" text-anchor="middle" font-size="15" fill="#17384a">trading_v2 HTTP → ACK / UNKNOWN / REJECTED</text><rect x="100" y="415" width="700" height="70" rx="9" fill="#e5f2f3" stroke="#72a4b2"/><text x="450.0" y="444.5" text-anchor="middle" font-size="15" fill="#17384a">案例观察 → 归因 / 验证 → 固定步长学习</text><text x="450.0" y="465.5" text-anchor="middle" font-size="15" fill="#17384a">激活 / 监测 / 回滚保持原控制流</text></svg><figcaption>图 D2-Go：资格、账本、投影与执行事实</figcaption></figure><h2 id="section-19">13 P2 参考、固定对照与本版落地状态</h2>
+<p>本版复用当前已审查的 Financier 固定提交 3708a31d77cb57c0f972828488449efc341dfbf1 / engine/app/core/fusion_hub.py 的 _gate_direction 等号边界；Go position.LevelFor 延续现有改编，保留 MIT 与版权声明。timeseriescv 固定提交 cb04fb6ea7a0b2c15920ca253f882336fe336ba8 / timeseriescv/cross_validation.py 的 purge 思路已用于 validation_runner.go 的原生迁移，不引入 pandas/NumPy，不增加未来训练分支。</p>
+<p>P2 全部 Go 域、API、周期事务、案例/学习/验证、PostgreSQL 与四入口已迁移。固定合成结果在 tests/strategy/fixtures/go_migration.json，源提交与 fixture_only 可查；209 个冻结状态转换比较完整结果、状态、账本及 P1 调用，原生 P2→P1 SIM 另验证实际成交和费用。旧 capture_migration_fixtures.py 已退役到 Git 历史，Go 测试不运行 Python、不读取真实配置或调用供应商；本地机制不能替代生产标定。</p><h2 id="section-20">Go 迁移共同约束与切换门槛</h2>
+<p>语言选择按模块而非全项目统一：现有 P1/P2 与已实现上层 Go 模块继续采用 Go；上层可复用 TypeScript/JavaScript 等非 Python 模块，不要求为统一语言重写成熟接入代码。语言选择不改变三层依赖、公开契约、权限隔离或准入；Python 不得作为活跃源码、解释器、子进程、HTTP 服务或构建/测试/hooks/CI 的必需依赖。具体跨语言传输和模块引入仍须先验证再定稿设计。根 go.mod 是本仓库 Go 模块唯一真源，只约束 Go 源码，go.sum 固定其依赖校验；现有工具链 Go 1.27.1。Go 生产代码仍只放 src/factorforge 对应层，domain、application、ports、adapters、api、workers 六类职责保留；独立 main 放本层 entrypoints/入口名。P1 不导入上层，P2 仅引用 P1 api/dto 的公开值类型和 HTTP 客户端；不创建承载跨层业务的 common。Go 测试放 tests 对应层，数据库迁移仍归属本层 PostgreSQL 适配器。</p>
+<p>迁移以 v2.1.0 标签 e97c9e9a380d105a7e96933bdd325e1d9af06d93 的源码、冻结业务式样和 contracts/v2 契约为对照。HTTP 方法/路径、schema_version、十进制字符串、UTC/空值/未知语义、错误码、状态机和授权范围保持；OpenAPI 3.1.0 及历史 JSON Schema Draft 2020-12 不降级。接口不是因 Go 类型名变化自动升版。</p>
+<p>新实现不调用 Python 子进程、不嵌 Python 解释器，也不以 Python HTTP 服务作为最终 Go 后端。迁移期间旧源码与入口保留，用合成夹具捕获对照；不得双启动同一账户的执行者、双写同一运行，或因 Go 模块编译通过就替换运行服务。切换前记录当前版本、运行状态和库快照，停止旧执行者并取得隔离证据，由新进程恢复对账；回退也须停止并隔离新执行者，不能同时使用同一签名身份。</p>
+<p>替换全部活跃初始化、布局/版本/HTML/公开内容/历史契约检查、构建、hooks、CI 与运行工具；最终用没有 Python 的受控环境完成 Go 构建、单元/故障/真实 PostgreSQL/独立进程/SIM 验收。历史冻结文档中的 Python 文字或文件保留为历史，不要求运行其作者脚本；旧活跃作者工具在 Go 替代检查通过后退役。迁移夹具 JSON 自带源提交和 fixture_only，Go 测试读取固定结果，不依赖即时 Python oracle。真实配置及 Prompt 不迁移进夹具。</p>
+<p>发布记录逐模块区分本地机制、真实环境和生产准入证据。P1/P2 已完成 Go 运行迁移，G3 已退役活跃 Python 工具；原 Python 证据只作历史对照。P3 原生工作池、管理台 Go BFF/React 和日历/报告已完成本地集成，具体结果见进度记录。外部来源许可、抽取/模型评测、生产参数、DEC-06、独立复核和 LIVE 准入仍未关闭。本次不授权实际交易。</p><h2 id="native-intervals">v2.1.6 通用时段窗口运行设计</h2>
+<p>对应原 S2-010/S2-013/S2-023 及上层 S3-011；业务效果不变。新增 domain/time_intervals.go、application/time_intervals.go、api/window_contract.go，公开值在 api/dto。P2 不导入市场日历、时区、标的或模型。原固定 window_seconds/window_anchor 是未登记窗口计划的兼容路径；一旦对象登记计划，缺覆盖禁止新增风险，不回落到固定窗口。</p>
+<table><thead><tr><th>接口/记录</th><th>实际行为</th></tr></thead><tbody>
+<tr><td><code>GET /api/v2/strategy/objects/{object_id}/time-windows</code></td><td>公共 Query 或绑定 workload，只读 object_id、snapshot_version、plans；拒绝也无写入/时钟推进。注册的 MaxRecords 约束总窗口数，无默认值。</td></tr>
+<tr><td><code>POST /api/v2/strategy/objects/{object_id}/time-windows</code></td><td>仅 WORKLOAD listener；已有 signal:sim/signal:live 能力与对象范围、数据库授权均核验。WindowCommand 继承 Command，使用全实例 expected_version、请求/幂等 ID；不赋予公共研究身份注册能力。</td></tr>
+<tr><td>TimeWindowPlan / PolicyWindow</td><td>plan_id、object_id、policy_version、source_version；连续 UTC start/end、唯一 window_id、enforce_limits。阈值读取对象已登记 Policy.max_new_risk/max_loss_cases，本接口不接受阈值或修改政策。边界为 [start,end)。</td></tr>
+<tr><td>不可改与追加</td><td>同 ID 同内容可恢复；同 ID 改写拒绝。首次附加要求无既有预约/案例及对象零方向/等级，旧有运行必须另作排空迁移；后续只在最后已登记边界追加尚未开始的窗口。历史窗口、预约和净亏损案例不清零，内存及 PostgreSQL 事务均拒绝窗口重写。</td></tr>
+<tr><td>计数与保护</td><td>Reserve 按 object/policy/window_id 读取独立的非 RELEASED 预约数及 LossCases。任一触限只拦截增险目标，原周期减仓、止损与反馈继续。enforce_limits=false 用于调用者登记的不限这两计数窗口，其他全部风险门保持。既有案例沿用实际预约窗口；迟到/外部事实没有覆盖时仍处理账务，不据此允许增险。</td></tr>
+<tr><td>存储兼容</td><td>StrategyState.time_windows 为可缺省有限计划字典；无计划时 JSON/hash 和 209 个冻结状态转换保持。已有 pgx internal_state 保存计划；公共数据库角色不能改计划。窗口过期返回 TIME_WINDOW_COVERAGE_REQUIRED，不自动补造日历或机会。</td></tr>
+</tbody></table>
+<figure><svg role="img" viewBox="0 0 860 250"><title>通用窗口与双计数</title><desc>上层登记不可改 UTC 窗口。增险时检查覆盖及两个独立计数；缺数或触限保持已有目标。减险和保护继续走原路径。</desc><rect x="20" y="30" width="235" height="65" fill="#e5f2f3" stroke="#72a4b2"/><text x="35" y="58">P3 日历 → UTC 计划</text><text x="35" y="82">绑定 / CAS / 幂等登记</text><path d="M255 62H300" stroke="#006e82"/><rect x="300" y="30" width="255" height="65" fill="#e5f2f3" stroke="#72a4b2"/><text x="315" y="58">P2 Reserve：有效覆盖</text><text x="315" y="82">新增风险数 / 净亏损案例数</text><path d="M555 62H600" stroke="#006e82"/><rect x="600" y="30" width="235" height="65" fill="#e5f2f3" stroke="#72a4b2"/><text x="615" y="58">符合限制才新增风险</text><text x="615" y="82">缺覆盖 / 触限保留原因</text><rect x="190" y="155" width="480" height="60" fill="#d6eee8" stroke="#72a4b2"/><text x="210" y="190">原有减仓、止损、成交反馈继续；重启不重置计数</text></svg><figcaption>图 D2-I：通用窗口接入现有决策周期，测试阈值仅属合成夹具。</figcaption></figure>
+<p>实际接口契约见 <a href="../../contracts/v2/strategy/workload.openapi.json">工作负载契约</a> / <a href="../../contracts/v2/strategy/openapi.json">公共契约</a>。实现沿用已有 P2 Command/CAS/pgx 与 P1 HTTP 执行，日历计算不引入新的交易框架。测试覆盖实际 P3→Go P2 HTTP、周末/夏令时/提前收市、两项分别触限、边界恢复、不可改、PostgreSQL 重开、公共只读及减险路径。</p><section id="decision-retention">
+<h2>v2.5.7 决策输入外置与决策归档</h2>
+<p>对应既有 S2-010/012/024，五组仕様语义保持。本地影子运行（SIM，SOXLUSDT，2026-10-12）中，P2 状态在 4.5 小时内增长到 4.59 MB，超过领域解码上限 4 MiB（domain.Decode 的 4&lt;&lt;20），此后每次加载均返回 STORE_STATE_INVALID，调度、反馈与 P3 的 /objects 读取全部停止。内部状态中 decisions 占 2.26 MB、outbox 占 2.30 MB，共 42 个决策：每个 DecisionView.input_snapshot 内含完整交易快照，其中 bars 约 287 根、约 50 KB，占单个决策的 95%；TargetOutbox.decision 又完整复制一份。原设计没有规定决策与目标记录在状态中的保留范围。本章规定两件事：决策输入中的 K 线以摘要引用代替原文；已被取代且过期的决策与目标移出聚合状态，写入只追加的归档表。</p>
+<figure>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 230" role="img" aria-labelledby="decision-retention-title decision-retention-desc">
+<title id="decision-retention-title">决策输入外置与归档</title>
+<desc id="decision-retention-desc">决策周期先对完整输入计算 input_hash，再把快照中的 bars 换成数量、首尾收盘时间与摘要的引用后存入状态；每轮结束时，满足归档条件的决策与其目标从状态移出，存储在同一事务内写入只追加的 decision_archive 表。</desc>
+<g fill="#edf7f8" stroke="#006e82" stroke-width="2">
+<rect x="15" y="35" width="270" height="95" rx="10"/>
+<rect x="325" y="35" width="270" height="95" rx="10"/>
+<rect x="635" y="35" width="270" height="95" rx="10"/>
+</g>
+<g font-family="sans-serif" font-size="15" fill="#17384a" text-anchor="middle">
+<text x="150" y="65">input_hash = Digest(完整输入)</text>
+<text x="150" y="91">计算口径不变</text>
+<text x="460" y="65">bars → bars_ref</text>
+<text x="460" y="91">数量 / 首尾 close_at / 摘要</text>
+<text x="770" y="65">取代且过期 24 h 的决策与目标</text>
+<text x="770" y="91">同事务写 decision_archive</text>
+<text x="460" y="185">K 线原文由 P1 保存，可按 close_at 区间与摘要复核；未终结、最新或仍被引用的记录不归档</text>
+</g>
+<g stroke="#006e82" stroke-width="3" fill="none">
+<path d="M285 82 H325"/>
+<path d="M595 82 H635"/>
+</g>
+</svg>
+<figcaption>图 D2-J：状态只保留运行需要的决策；历史决策可审计、可复核，但不再随每次事务加载。</figcaption>
+</figure>
+<h3>决策输入中的 K 线引用</h3>
+<p>新增领域函数 CompactDecisionInput(inputs)：返回 inputs 的副本，其中 snapshot.bars 换为 snapshot.bars_ref，按对象给出 {count, first_close_at, last_close_at, digest}，digest 为 Digest(该对象 bars)；空序列为 count=0 且其余为 null。DecisionView.input_hash 仍为 Digest(完整 inputs)，先算哈希、后压缩，因此既有哈希口径与已存决策不变。decision_cycle 的目标决策、参数未定决策与 cases.go 的成交风险决策三处构造统一使用压缩后的 input_snapshot。领域读取 input_snapshot 的只有 policy 与 pool.contributions（domain/case.go），不读 bars，行为不变。K 线原文由 P1 行情存储保留（P1 只有公开成交设了保留窗口，K 线未设），研究复核时按对象、close_at 区间从 P1 读取并比对摘要。</p>
+<h3>归档条件与归档表</h3>
+<p>新增领域函数 ArchivableDecisions(state, at)，在每个决策周期结束、状态写回前由工作负载调用；满足全部条件的决策 ID 从 Decisions 与 Outbox 移出：（1）该决策没有目标记录，或目标状态为 ACK、REJECTED、EXPIRED 之一（PENDING、DELIVERY_UNKNOWN 等未终结状态不动）；（2）同一对象存在可用截止时刻更晚的决策（每个对象最新的决策永远保留）；（3）available_cutoff 与目标 expires_at 均早于 at − 24 小时；（4）没有 Reservations 记录引用它的 reservation_id，也没有 status 为 OPEN 或 OBSERVING 的案例在 entry_snapshot.source_decision_id 或 risk_lots[].source_decision_id 中引用该 decision_id。24 小时取自已观测的事实回传延迟上限之外的充分余量：P1 只对当前生效目标产生成交，被取代的目标在 24 小时后不会再有成交引用它。</p>
+<p>迁移 001_strategy.sql 增加 decision_archive(instance_id, decision_id, archived_at, payload jsonb, PRIMARY KEY(instance_id, decision_id))，与 audit_event、sentiment_entry 相同的不可变触发器；工作负载角色授予 INSERT，查询角色 SELECT。Store.Transaction 在 worker 类存储中比较事务前后状态：事务前存在、事务后从 Decisions 消失的决策，连同其目标记录以 {decision, outbox} 写入归档表；只允许“删除并归档”，同一 ID 不得在归档后再出现于状态（再出现返回 STORE_STATE_INVALID）。public 类存储仍禁止任何内部状态变化。决策 API（/decisions、/targets）只列出状态中保留的记录；审计查询按 decision_id 关联对象时，状态中找不到则不添加对象关联，不报错。</p>
+<h3>容量、遗留状态与未决项</h3>
+<p>按影子运行频率（约每 6.4 分钟一个决策），压缩后单个决策约 2.5 KB、目标副本约 2.5 KB，24 小时保留约 1.1 MB，远低于 4 MiB。影子数据库中已超限的状态由一次性运维脚本处理：在 internal_state 中把每个决策与目标副本的 input_snapshot.snapshot.bars 按上述规则换为 bars_ref（不改 input_hash），之后由新版本首次周期按规则归档；该脚本只用于影子运行，不进入系统代码。已知未决：Samples 按对象每分钟追加约 150 字节，无保留上限（约 13 天后与其他字段合计触及上限）；趋势因子以样本序列首项为基准，裁剪样本会改变其含义，因此本版不裁剪，待因子窗口定义另行设计。测试覆盖：压缩前后 input_hash 相同且不含 bars；四项归档条件逐项反例；归档写表与状态删除同事务、回滚时两者都不发生；归档后同 ID 再出现被拒绝；public 存储不能归档；超过 24 小时的被取代决策在一次周期后离开状态且状态序列化大小有界。</p>
+</section>
+<section id="workload-capacity">
+<h2>v2.5.8 工作负载并发与状态容量</h2>
+<p>对应既有 S2-010/012/024，五组仕様语义保持；趋势因子定义按本章修正。v2.5.7 上线后的影子运行（SIM，SOXLUSDT，2026-10-12）显示四个问题。（1）反馈与调度都是 30 秒一轮，各自先读状态、再向 P1 取交易快照、最后在事务中比较状态版本，对方在其间提交即返回 FEEDBACK_SNAPSHOT_CONFLICT 或 CYCLE_SNAPSHOT_CONFLICT，本轮作废，3 小时内反馈失败 9 次，另有 3 次 P1 侧 TRADING_SNAPSHOT_CONFLICT；成交回填因此推迟一轮或更多。（2）审计每次事务全量加载并做前缀摘要比较，调度每轮写一条 CYCLE_COMMITTED，约 5 小时已有 696 条；查询服务对 audit 与 parameter-activations 资源先比较总条数与 query_max_records（影子 5,000），约 1.7 天后这两个查询将固定返回 QUERY_RESOURCE_LIMIT。（3）v2.5.7 的容量估计偏低：实测约每 5 分钟一个决策，压缩后决策约 3.9 KB，目标记录约 4.8 KB（其中复制的决策 3.4 KB，内含 2.8 KB 的 input_snapshot），24 小时保留约 288 个、约 2.5 MB，占 4 MiB 解码上限的 60%。（4）Samples 按对象只追加，约每 2 分钟一条、每天约 100 KB；趋势因子以序列首项为基准，含义随运行时长变化，不能直接裁剪。</p>
+<figure><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 230" role="img" aria-labelledby="p2-capacity-title p2-capacity-desc"><title id="p2-capacity-title">工作负载并发与状态容量</title><desc id="p2-capacity-desc">调度与反馈遇到快照版本冲突时在同一轮内重新读取并有限次重试；审计只存在于 audit_event 表并分页查询；目标记录不再复制决策输入，决策保留 6 小时；价格样本按趋势窗口与未完成案例裁剪。</desc><defs><marker id="p2-capacity-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#006e82"/></marker></defs><g fill="#eef7f8" stroke="#006e82" stroke-width="2"><rect x="15" y="40" width="250" height="90" rx="10"/><rect x="325" y="40" width="250" height="90" rx="10"/><rect x="635" y="40" width="250" height="90" rx="10"/></g><g fill="#17384a" font-family="sans-serif" font-size="15" text-anchor="middle"><text x="140" y="78">*_SNAPSHOT_CONFLICT</text><text x="140" y="106">同轮重读重试 ≤ 2 次</text><text x="450" y="78">审计只在表内</text><text x="450" y="106">分页查询，不随事务加载</text><text x="760" y="78">决策保留 6h / 样本按窗口</text><text x="760" y="106">状态大小有上界</text><text x="450" y="190">每个状态字段都有保留规则；超过解码上限一半时工作负载告警</text></g><g fill="none" stroke="#006e82" stroke-width="2" marker-end="url(#p2-capacity-arrow)"><path d="M265 85H325"/><path d="M575 85H635"/></g></svg><figcaption>图 D2-K：并发冲突在同一轮内消化；每个随时间增长的状态字段都有保留规则。</figcaption></figure>
+<h3>快照冲突的有限重试</h3>
+<p>工作负载循环（entrypoints/assembly 的调度与反馈）在一轮 Tick 返回 CYCLE_SNAPSHOT_CONFLICT、FEEDBACK_SNAPSHOT_CONFLICT 或 TRADING_SNAPSHOT_CONFLICT 时，在同一轮内最多再试 2 次，每次之前随机等待 200–800 毫秒；每次重试都从读取状态、取交易快照开始，不复用上一轮的读取结果，事务内的版本比较保持不变。重试成功时向标准错误输出一行 RETRIED &lt;code&gt; &lt;次数&gt;，最终失败才输出错误码。其他错误不重试。这样不放宽任何一致性条件，只是不让一次竞争浪费整轮 30 秒。</p>
+<h3>审计外置与分页查询</h3>
+<p>审计以 audit_event 表为唯一存储，StrategyState.Audit 只承载本事务新增的行，加载时为空；新增不序列化的 AuditCount，加载时取 max(sequence)（与 count(*) 不一致返回 STORE_STATE_INVALID）。Store.Transaction 把新增行按 AuditCount + 序号 写入，并保持只追加校验。commands.go 的审计 sequence 改为 AuditCount + len(Audit) + 1。Store 新增按序号分页读取审计的方法（可按 action 过滤），查询服务的 audit 资源与 parameter-activations 资源改为通过它读取：source_record_id 仍为 audit:&lt;sequence − 1&gt;，与原切片下标一致；audit 资源不再受总条数上限约束，parameter-activations 的计数只统计 PARAMETER_ACTIVATED、PARAMETER_ROLLED_BACK、PARAMETER_FROZEN 三类。内存存储与冻结回放的比较器按同样口径读取审计。sentiment_entry（情绪账本）随事件增长，速度低，本版仍全量加载。</p>
+<h3>决策与目标容量</h3>
+<p>TargetOutbox.decision 保存决策副本时去掉 input_snapshot（置空），input_hash 与其余字段保留；决策本体仍在 Decisions 中保存压缩后的 input_snapshot，二者在归档时一起写入 decision_archive，因此可审计性不变。目标投递只读取对象、目标数量、止损计划、来源事件版本等字段，不读 input_snapshot。冻结回放比较器对期望值做同样投影，夹具文件不改。DecisionRetention 由 24 小时改为 6 小时：v2.5.7 选 24 小时是为事实回传留余量，而归档条件（1）未终结目标不动、（4）被预留或未结束案例引用的不动，已经覆盖回传仍可能引用的决策；目标在 target_ttl_seconds（影子 600 秒）内终结，6 小时仍有充分余量。按实测频率，保留期内约 72 个决策，每个决策连同目标约 6 KB，合计约 0.45 MB。Store 在 worker 写回时若编码后的内部状态超过 2 MiB（解码上限的一半），向标准错误输出 STATE_SIZE_HIGH &lt;bytes&gt;，不改变事务结果。</p>
+<h3>价格样本保留与趋势窗口</h3>
+<p>Policy 增加可选字段 trend_window_seconds（整数，cycle_seconds ≤ 值 ≤ 604800）。趋势因子的基准改为：取可用时间不晚于 at − trend_window_seconds 的最新有效样本 b，metric = ln(last.price / b.price) / last.sigma；找不到 b 时为 UNKNOWN（FACTOR_MISSING）；策略未设该字段且趋势清单有效时为 UNKNOWN（TREND_WINDOW_UNDEFINED）。其余维度不变。现有冻结夹具中趋势维度全部为 UNKNOWN（FACTOR_UNVALIDATED），结果不变。</p>
+<p>每轮追加样本后按对象裁剪：截止时刻 cutoff 取以下各项的最小值：at − max(trend_window_seconds, 2 × cycle_seconds)；该对象 status 为 OPEN 或 OBSERVING 的案例中最早的 tau（来源贡献中最早的 effective_at）与 entry_at；该对象尚未注入的接收回执中最早的 eligible_from。删除可用时间早于 cutoff 的样本，但保留 cutoff 之前最新的一条（PriceAt 取不晚于某时刻的最新样本，需要它作为前值）。另设每对象上限 MaxSamplesPerObject = 5000（约 0.7 MB）；超过时删除最旧的样本，依赖它们的案例在标注时自然得到 CENSORED。按实测频率，无未完成案例时 1 天窗口约 700 条、约 0.1 MB。</p>
+<h3>验证</h3>
+<p>测试覆盖：冲突后重试成功、三次都冲突时报错、非冲突错误不重试；审计在 AuditCount 之后连续编号、截断或改写仍被拒绝、分页结果与旧切片口径一致、超过 5,000 条后 audit 查询仍可用；目标记录不含 input_snapshot、投递请求与改动前相同、6 小时归档；趋势基准按窗口取值、无窗口时为 TREND_WINDOW_UNDEFINED；样本裁剪保留前值、不删除未完成案例与待注入回执需要的样本、上限生效；以 5 分钟周期模拟 7 天运行，内部状态编码大小保持在 1 MiB 以下。影子环境升级后需登记带 trend_window_seconds 的新策略版本，取值属于参数标定，另行实验确定。</p>
+</section>
+<section id="baseline-composition-design">
+<h2>v2.6.0 行情基线、预排事件与有界调整</h2>
+<p>实现 S2-011（修订）、S2-012（修订）与 S2-025～S2-027。依据：框架复审 <code>doc/engineering/FRAMEWORK_REVIEW_BASELINE_EXPOSURE.md</code> 第 7～11 节，以及 E1（财报周期）、E2（行情基线）、E3（新闻研判回放）三项实验。设计原则是结构一次到位，因子按证据逐个启用：所有新增分量都有“启用 / 只记录 / 停用”状态，只记录时照常计算并进入假设账务，供前向检验积累证据。</p>
+<figure><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 330" role="img" aria-labelledby="comp-title comp-desc"><title id="comp-title">应持仓位的分层合成</title><desc id="comp-desc">行情基线、行情研判与预排事件相加形成核心方向；事件调整叠加在核心之上，与核心反向时最多压到空仓；合成值量化为离散档位，再经波动、流动性与风险约束，最后经过成本感知的无交易带与冷却才形成提交给交易层的目标。</desc>
+<defs><marker id="comp-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#006e82"/></marker></defs>
+<g fill="#eef7f8" stroke="#006e82" stroke-width="2">
+<rect x="15" y="20" width="200" height="52" rx="8"/><rect x="15" y="86" width="200" height="52" rx="8"/><rect x="15" y="152" width="200" height="52" rx="8"/>
+<rect x="15" y="236" width="200" height="60" rx="8"/>
+<rect x="285" y="86" width="170" height="52" rx="8"/><rect x="285" y="236" width="170" height="60" rx="8"/>
+<rect x="525" y="150" width="160" height="60" rx="8"/><rect x="745" y="40" width="140" height="60" rx="8"/><rect x="745" y="150" width="140" height="60" rx="8"/><rect x="745" y="250" width="140" height="60" rx="8"/></g>
+<g fill="#17384a" font-family="sans-serif" font-size="14" text-anchor="middle">
+<text x="115" y="44">L1 行情基线 B</text><text x="115" y="62" font-size="12">按日 · 因子加权 · 可做空开关</text>
+<text x="115" y="110">L2 行情研判 L</text><text x="115" y="128" font-size="12">周期 · 默认 SHADOW</text>
+<text x="115" y="176">L4 预排事件 S</text><text x="115" y="194" font-size="12">日程窗口 · 模板自动标定</text>
+<text x="115" y="262">L3 事件调整 A</text><text x="115" y="282" font-size="12">情绪账本 · |A| ≤ 上限 ≤ 100%</text>
+<text x="370" y="110">核心 C = B+L+S</text><text x="370" y="128" font-size="12">裁剪到 [−1, 1]</text>
+<text x="370" y="260">合成 X = C + A</text><text x="370" y="280" font-size="12">反向只压到 0</text>
+<text x="605" y="176">离散档位 + 滞回</text><text x="605" y="194" font-size="12">0 / 25 / 50 / 100%</text>
+<text x="815" y="66">风险约束</text><text x="815" y="84" font-size="12">波动 · 流动性 · 组合</text>
+<text x="815" y="176">无交易带</text><text x="815" y="194" font-size="12">费用+滑点+资金费</text>
+<text x="815" y="276">目标暴露</text><text x="815" y="294" font-size="12">提交交易层</text></g>
+<g fill="none" stroke="#006e82" stroke-width="2" marker-end="url(#comp-arrow)">
+<path d="M215 46 L285 104"/><path d="M215 112 L285 112"/><path d="M215 178 L285 122"/>
+<path d="M370 138 L370 236"/><path d="M215 266 L285 266"/><path d="M455 260 L525 190"/>
+<path d="M685 170 L745 80"/><path d="M815 100 L815 150"/><path d="M815 210 L815 250"/></g></svg><figcaption>图 D2-L：决策周期中应持仓位的合成顺序。</figcaption></figure>
+<h3>1 兼容性</h3>
+<p>Policy 新增可选字段 <code>composition</code>。缺省（null）时 Decide 走原路径：LevelFor(|net|) → Exposure（含 fconf）→ UNKNOWN 乘数，结果与 v2.5.8 逐位相同，现有冻结夹具不改。声明后走本章路径。合成路径仍复用原有的 Quantity、SizeAndStop、止损、恢复、交付阻断、STOP_CYCLE_NO_REOPEN 与冷却逻辑，只替换“raw 暴露”的计算并在其后增加无交易带。</p>
+<h3>2 数据模型</h3>
+<ul>
+<li><b>Composition</b>（Policy.composition）：
+<code>baseline: [{factor_id, weight, state, max_age_seconds, evidence_ref}]</code>、<code>allow_short_baseline</code>（bool）、<code>missing_policy</code>（ZERO | HOLD_REDUCE_ONLY）；
+<code>assessment: {factor_id, state, max_age_seconds, evidence_ref, force_reduce} | null</code>；
+<code>scheduled: {state, cap}</code>；
+<code>adjustment: {state, cap, scale, event_only_cap}</code>（0 ≤ event_only_cap ≤ cap ≤ 1，scale &gt; 0）；
+<code>levels: [{enter, exit, exposure}]</code>（与 Level 同结构，作用于 |X|，exposure 单调递增且 ≤ 1）；
+<code>rebalance: {band_floor, expected_hold_seconds, funding_fallback_annual, adjust_interval_seconds, reverse_confirm_seconds}</code>。state 取 ENABLED | SHADOW | DISABLED。校验：权重有限且 Σ|weight| ≤ 1；ENABLED 的因子必须有非空 evidence_ref；levels 满足 exit &lt; enter 且 enter 单调；所有秒数为正整数。</li>
+<li><b>FactorSeries</b>（StrategyState 新增 Ordered，键 factor_id）：<code>definition {factor_id, purpose: BASELINE|ASSESSMENT, value_min −1, value_max 1, cadence_seconds, source_manifest}</code> 在初始登记中给出；<code>observations [{observation_id, available_at, value, force_reduce, inputs_hash, evidence_ref, supersedes}]</code> 只追加，每个因子保留最近 512 条（更早的写入 factor_observation_archive 只追加表，与 decision_archive 同构）。</li>
+<li><b>ScheduledEvents</b>（Ordered，键 schedule_id）：<code>{schedule_id, object_id, event_type, expected_at, certainty: CONFIRMED|ESTIMATED, source_ref, revision, status: SCHEDULED|CANCELLED, windows_state: {window_id: PENDING|OPEN|CLOSED|VOID}}</code>。</li>
+<li><b>Templates</b>（Ordered，键 event_type + "/" + window_id）：<code>{start_offset_seconds, end_offset_seconds, certainty_required, prior: {mean, n0, evidence_ref}, scale, cap, min_n, gate_t, forget_cases, stats: {n, mean, m2, n_eff}, state}</code>。prior.n0 = 0 表示无离线证据。</li>
+<li><b>LayerLedger</b>（Ordered，键 object_id + 日期 UTC）：每个分量的 <code>{exposure_seconds, pnl, cost_fee, cost_funding, hypothetical: bool}</code>，日终封存后不再改写，保留 400 天。</li>
+<li><b>ObservedObject</b> 新增 <code>core_direction</code>、<code>reverse_candidate {direction, since}</code>、<code>last_adjustment_trade_at</code>。</li>
+<li>Decision 新增 <code>components {baseline, assessment, scheduled, adjustment, core, combined, level, exposure, trigger_layer, shadow: {…}}</code>，全部为十进制字符串；参与 input_hash。</li>
+</ul>
+<h3>3 新命令（公共接口，需 signal 资格）</h3>
+<ul>
+<li><code>SUBMIT_FACTOR_OBSERVATION {factor_id, observation_id, available_at, value, force_reduce?, inputs_hash, evidence_ref, supersedes?}</code>：available_at 不得晚于框架时钟，也不得早于该因子最近一条观测；value 超界拒绝（FACTOR_VALUE_OUT_OF_RANGE）；同 observation_id 同内容幂等返回，不同内容 FACTOR_OBSERVATION_CONFLICT；supersedes 只能指向同因子最近一条且尚未被任何决策引用的观测，否则 FACTOR_OBSERVATION_IMMUTABLE。</li>
+<li><code>UPSERT_SCHEDULED_EVENT {schedule_id, object_id, event_type, expected_at, certainty, source_ref, revision, status}</code>：revision 必须严格递增；已 OPEN 或 CLOSED 的窗口不受 expected_at 变化影响，PENDING 窗口按新时刻重算；CANCELLED 时 OPEN 窗口转 VOID（不形成案例），PENDING 窗口转 VOID。event_type 必须在 Templates 中有定义（SCHEDULED_TEMPLATE_UNKNOWN）。</li>
+</ul>
+<p>两条命令都写审计，进入 outbox 供查询服务读取；查询服务新增资源 factor-series、scheduled-events、templates、layer-ledger，分页语义同 S2-024。</p>
+<h3>4 决策周期中的合成</h3>
+<p>在 UpdateRegime 与 EvaluateLearning 之后、LevelFor 之前执行 Compose(state, obj, at, view, p)。记 val(f) 为因子 f 在 at 时刻可用（available_at ≤ at 且 at − available_at ≤ max_age_seconds）的最新未被取代观测值，找不到时为缺失。</p>
+<ol>
+<li>B = Σ weight·val(f)，对 baseline 中 ENABLED 的因子；任一 ENABLED 因子缺失时按 missing_policy：ZERO 令该项为 0；HOLD_REDUCE_ONLY 令 B 为 0 并给出原因 BASELINE_STALE，同时目标只能向零靠拢。allow_short_baseline 为 false 时 B = max(B, 0)。B 裁剪到 [−1, 1]。</li>
+<li>L = assessment 为 ENABLED 时取 val，否则 0；观测带 force_reduce 时设 force = true。</li>
+<li>S = Σ 模板贡献：对每个 status = SCHEDULED 的同对象日程、每个模板窗口，若 expected_at + start_offset ≤ at &lt; expected_at + end_offset 且满足 certainty_required，则窗口为 OPEN。贡献 = clip(μ̂ / scale, −1, 1) × cap，μ̂ 见第 6 节；未通过门控时贡献为 0（记入 shadow）。S 裁剪到 [−scheduled.cap, scheduled.cap]。</li>
+<li>C = clip(B + L + S, −1, 1)。</li>
+<li>A = clip(net / adjustment.scale, −1, 1) × adjustment.cap × fconf，其中 net、fconf 与原 Exposure 中定义相同（fconf = quality·|net| /(plus + minus + ε)）。adjustment 非 ENABLED 时 A = 0。</li>
+<li>合成 X：若 C = 0，X = clip(A, −event_only_cap, event_only_cap)；否则 X = C + A，若 sign(X) ≠ sign(C) 则 X = 0；X 裁剪到 [−1, 1]。</li>
+<li>档位：level = LevelFor(|X|, obj.Level, composition.levels)；dir = sign(X)，若 dir 与 obj.core_direction 不同且 C ≠ 0，进入反向确认：reverse_candidate 不同则重置 since = at；at − since &lt; reverse_confirm_seconds 时 level = 0（REVERSE_CONFIRMING），否则更新 core_direction。</li>
+<li>raw = dir × levels[level−1].exposure × fvol × fliq（fvol、fliq 与原公式相同，不再乘 fconf，因为它已在 A 中）；UNKNOWN 状态乘数照旧。force = true 时 raw 的绝对值不得超过当前实际暴露（只减不加）。</li>
+<li>对 SHADOW 的因子、研判、模板与调整，分别以“若启用”计算对应的 X、level、raw，结果写入 components.shadow，不影响目标。</li>
+</ol>
+<p>其后原有流程（Quantity、SHORT_UNAVAILABLE、FLATTEN_BEFORE_REVERSE、SizeAndStop、保护、阻断）不变。FLATTEN_BEFORE_REVERSE 的判断改为比较 raw 与实际持仓方向（原实现比较 view.Net，合成路径下 view.Net 可能与目标方向不同）。</p>
+<h3>5 成本感知调仓</h3>
+<p>合成路径用无交易带取代原 MinAdjustment 判断，冷却规则保留。设当前暴露 e<sub>c</sub> = (actual + pending) × price × multiplier / equity，目标暴露 e<sub>t</sub>。funding 取 P1 交易快照中该品种最新的资金费率年化值（见 P1 设计第 15 章），没有时取 funding_fallback_annual；持仓方向为多时多头支付为正成本。</p>
+<pre>band = max(band_floor, 2·(fee_rate + slippage_fraction) + |funding|·expected_hold_seconds/31536000)</pre>
+<ul>
+<li>|e<sub>t</sub>| &lt; |e<sub>c</sub>| 且 e<sub>t</sub> = 0、force、止损或保护相关：立即执行。</li>
+<li>|e<sub>t</sub> − e<sub>c</sub>| &lt; band：保持当前，原因 NO_TRADE_BAND。</li>
+<li>本次变化只由调整分量引起（与上一个已执行决策相比 C 与档位以外的分量未变，即 trigger_layer = ADJUSTMENT）且 at − last_adjustment_trade_at &lt; adjust_interval_seconds：保持，原因 ADJUSTMENT_INTERVAL。</li>
+<li>trigger_layer 取与上一个已执行决策相比 |Δ分量| 最大者（BASELINE / ASSESSMENT / SCHEDULED / ADJUSTMENT），并列时按此顺序。</li>
+</ul>
+<h3>6 模板的在线标定</h3>
+<p>窗口 CLOSED 时（at ≥ expected_at + end_offset 且期间日程未取消），取对象价格代理在窗口起止时刻的价格（PriceAt，取不晚于该时刻的最新有效样本），r = ln(p<sub>end</sub>/p<sub>start</sub>)，缺价时案例记 CENSORED 且不更新。有效样本先按遗忘系数衰减：λ = 2<sup>−1/forget_cases</sup>（forget_cases = 0 表示不遗忘），n_eff ← λ·n_eff + 1，mean、m2 用加权 Welford 更新。收缩估计 μ̂ = (n0·prior.mean + n_eff·mean)/(n0 + n_eff)；门控：n0 = 0 时要求 n_eff ≥ min_n 且 |mean|/(sd/√n_eff) ≥ gate_t，否则贡献为 0；n0 &gt; 0（有离线证据）时直接使用 μ̂。每个案例写入 Cases，kind = SCHEDULED_WINDOW，进入 S2-016～S2-018 的现有标注与归因。收缩强度、门控与遗忘的初始值由 E7 实验标定，写入 P3 初始登记。</p>
+<h3>7 分层归因</h3>
+<p>反馈周期在处理成交与资金费收入后，对每个对象把 [上次结算时刻, 本次] 的持仓收益分摊：持仓数量 q 的收益 Δpnl 按最近决策 components 中各启用分量对 X 的有向份额 s<sub>i</sub> = x<sub>i</sub>/X 分摊（X = 0 时全部归入 UNATTRIBUTED）；其中 x<sub>BASELINE</sub>、x<sub>ASSESSMENT</sub>、x<sub>SCHEDULED</sub> 按其在 C 中的比例拆分 C，x<sub>ADJUSTMENT</sub> = X − C。成交手续费归 trigger_layer；资金费按 s<sub>i</sub> 分摊。分摊后各项之和必须等于实际 Δpnl、费用与资金费（容差 numerical_tolerance），否则冻结增险（LAYER_LEDGER_IMBALANCE）。迟到成交、数量对账与冻结状态的判定见第 17 章。SHADOW 分量：以 components.shadow 中的假设暴露乘以对象收益得到假设收益，假设成本 = |Δ假设暴露|·(fee_rate + slippage_fraction) + 假设暴露·funding·Δt，hypothetical = true 分列。</p>
+<h3>8 权重学习与自动启用</h3>
+<ul>
+<li>learnable 增加 <code>layer:&lt;LAYER&gt;</code> 与 <code>factor:&lt;factor_id&gt;</code>，值即 Composition 中的 cap 或 weight，界限与步长在 ParameterSnapshot 登记。证据单位为 LayerLedger 的日记录：取最近 forget_seconds 内的日净贡献（pnl − 成本），按周分组构成独立组，沿用现有 min_groups、min_neff、置信区间与 deadband 门控。</li>
+<li>ENABLED 分量的置信上界 &lt; 0：按步长降低；降到 0 时把状态改为 SHADOW（审计 LAYER_DEMOTED）。SHADOW 分量的假设净贡献置信下界 &gt; 0 且满足登记的 promotion_min_days：提出启用，经 S2-021 的自动生效、监测与回滚；启用后初始权重为登记的最小步长。</li>
+<li>w 的校验：commands.go 现要求 w &gt; 0，改为 w ∈ [w_bounds.min, w_bounds.max]（必须登记，min 可为负）；Propose 中若提议值与当前值异号（含从 0 出发），required 门槛中的 min_groups、min_neff 按两倍检查。w = 0 时 events.go 的注入量为 0，事件仍进入账本以便积累证据。</li>
+</ul>
+<h3>9 验证</h3>
+<p>单元测试覆盖第 4 节每一步的边界：核心多头 + 强负调整 → 0；核心 0 + event_only_cap = 0 → 0；反向确认期；allow_short_baseline=false；过期观测两种缺失政策；force 只减不加；SHADOW 不影响目标。无交易带的四条规则；模板窗口开闭、修订与取消、收缩与门控、遗忘；分层归因守恒与失衡冻结；w 跨零双倍门槛；降级与启用。冻结回放：现有夹具在 composition = null 时结果不变；新增 composition 夹具一套（日线基线 + 一个预排模板 + 事件调整）。容量：FactorSeries 512 条/因子、LayerLedger 400 天/对象，按 1 个对象估算增加约 0.3 MB。契约重新导出（policy、decision、新命令、新查询资源）。</p>
+</section>
+<section id="baseline-composition-patch"><h2>v2.6.1 合成路径的两处补充</h2>
+<p>v2.6.0 实现过程中发现两处设计不足，按本节修正，业务式样不变。</p>
+<h3>逐事件窗口时刻</h3>
+<p>模板的 start_offset_seconds / end_offset_seconds 只能表达固定秒数，无法表达“财报前 20 个交易日”这类随交易所日历变化的窗口。UPSERT_SCHEDULED_EVENT 增加可选字段 <code>windows: {window_id: {start_at, end_at}}</code>（UTC，start_at &lt; end_at），由应用按交易所日历计算后提交。提供时以它为准，未提供时按模板偏移计算。window_id 必须是该 event_type 模板中已定义的窗口（SCHEDULED_WINDOW_UNKNOWN）。修订规则不变：只有 PENDING 窗口随新修订改变时刻，OPEN 或 CLOSED 的窗口保持原时刻。</p>
+<h3>基线缺失时的 HOLD_REDUCE_ONLY</h3>
+<p>v2.6.0 写为“令 B 为 0，同时目标只能向零靠拢”，实现结果是基线一旦过期就平仓，与“保持、只减”的本意不符。改为：ENABLED 因子的观测超过 max_age_seconds 但未超过 2 × max_age_seconds 时，沿用最近一次有效观测的值，并令目标暴露的绝对值不超过当前实际暴露（只减不加），原因 BASELINE_STALE；超过 2 × max_age_seconds 后，该因子取 0，原因 BASELINE_MISSING。ZERO 政策不变。</p></section>
+<section id="bar-sigma-fallback"><h2>v2.6.2 无价格代理时的波动估计（SIM）</h2>
+<p>对应 S2-012 中“受波动、流动性修正”的既有规则，业务式样不变。影子部署时发现：价格样本的 σ 与流动性只来自初始登记的静态 PRICE_PROXY 清单，影子从未登记，因此 Exposure 与 CompositionExposure 恒为 0（v2.5.8 影子也从未能形成非零目标）。静态清单也无法随行情更新。</p>
+<figure><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 200" role="img" aria-labelledby="sig-title sig-desc"><title id="sig-title">价格样本的波动与流动性来源</title><desc id="sig-desc">登记了有效价格代理时，波动与流动性取代理观测；未登记时，在 SIM 环境由最近已完成 K 线的收盘对数收益估计波动，流动性按策略的流动性预算计；LIVE 环境仍要求价格代理，缺失时暴露为零。</desc>
+<defs><marker id="sig-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#006e82"/></marker></defs>
+<g fill="#eef7f8" stroke="#006e82" stroke-width="2"><rect x="15" y="40" width="250" height="100" rx="10"/><rect x="325" y="40" width="250" height="100" rx="10"/><rect x="635" y="40" width="250" height="100" rx="10"/></g>
+<g fill="#17384a" font-family="sans-serif" font-size="14" text-anchor="middle"><text x="140" y="72">有效价格代理</text><text x="140" y="96" font-size="12">σ、流动性取代理观测</text><text x="140" y="116" font-size="12">（原规则，优先）</text>
+<text x="450" y="72">SIM 且无代理</text><text x="450" y="96" font-size="12">σ = 已完成 K 线对数收益标准差</text><text x="450" y="116" font-size="12">流动性 = liquidity_budget</text>
+<text x="760" y="72">LIVE 且无代理</text><text x="760" y="96" font-size="12">σ 缺失 → 暴露为 0</text><text x="760" y="116" font-size="12">（原规则）</text></g>
+<g fill="none" stroke="#006e82" stroke-width="2" marker-end="url(#sig-arrow)"><path d="M265 90H325"/><path d="M575 90H635"/></g></svg><figcaption>图 D2-S：价格样本的 σ 与流动性来源。</figcaption></figure>
+<ul>
+<li>有效 PRICE_PROXY 清单存在时，规则不变。</li>
+<li>环境为 SIM 且没有有效清单时：σ 取交易快照中该对象最近 noise_window + 1 根已完成、质量为 VALID、相邻间隔不超过 max_bar_gap_seconds 的 K 线，按收盘价对数收益的样本标准差计算（单位与 sigma_ref 相同，为每根 K 线）。不足 noise_window + 1 根或存在超限间隔时 σ 为缺失（暴露为 0，原规则）。流动性取 policy.liquidity_budget，即不构成约束，并在决策原因中记录 SIGMA_FROM_BARS 与 LIQUIDITY_ASSUMED。</li>
+<li>环境为 LIVE 时仍必须登记有效价格代理，否则 σ 缺失、暴露为 0。</li>
+<li>K 线结构与 bars_ref 不变，现有冻结回放（均登记了价格代理）结果不变。</li>
+</ul>
+<p>测试：无清单的 SIM 对象由 K 线得到 σ 且与手算一致；K 线不足或有超限间隔时 σ 缺失；LIVE 无清单时暴露为 0；有清单时与原结果相同。</p></section>
+<section id="sim-experiment-quality"><h2>v2.6.3 SIM 环境允许 EXPERIMENT_ONLY 增险</h2>
+<p>对应 S2-012/S2-013 的既有门控，业务式样不变。原实现在任何环境中，只要策略或参数的 quality_state 不是 VALIDATED，就阻止增险（RECOVERY_OR_PAUSE_OR_DELIVERY_BLOCK）。P3 设计对 EXPERIMENT_ONLY 的定义是“临时人工联调阈值，不能替代实盘准入证据”，即它本来就用于非 LIVE 的联调与影子运行。现在影子 SIM 运行因此永远无法形成持仓，前向检验也无从积累实际账务。</p>
+<ul>
+<li>环境为 SIM 时，策略与参数的 quality_state 为 VALIDATED 或 EXPERIMENT_ONLY 均允许增险，评分准入（S2-003）也不再因此标为 RESEARCH_ONLY；REQUIRED_UNSET 仍然阻止。只记录的事件调整由此可以在影子中积累前向证据。</li>
+<li>环境为 LIVE 时规则不变，必须两者都是 VALIDATED。</li>
+<li>对象状态、恢复状态、风险锁与交付未知的阻止条件不变；学习的启用门槛（S2-019～S2-021 中要求 VALIDATED 的部分）不变。</li>
+<li>测试：SIM + EXPERIMENT_ONLY 可以开仓且评分被准入；SIM + REQUIRED_UNSET 被阻止；LIVE + EXPERIMENT_ONLY 被阻止。</li>
+</ul></section>
+<section id="withdraw-kline-design"><h2>v2.7.0 撤回 K 线行情判断</h2><p>对应 <a href="02_策略化框架层式样书.html#withdraw-kline-spec">第 9 章 S2-011/S2-012 再修订、T2-22</a>。本节优先于本页 v2.6.0 合成公式及 v2.6.2 波动估计。仅做已明确方法的删除，不引入新因子、外部依赖或下层私有调用。</p><h3>代码与计算顺序</h3><p>domain/composition.go 的 CompositionExposure 改为 <code>raw = dir × levels[level−1].exposure × f_liq</code>，其中 <code>f_liq = min(1, min(liquidity, liquidity_budget) / max(equity × level_exposure, epsilon))</code>。只要求有效价格样本及 liquidity，不再要求 sample.Sigma。删除 f_vol；证据质量仍只进入调整 A，不重复乘入核心。shadow 复用同一公式。</p><p>application/decision_cycle.go 在 composition 非空时不调用 UpdateRegime，不从历史样本生成状态；保持使用者已登记的状态输入供查询和原有学习门控读取，但不得对 raw 或 shadow.Exposure 施加 UNKNOWN 乘数。无 composition 时保留 UpdateRegime、Exposure 与 UNKNOWN 乘法原样，T2-17 冻结。</p><p>删除 domain/stop.go 的 BarSigma 及 SIGMA_FROM_BARS 暴露分支。价格优先由 P1 Snapshot 的 MARK 样本提供；合成路径在 SIM 无有效代理且无价格样本时，由 decision_cycle.go 取最新已完成、质量 VALID、收盘价为正且当时可用的 K 线收盘价，仅作价格点；仍执行 MaxPriceAgeSeconds 校验，SIM 无有效 PRICE_PROXY 时仅在合成路径把 liquidity 设为 policy.liquidity_budget，记录 LIQUIDITY_ASSUMED，不填 σ；LIVE 不假设流动性，缺失时 raw=0。有有效代理时继续读取价格/流动性，不以代理 σ 缩放合成仓位。sigma_ref、unknown_regime_multiplier 字段与契约保持，合成路径不再使用，兼容已登记策略及旧路径。</p><h3>下层接口与异常</h3><p>继续经 ports.Trading.Snapshot / P1 公开 GET 市场、账户和品种接口读取，不新增调用。Quantity → NormalNoise（已完成 K 线 TR 稳健分位数）→ SizeAndStop → 保护与组合风险流程保持；NormalNoise 及 S2-014 的窗口、间隔、质量、微观距离、单笔预算和旧批次不放宽。价格陈旧、流动性缺失、币种未知、噪声未知、恢复或交付异常按原原因阻断。停止 BarSigma 不得使止损绕过缺数门控。</p><figure class="revision-figure"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 316" role="img" aria-labelledby="d2-v270-title d2-v270-desc"><title id="d2-v270-title">图 D2-K270：合成与冻结路径分离</title><desc id="d2-v270-desc">composition 非空 → 登记输入 → Compose → f_liq → 价格：P1 快照；SIM 无代理仅假设流动性预算 → Quantity → TR 分位止损 → 组合风险 → P1 → composition 为空 → 冻结 Exposure / Regime 路径</desc><rect x="12" y="10" width="656" height="54" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="43" text-anchor="middle" font-size="19" fill="#17384a">composition 非空 → 登记输入 → Compose → f_liq</text><path d="M340 64v20m-5 -6l5 6 5 -6" fill="none" stroke="#006e82"/><rect x="12" y="84" width="656" height="54" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="117" text-anchor="middle" font-size="19" fill="#17384a">价格：P1 快照；SIM 无代理仅假设流动性预算</text><path d="M340 138v20m-5 -6l5 6 5 -6" fill="none" stroke="#006e82"/><rect x="12" y="158" width="656" height="54" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="191" text-anchor="middle" font-size="19" fill="#17384a">Quantity → TR 分位止损 → 组合风险 → P1</text><path d="M340 212v20m-5 -6l5 6 5 -6" fill="none" stroke="#006e82"/><rect x="12" y="232" width="656" height="54" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="265" text-anchor="middle" font-size="19" fill="#17384a">composition 为空 → 冻结 Exposure / Regime 路径</text></svg><figcaption>图 D2-K270：合成与冻结路径分离</figcaption></figure><h3>测试与参考</h3><p>go_composition_test.go 验证 σ 缺失/极大/参考值变化不影响合成、流动性仍限制、空基线无核心；go_composition_api_test.go 验证 UNKNOWN 乘数为零/非零都不改变实际和 shadow 暴露、不调用历史状态引擎、SIM 价格与流动性 fallback、LIVE 缺流动性阻断及止损缺数阻断。T2-17 原逐位回放与止损测试保留，冻结夹具不改。开源参考沿原章固定 Financier/timeseriescv 等文件，仅保留既有算法，无新上游方法。</p></section>
+<section id="lower-compat-design"><h2>14 v2.8.0 直接反向与止损指令实现设计</h2>
+<p>唯一对应<a href="02_策略化框架层式样书.html#lower-compat-spec">式样第 10 章 S2-028～032 / T2-23～27（R7～R11）</a>；依赖<a href="01_交易系统层设计书.html#lower-compat-design">P1 第 18 章</a>公开契约。本章取代旧 FLATTEN_BEFORE_REVERSE、确认期 level=0 强制归零、存量保护只收紧及同量目标清空止损的实现；v2.7.0 撤回 K 线方向判断继续有效。本版只设计，源码和 contracts/v2 尚未更新。（v2.9.0 注：本章已由 v2.8.0 代码 PR #101 实施并导出契约；文中“本轮不改生成文件”“后续代码 PR”等为当时状态。14.8、14.9.3 中留给 v2.9.0 的收盘触发与“行情判断”模块，由第 15 章与 P3 第 28 章的新闻研判承接。“v2.6.0 行情基线、预排事件与有界调整”节中的 FLATTEN_BEFORE_REVERSE 已被本章 S2-028 取代；第 11 章所列 .py 路径为退役的 Python 实现，现行实现为 Go 的 strategy/application/query_service.go 与 strategy/api。）</p>
+<h3 id="p2-structure280">14.1 代码结构与实际调用点</h3>
+<div class="table-wrap"><table><thead><tr><th>现有代码</th><th>后续改动与归属</th></tr></thead><tbody><tr><td><a href="../../src/factorforge/strategy/domain/composition.go">domain/composition.go</a>：Composition.Validate / Compose</td><td>ReverseConfirmSeconds 从 >0 改为 ≥0；确认等待不再 level=0 导致平仓，返回保持当前意图的原因与候选状态，完成后给出直接反向暴露。</td></tr>
+<tr><td><a href="../../src/factorforge/strategy/domain/stop.go">domain/stop.go</a>：NormalNoise / SizeAndStop / ActualRiskTarget</td><td>噪声法保留为无指令后备；提取共享的“给定距离/触发价 → 成本后风险量 → 按步长缩量”确定性函数，初始距离不依赖 NormalNoise。存量指令更新与开仓 sizing 分开。</td></tr>
+<tr><td><a href="../../src/factorforge/strategy/application/decision_cycle.go">application/decision_cycle.go</a>：Tick / Dispatch</td><td>删除先发 0 分支；新增每周期指令选择与保护更新分支，不在 target==actual 或 target==actual+pending 时无条件 stop=nil；按是否含新开部分判断增险。</td></tr>
+<tr><td><a href="../../src/factorforge/strategy/application/composition_commands.go">application/composition_commands.go</a> / <a href="../../src/factorforge/strategy/api/http.go">api/http.go</a></td><td>沿因子观测的 Command、CAS、审计与身份校验方式，新增本层 domain/stop_directive.go、application/stop_directives.go、api/stop_directive_contract.go；不调用应用层模块。</td></tr>
+<tr><td><a href="../../src/factorforge/strategy/adapters/trading_v2.go">adapters/trading_v2.go</a>：Snapshot / Prepare / Deliver</td><td>Snapshot 保留 P1 保险/上层角色、方向、周期和核验时间；Prepare 保存完整保护计划，Deliver 继续调用公开 P1 目标 API。不直接写 P1 数据库或调用其 domain。</td></tr></tbody></table></div><p>新增测试归 tests/strategy，契约归 contracts/v2/strategy；策略存储与迁移仍归本层 adapters/postgres。API DTO 使用公开值类型；没有新增上层包、manifest、语言运行时、模型依赖或解释器。</p>
+<h3 id="p2-contract280">14.2 止损指令公开契约</h3>
+<p>新增 <code>POST /api/v2/strategy/stop-directives</code>（命令 <code>SUBMIT_STOP_DIRECTIVE</code>），与现有 POST /factor-observations 同级；新增 <code>GET /api/v2/strategy/objects/{object_id}/stop-directives</code> 查询指令及生效回执。公共 listener 按对象写范围核验，研究身份只产生研究记录；执行有效指令必须同时具备对象范围的来源写授权与 workload 的 signal:sim / signal:live 资格，沿现有独立 listener/类型/数据库授权，不把公开 ApiScope 当作信号能力。</p>
+<div class="table-wrap"><table><thead><tr><th>字段（StopDirectiveCommand）</th><th>类型与校验</th></tr></thead><tbody><tr><td>Command 公共字段</td><td>schema_version=strategy-2.0、request_id、idempotency_key、expected_version、reason；身份/instance/environment 由认证上下文与对象绑定取得，不能由请求自授。</td></tr>
+<tr><td>directive_id、object_id、version</td><td>不透明 ID、已存在对象、正整数版本；版本按 object_id + source_module + kind 严格递增，同 ID/版本同内容幂等，改内容冲突。与聚合 expected_version 分开。</td></tr>
+<tr><td>kind</td><td>POSITION_STOP（持仓期绝对触发价）或 INITIAL_DISTANCE（拟开方向的初始距离），不能混合两种语义。</td></tr>
+<tr><td>position_direction</td><td>LONG|SHORT；POSITION_STOP 必须与 P1 当前非零实际持仓符号相同。INITIAL_DISTANCE 只绑定拟开方向，消费时核对目标/新开方向，空仓不伪造实际方向。</td></tr>
+<tr><td>trigger_price、trigger_kind</td><td>POSITION_STOP 必填正十进制字符串、支持的价格类型（MARK / LAST 等以 P1 品种声明为准）；VENUE 按 tick 校验，UPPER_MANAGED 的管理声明不做交易所 tick 舍入；两者均以相同类型的新鲜当前价格校验未穿越。INITIAL_DISTANCE 的 trigger_price 为 null，触发价由开仓参考价与距离计算；trigger_kind 仍必填。</td></tr>
+<tr><td>initial_stop_distance</td><td>仅 INITIAL_DISTANCE 必填，正十进制字符串，单位为该品种报价价格单位的绝对距离；POSITION_STOP 为 null。不得把比例、价格或币种混用。</td></tr>
+<tr><td>effective_at、valid_for_seconds</td><td>UTC 时刻与正整数有效秒数；有效区间 [effective_at, effective_at + valid_for_seconds)，接收时须已生效且未到期。保存 received_at / accepted_at，不回填历史可用时间；周期只能用接收和验证均已完成的记录。</td></tr>
+<tr><td>source_module、reason_codes</td><td>已登记来源模块 ID、非空有界原因代码列表；来源与认证身份的写授权绑定，不能只相信正文名称。来源代码和 ID 不携带 Prompt 或自由指令。</td></tr></tbody></table></div>
+<p>来源登记以对象、环境和 kind 为范围指定唯一可执行写来源；其他来源仅研究或拒绝执行，不能用到达先后隐式决定多个模块的优先级。绑定记录 StopDirectiveWriterBinding={binding_id,version,source_module,principal_id,object_id,environment,kind,can_write,valid_from,valid_until?}，由本层身份/对象政策的受控装配与授权存储维护；指令接口不接受自建绑定，接收用例先 CheckWorkload 再核对来源绑定，公共研究写权限与执行能力分离。每次接收、决策消费和派发均复核授权。POSITION_STOP 使用 P1 的最新一致 Snapshot 查询实际方向与 trigger_kind 价格；价格缺失/陈旧时拒绝进入可执行状态，不能拿 MARK 代验 LAST。</p>
+<p><code>StopDirectiveReceipt</code> 含 directive_id、object_id、version、state（RESEARCH_ONLY / ACCEPTED / EXPIRED / SUPERSEDED）、received_at、accepted_at、effective_at、expires_at、reason_codes、current_version；ACCEPTED 只表示指令已登记。查询另返回 <code>application_state</code>（NOT_APPLIED / TARGET_PENDING / P1_ACCEPTED / RECORDED / VERIFIED / REJECTED / UNKNOWN）、source_decision_id?、target_version?、protection_id?、verified_at?。P1_ACK 不表示模式切换或条件保护已生效，VENUE 只有角色/方向/周期/字段均匹配的 ACTIVE_VERIFIED 才可记 VERIFIED；UPPER_MANAGED 以 P1 生效模式/声明和有效保险核对后记 RECORDED，不等待 STRATEGY 单。</p>
+<p>StrategyState 新增有限的 StopDirectives 索引和 LastEffectiveStrategyStop 投影，保存来源/版本/时间/哈希、P1 实际方向/周期/保护 ID、最后已核验计划及对应目标版本。每个对象/来源/kind 只把最新记录留在活跃索引，已引用、被取代及过期记录写本层只追加 stop_directive_archive；决策与 outbox 保留其不可变引用，旧回执继续可查。上层指令不能覆盖 P1 保险价或账户政策。</p>
+<h3 id="p2-reversal280">14.3 反向确认与新开风险</h3>
+<p>Compose 保留 ReverseCandidate{direction,since}，候选改变或消失即重置。合成策略读 composition.rebalance.reverse_confirm_seconds，校验 ≥0；0 在首次满足方向条件的同一周期完成确认。等待期间保留原实际/未完成意图与原方向保护，记 REVERSE_CONFIRMING，不发目标 0；若另有强制减险、停止或风险命令，按其独立原因减险，不以确认等待阻断它。</p>
+<p>确认结束直接以新方向 raw → Quantity → 新方向止损 sizing → 账户风险投影 → 目标 outbox 派发。删除 decision_cycle 中比较 directionInput 与 actual/pending 后强制 target=0 的分支。非合成执行路径若继续使用，也取消该强制归零；通过 Policy.reverse_confirm_seconds 显式登记同语义确认期，未登记禁止新增反向风险。历史 Exposure/噪声数学夹具仍冻结，T2-17 的历史先平后反执行断言由本版 T2-23 替代；不得把本次有意变化写成全部旧状态转换逐位不变。</p>
+<p>Tick、SharedProjection/ExistingRiskScale 的调用与 Dispatch 不再只用 |target| &gt; |actual+pending| 判断增险。统一依据 P1 公开实际、待成交风险和目标方向分解新开部分；反向含新开量时，无论绝对值变大、相等或变小，均执行资格/恢复/交付未知/停止、账户预算、时段预占与 STOP_CYCLE_NO_REOPEN 门。反手只有一个新开业务意图预约，拆单、重试及部分成交不重复占额；减仓豁免不得误放行反手。</p>
+<p>目标只包含新开部分的上层保护覆盖需求，不用旧方向最紧价钳制新方向计划。实际成交反馈若跨零，关闭旧方向案例并建立新方向案例；费用按同一真实成交中平仓/开仓数量分配且加总守恒，不要求外部成交必须出现中间零仓快照。</p>
+<h3 id="p2-cycle280">14.4 决策周期与持仓期保护更新</h3>
+<p>每周期仍先读交易事实与保护、处理旧贡献/新评分并形成数量建议。之后独立处理保护指令：读取本周期截止前已接收的最新可执行 POSITION_STOP，复核有效期、来源、实际方向、价格类型和未穿越；VENUE 比较当前 P1 已核验 STRATEGY 的 (trigger_kind, trigger_price)，UPPER_MANAGED 按 14.9 比较 P1 生效声明的模式/M/O；不与 INSURANCE 比较是否“需要更新”。有差异或 VENUE 上层保护缺失时，VENUE 覆盖量设 |actual|，UPPER_MANAGED 保留完整管理声明，写新的 target_version 与完整计划；纯保护意图的 target_quantity 保持既有规范目标数量。无未成交差额时等于实际量，有待成交订单时不把它隐式变为撤单指令。</p>
+<p>该分支不再被 stop=nil、无交易带、最小调仓量、冷却或新增风险次数抹除；仅改变保护时不发普通订单。若同周期另有正常数量调整，将计划合并到相同方向的最终目标；反向目标只携新方向计划，原方向持仓更新不得混入，P1 按实际方向维护。若 P1 为 VENUE 且仅保险而可恢复上层保护，允许保护维护通过，不能因 run_state=DEGRADED 一律跳过；增险仍禁用。Snapshot 不再把仅保护降级一律归为未知外部改仓，按具体原因区分。</p>
+<p>POSITION_STOP 允许在保险边界内放宽，取消按旧最紧价强制收紧的逻辑；不以开仓 sizing 再计算而改变该保护意图的数量。CorrectActualRisk / ActualRiskTarget 必须识别模式、角色和授权的指令更新，不以旧“批次不放宽”规则立即抵消新计划；已有账户硬限、强制减险及真实保护失效处置仍优先。无指令路径继续不因学习改变存量保护。</p>
+<p>新目标受理前/后通过 P1 模式/声明及保护投影跟踪真正生效值；超时先查询 source_decision_id 与目标/保护，未确认前 LastEffectiveStrategyStop 不前移。同指令已有未决 outbox 时推进该意图，不能每周期重复造新版本。较新指令在旧投递结果明确后形成新意图；旧单撤销未确认也需保持追踪。指令在投递前到期或失去方向/权限时，停止未发送更新并保存原因；若 P1 已受理则核验结果，不试图回滚已发生事实。指令过期仅停止继续消费，保留最后实际生效的止损，不发送 cancel/null 计划。</p>
+<figure class="revision-figure"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 450" role="img" aria-labelledby="d2-flow280-title d2-flow280-desc"><title id="d2-flow280-title">图 D2-R280：周期中数量与保护意图的形成</title><desc id="d2-flow280-desc">Trading.Snapshot → 实际、待成交、两角色保护；先处理成交/风险反馈，再按截止时间读取指令 → 反向确认完成 → 直接新方向目标；初始距离或噪声 sizing → 新开部分全部门控 → 持仓有效指令与当前 STRATEGY 不同 → 保护意图；目标数量不变 + 新版本 + 按实际量保护；无普通下单 → 周期事务保存 Decision / TargetOutbox / 指令引用；Dispatch → Prepare → P1 公开目标接口；未知先查 → 按模式核对 P1 保护或管理声明后记最后生效；过期不撤；无指令维持旧保护；重发保留计划</desc><rect x="12" y="12" width="656" height="62" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="37" text-anchor="middle" font-size="18" fill="#17384a">Trading.Snapshot → 实际、待成交、两角色保护</text><text x="340" y="60" text-anchor="middle" font-size="18" fill="#17384a">先处理成交/风险反馈，再按截止时间读取指令</text><path d="M340 74v24m-5 -6l5 6 5 -6" fill="none" stroke="#006e82"/><rect x="12" y="98" width="656" height="62" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="123" text-anchor="middle" font-size="18" fill="#17384a">反向确认完成 → 直接新方向目标</text><text x="340" y="146" text-anchor="middle" font-size="18" fill="#17384a">初始距离或噪声 sizing → 新开部分全部门控</text><path d="M340 160v24m-5 -6l5 6 5 -6" fill="none" stroke="#006e82"/><rect x="12" y="184" width="656" height="62" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="209" text-anchor="middle" font-size="18" fill="#17384a">持仓有效指令与当前 STRATEGY 不同 → 保护意图</text><text x="340" y="232" text-anchor="middle" font-size="18" fill="#17384a">目标数量不变 + 新版本 + 按实际量保护；无普通下单</text><path d="M340 246v24m-5 -6l5 6 5 -6" fill="none" stroke="#006e82"/><rect x="12" y="270" width="656" height="62" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="295" text-anchor="middle" font-size="18" fill="#17384a">周期事务保存 Decision / TargetOutbox / 指令引用</text><text x="340" y="318" text-anchor="middle" font-size="18" fill="#17384a">Dispatch → Prepare → P1 公开目标接口；未知先查</text><path d="M340 332v24m-5 -6l5 6 5 -6" fill="none" stroke="#006e82"/><rect x="12" y="356" width="656" height="62" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="381" text-anchor="middle" font-size="18" fill="#17384a">按模式核对 P1 保护或管理声明后记最后生效</text><text x="340" y="404" text-anchor="middle" font-size="18" fill="#17384a">过期不撤；无指令维持旧保护；重发保留计划</text></svg><figcaption>图 D2-R280：周期中数量与保护意图的形成</figcaption></figure>
+<h3 id="p2-sizing280">14.5 初始止损距离与无指令后备</h3>
+<p>新开/反手新方向优先取匹配拟开方向、已授权且有效的 INITIAL_DISTANCE。记预计入场 P、绝对距离 D&gt;0；δ=D/P，仍检查 MicroDistance、MaxStopFraction 等批准边界。按原 SizeAndStop 的方向取 tick（多向入场方向上取、空向下取；仅 VENUE），得到 trigger，并用指令 trigger_kind 当前价复核未穿越；舍入后严格重验风险，不能以舍入伪装满足距离或预算。若违反最小距离/批准上限、P1 保险边界或 tick 可行性，拒绝该新开，不静默退回更松的噪声计划。</p>
+<p><code>loss_unit=multiplier×(|P−trigger| + overshoot_allowance + P×(fee_rate+slippage_fraction+gap_fraction))</code>，<code>|q|≤ObjectLossBudget/loss_unit</code>，再与方向目标上限取小并按 quantity_step 向零取整；最小名义及 P1 TradeLossLimit 再验。反手仅为新向 |target| sizing，完整反手订单量由 P1 求差额。INITIAL_DISTANCE 不作为持仓期绝对价更新，也不能把当前原方向计划用于反向开仓。</p>
+<p>无有效初始距离指令时，调用 NormalNoise（已完成且当时可用 K 线的 TR 稳健分位）和原 SizeAndStop，保留 NOISE_UNKNOWN、STOP_DISTANCE_UNAPPROVED、MINIMUM_UNIT 等原因。INITIAL_DISTANCE 有效时跳过 NormalNoise 的距离生成，不因噪声数据缺失阻断已经满足全部价格/距离/预算条件的该指令；无指令时噪声缺失仍阻断新开。两种分支使用相同亏损预算，不能因有指令而扩大预算。</p>
+<h3 id="p2-resend280">14.6 未成交重发、派发及实际下层接口</h3>
+<p>待成交意图的计划必须与目标一起持久化；不能从“本周期目标等于 actual+pending”推断无需止损。重发沿该意图保存的方向、计划和覆盖需求；部分成交后 P1 用实际量维护当前保护，剩余新开仍有计划。无有效指令时保持原有效计划，不每周期重新估计并隐式改宽；若旧计划已穿越、品种版本过时或资格撤回，停止新开并核验/取消剩余增险，保留减仓与实际保护。</p>
+<p>Dispatch 沿用已冻结 CommandPayload、decision_id 幂等键和 target_version；DELIVERY_UNKNOWN 先查 P1 SourceDecisions / 目标回执，未核清不造第二个意图。同量同计划的业务续期可以使用新 target_version，但 P1 按 R3/R9 识别为同一数量意图，不撤替有效普通挂单。仅在业务计划变化且旧结果已核清后产生新正文；不能用同幂等键偷偷改变保护内容。</p>
+<p>实际调用链不变：<code>ports.Trading.Snapshot</code> → <code>adapters.TradingV2</code> 的 P1 公开 GET（run、account、positions、orders、targets、protections、instrument/market、fills/income/external facts）；<code>Prepare</code> 生成 <code>dto.TargetRequest</code>，<code>Deliver</code> → <code>PUT /api/v2/trading/owners/{owner_id}/targets/{instrument}</code>。计划字段含 14.9 的模式/管理价/余量，完整送出，方向由目标确定，保险只读；P1 最终核验保险边界和新开风险。新增止损指令只入 P2，不绕过目标入口直接发交易所条件单。</p>
+<p>契约与部署顺序：先实施 P1 双层角色、同量保护更新及一笔反手并验证，再实施 P2 指令/反向，最后导出 contracts/v2/trading、strategy 的公共/工作负载 OpenAPI/JSON Schema。仍用 trading-2.0 / strategy-2.0，不凭文档版本自动修改 schema 字符串；P2 启用前明确验证 P1 契约能力（含 INSURANCE/STRATEGY、UPPER_MANAGED 与保护更新语义），旧 P1 禁止启用新行为，不能静默退回先平后反。生成器、DTO、存储升级与公开客户端在代码 PR 一起审查；本次不修改生成文件。</p>
+<h3 id="p2-errors280">14.7 错误码、持久化与异常恢复</h3>
+<div class="table-wrap"><table><thead><tr><th>状态码 / 原因码</th><th>语义与处置</th></tr></thead><tbody><tr><td>401 UNAUTHENTICATED；403 STOP_DIRECTIVE_WRITE_FORBIDDEN</td><td>未认证或来源未获对象/环境/kind 写权限；保留原保护，不自授 signal 资格。</td></tr>
+<tr><td>404 OBJECT_NOT_FOUND；409 STOP_DIRECTIVE_VERSION_CONFLICT / STOP_DIRECTIVE_CONTENT_CONFLICT</td><td>不泄露其他范围对象；版本倒退、同 ID 不同正文拒绝，同键同文返回原回执。</td></tr>
+<tr><td>422 STOP_DIRECTIVE_INVALID / STOP_DIRECTIVE_DIRECTION_MISMATCH</td><td>非法字段/组合，或 POSITION_STOP 对空仓/与实际方向不一致；INITIAL_DISTANCE 另按拟开方向消费。</td></tr>
+<tr><td>422 STOP_DIRECTIVE_NOT_EFFECTIVE / STOP_DIRECTIVE_EXPIRED</td><td>尚未生效或已到有效区间右端；不撤最后有效止损。消费时到期记跳过原因。</td></tr>
+<tr><td>422 STOP_DIRECTIVE_TRIGGER_UNSUPPORTED / STOP_DIRECTIVE_TICK_MISMATCH；423 STOP_DIRECTIVE_ALREADY_CROSSED</td><td>价格类型不支持、步长不符或已穿越；不把无效新指令写成生效计划。</td></tr>
+<tr><td>423 STOP_DIRECTIVE_PRICE_UNUSABLE / P1_LOWER_COMPAT_REQUIRED</td><td>价格缺失/陈旧，或下层不支持本版语义，阻止相关更新/新开。</td></tr>
+<tr><td>P1 STRATEGY_NOT_TIGHTER_THAN_INSURANCE 等原错误</td><td>完整保留原因，旧生效值不前移；保险有效时保持仅保险/旧上层保护状态，按 P1 事实展示。</td></tr></tbody></table></div>
+<p>接收指令的 CAS、存储错误与审计失败无部分业务提交。周期事务写 Decision、指令引用和 TargetOutbox 后才派发；网络失败保持 UNKNOWN 并按既有查询规则核验。重启先恢复指令/回执/未决 outbox，再读 P1 实际持仓周期和两角色保护；旧周期指令不迁移到反向新仓，不把过期记录恢复为新鲜。跨服务快照变化在派发和 P1 入口重验；已失效的新指令不能撤销最后已核验保护。</p>
+<h3 id="p2-tests280">14.8 验证映射、参考与后续范围</h3>
+<div class="table-wrap"><table><thead><tr><th>式样 / 验收</th><th>后续验证计划</th></tr></thead><tbody><tr><td>S2-028 / T2-23</td><td>确认 0/正/负数、候选重置与等待不平仓；大小相等/更小的反向目标仍经新开门、预约和预算；P2→HTTP→P1 SIM 一笔反手、多空及部分成交案例。</td></tr>
+<tr><td>S2-029 / T2-24</td><td>公共研究/工作负载资格、来源/对象/环境边界、版本幂等/冲突、时效端点、方向、触发价/类型；同量更新无普通订单；放宽/替换失败/过期/重启保留最后生效。</td></tr>
+<tr><td>S2-029 / T2-24</td><td>给定初始距离的手工预算对照与 tick/最小名义；有指令不依赖噪声，无指令仍用 NormalNoise×k_stop；不改变亏损预算或保险边界。</td></tr>
+<tr><td>S2-030 / T2-25</td><td>零成交/部分成交多周期重发带计划；不撤同意图挂单、不重复预约；冻结正文重试、超时先查、旧方向残仓与反向新计划隔离。</td></tr>
+<tr><td>S2-031 / T2-26</td><td>代码 PR 契约导出及字段/错误码一致性；本地 P1/P2/PostgreSQL/独立进程故障恢复，T2-17 历史数学夹具保留并单列本版执行差异。</td></tr></tbody></table></div><p>本版复用现有 Command/CAS、因子观测接收与公开 TradingV2 适配器；数学与依赖参考沿第 12～13 章固定的 Financier/timeseriescv 文件及 <a href="../../THIRD_PARTY_NOTICES.md">第三方声明</a>。没有引入新开源止损算法，交易所能力依据见 <a href="01_交易系统层设计书.html#exchange-evidence280">P1 18.1</a>。此处只实现通道；v2.9.0 另立行情判断和动态止损模块式样/设计，噪声表、棘轮、失效出场、重新入场均不在本版。IOC 限价/只挂单等待盘口成本实验。</p>
+<h3 id="upper-managed-design">14.9 R11：模式、管理价与收盘超出余量透传</h3>
+<p>对应 <a href="02_策略化框架层式样书.html#s2-032">S2-032 / T2-27</a> 与 <a href="01_交易系统层设计书.html#upper-managed-design">P1 18.9</a>；本节优先于前文一律等待 STRATEGY 单、依旧单有无判断保护有效的描述。用户已选择上层按 5 或 15 分钟 K 线收盘判断；本版 P2 只接收声明和转交目标，不实现收盘判断，也不恢复历史 K 线方向预测。</p>
+<h4>14.9.1 指令字段、映射与回执</h4>
+<div class="table-wrap"><table><thead><tr><th>P2 止损指令</th><th>P1 目标 protection_plan / 行为</th></tr></thead><tbody><tr><td>mode（必填）</td><td>VENUE | UPPER_MANAGED，原值映射 strategy_protection_mode；未知值 STOP_DIRECTIVE_MODE_INVALID（422）。</td></tr>
+<tr><td>overshoot_allowance</td><td>UPPER_MANAGED 必填有限非负十进制字符串，报价价格单位；VENUE 缺省或显式 0。负数/缺失/单位不符为 STOP_DIRECTIVE_OVERSHOOT_INVALID（422）。透传至 P1 同名字段，不换成比例或重复加到价格。</td></tr>
+<tr><td>POSITION_STOP.trigger_price</td><td>VENUE 映射 trigger_price；UPPER_MANAGED 映射 managed_stop_price=M。trigger_kind、spec_version、来源/版本追溯随原契约保存；不为管理模式构造 STRATEGY 条件单计划。</td></tr>
+<tr><td>INITIAL_DISTANCE.initial_stop_distance=D</td><td>对拟开方向以参考价 P 计算 M=P−d×D；管理模式不按交易所 tick 舍入 M，VENUE 保留原 tick 规则。开仓 sizing 用 D+O（舍入后重验）；P1 仍收到原 M/O 分列字段。</td></tr>
+<tr><td>Snapshot / LastEffectiveStrategyStop</td><td>回读 effective_mode、target_version、管理声明及保险；VENUE 用 STRATEGY 确认更新，UPPER_MANAGED 核对 P1 已记录声明版本/方向/周期/字段与保险后记 RECORDED。条件单 ID 可为 null，不能伪造验证。</td></tr></tbody></table></div>
+<p>来源写权限、对象/环境、方向、当前价格、时效、版本及幂等规则不变。mode、M、O 纳入指令哈希、决策输入、TargetOutbox 的不可改正文、只追加归档与查询投影；不因 mode 改变而授予新的 signal 权限。P1 模式切换回执仅 PENDING/UNKNOWN 时，P2 继续展示旧 effective_mode 和待办，不能先记新模式生效。</p>
+<h4>14.9.2 开仓、持仓更新与保护门</h4>
+<p>初始距离指令使用 <code>D_risk=D+O</code>；单位损失为 multiplier×(D_risk+原价格单位成本准备)，同一 ObjectLossBudget 下按数量步长向零缩量，不能扩大预算。UPPER_MANAGED 的批准距离/保险边界用含余量后的不利价格复核；无指令仍用 NormalNoise×k_stop 的 VENUE 后备，已生效 UPPER_MANAGED 的存量声明不因暂时无新指令而被切回。反手只为新方向 |target| sizing，新开计划与旧方向残仓模式分离。</p>
+<p>上层负责保证管理价及余量严格位于保险以内：多 M−O>I，空 M+O&lt;I，且 M 本身也严格更紧。P2 先用 P1 品种/政策快照核对，最终由 P1 按预计及成交后实际均价确定的保险价拒绝 <code>MANAGED_STOP_OUTSIDE_INSURANCE</code>；P2 原样保留错误，不改保险参数、不吞余量或静默改回 VENUE。P1 保险生产比例未标定，SIM/测试网比例仅为实验值。</p>
+<p>每周期同量指令比较使用 (mode, trigger_kind, M, O)；有变化时提交新版同量目标。保持 UPPER_MANAGED 且只改 M/O，P1 仅校验、记录，不产生普通单或条件单；模式变化转入 P1 切换状态机。指令过期保持最后生效模式与管理声明，不能下发 null/cancel 来撤掉声明。未成交重发完整保留 mode/M/O，结果未知仍先查 P1 回执。</p>
+<p>TradingV2.Snapshot、DecisionCycle.Tick 的恢复判断、CorrectActualRisk / ActualRiskTarget 和 Dispatch 保护门须读取 effective_mode：UPPER_MANAGED+有效保险按 ACTIVE_VERIFIED 处理，不因 STRATEGY 列表为空而转 RECOVERY_REQUIRED、INSURANCE_ONLY 或阻止加仓；其他风险门及开仓 TradeLossLimit 含 O 校验继续生效。保险失效两种模式均沿 UNPROTECTED+DEGRADED。管理价/余量不是已核验交易所计划，不能被 ActualRiskTarget 冒充真实退出成交或按旧批次保护规则反向覆盖。</p>
+<h4>14.9.3 下层调用与模式切换</h4>
+<p>改动仍限 domain/stop_directive.go、stop.go、application/stop_directives.go、decision_cycle.go、adapters/trading_v2.go 及公开 DTO/契约生成器/存储。Prepare 将 mode、managed_stop_price、overshoot_allowance 写入 TargetRequest.protection_plan，Deliver 仍用 <code>PUT /api/v2/trading/owners/{owner_id}/targets/{instrument}</code>；不新增绕过 P1 的交易所调用。P1 两向模式切换分别执行“撤上层单并核实”和“先挂上层单并确认再切模式”；P2 回读有效模式后更新 LastEffectiveStrategyStop。</p>
+<p>未来上层在已完成且当时可用的 5/15 分钟 K 线收盘触发后，经获授权的数量目标意图形成减仓/归零，最终执行 P1 的公开目标契约；不是重提交一个已穿越的 POSITION_STOP 保护更新。入口不得把新开管理价校验用于拦截该可证减险；上层模块与 P2 的触发消息装配仍留 v2.9.0 配对设计。此处只约定通道，不选择两种周期的生产值，也不在 P1/P2 模拟盘中把盘中越过 M 当作上层已经触发；保险保持独立触发。</p>
+<figure class="revision-figure"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 364" role="img" aria-labelledby="d2-managed280-title d2-managed280-desc" style="min-width:0"><title id="d2-managed280-title">图 D2-M280：声明透传与生效回读</title><desc id="d2-managed280-desc">StopDirective(mode, M/D, O) → 权限/时效校验；新开按 D+O 同预算缩量；边界最终由 P1 校验 → Prepare 保留模式与原值 → P1 公开目标入口；同量管理声明仅记录；模式切换由 P1 推进 → 回读 P1 effective_mode、管理声明与保险；管理模式记 RECORDED；VENUE 等 STRATEGY 核验 → 上层收盘触发 → 数量变更目标 → P1 执行；本版不实现收盘判断；保险失效仍降级</desc><rect x="12" y="12" width="656" height="62" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="37" text-anchor="middle" font-size="18" fill="#17384a">StopDirective(mode, M/D, O) → 权限/时效校验</text><text x="340" y="60" text-anchor="middle" font-size="18" fill="#17384a">新开按 D+O 同预算缩量；边界最终由 P1 校验</text><path d="M340 74v24m-5 -6l5 6 5 -6" fill="none" stroke="#006e82"/><rect x="12" y="98" width="656" height="62" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="123" text-anchor="middle" font-size="18" fill="#17384a">Prepare 保留模式与原值 → P1 公开目标入口</text><text x="340" y="146" text-anchor="middle" font-size="18" fill="#17384a">同量管理声明仅记录；模式切换由 P1 推进</text><path d="M340 160v24m-5 -6l5 6 5 -6" fill="none" stroke="#006e82"/><rect x="12" y="184" width="656" height="62" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="209" text-anchor="middle" font-size="18" fill="#17384a">回读 P1 effective_mode、管理声明与保险</text><text x="340" y="232" text-anchor="middle" font-size="18" fill="#17384a">管理模式记 RECORDED；VENUE 等 STRATEGY 核验</text><path d="M340 246v24m-5 -6l5 6 5 -6" fill="none" stroke="#006e82"/><rect x="12" y="270" width="656" height="62" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="295" text-anchor="middle" font-size="18" fill="#17384a">上层收盘触发 → 数量变更目标 → P1 执行</text><text x="340" y="318" text-anchor="middle" font-size="18" fill="#17384a">本版不实现收盘判断；保险失效仍降级</text></svg><figcaption>图 D2-M280：声明透传与生效回读</figcaption></figure>
+<h4>14.9.4 契约与验收</h4>
+<p>contracts/v2/strategy 新增 mode/O 及 RECORDED 回执语义，与 P1 18.9 的联合类型、公开模式/声明和错误码同一代码 PR 导出；本轮不改生成文件。T2-27 覆盖多空 D+O 数量预算、余量边界相等拒绝、同量声明零订单、UPPER_MANAGED 仅保险可增险、保险丢失阻断、模式切换未知/失败/重启与过期保持，以及未成交重发原值不变。实际 P2→HTTP→P1 SIM 使用手工收盘目标夹具验证，不依赖或冒充 v2.9.0 上层模块已实现。</p>
+
+</section>
+<section id="dynamic-stop-design"><h2>15 v2.9.0 风险单位、收盘止损退出、再入场门与转基线实现设计</h2>
+<p>唯一对应<a href="02_策略化框架层式样书.html#dynamic-stop-spec">式样第 11 章 S2-033～038 / T2-28～33</a>。本章只增加通用机制，所有新行为由策略合成配置显式启用；未声明时 Tick、Compose 与 SizeAndStop 的结果与 v2.8.0 逐位相同。判断、噪声、止损距离和基线状态由应用实例计算（<a href="03_SOXLUSDT_JEV应用实例设计书.html#dynamic-stop-instance-design">P3 设计第 28 章</a>），P2 不导入应用层代码，也不从 K 线推断方向。</p>
+<h3 id="p2-structure290">15.1 代码结构与改动归属</h3>
+<div class="table-wrap"><table><thead><tr><th>现有代码</th><th>改动</th></tr></thead><tbody>
+<tr><td><a href="../../src/factorforge/strategy/domain/composition.go">domain/composition.go</a>：Composition / Validate / CompositionExposure</td><td>新增 <code>Sizing *SizingRule</code>、<code>Reentry *ReentryRule</code>、<code>ChainLoss *ChainLossRule</code>、<code>PreEvent []PreEventRule</code>、<code>Transfer *TransferRule</code>；均为可选，nil 时旧路径。RISK_UNIT 时 CompositionExposure 只返回档位比例，数量交由风险单位计算。</td></tr>
+<tr><td><a href="../../src/factorforge/strategy/domain/stop_directive.go">domain/stop_directive.go</a>：StopDirective / ValidateStopDirective</td><td>INITIAL_DISTANCE 增加可选 <code>risk_fraction</code>（十进制，0&lt;f≤SizingRule.max_risk_fraction）；POSITION_STOP 不接受该字段。两种 kind 在 VENUE 模式增加可选 <code>close_stop_price</code>（POSITION_STOP）/ <code>close_stop_distance</code>（INITIAL_DISTANCE）：须严格比交易所触发价/距离更紧，否则 STOP_DIRECTIVE_CLOSE_STOP_INVALID（422）；只存于 P2 并进入 EffectiveStrategyStop.close_stop，不进 P1 protection_plan；sizing 仍用到交易所触发价的距离。UPPER_MANAGED 以 M 作收盘止损价。</td></tr>
+<tr><td><a href="../../src/factorforge/strategy/domain/composition.go">domain/composition.go</a>：FactorObservation</td><td>增加可选 <code>reconfirm bool</code> 与 <code>reason_code string</code>；参与 inputs 哈希、幂等比较与查询投影。</td></tr>
+<tr><td><a href="../../src/factorforge/strategy/domain/records.go">domain/records.go</a>：ObservedObject / CaseRecord</td><td>ObservedObject 新增 <code>RiskUnit *RiskUnitState</code>、<code>Reentry *ReentryState</code>、<code>Chain *ChainState</code>、<code>PreEventApplied []string</code>；CaseRecord.RiskLots 每批增加 batch_id、budget、unit_quantity、exit_kind（CLOSE_STOP / VENUE_STOP / INSURANCE_STOP / TARGET / FORCE）。</td></tr>
+<tr><td><a href="../../src/factorforge/strategy/domain/sentiment.go">domain/sentiment.go</a>：AdvanceContributions / LedgerEntry</td><td>LedgerEntry.kind 增加 TRANSFER；事件类型参数增加 <code>realization_disabled</code>，为 true 时该类型贡献不参与兑现预算。</td></tr>
+<tr><td><a href="../../src/factorforge/strategy/application/decision_cycle.go">application/decision_cycle.go</a>：Tick</td><td>在“接收成交与保护结果”之后新增批次结束识别（链计数、再入场门开启）；在 Compose 之后、SizeAndStop 之前新增门控顺序：链上限 → 预排降险 → 再入场门 → 风险单位数量。</td></tr>
+<tr><td><a href="../../src/factorforge/strategy/application/stop_directives.go">application/stop_directives.go</a>：SizeDirective</td><td>新增 <code>RiskUnitQuantity(equity, price, rules, directive, policy, sizing)</code>：预算 = equity × min(risk_fraction, max_risk_fraction)，再与 ObjectLossBudget 取小；单位损失沿用 D+O+成本准备的 v2.8.0 公式。</td></tr>
+<tr><td>新增 application/exit_requests.go、application/baseline_transfer.go；api/http.go、dto/models.go</td><td><code>POST /api/v2/strategy/exit-requests</code>（SUBMIT_CLOSE_EXIT）与 <code>POST /api/v2/strategy/baseline-transfers</code>（TRANSFER_TO_BASELINE），沿止损指令的 Command、CAS、审计、写授权与 signal 资格校验；查询加入 exit-requests、baseline-transfers、risk-units、reentry、chains 资源。</td></tr>
+</tbody></table></div>
+<h3 id="p2-config290">15.2 登记配置</h3>
+<div class="table-wrap"><table><thead><tr><th>配置</th><th>字段与校验</th></tr></thead><tbody>
+<tr><td>SizingRule</td><td><code>mode=RISK_UNIT</code>；<code>max_risk_fraction</code>（0&lt;x≤1，登记必填，无默认）；<code>require_initial_distance=true</code>（固定）。</td></tr>
+<tr><td>ReentryRule</td><td><code>cooldown_seconds</code>（≥0）；<code>qualifying_inputs</code> ⊆ {NEW_CONTRIBUTION, BASELINE_RECONFIRM}，非空。</td></tr>
+<tr><td>ChainLossRule</td><td><code>max_loss_r</code>（&gt;0）；<code>profit_offsets=false</code> 默认。</td></tr>
+<tr><td>PreEventRule</td><td><code>event_type</code>（须在 Templates 定义）；<code>before_seconds</code>、<code>after_seconds</code>（≥0）；<code>reduce_factor</code>（0≤x&lt;1）；<code>certainty_required</code>。</td></tr>
+<tr><td>TransferRule</td><td><code>factor_id</code>（须为 ENABLED 基线因子）；<code>combined_tolerance</code>（≥0，合成值变化上限）。</td></tr>
+</tbody></table></div><p>缺任一必填项或引用不存在时 Validate 返回 COMPOSITION_INVALID（422），整份合成配置不生效。生产数值由应用实例登记，本层不写常数。</p>
+<h3 id="p2-cycle290">15.3 决策周期中的位置</h3>
+<p><strong>批次结束识别。</strong>读取 P1 快照的成交与保护角色后，若对象实际持仓从非零变为零或方向翻转，结束当前批次：exit_kind 按触发来源判定（本周期已受理的收盘退出请求 → CLOSE_STOP；STRATEGY 条件单成交 → VENUE_STOP；INSURANCE 成交 → INSURANCE_STOP；目标归零 → TARGET；强制减险 → FORCE）。止损类结束时写入 <code>Reentry{direction, stopped_at, opened=false}</code>；按 realized_pnl / budget 计算 r（亏损为正），累加到 Chain（profit_offsets=false 时盈利不减少）。</p>
+<p><strong>门控顺序（Compose 之后）。</strong>① 链：Chain.direction 与本次拟增险方向相同且 loss_r ≥ max_loss_r → 新增风险量置零，原因 CHAIN_LOSS_LIMIT；合成方向改变（core_direction 更新或 X 反号且已过反向确认）时 Chain 重置。② 预排降险：对每个 OPEN 的 PreEventRule 窗口，拒绝新增风险（PRE_EVENT_WINDOW）；对 PreEventApplied 不含 schedule_id 的批次，若最后生效上层止损未达保本价（多：stop &lt; entry+往返成本；空：stop &gt; entry−往返成本），目标 = 当前 × reduce_factor（向零取步长），记 FORCE 并写入 PreEventApplied。③ 再入场门：Reentry 存在、方向相同且 opened=false 时，要求 at − stopped_at ≥ cooldown 且存在 available_at &gt; stopped_at 的合格输入（同向且已被本周期 Compose 使用的新贡献，或 reconfirm=true 的同向基线观测）；满足则 opened=true，否则 REENTRY_GATE。④ 风险单位：见 15.4。</p>
+<h3 id="p2-riskunit290">15.4 风险单位数量</h3>
+<p>无存量批次且拟增险时，取最新有效 INITIAL_DISTANCE 指令（v2.8.0 LatestStopDirective），计算 <code>Q = floor_step(budget / (multiplier × (D + O + cost_reserve)))</code>，写入 <code>RiskUnit{batch_id, direction, unit_quantity=Q, budget, distance=D, allowance=O, opened_at}</code>。目标数量 <code>q_t = dir × Q × levels[level−1].exposure</code>；|q_t| 不超过 Q；名义上限、组合与流动性约束照旧取小。存量批次期间档位升降只改 q_t，不重算 Q；方向改变或批次结束清除 RiskUnit。缺指令或 risk_fraction 时 q_t=0，原因 RISK_UNIT_DIRECTIVE_MISSING。舍入后按 v2.8.0 规则复核单笔亏损不超预算。</p>
+<h3 id="p2-commands290">15.5 新命令</h3>
+<div class="table-wrap"><table><thead><tr><th>命令</th><th>字段、校验与效果</th></tr></thead><tbody>
+<tr><td>SUBMIT_CLOSE_EXIT</td><td>{request_id, object_id, position_direction, directive_id, directive_version, bar_interval (300|900), bar_close_at, close_price, source_module}。校验：写授权与 signal 资格；方向等于 P1 实际持仓；directive 为当前 LastEffectiveStrategyStop（取其 close_stop）或已记录的 UPPER_MANAGED 声明（取 M），无收盘止损价时拒绝 EXIT_NO_CLOSE_STOP；bar_close_at ≤ 框架时钟且为该周期边界；close_price 与 P1 快照中以 bar_close_at 结束的已完成 5 分钟 K 线收盘价一致（15 分钟周期取该边界上的 5 分钟收盘，容差为价格步长），多头 close ≤ 收盘止损价、空头 close ≥ 收盘止损价。通过后写 ExitRequest{state=ACCEPTED}，本周期目标为 0，绕过无交易带、调仓间隔、冷却与再入场门；批次结束时 exit_kind=CLOSE_STOP。错误：EXIT_BAR_INCOMPLETE、EXIT_PRICE_MISMATCH、EXIT_NOT_TRIGGERED、EXIT_DIRECTION_MISMATCH（422）；越权 403；重复 request_id 同内容幂等。</td></tr>
+<tr><td>TRANSFER_TO_BASELINE</td><td>{request_id, object_id, contribution_ids[], factor_id, observation {observation_id, value, reason_code}}。在一个 CAS 事务内：以当前时钟计算转出前合成 X0；把所列贡献剩余量写 LedgerEntry(kind=TRANSFER, amount=剩余, ref=transfer_id) 并置零；写入基线观测；重算 X1。要求 sign(X1)=sign(X0) 且 |X1−X0| ≤ combined_tolerance，否则整笔回滚，错误 TRANSFER_CHANGES_POSITION（422）。贡献不属于该对象或已为零：TRANSFER_CONTRIBUTION_INVALID。不修改 RiskUnit、保护或 Reentry。</td></tr>
+</tbody></table></div>
+<p>两条命令均写审计与 outbox 查询记录；研究身份只产生研究记录，不进入执行状态。</p>
+<h3 id="p2-recovery290">15.6 持久化、恢复与异常</h3>
+<p>RiskUnit、Reentry、Chain、PreEventApplied、ExitRequest 与转基线记录都存于 StrategyState，随原 CAS 事务提交；重启后原样恢复，不按重启时刻重置冷却或链计数。P1 快照不可用时不识别批次结束，也不放行再入场；收盘退出请求在快照恢复前保持 PENDING，不推断已触发。转基线与观测写入失败无部分提交。贡献在转出后不再衰减或兑现；守恒校验把 TRANSFER 计入变化项。</p>
+<figure><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 258" role="img"><title>v2.9.0 决策周期门控顺序</title><desc>v2.9.0 决策周期门控顺序</desc><rect x="12" y="12" width="656" height="62" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="37" text-anchor="middle" font-size="18" fill="#17384a">P1 快照：成交 / 保护角色 → 批次结束识别</text><text x="340" y="60" text-anchor="middle" font-size="18" fill="#17384a">止损类结束 → Reentry 关闭；链按 R 累计</text><path d="M340 74v24m-5 -6l5 6 5 -6" fill="none" stroke="#006e82"/><rect x="12" y="98" width="656" height="62" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="123" text-anchor="middle" font-size="18" fill="#17384a">Compose → 链上限 → 预排降险 → 再入场门</text><text x="340" y="146" text-anchor="middle" font-size="18" fill="#17384a">收盘退出请求已受理 → 直接归零，绕过带宽与冷却</text><path d="M340 160v24m-5 -6l5 6 5 -6" fill="none" stroke="#006e82"/><rect x="12" y="184" width="656" height="62" rx="8" fill="#eef7f8" stroke="#006e82"/><text x="340" y="209" text-anchor="middle" font-size="18" fill="#17384a">风险单位 Q（初始距离 + 余量 + 成本，风险比例）</text><text x="340" y="232" text-anchor="middle" font-size="18" fill="#17384a">目标 = 方向 × Q × 档位比例 → 原有保护与派发</text></svg><figcaption>图 D2-R290：v2.9.0 周期内的新增步骤</figcaption></figure>
+<h3 id="p2-verify290">15.7 验证映射</h3>
+<div class="table-wrap"><table><thead><tr><th>式样 / 验收</th><th>测试（tests/strategy）</th></tr></thead><tbody>
+<tr><td>S2-033 / T2-28</td><td>手工预算对照：risk_fraction 截断、ObjectLossBudget 取小、档位 25/50/75/100% 对应数量、档位上升不超 Q、缺指令零目标；未声明 Sizing 的 T2-17 冻结夹具逐位不变。</td></tr>
+<tr><td>S2-034 / T2-29</td><td>未完成 K 线、未来 bar_close_at、价格不一致、未越过、方向不符、越权；合格请求零目标绕过带宽与冷却；重复幂等；P2→HTTP→P1 SIM 平仓并记 CLOSE_STOP；贡献保持。</td></tr>
+<tr><td>S2-035 / T2-30</td><td>冷却内、仅旧贡献、仅价格回到原方向、反方向输入、止损后新贡献、再确认基线观测六种组合；重启保持 Reentry。</td></tr>
+<tr><td>S2-036 / T2-31</td><td>三笔亏损批次累计 3R 拒绝同向；盈利不抵扣；方向改变重置；重启保持。</td></tr>
+<tr><td>S2-037 / T2-32</td><td>窗口内拒新开；保本以下按比例减一次、保本以上不动；改期/取消；FORCE 绕过带宽。</td></tr>
+<tr><td>S2-038 / T2-33</td><td>转基线守恒、方向不变与容差边界、失败回滚无部分写入、Q 与保护不变、realization_disabled 类型不消耗兑现预算。</td></tr>
+</tbody></table></div><h3 id="judgment-input-design">15.8 判断型输入、相对无交易带、学习冻结与模板标定停用</h3>
+<p>唯一对应 <a href="02_策略化框架层式样书.html#judgment-input-spec">式样 11.2 S2-039～042 / T2-34～37</a>。新字段均可选，缺省时评分准入、合成、调仓和学习与 v2.8.0 逐位相同。</p>
+<div class="table-wrap"><table><thead><tr><th>现有代码</th><th>改动</th></tr></thead><tbody>
+<tr><td><code>domain/records.go</code>：Policy</td><td>新增 <code>judgment_event_types []string</code>、<code>prepricing_modes map[event_type]ASSESSED|NOT_ASSESSED</code>（NOT_ASSESSED 只允许用于判断型类型，否则 POLICY_INVALID）、<code>experiment_calibrations []string</code>（须为 Calibrations 子集）、<code>learning_mode ACTIVE|FROZEN</code>（缺省 ACTIVE）。半衰期沿用既有 <code>event_half_life_approved</code> 与 <code>HalfLifeBounds</code>，数值由实例登记。</td></tr>
+<tr><td><code>application/commands.go</code>：评分准入</td><td>在现有校验顺序中：calibration_version 属于 experiment_calibrations 且环境为 LIVE → QUARANTINED / EXPERIMENT_CALIBRATION_LIVE。默认分支中事件类型的 prepricing_mode 为 NOT_ASSESSED 时，不读取 <code>prepricing:</code> 清单、不调用 AssessPrepricing，直接写 assessment <code>{fraction:"0", mode:"NOT_ASSESSED", reason:"PREPRICING_NOT_ASSESSED"}</code>，状态 READY_PENDING_PRICE；<code>application/injection.go</code> 读取该 assessment 时 p=0。其余类型路径不变。</td></tr>
+<tr><td><code>domain/events.go</code>：事件核验与新颖度</td><td>不改代码。判断型事件由上层每次注入新建独立事件族，claims 的经济身份为（对象主体, NEWS_JUDGMENT, 注入编号），证据为本次新出现的新闻编号，现有核验得到新颖度 1；证据可用时刻晚于 verified_at 时仍为无效事件。方向改变不走 CORRECTION，而由上层新建事件并对旧事件提交失效。</td></tr>
+<tr><td><code>domain/composition.go</code>：RebalanceRule / Validate / 调仓判断</td><td>新增 <code>band_ratio_of_unit</code>（0≤x&lt;1，缺省 0）；Validate 把 <code>adjust_interval_seconds</code> 下限由 1 改为 0，composition_schema 同步。Sizing 为 RISK_UNIT 且存在 RiskUnit 时，|q_t − actual| &lt; max(band_ratio_of_unit × Q, 原成本带) 则保持，原因 UNIT_BAND_HOLD；归零、CLOSE_STOP、FORCE、方向改变与保护更新不经此判断。单独开仓沿用既有 <code>event_only_cap</code>（≤ adjustment.cap），Combined 不改。</td></tr>
+<tr><td><code>application/cases.go</code>：EvaluateLearning；<code>domain/layer_learning.go</code></td><td>learning_mode=FROZEN 时照常计算候选与验证，写入 <code>StrategyState.FrozenCandidates</code>（候选、证据、计算时刻、策略版本），不写新 ParameterSnapshot、不改分量 ENABLED/RECORD_ONLY 状态。切回 ACTIVE 不回放这些候选。查询新增 <code>learning-candidates?frozen=true</code>。</td></tr>
+<tr><td><code>domain/scheduled.go</code>：ScheduledTemplate.Observe</td><td>停用在线更新：决策周期不再调用 Observe，Estimate 只使用登记先验；已有观测记录保留可查。日程修订、取消和 PreEventRule 窗口不受影响。</td></tr>
+</tbody></table></div>
+<p>持久化：FrozenCandidates 与 assessment 随原 CAS 事务提交，重启保持。错误码 EXPERIMENT_CALIBRATION_LIVE、PREPRICING_NOT_ASSESSED（作为留痕原因而非拒绝）、UNIT_BAND_HOLD 进入公开契约，由实现 PR 导出。</p>
+<div class="table-wrap"><table><thead><tr><th>式样 / 验收</th><th>测试（tests/strategy）</th></tr></thead><tbody>
+<tr><td>S2-039 / T2-34</td><td>判断型无清单 → p=0 且注入量等于手工计算；非判断型无清单仍 PREPRICING_EVIDENCE_UNVERIFIED；半衰期越界拒绝；experiment 校准在 LIVE 隔离；新族新颖度 1；核心为零按 event_only_cap 开仓，核心反向压到零。</td></tr>
+<tr><td>S2-040 / T2-35</td><td>Q=100、比例 0.2：差 19 保持、差 21 调仓；归零与收盘退出绕过；interval=0 校验通过；未声明 RISK_UNIT 时调仓结果逐位不变。</td></tr>
+<tr><td>S2-041 / T2-36</td><td>FROZEN 下候选写入、参数快照哈希与分量状态不变；切回 ACTIVE 不自动生效；硬风险门测试不变。</td></tr>
+<tr><td>S2-042 / T2-37</td><td>窗口结束后模板估计不变，日程修订与降险窗口测试通过。</td></tr>
+</tbody></table></div>
+<p>契约 contracts/v2/strategy 由实现 PR 导出；本版只设计。没有新增依赖或语言运行时。</p></section>
+<section id="state-growth-design"><h2>16 v2.11.1 只增数据的读取上限与增量读取</h2>
+<p>对应既有 S2-010/012/024，业务式样不变，补充第 v2.5.7/v2.5.8 章“决策输入压缩与保留”和“审计外置”的实现。影子 E15（SIM，SOXLUSDT）运行中出现两次停摆和持续偏高的 CPU，原因都是“只增不减的数据被整份读取或整份复制”：</p>
+<ul>
+<li>2026-10-18 04:35～21:54 JST：每个决策的 input_snapshot 复制 P1 接受过的全部目标决策编号（snapshot.source_decisions，456 条且只增），单个决策从 8 KB 增至 47 KB，聚合超过 4 MiB 解码上限后每次加载返回 STORE_STATE_INVALID。</li>
+<li>2026-10-20 05:03～09:54 JST：交易快照每轮整页读取 P1 /audit（11472 条、4.39 MB，其中 92% 为 MARKET_SNAPSHOT 与 REPLAY_FRAME），超过 4 MiB 响应上限，快照一直 TRADING_UNAVAILABLE。</li>
+<li>修复两次停摆后，scheduler 与 feedback 仍各占约 20% 单核。采样显示：每次加载把 sentiment_entry 全部行（8522 行、3.6 MB，每天约 +2100 行）逐行按 schema 解码（约 50%），并对整份账本求规范化摘要、整份 JSON 深拷贝。</li>
+</ul>
+<p>这些改动先以 code-only 合并（#116～#119），与本层“先设计后实现”的规则不符；本版补登设计，代码不再变化。</p>
+<figure><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 250" role="img" aria-labelledby="growth-title growth-desc"><title id="growth-title">只增数据的增量读取</title><desc id="growth-desc">P1 审计按 500 条分页、只保留 TARGET_SET 行并记住已读偏移；情绪账本表只追加，存储缓存已解码前缀并核对第 n 行原始字节，每次只读第 n 行之后的新行；两者合成交易快照与策略状态，决策输入再把只增列表换成数量与摘要。</desc>
+<defs><marker id="growth-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#006e82"/></marker></defs>
+<g fill="#eef7f8" stroke="#006e82" stroke-width="2"><rect x="15" y="20" width="250" height="90" rx="10"/><rect x="325" y="20" width="250" height="90" rx="10"/><rect x="15" y="140" width="250" height="90" rx="10"/><rect x="325" y="140" width="250" height="90" rx="10"/><rect x="635" y="80" width="250" height="90" rx="10"/></g>
+<g fill="#17384a" font-family="sans-serif" font-size="14" text-anchor="middle"><text x="140" y="52">P1 GET /audit</text><text x="140" y="76" font-size="12">cursor = 已读偏移，limit = 500</text><text x="140" y="96" font-size="12">只追加</text>
+<text x="450" y="52">TradingV2.AuditTargets</text><text x="450" y="76" font-size="12">只留 TARGET_SET 行</text><text x="450" y="96" font-size="12">进程内缓存偏移与行</text>
+<text x="140" y="172">sentiment_entry 表</text><text x="140" y="196" font-size="12">不可变触发器，只追加</text><text x="140" y="216" font-size="12">sequence 1…N</text>
+<text x="450" y="172">Store 账本缓存</text><text x="450" y="196" font-size="12">核对第 n 行字节</text><text x="450" y="216" font-size="12">只读 sequence &gt; n</text>
+<text x="760" y="112">交易快照 / 策略状态</text><text x="760" y="136" font-size="12">决策输入换成数量 + 摘要</text></g>
+<g fill="none" stroke="#006e82" stroke-width="2" marker-end="url(#growth-arrow)"><path d="M265 65H325"/><path d="M265 185H325"/><path d="M575 65L635 110"/><path d="M575 185L635 140"/></g></svg><figcaption>图 D2-G：只增数据的增量读取。</figcaption></figure>
+<h3 id="state-growth-compact">16.1 决策输入压缩的扩展</h3>
+<p>CompactDecisionInput 在 bars → bars_ref 之外再做三项替换，均在计算 input_hash（Digest(完整 inputs)）之后进行，已存决策的哈希口径不变：</p>
+<div class="table-wrap"><table><thead><tr><th>位置</th><th>保留</th><th>替换为</th></tr></thead><tbody>
+<tr><td>snapshot.source_decisions</td><td>不保留（完整列表在 P1）</td><td>source_decisions_ref = {count, digest}</td></tr>
+<tr><td>snapshot.protections[对象]</td><td>state 不为 CLOSED 的保护单</td><td>closed_protections_ref[对象] = {count, digest}（该对象有已关闭保护单时）</td></tr>
+<tr><td>pool.contributions</td><td>remaining_amount &gt; 0 的贡献（v2.19.3 起只保留第 22 章所列字段）</td><td>pool.spent_contributions_ref = {count, digest}；v2.19.3 起另有 pool.live_contributions_ref = {count, digest}</td></tr>
+</tbody></table></div>
+<p>领域读取 input_snapshot 的仍只有 policy 与 pool.contributions（domain/case.go 开案时只取 remaining_amount &gt; 0 的贡献），因此行为不变。压缩函数幂等：已含 bars_ref 的输入原样返回。E15 实测单个决策 47 KB → 14 KB。</p>
+<h3 id="state-growth-limit">16.2 解码上限分开</h3>
+<p>domain.Decode（请求体）上限仍为 4 MiB。新增 domain.DecodeState(data, target) 供 Store.load 读取已存聚合，上限 16 MiB，使已越过请求上限的状态仍能读出并由保留规则归档。超过 2 MiB 的 STATE_SIZE_HIGH 告警不变。</p>
+<h3 id="state-growth-audit">16.3 P1 审计的增量读取</h3>
+<p>adapters/trading_v2.go 的交易快照不再整页读取 /audit。新增 TradingV2.AuditTargets(ctx, query)：以 <code>GET /api/v2/trading/audit?environment&amp;account_id&amp;run_id&amp;cursor=&lt;偏移&gt;&amp;limit=500</code>（P1 已有的分页参数，见 P1 设计查询接口）循环读取，直到响应 cursor 为 null 或本页为空；只保留 action = TARGET_SET 的行（P2 只用这些行求 source_decisions 与订单来源请求）。审计只追加，适配器在进程内按运行绑定（查询串）缓存已读偏移与 TARGET_SET 行，之后每轮只读新增行；进程重启后从偏移 0 重读一次。快照一致性检查使用最后一页的 snapshot_version，与其他资源页比较的规则不变。</p>
+<h3 id="state-growth-ledger">16.4 情绪账本的增量加载</h3>
+<p>sentiment_entry 由不可变触发器保证只追加，序号为 1…N 且连续。Store 按（表、instance_id）缓存已解码的账本前缀与第 n 行的原始 payload。load 先读第 n 行并与缓存字节比较：一致则只查询 <code>sequence &gt; n</code> 的行并逐行 DecodeJSON；不一致或该行不存在则清空缓存、从第 1 行重读。返回给调用方的是独立切片，调用方追加或修改不影响缓存；缓存只在读到更多行时更新。查询接口 /objects/{object_id}/ledger 仍从加载后的状态读取，结果不变。</p>
+<h3 id="state-growth-admit">16.5 已存聚合的按字段复用</h3>
+<p>DecodeState 对顶层对象逐字段执行原 admit 规则（未知字段拒绝、必填检查、默认值填充），字段字节与上次相同则复用上次的规范化结果；之后照常执行 JSON 解码（DisallowUnknownFields、UseNumber）与一次 Validate。请求体 Decode 不缓存。原 decode 中重复的第二次 Validate 删除。</p>
+<h3 id="state-growth-prefix">16.6 账本前缀比较</h3>
+<p>CloneState 对除账本外的字段做 JSON 深拷贝；账本条目追加后不再修改，按值复制到新切片。新增 SameLedgerPrefix(prefix, ledger)：长度不足即不同；逐条用值比较，不相等时退回该条的规范化摘要比较。Store.appendRows 的只追加检查与 public 类存储的“账本不得变化”检查改用它，错误码不变（APPEND_ONLY_MUTATION_FORBIDDEN、PUBLIC_INTERNAL_STATE_FORBIDDEN）。</p>
+<h3 id="state-growth-result">16.7 效果与验证</h3>
+<div class="table-wrap"><table><thead><tr><th>项目</th><th>修正前</th><th>修正后</th></tr></thead><tbody>
+<tr><td>E15 单个决策大小</td><td>47 KB</td><td>14 KB</td></tr>
+<tr><td>交易快照读取的审计</td><td>每轮 4.39 MB</td><td>首次分页读取，之后只读新增行</td></tr>
+<tr><td>scheduler / feedback CPU（单核占比，3 分钟采样）</td><td>约 21% / 20%</td><td>约 4% / 3%</td></tr>
+</tbody></table></div>
+<div class="table-wrap"><table><thead><tr><th>式样 / 验收</th><th>测试（tests/strategy）</th></tr></thead><tbody>
+<tr><td>S2-010 / S2-024</td><td>TestCompactDecisionInputReferencesSourceDecisions、TestCompactDecisionInputDropsSpentContributionsAndClosedProtections：哈希不变、幂等、压缩后大小上限。</td></tr>
+<tr><td>S2-012</td><td>TestDecodeStateLoadsAboveRequestLimit、TestDecodeStateReusesAdmissionOnlyForUnchangedFields：请求仍限 4 MiB；改动字段照常拒绝。</td></tr>
+<tr><td>S2-010</td><td>TestAuditTargetsPagesAndReadsOnlyNewRows：1205 行分三页，第二次只读新增 15 行，只留 TARGET_SET。</td></tr>
+<tr><td>S2-012</td><td>TestNativeP2LedgerCacheReadsOnlyNewRowsAndDetectsReplacement（原生 PostgreSQL）、TestSameLedgerPrefixDetectsChangedEntries。</td></tr>
+</tbody></table></div>
+<h3 id="state-growth-open">16.8 仍未决</h3>
+<ul>
+<li>VerifyLedger 每轮仍遍历全部账本行（十进制运算），成本随账本线性增长。根治需要账本检查点（状态保存截至第 n 行的各贡献余额，只校验其后的行，查询接口改为按序号分页读表），另行设计；2026-10-30 复测 CPU。</li>
+<li>contributions、receipts、prepricing_assessments 每条研判各增一条，没有保留规则；receipts 关系事件去重，不能直接删除，归档方式另行设计。</li>
+<li>P1 运行状态内 protections、orders、fills、targets 随交易缓慢增长，列表接口整份返回；属 P1 设计，另行处理。</li>
+</ul>
+<p>没有新增依赖、语言运行时或公开契约变化。</p></section>
+<section id="layer-late-design"><h2>17 v2.11.2 分层账本的迟到成交与数量对账</h2>
+<p>对应 S2-024（分层归因）与第 7 节“分层归因”，业务式样不变。第 7 节只规定了分摊不守恒时冻结增险（LAYER_LEDGER_IMBALANCE），没有规定两种情况：成交在其所属区间结算之后才可见；账本数量与 P1 实际持仓不一致。原实现对这两种情况都把 object.layer_ledger_blocked 置为 true，不计入迟到的成交，而且这个标志只有重新激活对象的命令才会清除。</p>
+<p>影子 E15（SIM，SOXLUSDT）因此出现第三次中断：第二批空单的开仓成交（2026-10-19 11:30:57Z，SELL 2.22）没有计入分层账本，账本数量从此比实际多 2.22 张，对象一直被冻结增险。持仓期间不需要加仓，所以没有表现出来；2026-10-20 21:36Z 研判转多、空单平仓后，P2 每轮的合成值都约为 +1、档位为 4，但目标一直是 0（RECOVERY_OR_PAUSE_OR_DELIVERY_BLOCK），无法开多。</p>
+<figure><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 250" role="img" aria-labelledby="late-title late-desc"><title id="late-title">迟到成交的结算</title><desc id="late-desc">反馈进程在 T0 读取交易快照，在 T1 用本进程时钟结算到 T1。P1 以事务开始时刻 t 记成交，t 早于 T1 但成交在 T0 之后才可见。下一次结算看到 t 小于上次结算时刻的成交：原实现冻结增险且不计入；修正后在上次结算时刻补记数量、手续费与漏掉区间的收益，并审计 LAYER_FACT_LATE。结算末尾数量与 P1 实际持仓不一致时采用 P1 数量，审计 LAYER_QUANTITY_RECONCILED，只冻结当轮。</desc>
+<defs><marker id="late-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#006e82"/></marker></defs>
+<g fill="none" stroke="#587083" stroke-width="2"><path d="M40 60H860"/></g>
+<g fill="#17384a" font-family="sans-serif" font-size="13" text-anchor="middle"><text x="150" y="40">T0 读取快照（无此成交）</text><text x="400" y="40">t 成交时刻（事务开始）</text><text x="650" y="40">T1 结算到本进程时钟</text></g>
+<g fill="#006e82"><circle cx="150" cy="60" r="6"/><circle cx="400" cy="60" r="6"/><circle cx="650" cy="60" r="6"/></g>
+<g fill="#eef7f8" stroke="#006e82" stroke-width="2"><rect x="15" y="110" width="410" height="120" rx="10"/><rect x="475" y="110" width="410" height="120" rx="10"/></g>
+<g fill="#17384a" font-family="sans-serif" font-size="14" text-anchor="middle"><text x="220" y="140">原实现：下次看到 t &lt; 上次结算时刻</text><text x="220" y="166" font-size="12">layer_ledger_blocked = true，成交不计入</text><text x="220" y="188" font-size="12">账本数量与 P1 永久不一致</text><text x="220" y="210" font-size="12">只有重新激活对象才能解除，增险一直被拒</text>
+<text x="680" y="140">修正：在上次结算时刻补记</text><text x="680" y="166" font-size="12">数量 + 手续费 + q·(P 上次 − P 成交)·乘数</text><text x="680" y="188" font-size="12">审计 LAYER_FACT_LATE，不冻结</text><text x="680" y="210" font-size="12">冻结状态每次结算重新判定</text></g>
+<g fill="none" stroke="#006e82" stroke-width="2" marker-end="url(#late-arrow)"><path d="M400 70L220 108"/><path d="M400 70L680 108"/></g></svg><figcaption>图 D2-H：迟到成交的结算。</figcaption></figure>
+<h3 id="layer-late-cause">17.1 原因</h3>
+<p>反馈进程（workers.Feedback.Tick）先读取交易快照，再在事务中以本进程时钟 Clock.Now() 调用 SettleLayers，把结算时刻 st.At 推到该时刻。P1 以事务开始时刻记录 happened_at，成交在事务提交后才可见。若成交的 happened_at 位于“读取快照”与“结算”之间，本次快照没有它，下一次快照有它但 happened_at 早于 st.At，进入原来的 <code>f.at.Before(st.At)</code> 分支：冻结并跳过，且不记入 seen_fills，所以之后每轮都重复冻结。资金费收入同理。</p>
+<h3 id="layer-late-fact">17.2 迟到事实的补记</h3>
+<p>domain/layer_ledger.go SettleLayers 中，未见过且 happened_at &lt; st.At 的成交或资金费，在 st.At 所在日的记录中补记，不再冻结：</p>
+<ul>
+<li>成交：带符号数量 q（BUY 为正）计入 st.Quantity；分量取成交 source_decision_id 对应决策的 components（找不到时用当前 components，与按时成交相同）；手续费照常归 trigger_layer；收益补正 = q × (st.Price − 成交价) × 合约乘数，暴露补正 = q × 成交价 × 乘数 / st.Equity × (st.At − happened_at) 秒，按同一份额分摊。之前区间已按旧数量结算到 st.Price，加上补正后，累计收益与按时计入完全相同（只是落在补记当日）。</li>
+<li>资金费：金额按当前 components 分摊到 st.At 所在日。</li>
+<li>结算币种与对象不一致时仍冻结并跳过，与按时事实相同。</li>
+<li>记入 seen_fills / seen_incomes，审计 <code>LAYER_FACT_LATE {object_id, kind, fact_id, happened_at, settled_at}</code>。</li>
+</ul>
+<h3 id="layer-late-reconcile">17.3 数量对账</h3>
+<p>处理完全部事实并结算到本次时刻后，若 st.Quantity 与快照的 P1 实际持仓不一致（成交缺失，例如超出 P1 列表范围），采用 P1 的数量，审计 <code>LAYER_QUANTITY_RECONCILED {object_id, at, ledger_quantity, actual_quantity, difference}</code>，并冻结当轮增险。差额对应的收益无法归属，不补记；下一轮数量一致即解除。</p>
+<h3 id="layer-late-flag">17.4 冻结状态每次结算重新判定</h3>
+<p>layer_ledger_blocked 不再是“置位后一直保留”的标志。SettleLayers 在日记录守恒检查通过、且本次行情样本有效时先把它清为 false，再由本次结算中的情况重新置位：日记录不守恒（LAYER_LEDGER_IMBALANCE，在清零之前检查，每轮都会重新冻结）、事实无法结算（币种不符、分摊不守恒等）、数量对账。样本无效而提前返回时保留上一次的结果。重新激活对象的命令照旧清除该标志。</p>
+<h3 id="layer-late-ops">17.5 部署与 E15</h3>
+<p>部署后第一次结算会把 E15 漏记的开仓成交按 17.2 补记：账本数量恢复为 0，补正收益记在补记当日；2026-10-19、10-20 两日已封存的日记录不改写（LayerLedger 日终封存后不再改写），因此这两日的分层收益多计、补记当日少计，合计正确。E15 学习冻结，分层日记录不用于权重学习，不影响实验。解除冻结后由框架按当时的研判自行开仓，不手工下单；已冻结、未成交的风险单位（2.39 张，冻结时的初始止损距离与当前相差约 1%）照常使用。2026-10-21 06:36 JST 起至部署时刻登记为 E15 第三个剔除段。</p>
+<h3 id="layer-late-tests">17.6 验证</h3>
+<div class="table-wrap"><table><thead><tr><th>式样 / 验收</th><th>测试（tests/strategy/go_layer_late_fill_test.go）</th></tr></thead><tbody>
+<tr><td>S2-024</td><td>TestLayerLedgerCountsFillVisibleAfterSettlement：结算后才可见的 SELL 2 @100 计入，价格到 95 时当日收益 10、手续费 0.1，不冻结；重复结算不重复计入。</td></tr>
+<tr><td>S2-024</td><td>TestLayerLedgerReconcilesQuantityAndUnfreezes：无成交解释的数量变化采用 P1 数量、审计差额并冻结当轮，下一轮解除。</td></tr>
+<tr><td>S2-024</td><td>TestLayerLedgerImbalanceStaysFrozen：日记录不守恒时每轮都冻结，不会被重新判定解除。</td></tr>
+</tbody></table></div>
+<p>没有新增依赖、语言运行时或公开契约变化；新增的两个审计动作只进入审计表。</p></section>
+<section id="cycle-time-design"><h2>18 v2.14.6 决策周期时刻与快照读取</h2>
+<p>对应 S2-010，业务式样不变。DecisionCycle.Tick 原先在读交易快照之前取周期时刻 at（未指定时刻时为本机时刻），读完后要求每个快照的时刻不晚于 at，否则以 FUTURE_TRADING_SNAPSHOT（422）放弃本轮，下一次调度重做，防止决策使用 at 之后才有的事实。读快照要依次请求运行、账户、十个列表、审计增量并再次核对版本（版本变化时最多重读 3 次），持续数秒。内部撮合运行（E15）的时钟随模拟帧推进，读取期间偶有新帧，偶发跳过（B9）。模拟盘运行（E20）的时钟还由交易所执行器的账户同步推进（P1 设计 20.1、21），约每 16.7 秒一次，observed_at 为执行器本机时刻；同步在读取期间提交时快照时刻晚于 at。调度器约每 33.4 秒一轮，恰为同步间隔的两倍，两者相位锁住时每轮都撞上同步：2026-10-24 14:55–15:06 JST 连续失败，漏掉 15:00 的周期，此前 3 小时 50 次失败中 44 次在一次同步之后 1～4 秒内。</p>
+<h3 id="cycle-time-change">18.1 处理</h3>
+<p>未指定时刻（requested 为空，调度器的正常调用）时，Tick 在读完全部快照之后再取本机时刻作为 at。快照中的事实在读取结束时都已可用，P1 运行时钟不超前于本机时刻，因此快照时刻不晚于 at，不引入未来数据；周期边界、CLOCK_REWIND 与 cutoff 按新的 at 计算，只比原先晚读取耗时（数秒）。快照时刻晚于 at 的检查保留，用于宿主时钟不一致等异常。指定时刻的调用（回放与按时刻补算）不变：仍在读取前取 at，快照晚于该时刻即拒绝。</p>
+<h3 id="cycle-time-tests">18.2 验证</h3>
+<div class="table-wrap"><table><thead><tr><th>式样 / 验收</th><th>测试（tests/strategy/go_cycle_time_test.go）</th></tr></thead><tbody>
+<tr><td>S2-010</td><td>TestCycleStampedAfterSnapshotRead：读快照期间时钟前进 2 秒、快照时刻为读取结束时刻，周期成功且 cutoff 不早于快照时刻（不含本修正时同一测试以 FUTURE_TRADING_SNAPSHOT 失败，与 E20 现象一致）。</td></tr>
+<tr><td>S2-010</td><td>TestRequestedCycleStillRejectsLaterSnapshot：指定时刻的周期遇到更晚的快照仍以 FUTURE_TRADING_SNAPSHOT 拒绝。原有决策周期测试照旧通过。</td></tr>
+</tbody></table></div>
+<p>没有新增依赖、语言运行时或公开契约变化。</p></section>
+
+<section id="funding-source-design"><h2>19 v2.17.0 资金费估计来源</h2><p>对应 S2-043。实例配置 <code>[strategy] funding_source</code>（<code>adapters/configuration/config.go</code>）取 <code>""</code>、<code>RUN</code> 或 <code>REFERENCE</code>，其他值使 Load 返回 STRATEGY_CONFIGURATION_INCOMPLETE。<code>entrypoints/assembly</code> 把它赋给 <code>adapters.TradingV2.FundingSource</code>。<code>TradingV2.Snapshot</code> 读取 P1 instruments 条目时，REFERENCE 取 <code>reference_funding</code>（P1 设计 24.6），否则取 <code>funding</code>；整数 interval_hours 的规范化与解析失败的错误码（TRADING_FUNDING_INVALID）不变。REFERENCE 时快照记 <code>funding_source=REFERENCE</code>（TradingSnapshot 新字段，模式枚举只有 REFERENCE，默认省略），随决策输入保存。条目没有所选字段时快照不含该对象的资金费，<code>FundingAnnual</code> 照旧返回策略登记的 <code>funding_fallback_annual</code>，因此不会退回运行费率。<code>NoTradeBand</code> 与分层账本的调用方式不变。</p><p>来源是实例配置而不是策略版本字段：策略版本不可修改，重新绑定对象会重置其运行状态；改用配置只需重启该实例的 P2 单元，已有持仓与批次不受影响。</p><p>验证：tests/strategy/go_composition_api_test.go TestS243ReferenceFundingSource——同一条目带模拟盘费率 0.0075 与参考费率 0.0001：默认年化 8.2125、REFERENCE 年化 0.1095 且快照注明来源；REFERENCE 而参考缺失时为备用 0.1。原有 TestCompositionTradingAdapterFundingOptionalAndIntegerInterval 照常通过。</p></section><section id="exit-redeliver-design"><h2>20 v2.18.0 收盘止损退出的重发与有效期</h2><p>对应 S2-034（v2.18.0 修订）。原实现在 <code>DecisionCycle.Tick</code> 生成决策的事务中即把 ExitRequestRecord 置 APPLIED（decision_cycle.go），<code>DynamicTarget</code> 只处理 ACCEPTED（application/dynamic_stop.go）；归零目标在 <code>Dispatch</code> 被 P1 拒绝（409 VERSION_CONFLICT，B8 竞争）后，下一周期不再归零，退出丢失（E20 10-27 05:55Z，B28）。</p><ul><li><code>domain/dynamic_stop.go</code>：常量 <code>ExitRequestValidity = 30 * time.Minute</code>。</li><li><code>Dispatch</code> 写回下发结果的事务中，状态为 REJECTED 或 EXPIRED 时，DecisionID 等于该决策的 APPLIED 请求改回 ACCEPTED、清空 DecisionID，审计 CLOSE_EXIT_REDELIVER（含原因）。DELIVERY_UNKNOWN 保持 APPLIED（P1 可能已受理）。</li><li><code>DynamicTarget</code> 遍历该对象的请求：周期时刻晚于 bar_close_at + ExitRequestValidity 时，ACCEPTED 的请求，以及 APPLIED 且对象仍按请求方向持仓、风险单位 batch_id 与请求相同（或请求无 batch_id）的请求，置 EXPIRED 并审计 CLOSE_EXIT_EXPIRED；其余 APPLIED（批次已结束）保持，供批次结束识别取 exit_kind=CLOSE_STOP。仍为 ACCEPTED 的请求照旧直接归零并记 CLOSE_STOP_EXIT。</li></ul><p>状态取值增加 EXPIRED（状态为字符串字段，存储结构不变）。升级前已置 APPLIED 而从未执行的请求，在升级后的第一个周期按上述条件置 EXPIRED，不追溯归零。</p><p>验证：tests/strategy/go_dynamic_stop_test.go TestT229CloseStopExitRedeliveredAfterRejectionThenExpires——下发被拒后请求回到 ACCEPTED，5 分钟后的周期再次归零并记新决策，确认后批次仍持仓、超过有效期置 EXPIRED 且不再归零；TestT229PendingCloseExitExpiresAppliedClosedKept——未下发的请求过期，另一批次已执行的请求保持 APPLIED。去掉修复时两项均失败。</p></section><section id="exit-immediate-design"><h2>21 v2.19.2 收盘止损退出的周期外下发</h2><p>对应 S2-034“通过后立即下发归零目标”，式样不变。原实现中 <code>SubmitCloseExit</code> 只把请求记为 ACCEPTED，归零由 <code>DynamicTarget</code> 在决策周期中生成；对象本周期已决策（<code>LastCycle</code> 为本周期起点）时，<code>Tick</code> 跳过该对象直到下一周期。P3 在 K 线收盘后约 5 秒提交请求、约 10～15 秒受理，而调度器的周期截止落在周期起点后 0～80 秒（各实例平均约 21 秒），所以相当一部分退出晚一个周期（B29：E22 10-29 05:35 JST 截止 05:35:06、受理 05:35:15、05:40 才下发）。</p><ul><li><code>application/exit_requests.go</code> 新增 <code>CloseExitNow</code>，在 <code>Tick</code> 中位于成交风险修正（<code>CorrectActualRisk</code>）之后、本周期跳过判断之前调用。</li><li>仅在对象本周期已决策时生效（周期未决策的仍由周期内的 <code>DynamicTarget</code> 处理）。条件与周期内的减仓下发一致：价格样本有效、持仓归属代次与快照一致；归零只减仓，所以不要求恢复状态为 NORMAL。</li><li>只处理 ACCEPTED、未过有效期（bar_close_at + 30 分钟）且与当前持仓方向一致的请求；过期与方向不符仍留给周期处理（置 EXPIRED / NOT_APPLICABLE）。</li><li>生成独立决策：编号取 (实例, 环境, 对象, "close-exit", 请求编号, 快照版本) 的摘要，cycle_id 为 <code>close-exit:&lt;请求编号&gt;</code>，目标 0，原因码 CLOSE_STOP_EXIT；写入 outbox（目标版本 = 已知最大版本 + 1，有效期按 TargetTTLSeconds），请求置 APPLIED 并记 DecisionID 与 batch_id，审计 CLOSE_EXIT_OFF_CYCLE。之后的下发、拒绝后回到 ACCEPTED 再下发（第 20 章）、批次结束记 CLOSE_STOP 均沿用原流程；被拒后同一周期内即可再次周期外下发（快照版本不同，编号不同）。</li><li>本周期的 <code>LastCycle</code> 不变，下一周期照常决策。</li></ul><p>验证：tests/strategy/go_dynamic_stop_test.go TestT240CloseExitAcceptedAfterCycleDeliveredBeforeNextPeriod——周期决策后才受理的请求，在同一周期内的下一次轮询即得到 close-exit 决策（目标 0、outbox PENDING、目标版本高于周期决策、请求 APPLIED 且记 batch_id）；再次轮询不重复；被交易层拒绝后同一周期内再次下发且编号不同。TestT240CloseExitBetweenCyclesLeavesInvalidToCycle——过期或方向不符的请求在周期外不处理、仍为 ACCEPTED。去掉修复时前者失败（轮询无决策）。原有 TestT229 各项不变通过。</p></section><section id="live-contribution-design"><h2>22 v2.19.3 决策输入中生效贡献的精简</h2><p>对应既有 S2-010/012/024，式样不变。第 16.1 节的压缩只把 remaining_amount 为 0 的贡献换成数量与摘要，生效贡献整行（约 21 个字段、0.8 KB）保留。同向研判链每多一次研判就多一条生效贡献，保留期（6 小时）内的每条决策都带着整份列表，所以聚合大小约为“决策条数 × 链长 × 行大小”。2026-10-29 实测：E22 118 条决策、平均 22 条生效贡献，贡献行合计 2.1 MB（决策 4.0 MB、内部状态 5.25 MB）；E15 链 LONG ×53，内部状态 5.95 MB，每 3 小时约 +0.3 MB（B13）。各条决策中的贡献行互不相同（remaining_amount、high_water、last_updated_at 每周期变化），所以不能按内容去重。</p><p>领域层读取决策中贡献的只有开案（<code>domain/case.go</code> <code>FeedbackCases</code>：按 remaining_amount &gt; 0 筛选、取 family_id 作事件组，并把这些行存为案例的 source_contributions），以及之后读 source_contributions 的归因（<code>LabelCase</code>：effective_at、initial_amount、direction）和样本保留（<code>RetainSamples</code>：effective_at）。</p><ul><li><code>CompactDecisionInput</code> 对生效贡献只保留 <code>CaseContributionFields</code> = contribution_id、family_id、direction、effective_at、initial_amount、remaining_amount（原行没有的字段不补），并加 <code>pool.live_contributions_ref = {count, digest}</code>，digest 为完整生效行的规范化摘要。</li><li>input_hash 仍为压缩前完整输入的 Digest，口径不变；完整贡献在状态的 contributions 集合与情绪账本中保留，可按 contribution_id 追溯。</li><li>压缩仍幂等：已含 bars_ref 的输入原样返回。已存的旧决策不改写，按保留期自然归档；新决策写入后聚合逐步变小。案例 source_contributions 随之只含上述字段，开案、标签与样本保留的结果不变。</li></ul><p>预期：每条生效贡献约 0.8 KB → 约 0.25 KB，同向研判每次约 +95 KB → 约 +30 KB（以 118 条决策计）。</p><p>验证：tests/strategy/go_decision_retention_test.go TestT241LiveContributionsKeepCaseFieldsOnly——40 条完整生效贡献压缩后只剩 6 个字段且值不变，live/spent 数量正确、池体积降到一半以下、压缩幂等、input_hash 不变；用完整行（旧决策）与精简行（新决策）分别开案并打标签，状态 MATURE、标签、事件组完全一致。对照：字段表去掉 effective_at 时该测试失败（MANIFEST_TIME_INVALID）。原有 TestCompactDecisionInput 各项通过。冻结状态转换对照（go_replay_test.go TestFrozenP2StateTransitions）对基准中的决策输入已按 CompactDecisionInput 投影，本版同样把基准案例的 source_contributions 投影到上述字段后比较，其余状态（含标签）逐项一致。</p></section><section id="prepricing-compact-design"><h2>22.1 v2.19.4 预定价评估的精简</h2><p>决策输入的 prepricing 由决策周期按池中每条贡献（含 remaining_amount 为 0 的）的 score_id 取 <code>PrepricingAssessments</code> 组成，所以随历史研判只增不减。v2.19.3 部署后实测 E22 新决策：prepricing 66 条、7.9 KB，与精简后的贡献池（35 条、10.5 KB）同一量级。领域层读取决策 input_snapshot 的仍只有 policy 与 pool.contributions（第 16.1 节），不读 prepricing。</p><ul><li><code>CompactDecisionInput</code> 在处理贡献池时，按完整生效贡献行的 score_id 保留对应的 prepricing 条目，其余条目换成 <code>spent_prepricing_ref = {count, digest}</code>（digest 为被替换条目的规范化摘要）。</li><li>input_hash 仍按完整输入计算；完整评估保留在状态的 PrepricingAssessments 中。压缩幂等（已含 bars_ref 的输入原样返回），旧决策不改写，按保留期归档。</li></ul><p>验证：tests/strategy/go_decision_retention_test.go TestT242PrepricingKeepsLiveContributionsOnly——70 条贡献中 10 条生效，压缩后 prepricing 只剩这 10 条，spent_prepricing_ref 计 60 条，input_hash 与原输入不变，压缩幂等；去掉本节实现时该测试失败。TestT241、TestFrozenP2StateTransitions 与原有 TestCompactDecisionInput 各项通过。</p></section><section id="deployment-migrate"><h2>部署迁移入口</h2><p>factorforge-strategy新增migrate命令：读取已有SIM/LIVE配置的migration_database_url，调用本层postgres.Initialize后退出；不执行Store.Create或重新登记Workload。initialize保持原语义。部署工具分别调用schema迁移与首次业务登记，不在每次重启重建实例。迁移失败返回原稳定代码，不启动服务；对应部署式样S6-005。</p></section></article><footer>HTML 是本版唯一发布正文。图表为内嵌 SVG，无需联网或运行脚本。文档通过不代表程序实现、交易运行或实盘准入通过。</footer></main></div></body></html>

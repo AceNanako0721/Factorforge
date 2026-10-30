@@ -83,7 +83,7 @@ func Check(root string) ([]string, error) {
 		}
 		own := module + layer + "/"
 		if layer == "applications" {
-			if len(parts) < 6 || !has([]string{"soxl_jev", "console", "model_access"}, parts[3]) {
+			if len(parts) < 6 || !has([]string{"soxl_jev", "console", "model_access", "deployment"}, parts[3]) {
 				fail("unregistered application or source area")
 				return nil
 			}

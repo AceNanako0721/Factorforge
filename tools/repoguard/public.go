@@ -81,8 +81,15 @@ func asMap(value any) map[string]any {
 func TemplateIssue(name string, data []byte, historical bool) string {
 	var actual, expected map[string]any
 	if name == "config/config.example.toml" {
-		if toml.Unmarshal(data, &actual) != nil || toml.Unmarshal([]byte(expectedConfig+expectedConsole+expectedModelAccess), &expected) != nil {
+		if toml.Unmarshal(data, &actual) != nil || toml.Unmarshal([]byte(expectedConfig+expectedConsole+expectedDeployment+expectedModelAccess), &expected) != nil {
 			return "invalid-template-format"
+		}
+		// Frozen pre-deployment templates have no deployment block. Present
+		// blocks must always match the complete empty shape, including history.
+		if historical {
+			if _, present := actual["deployment"]; !present {
+				delete(expected, "deployment")
+			}
 		}
 		// Enforce a complete, exact empty shape, including short arbitrary secrets.
 		if actual["mode"] != "mock" || !equalJSON(actual["schema_version"], expected["schema_version"]) || asMap(actual["runtime"])["environment"] != "SIM" || asMap(actual["trading"])["allow_live"] != false || asMap(actual["trading"])["adapter"] != "mock" {

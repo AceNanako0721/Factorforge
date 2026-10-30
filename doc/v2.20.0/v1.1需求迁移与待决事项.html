@@ -1,0 +1,1084 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="ff:version" content="2.20.0"><meta name="ff:kind" content="migration"><title>v1.1需求迁移与待决事项 · Factorforge v2.20.0</title><style>
+:root{--ink:#172d40;--muted:#587083;--accent:#006e82;--line:#cfdee5;--paper:#fff;--bg:#edf3f6}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.8 system-ui,'Microsoft YaHei',sans-serif}
+a{color:var(--accent);text-underline-offset:3px;overflow-wrap:anywhere}header{background:#15384a;color:white;padding:28px max(24px,calc((100vw - 1320px)/2));border-bottom:5px solid #2eb6ad}
+header p{margin:0}header strong{font-size:23px}header a{color:#a9eee9}.shell{display:grid;grid-template-columns:245px minmax(0,1fr);gap:26px;max-width:1320px;margin:28px auto;padding:0 24px}
+nav{position:sticky;top:16px;align-self:start;max-height:calc(100vh - 32px);overflow:auto;padding:18px;background:var(--paper);border:1px solid var(--line);border-radius:12px;font-size:14px}
+nav a{display:block;padding:6px 0;text-decoration:none}main{overflow-wrap:anywhere;min-width:0;background:var(--paper);padding:30px 38px;border:1px solid var(--line);border-radius:12px}
+h1{font-size:30px;line-height:1.35;margin:0 0 18px}h2{font-size:23px;border-bottom:2px solid var(--line);padding:10px 0;margin:34px 0 18px;scroll-margin-top:20px}h3{font-size:18px;margin:25px 0 10px;scroll-margin-top:20px}p{margin:12px 0}
+.meta,.note{background:#eef7f8;border-left:4px solid var(--accent);padding:12px 16px;margin:18px 0;color:#294c60}.warning{background:#fff7e9;border-color:#d09b39}.table-wrap{overflow:auto;margin:18px 0}
+table{width:100%;border-collapse:collapse;font-size:14px}th{background:#e8f1f4;text-align:left}th,td{padding:11px 13px;border:1px solid var(--line);vertical-align:top;overflow-wrap:anywhere}td code{white-space:normal;overflow-wrap:anywhere}
+pre{padding:16px;background:#102d3d;color:#d8f2ed;border-radius:8px;overflow:auto;font:13px/1.7 Consolas,monospace}code{overflow-wrap:anywhere;font-family:Consolas,monospace;font-size:.9em;background:#edf3f6;padding:1px 4px;border-radius:3px}pre code{background:none;color:inherit;padding:0}
+figure{margin:24px 0;border:1px solid var(--line);border-radius:10px;padding:16px;background:#f8fbfc;overflow:auto}figure svg{display:block;width:100%;height:auto;min-width:520px}figcaption{font-size:14px;color:var(--muted);margin-top:12px}details{margin:12px 0}footer{color:var(--muted);font-size:13px;margin-top:28px;border-top:1px solid var(--line);padding-top:15px}li{margin:5px 0}.badge{display:inline-block;background:#d6eee8;color:#15564b;border-radius:5px;padding:0 7px;font-size:13px}
+@media(max-width:900px){.shell{display:block;padding:0 12px;margin:16px auto}nav{position:static;max-height:220px;margin-bottom:16px}main{padding:22px 18px}h1{font-size:25px}}
+@media print{body{background:white;font-size:11pt}.shell{display:block;margin:0;padding:0;max-width:none}nav,header{display:none}main{padding:0;border:0}h2,h3{break-after:avoid}figure,tr{break-inside:avoid}figure svg{min-width:0}pre{white-space:pre-wrap;overflow-wrap:anywhere}a{color:inherit}table{font-size:9pt}}
+</style></head><body><header><strong>Factorforge / 文档基线</strong><p>v2.20.0 · 2026-10-30 · 三层架构 · HTML 正文</p></header><div class="shell"><nav aria-label="文档目录"><a href="index.html">版本索引</a><a href="#section-1">1 保留及结构变更</a><a href="#section-2">2 继承的决策及未决状态</a><a href="#section-3">3 逐项迁移矩阵</a><a href="#section-4">需求及质量</a><a href="#section-5">合约专项</a><a href="#section-6">待决事项</a><a href="#section-7">历史工作包</a><a href="#section-8">历史功能验收</a><a href="#section-9">历史专项测试</a><a href="#revision-v270">v2.7.0 设计修订</a><a href="#revision-v280">v2.8.0 设计修订</a>
+<a href="#revision-v290">v2.9.0 设计修订</a><a href="#revision-v2100">v2.10.0 设计修订</a><a href="#revision-v2110">v2.11.0 设计修订</a><a href="#revision-v2111">v2.11.1 设计修订</a><a href="#revision-v2112">v2.11.2 设计修订</a><a href="#revision-v2113">v2.11.3 设计修订</a><a href="#revision-v2114">v2.11.4 设计修订</a><a href="#revision-v2115">v2.11.5 设计修订</a><a href="#revision-v2120">v2.12.0 设计修订</a><a href="#revision-v2121">v2.12.1 设计修订</a><a href="#revision-v2130">v2.13.0 设计修订</a><a href="#revision-v2140">v2.14.0 设计修订</a><a href="#revision-v2141">v2.14.1 设计修订</a><a href="#revision-v2142">v2.14.2 设计修订</a><a href="#revision-v2143">v2.14.3 设计修订</a><a href="#revision-v2144">v2.14.4 设计修订</a><a href="#revision-v2145">v2.14.5 设计修订</a><a href="#revision-v2146">v2.14.6 设计修订</a><a href="#revision-v2147">v2.14.7 设计修订</a><a href="#revision-v2148">v2.14.8 设计修订</a><a href="#revision-v2149">v2.14.9 设计修订</a><a href="#revision-v21410">v2.14.10 设计修订</a><a href="#revision-v2150">v2.15.0 设计修订</a><a href="#revision-v2160">v2.16.0 设计修订</a><a href="#revision-v2170">v2.17.0 设计修订</a><a href="#revision-v2180">v2.18.0 设计修订</a><a href="#revision-v2190">v2.19.0 设计修订</a><a href="#revision-v2191">v2.19.1 设计修订</a><a href="#revision-v2192">v2.19.2 设计修订</a><a href="#revision-v2193">v2.19.3 设计修订</a><a href="#revision-v2194">v2.19.4 设计修订</a><a href="#revision-v2195">v2.19.5 设计修订</a><a href="#revision-v2196">v2.19.6 当前设计修订</a></nav><main><div class="meta">v1.1需求迁移与待决事项</div><article id="document-body"><section id="plan-release"><h2>v2.6.5 设计修订</h2><p>规划修订，式样与设计不变：按实际进度重写<a href="开发规划书.html">开发规划书</a>阶段表（P3 主线改为行情基线与有界事件调整、当前阶段为影子 SIM 前向检验及其出口、模型接入已实现且账户验收待用户），并加入规划维护规则。</p></section><section id="sim-frames-release"><h2>v2.6.4 设计修订</h2><p>设计补充，业务式样不变：公开行情采集器可在 SIM 前向帧模式下，于每次快照后提交一帧模拟撮合帧（同组报价、上一帧以来的成交量、新收盘 K 线），使影子 SIM 运行的订单与保护止损按实时行情撮合。修正影子订单从未成交的问题。见<a href="01_交易系统层设计书.html#sim-forward-frames">P1 设计第 17 章</a>。</p></section><section id="sim-capabilities-release"><h2>v2.6.3 设计修订</h2><p>设计补充，业务式样不变：公开行情采集器可在 SIM 能力模式下，为 REPLAY 运行声明模拟器提供的条件保护、只减仓与做空能力（交易所须列出止损市价单），规则版本带 -sim 后缀且只允许 REPLAY 运行登记。另外，SIM 环境允许 quality_state 为 EXPERIMENT_ONLY 的策略与参数增险，LIVE 仍须 VALIDATED。两项共同修正影子运行从未下单的问题。见<a href="01_交易系统层设计书.html#sim-capabilities">P1 设计第 16 章</a>与<a href="02_策略化框架层设计书.html#sim-experiment-quality">P2 设计 v2.6.3 节</a>。</p></section><section id="bar-sigma-release"><h2>v2.6.2 设计修订</h2><p>设计补充，业务式样不变：SIM 环境未登记价格代理时，σ 由最近已完成 K 线的收盘对数收益估计，流动性按策略预算计；LIVE 仍必须登记价格代理。修正影子运行中目标暴露恒为 0 的问题。见<a href="02_策略化框架层设计书.html#bar-sigma-fallback">P2 设计 v2.6.2 节</a>。</p></section><section id="layered-view-release"><h2>v2.6.1 设计修订</h2><p>设计补充，业务式样不变：管理台设计登记 v2.6.0 新增的四个只读查询（因子序列、预排日程、模板、分层日账）及其展示；预排日程命令可携带逐事件窗口时刻，用于按交易所日历计算的窗口；基线缺失时的 HOLD_REDUCE_ONLY 改为沿用最近有效值且只减不加，超过两倍有效期后取零。见<a href="04_Web管理台设计书.html#layered-position-view">管理台设计第 15 章</a>与<a href="02_策略化框架层设计书.html#baseline-composition-patch">P2 设计 v2.6.1 节</a>。</p></section><section id="baseline-composition-release"><h2>v2.6.0 设计修订</h2><p>式样变更：应持仓位由“事件情绪决定”改为“行情基线 + 研判 + 预排事件构成核心方向，事件只做有界调整”（S2-011、S2-012 修订）；新增 S2-025 预排事件与模板标定、S2-026 成本感知调仓、S2-027 分层归因与权重学习（可信度权重 w 允许为负）；P3 新增 S3-019～S3-022 行情基线、预排日程、关注清单通知与初始启用范围；P1 公开资金费率观测。事件调整上限可达满仓，与核心反向时最多压到空仓。依据框架复审文档的 E1～E9 实验，P3 初始只启用趋势×波动基线，其余分量只记录并在影子运行中做前向检验。未声明合成规则的策略保持 v2.5.8 行为。见<a href="02_策略化框架层式样书.html#baseline-composition">P2 式样第 8 章</a>、<a href="02_策略化框架层设计书.html#baseline-composition-design">P2 设计 v2.6.0 章</a>、<a href="03_SOXLUSDT_JEV应用实例式样书.html#baseline-inputs">P3 式样第 6 章</a>、<a href="03_SOXLUSDT_JEV应用实例设计书.html#baseline-inputs-design">P3 设计第 25 章</a>与<a href="01_交易系统层设计书.html#funding-observation">P1 设计第 15 章</a>。</p></section><section id="workload-capacity-release"><h2>v2.5.8 设计修订</h2><p>影子运行暴露的容量与并发问题一并定稿。P1：交易所修正已完成 K 线时，在收盘后 1 小时内由 P1 赋予下一修订号并以快照时刻为可用时间，不再整份拒绝行情；运行聚合中的审计外置、幂等记录保留 24 小时、K 线保留 7 天并写入只追加表，采集器在规则未变时不再重复登记。P2：调度与反馈遇到快照版本冲突在同一轮内有限重试；审计外置并分页查询；目标记录不再复制决策输入、决策保留期改为 6 小时；价格样本按趋势窗口与未完成案例裁剪，趋势因子改为以窗口起点为基准。业务式样不变。见<a href="01_交易系统层设计书.html#market-capacity">P1 设计第 14 章</a>与<a href="02_策略化框架层设计书.html#workload-capacity">P2 设计 v2.5.8 章</a>。</p></section><section id="decision-retention-release"><h2>v2.5.7 设计修订</h2><p>本地影子运行 4.5 小时后，P2 状态因每个决策内嵌约 50 KB 的 K 线快照、目标再复制一份而超过 4 MiB 解码上限，调度与反馈全部停止。定稿决策输入中 K 线改为摘要引用（input_hash 口径不变），被取代且过期 24 小时的决策与目标移入只追加的归档表；业务式样不变。样本序列保留另列未决。见<a href="02_策略化框架层设计书.html#decision-retention">P2 设计 v2.5.7 章</a>。</p></section><section id="rss-identity-release"><h2>v2.5.6 设计修订</h2><p>本地影子运行中，美联储 RSS 来源因 feed 无时间下限、证据 ID 含内容哈希而页面字节每次变化，每 15 分钟重复收录同一批公告。定稿 RSS 回看窗口与进程内去重、证据 ID 只由来源与链接决定、同一 ID 以首次捕获为准；业务式样不变。见<a href="03_SOXLUSDT_JEV应用实例设计书.html#rss-evidence-identity">P3 设计第27章</a>。</p></section><section id="market-trade-retention-release"><h2>v2.5.5 设计修订</h2><p>本地影子运行 4 小时后，公开成交在 P1 运行快照中无界累积到约 10 MB，执行器高频事务整表重写投影，CPU 持续满载。定稿公开成交保留窗口（1 小时、每品种 1000 条），投影改为增量写入，SIM 执行器空闲退避；补登记既有投影表。业务式样不变。见<a href="01_交易系统层设计书.html#market-trade-retention">P1 设计第13章</a>。</p></section><section id="jev-rounding-release"><h2>v2.5.4 设计修订</h2><p>先导评测复查 94 份真实 JEV 响应，发现 18% 的概率和因舍入不等于 1，而原校验要求精确等于 1。定稿 ±0.01 的十进制容差与分数期望归一化；保持五组业务式样、题目、量表、标定和路由资格。下一步按<a href="03_SOXLUSDT_JEV应用实例设计书.html#jev-rounding-tolerance">设计第26章</a>实现。<a href="../engineering/P3_SEC_DIRECT_EVAL_PILOT_RESULTS.md">先导结果</a></p></section><section id="sec-source-release"><h2>v2.5.3 设计修订</h2><p>先完成新闻来源调研和 SEC EDGAR 带身份探针，再定稿 8-K 新闻稿附件来源适配器：按登记公司读取申报，筛选事项与时间窗口，保存 EX-99 原文；保持五组业务式样，不改变抽取、评分资格或首发时间规则。下一步按<a href="03_SOXLUSDT_JEV应用实例设计书.html#sec-filing-source">设计第25章</a>实现并验证。<a href="../engineering/P3_SEC_FILING_SOURCE.md">选型与探针</a></p></section><section id="semantic-review-release"><h2>v2.5.2 设计修订</h2><p>先完成外部事件对照和审阅衔接探针，再定稿原文页的可选语义候选旁注；保持五组业务式样、不预填事实或审阅答案，不启用生产抽取或交易。下一步按<a href="03_SOXLUSDT_JEV应用实例设计书.html#semantic-review-annotations">设计第24章</a>实现并验证。<a href="../engineering/P3_EXTERNAL_EVENT_RESULTS.md">试验及限制</a>；前版为<a href="../v2.5.1/index.html">v2.5.1</a>。候选生产选择/来源资产/标定和经济准入继续未决，本地模型仍暂停。以下继承条目的版本/本次描述属于历史沿革。</p></section><div class="note">本版采用 Go 后端与浏览器 JavaScript（React/TypeScript 编译），三层职责和全部业务式样不变。G0～G3 的迁移及 GitHub 收尾已完成；G4 实例/管理台、日历与报告已完成本地集成。原 Python 仅保留历史对照；来源许可、供应商评测、生产标定和 LIVE 准入继续单独验证，不能由代码或 CI 代替。</div><div data-source-sha256="4fb71caaf74ffba4c330d3a2dd156698cb204cb9f11fa2bc097b054a5cf1d51c" data-source-document="v1.1需求迁移与待决事项.md"><h1>v1.1 需求迁移与待决事项</h1>
+<p>版本：2.19.6；日期：2026年10月27日。本表追踪历史规则的归属，不向开发规划复制详细工作包。新版式样编号S1/S2/S3及验收编号T1/T2/T3是当前真源，旧编号只用于迁移。</p>
+<h2 id="section-1">1 保留及结构变更</h2>
+<p>v1.1 的需求和质量要求全部有新版落点。数学、事件修订、守恒、风险优先、固定步长门控与自动生效保留；目标/模型/搜索属于应用，确定性量化属于框架，执行/最终账户风控属于交易。旧规划的估算人日和大量工作包不作为新版工程顺序，改以P1～P5管理，历史任务去向列在下表。</p>
+<p>原两层Core/Upper以及“JEV在Core内部”的结构被本次三层要求取代。交易信号资格仍由框架服务独立核验，但评分worker和Provider运行在应用层。允许从已有事件提交评分或修订；事件创建不自动注入。该结构变更是本次用户要求，不能据旧结构阻止应用提交评分。</p>
+<h2 id="section-2">2 继承的决策及未决状态</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>编号</th>
+<th>当前状态与需完成的工作</th>
+<th>所属层/最迟时点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DEC-01</td>
+<td>SOXLUSDT、双向、全天和本版JEV主要判断已明确；实际账户产品/API能力未知</td>
+<td>应用绑定、交易探针；使用相应真实能力前</td>
+</tr>
+<tr>
+<td>DEC-02</td>
+<td>时基明确；周期、漏周期恢复策略细节及观察窗待标定</td>
+<td>框架；数据/模拟方案冻结前</td>
+</tr>
+<tr>
+<td>DEC-03</td>
+<td>非实盘4000、实盘测试400名义上限明确；本金及风险日未确认</td>
+<td>应用配置/交易账务；资金仿真及R3前</td>
+</tr>
+<tr>
+<td>DEC-04</td>
+<td>数据源许可、价格/成交代理、执行能力及成本未完全确认</td>
+<td>应用/交易；可信研究及对应执行前</td>
+</tr>
+<tr>
+<td>DEC-05</td>
+<td>启用事件类型、最少因子/参数及量表待标定</td>
+<td>框架/应用；首次标定前</td>
+</tr>
+<tr>
+<td>DEC-06</td>
+<td>实盘ENFORCE明确；触限后存量保留/减仓/退出及恢复仍未定</td>
+<td>交易政策/应用；R3前</td>
+</tr>
+<tr>
+<td>DEC-07</td>
+<td>非实盘账户亏损只观察；日亏损默认值、非传统双次数与冷却待验证</td>
+<td>应用研究/通用框架；R3前</td>
+</tr>
+<tr>
+<td>DEC-08</td>
+<td>主指标、功效、样本量、最小效应及验证门槛待登记</td>
+<td>框架研究/应用评测；独立验证前</td>
+</tr>
+<tr>
+<td>DEC-09</td>
+<td>白名单门控后自动生效已明确；周期检查、漂移及回滚阈值待标定</td>
+<td>框架；参数试用前</td>
+</tr>
+<tr>
+<td>DEC-10</td>
+<td>本地局域网全天运行明确；资源、断网断电、告警和保留待验证</td>
+<td>各层设施/应用运维；R1验收前</td>
+</tr>
+<tr>
+<td>OD-01</td>
+<td>生产事实抽取器、完整性/漏抽量表、成本许可及复核方式未定</td>
+<td>应用；真实可交易评分前</td>
+</tr>
+<tr>
+<td>OD-02</td>
+<td>LIVE来源白名单、映射/新鲜度政策及共享JEV配额隔离尚需验证</td>
+<td>应用路由/框架准入；R3前</td>
+</tr>
+<tr>
+<td>OD-03</td>
+<td>目标账户官方操作、备用访问、存量政策及独立复核安排未验证</td>
+<td>交易人工预案/应用运维；R3前</td>
+</tr>
+</tbody>
+</table></div>
+<p>JEV产品身份沿用历史TypeSafe AI Jev；本次明确其归应用。生产协议、版本、费用/隐私/保留和许可仍需目标环境探针，不因指定主要模型而自动关闭这些条件。用户与AI没有新增成员，独立复核职责不能描述成已有第二人。以上未决项不妨碍使用Mock完成分层骨架。</p>
+<h2 id="section-3">3 逐项迁移矩阵</h2>
+<h3 id="section-4">需求及质量</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>v1.1编号</th>
+<th>v2.0要求/验收/阶段</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NFR-001</td>
+<td>S1-015 S3-008</td>
+</tr>
+<tr>
+<td>NFR-002</td>
+<td>S1-014 S2-023</td>
+</tr>
+<tr>
+<td>NFR-003</td>
+<td>S1-015 S2-023</td>
+</tr>
+<tr>
+<td>NFR-004</td>
+<td>S1-015 S2-023 S3-006</td>
+</tr>
+<tr>
+<td>NFR-005</td>
+<td>S1-012 S2-023</td>
+</tr>
+<tr>
+<td>REQ-ATR-001</td>
+<td>S2-017</td>
+</tr>
+<tr>
+<td>REQ-ATR-002</td>
+<td>S2-017</td>
+</tr>
+<tr>
+<td>REQ-ATR-003</td>
+<td>S2-017</td>
+</tr>
+<tr>
+<td>REQ-ATR-004</td>
+<td>S2-017</td>
+</tr>
+<tr>
+<td>REQ-ATR-005</td>
+<td>S2-018</td>
+</tr>
+<tr>
+<td>REQ-AUT-001</td>
+<td>S2-021 S3-014</td>
+</tr>
+<tr>
+<td>REQ-CAP-001</td>
+<td>S1-008 S3-012</td>
+</tr>
+<tr>
+<td>REQ-CAP-002</td>
+<td>S1-009 S3-012</td>
+</tr>
+<tr>
+<td>REQ-CAP-003</td>
+<td>S3-013</td>
+</tr>
+<tr>
+<td>REQ-CAS-001</td>
+<td>S2-016</td>
+</tr>
+<tr>
+<td>REQ-CAS-002</td>
+<td>S2-016</td>
+</tr>
+<tr>
+<td>REQ-CFT-001</td>
+<td>S2-018</td>
+</tr>
+<tr>
+<td>REQ-CFT-002</td>
+<td>S2-018</td>
+</tr>
+<tr>
+<td>REQ-CFT-003</td>
+<td>S2-018</td>
+</tr>
+<tr>
+<td>REQ-DAT-001</td>
+<td>S1-003 S2-010 S3-003</td>
+</tr>
+<tr>
+<td>REQ-DAT-002</td>
+<td>S1-004 S2-012 S3-010</td>
+</tr>
+<tr>
+<td>REQ-EVT-001</td>
+<td>S2-002</td>
+</tr>
+<tr>
+<td>REQ-EVT-002</td>
+<td>S2-003 S3-003 S3-005</td>
+</tr>
+<tr>
+<td>REQ-EVT-003</td>
+<td>S2-004</td>
+</tr>
+<tr>
+<td>REQ-EVT-004</td>
+<td>S2-004</td>
+</tr>
+<tr>
+<td>REQ-EVT-005</td>
+<td>S2-005</td>
+</tr>
+<tr>
+<td>REQ-EVT-006</td>
+<td>S2-006</td>
+</tr>
+<tr>
+<td>REQ-EVT-007</td>
+<td>S2-006 S2-023</td>
+</tr>
+<tr>
+<td>REQ-EXE-001</td>
+<td>S1-005 S1-011</td>
+</tr>
+<tr>
+<td>REQ-EXE-002</td>
+<td>S1-005 S2-013</td>
+</tr>
+<tr>
+<td>REQ-FAC-001</td>
+<td>S2-011</td>
+</tr>
+<tr>
+<td>REQ-FAC-002</td>
+<td>S2-011 S2-022</td>
+</tr>
+<tr>
+<td>REQ-GOV-001</td>
+<td>S1-015 S3-017</td>
+</tr>
+<tr>
+<td>REQ-GOV-002</td>
+<td>S2-019 S3-015</td>
+</tr>
+<tr>
+<td>REQ-LRN-001</td>
+<td>S2-019</td>
+</tr>
+<tr>
+<td>REQ-LRN-002</td>
+<td>S2-019</td>
+</tr>
+<tr>
+<td>REQ-LRN-003</td>
+<td>S2-019</td>
+</tr>
+<tr>
+<td>REQ-LRN-004</td>
+<td>S2-019</td>
+</tr>
+<tr>
+<td>REQ-LRN-005</td>
+<td>S2-020</td>
+</tr>
+<tr>
+<td>REQ-LRN-006</td>
+<td>S2-020</td>
+</tr>
+<tr>
+<td>REQ-LRN-007</td>
+<td>S2-020</td>
+</tr>
+<tr>
+<td>REQ-LRN-008</td>
+<td>S2-021</td>
+</tr>
+<tr>
+<td>REQ-LRN-009</td>
+<td>S2-021</td>
+</tr>
+<tr>
+<td>REQ-LRN-010</td>
+<td>S2-021 S3-014</td>
+</tr>
+<tr>
+<td>REQ-MET-001</td>
+<td>S2-022</td>
+</tr>
+<tr>
+<td>REQ-MET-002</td>
+<td>S1-010 S2-022</td>
+</tr>
+<tr>
+<td>REQ-MET-003</td>
+<td>S2-022</td>
+</tr>
+<tr>
+<td>REQ-OBJ-001</td>
+<td>S2-022</td>
+</tr>
+<tr>
+<td>REQ-OBJ-002</td>
+<td>S2-023 S3-014</td>
+</tr>
+<tr>
+<td>REQ-OBS-001</td>
+<td>S2-016</td>
+</tr>
+<tr>
+<td>REQ-OBS-002</td>
+<td>S2-017</td>
+</tr>
+<tr>
+<td>REQ-OPS-001</td>
+<td>S1-013 S3-016 S3-017</td>
+</tr>
+<tr>
+<td>REQ-PAR-001</td>
+<td>S2-019 S2-023</td>
+</tr>
+<tr>
+<td>REQ-POS-001</td>
+<td>S2-012</td>
+</tr>
+<tr>
+<td>REQ-POS-002</td>
+<td>S2-012</td>
+</tr>
+<tr>
+<td>REQ-POS-003</td>
+<td>S1-006 S1-008 S2-013</td>
+</tr>
+<tr>
+<td>REQ-POS-004</td>
+<td>S2-013</td>
+</tr>
+<tr>
+<td>REQ-POS-005</td>
+<td>S2-023</td>
+</tr>
+<tr>
+<td>REQ-REG-001</td>
+<td>S2-011</td>
+</tr>
+<tr>
+<td>REQ-REG-002</td>
+<td>S2-011 S2-020</td>
+</tr>
+<tr>
+<td>REQ-REL-001</td>
+<td>S3-015</td>
+</tr>
+<tr>
+<td>REQ-RSK-001</td>
+<td>S1-008 S1-009 S3-012</td>
+</tr>
+<tr>
+<td>REQ-RSK-002</td>
+<td>S1-008 S2-013</td>
+</tr>
+<tr>
+<td>REQ-RSK-003</td>
+<td>S1-009 S1-010</td>
+</tr>
+<tr>
+<td>REQ-RSK-004</td>
+<td>S1-009 S3-013</td>
+</tr>
+<tr>
+<td>REQ-RSK-005</td>
+<td>S1-009 S2-015 S3-011</td>
+</tr>
+<tr>
+<td>REQ-RSK-006</td>
+<td>S1-012 S1-013 S2-023</td>
+</tr>
+<tr>
+<td>REQ-SEC-001</td>
+<td>S3-016</td>
+</tr>
+<tr>
+<td>REQ-SEC-002</td>
+<td>S3-017</td>
+</tr>
+<tr>
+<td>REQ-SEC-003</td>
+<td>S3-017</td>
+</tr>
+<tr>
+<td>REQ-SEN-001</td>
+<td>S2-006 S2-007</td>
+</tr>
+<tr>
+<td>REQ-SEN-002</td>
+<td>S2-006</td>
+</tr>
+<tr>
+<td>REQ-SEN-003</td>
+<td>S2-008</td>
+</tr>
+<tr>
+<td>REQ-SEN-004</td>
+<td>S2-008 S2-009</td>
+</tr>
+<tr>
+<td>REQ-SEN-005</td>
+<td>S2-009</td>
+</tr>
+<tr>
+<td>REQ-STA-001</td>
+<td>S1-012 S1-013 S2-023</td>
+</tr>
+<tr>
+<td>REQ-STA-002</td>
+<td>S1-006 S2-006 S2-016</td>
+</tr>
+<tr>
+<td>REQ-STA-003</td>
+<td>S2-010 S3-011</td>
+</tr>
+<tr>
+<td>REQ-STA-004</td>
+<td>S2-013 S2-014</td>
+</tr>
+<tr>
+<td>REQ-STP-001</td>
+<td>S2-014</td>
+</tr>
+<tr>
+<td>REQ-STP-002</td>
+<td>S1-007 S1-008 S2-014</td>
+</tr>
+<tr>
+<td>REQ-STP-003</td>
+<td>S1-007 S2-014</td>
+</tr>
+<tr>
+<td>REQ-STP-004</td>
+<td>S2-014 S2-016</td>
+</tr>
+<tr>
+<td>REQ-TIM-001</td>
+<td>S2-010 S3-011</td>
+</tr>
+<tr>
+<td>REQ-TIM-002</td>
+<td>S2-015 S3-011</td>
+</tr>
+<tr>
+<td>REQ-TIM-003</td>
+<td>S2-015 S3-011</td>
+</tr>
+<tr>
+<td>REQ-TRD-001</td>
+<td>S1-004 S3-001 S3-010</td>
+</tr>
+<tr>
+<td>REQ-TRD-002</td>
+<td>S1-003 S3-010</td>
+</tr>
+<tr>
+<td>REQ-TRD-003</td>
+<td>S1-004 S1-010 S3-010</td>
+</tr>
+<tr>
+<td>REQ-TRD-004</td>
+<td>S1-007 S1-011 S1-012</td>
+</tr>
+<tr>
+<td>REQ-TST-001</td>
+<td>S1-015 S2-022 S3-015</td>
+</tr>
+<tr>
+<td>REQ-VAL-001</td>
+<td>S1-014 S2-022</td>
+</tr>
+<tr>
+<td>REQ-VAL-002</td>
+<td>S1-014 S2-022</td>
+</tr>
+<tr>
+<td>REQ-VAL-003</td>
+<td>S3-015</td>
+</tr>
+<tr>
+<td>REQ-VAL-004</td>
+<td>S2-022</td>
+</tr>
+<tr>
+<td>REQ-VAL-005</td>
+<td>S2-022</td>
+</tr>
+<tr>
+<td>REQ-VAL-006</td>
+<td>S2-022</td>
+</tr>
+<tr>
+<td>REQ-VAL-007</td>
+<td>S2-022</td>
+</tr>
+<tr>
+<td>REQ-VAL-008</td>
+<td>S2-022</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="section-5">合约专项</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>v1.1编号</th>
+<th>v2.0要求/验收/阶段</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CR-01</td>
+<td>S1-004 S3-001</td>
+</tr>
+<tr>
+<td>CR-02</td>
+<td>S1-003 S3-010</td>
+</tr>
+<tr>
+<td>CR-03</td>
+<td>S1-008 S1-010</td>
+</tr>
+<tr>
+<td>CR-04</td>
+<td>S1-005 S1-007 S1-011</td>
+</tr>
+<tr>
+<td>CR-05</td>
+<td>S1-004 S3-010</td>
+</tr>
+<tr>
+<td>CR-06</td>
+<td>S2-022 S3-015</td>
+</tr>
+<tr>
+<td>CR-07</td>
+<td>S3-012 S3-013 S3-017</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="section-6">待决事项</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>v1.1编号</th>
+<th>v2.0要求/验收/阶段</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DEC-01</td>
+<td>S3-001</td>
+</tr>
+<tr>
+<td>DEC-02</td>
+<td>S2-010 S2-016</td>
+</tr>
+<tr>
+<td>DEC-03</td>
+<td>S3-012 S1-010</td>
+</tr>
+<tr>
+<td>DEC-04</td>
+<td>S1-004 S3-003 S3-010</td>
+</tr>
+<tr>
+<td>DEC-05</td>
+<td>S2-002 S2-011 S2-019</td>
+</tr>
+<tr>
+<td>DEC-06</td>
+<td>S1-009 S3-013</td>
+</tr>
+<tr>
+<td>DEC-07</td>
+<td>S3-011 S3-013</td>
+</tr>
+<tr>
+<td>DEC-08</td>
+<td>S2-022 S3-015</td>
+</tr>
+<tr>
+<td>DEC-09</td>
+<td>S2-021 S3-014</td>
+</tr>
+<tr>
+<td>DEC-10</td>
+<td>S1-015 S3-016 S3-017</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="section-7">历史工作包</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>v1.1编号</th>
+<th>v2.0要求/验收/阶段</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>WP-01</td>
+<td>P1</td>
+</tr>
+<tr>
+<td>WP-02</td>
+<td>P1 P3</td>
+</tr>
+<tr>
+<td>WP-03</td>
+<td>P1</td>
+</tr>
+<tr>
+<td>WP-04</td>
+<td>P4</td>
+</tr>
+<tr>
+<td>WP-05</td>
+<td>P1 P3</td>
+</tr>
+<tr>
+<td>WP-06</td>
+<td>P2 P3</td>
+</tr>
+<tr>
+<td>WP-07</td>
+<td>P2</td>
+</tr>
+<tr>
+<td>WP-08</td>
+<td>P4</td>
+</tr>
+<tr>
+<td>WP-09</td>
+<td>P1</td>
+</tr>
+<tr>
+<td>WP-10</td>
+<td>P1</td>
+</tr>
+<tr>
+<td>WP-11</td>
+<td>P2</td>
+</tr>
+<tr>
+<td>WP-12</td>
+<td>P3 P5</td>
+</tr>
+<tr>
+<td>WP-13</td>
+<td>P1 P2 P3 P4</td>
+</tr>
+<tr>
+<td>WP-14</td>
+<td>P4</td>
+</tr>
+<tr>
+<td>WP-15</td>
+<td>P5</td>
+</tr>
+<tr>
+<td>WP-16</td>
+<td>P4 P5</td>
+</tr>
+<tr>
+<td>WP-17</td>
+<td>P1 P2 P3 P4 P5</td>
+</tr>
+<tr>
+<td>WP-18</td>
+<td>P5</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="section-8">历史功能验收</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>v1.1编号</th>
+<th>v2.0要求/验收/阶段</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>AC-01</td>
+<td>S1-015</td>
+</tr>
+<tr>
+<td>AC-02</td>
+<td>S3-015</td>
+</tr>
+<tr>
+<td>AC-03</td>
+<td>T1-09 T2-06</td>
+</tr>
+<tr>
+<td>AC-04</td>
+<td>T2-02 T3-04</td>
+</tr>
+<tr>
+<td>AC-05</td>
+<td>T2-03</td>
+</tr>
+<tr>
+<td>AC-06</td>
+<td>T2-04</td>
+</tr>
+<tr>
+<td>AC-07</td>
+<td>T2-02 T2-05</td>
+</tr>
+<tr>
+<td>AC-08</td>
+<td>T2-05</td>
+</tr>
+<tr>
+<td>AC-09</td>
+<td>T2-05</td>
+</tr>
+<tr>
+<td>AC-10</td>
+<td>T2-05</td>
+</tr>
+<tr>
+<td>AC-11</td>
+<td>T2-07 T2-14</td>
+</tr>
+<tr>
+<td>AC-12</td>
+<td>T2-07</td>
+</tr>
+<tr>
+<td>AC-13</td>
+<td>T1-06 T2-07</td>
+</tr>
+<tr>
+<td>AC-14</td>
+<td>T1-04</td>
+</tr>
+<tr>
+<td>AC-15</td>
+<td>T2-08</td>
+</tr>
+<tr>
+<td>AC-16</td>
+<td>T2-08</td>
+</tr>
+<tr>
+<td>AC-17</td>
+<td>T1-06</td>
+</tr>
+<tr>
+<td>AC-18</td>
+<td>T1-07 T1-08</td>
+</tr>
+<tr>
+<td>AC-19</td>
+<td>T1-09 T2-06</td>
+</tr>
+<tr>
+<td>AC-20</td>
+<td>T2-10</td>
+</tr>
+<tr>
+<td>AC-21</td>
+<td>T2-10</td>
+</tr>
+<tr>
+<td>AC-22</td>
+<td>T2-11</td>
+</tr>
+<tr>
+<td>AC-23</td>
+<td>T2-12</td>
+</tr>
+<tr>
+<td>AC-24</td>
+<td>T2-12</td>
+</tr>
+<tr>
+<td>AC-25</td>
+<td>T2-12</td>
+</tr>
+<tr>
+<td>AC-26</td>
+<td>T2-13</td>
+</tr>
+<tr>
+<td>AC-27</td>
+<td>T1-12 T2-15 T3-13</td>
+</tr>
+<tr>
+<td>AC-28</td>
+<td>T2-14</td>
+</tr>
+<tr>
+<td>AC-29</td>
+<td>T1-11 T3-12</td>
+</tr>
+<tr>
+<td>AC-30</td>
+<td>T2-14</td>
+</tr>
+<tr>
+<td>AC-31</td>
+<td>T2-14</td>
+</tr>
+<tr>
+<td>AC-32</td>
+<td>T3-10 T3-12</td>
+</tr>
+<tr>
+<td>AC-33</td>
+<td>T1-08 T3-07</td>
+</tr>
+<tr>
+<td>AC-34</td>
+<td>T1-04 T1-05</td>
+</tr>
+<tr>
+<td>AC-35</td>
+<td>T2-06 T3-08</td>
+</tr>
+<tr>
+<td>AC-36</td>
+<td>T2-09 T3-08</td>
+</tr>
+<tr>
+<td>AC-37</td>
+<td>T1-06 T3-09</td>
+</tr>
+<tr>
+<td>AC-38</td>
+<td>T1-07 T3-09</td>
+</tr>
+<tr>
+<td>AC-39</td>
+<td>T3-10</td>
+</tr>
+<tr>
+<td>AC-40</td>
+<td>T2-13 T3-11</td>
+</tr>
+<tr>
+<td>AC-41</td>
+<td>T1-09 T3-14</td>
+</tr>
+<tr>
+<td>AC-42</td>
+<td>T3-13</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="section-9">历史专项测试</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>v1.1编号</th>
+<th>v2.0要求/验收/阶段</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>TC-01</td>
+<td>T1-03 T3-01</td>
+</tr>
+<tr>
+<td>TC-02</td>
+<td>T1-03 T1-06</td>
+</tr>
+<tr>
+<td>TC-03</td>
+<td>T1-08 T3-07</td>
+</tr>
+<tr>
+<td>TC-04</td>
+<td>T3-07 T3-08</td>
+</tr>
+<tr>
+<td>TC-05</td>
+<td>T1-03 T3-07</td>
+</tr>
+<tr>
+<td>TC-06</td>
+<td>T1-08 T3-07</td>
+</tr>
+<tr>
+<td>TC-07</td>
+<td>T1-10 T3-07</td>
+</tr>
+<tr>
+<td>TC-08</td>
+<td>T1-04</td>
+</tr>
+<tr>
+<td>TC-09</td>
+<td>T1-05</td>
+</tr>
+<tr>
+<td>TC-10</td>
+<td>T1-05</td>
+</tr>
+<tr>
+<td>TC-11</td>
+<td>T1-05 T3-07</td>
+</tr>
+<tr>
+<td>TC-12</td>
+<td>T1-06 T1-10</td>
+</tr>
+<tr>
+<td>TC-13</td>
+<td>T1-05 T1-09</td>
+</tr>
+<tr>
+<td>TC-14</td>
+<td>T1-09 T1-10</td>
+</tr>
+<tr>
+<td>TC-15</td>
+<td>T1-08 T1-10</td>
+</tr>
+<tr>
+<td>TC-16</td>
+<td>T3-01 T3-10</td>
+</tr>
+<tr>
+<td>TC-17</td>
+<td>T2-15 T3-04 T3-06</td>
+</tr>
+<tr>
+<td>TC-18</td>
+<td>T1-12 T3-14</td>
+</tr>
+<tr>
+<td>TC-19</td>
+<td>T2-06 T3-08</td>
+</tr>
+<tr>
+<td>TC-20</td>
+<td>T2-09 T3-08</td>
+</tr>
+<tr>
+<td>TC-21</td>
+<td>T1-07 T3-09 T3-10</td>
+</tr>
+<tr>
+<td>TC-22</td>
+<td>T2-13 T3-11</td>
+</tr>
+<tr>
+<td>TC-23</td>
+<td>T1-09 T3-14</td>
+</tr>
+<tr>
+<td>TC-24</td>
+<td>T3-13</td>
+</tr>
+</tbody>
+</table></div>
+<p>本矩阵的覆盖只是文档追踪，未执行的T验收与P阶段仍为未完成；不能将迁移条目存在写成运行验收通过。</p>
+</div><p>v2.1.6 实际认证/固定版本和目标绑定试验完成，详见 <a href="03_SOXLUSDT_JEV应用实例设计书.html#jev-probe-evidence">P3 证据</a>；OD-01 完整性、OD-02 共享配额及生产标定仍未关闭。</p><p>v2.1.6 细化辅助候选准备，参见 <a href="03_SOXLUSDT_JEV应用实例设计书.html#proposal-experiment">离线试验与设计</a>；不解除 OD-01 语义完整性与独立盲标、自动事件关系及 OD-02。</p><section id="budget-policy"><h2>本版模型预算调整</h2><p>依据用户2026年10月11日要求，本地模型调用次数默认不设上限，0表示无限制；单次边界、供应商实际额度与交易准入保持。对应第五对仕様/设计；P3抽取机制试验及未定质量门槛另行记录，不将预算修订计为P3完成。</p></section><section id="candidate-status"><h2>辅助抽取实现</h2><p>按第三本设计书第23章实现操作者语义候选准备，接入Antigravity公开JSONL、确定性原文跨度核验和私有审阅产物。候选恒REVIEW_REQUIRED，不直接改变已核验事实/JEV评分/P2事件；独立质量与经济门禁继续待验。预算沿用v2.5.0默认不限，四次先行试验结果如实保留；本地模型实验不恢复。</p></section><section id="revision-v270"><h2>v2.7.0 设计修订</h2><p>2026-10-14 用户决定：禁止历史 K 线行情判断，仓位链路中 K 线只用于 S2-014 止损噪声估计；异常行情通知保留以 20 日日线波动作为正常幅度标尺，只触发新闻检索与通知，不判断方向、不影响仓位。撤回 SOXX 趋势/波动基线、合成路径 f_vol 与 UNKNOWN 乘数、SIM σ 估计、财报 E1 历史先验。基线层保留而本版不提供因子；所有方向分量只记录，影子目标为零，前向批次未登记、暂停。</p><p><a href="02_策略化框架层式样书.html#withdraw-kline-spec">P2 式样第 9 章</a> · <a href="02_策略化框架层设计书.html#withdraw-kline-design">P2 配对设计</a> · <a href="03_SOXLUSDT_JEV应用实例式样书.html#withdraw-kline-spec">P3 修订</a> · <a href="03_SOXLUSDT_JEV应用实例设计书.html#withdraw-kline-design">P3 配对设计与部署交接</a> · <a href="开发规划书.html#current">同步规划</a>。旧 v2.6.x 文档/Release 及 archive/v2.6.5-kline-baseline 封存，旧 Exposure 冻结回放不变。新的基线由使用者提出、验证并登记后再重启前向检验。</p></section><section id="revision-v280"><h2>v2.8.0 设计修订</h2><p>2026-10-15，Change-Type: specification。按用户决定先改下层兼容：P1 一笔反手、双层止损、持仓期上层止损更新、归零后全部条件单撤销及 SIM/Binance 适配；P2 方向确认后直接反向目标、止损指令通道、初始距离同预算 sizing 与未成交重发保留计划；追加 R11 上层自行管理止损。三层职责保持。本版只修订文档，代码、生成契约与新增交易验收待后续 PR。</p><p><a href="01_交易系统层式样书.html#lower-compat-spec">P1 式样第 5 章</a> · <a href="01_交易系统层设计书.html#lower-compat-design">P1 设计第 18 章</a> · <a href="02_策略化框架层式样书.html#lower-compat-spec">P2 式样第 10 章</a> · <a href="02_策略化框架层设计书.html#lower-compat-design">P2 设计第 14 章</a> · <a href="开发规划书.html#current">同步阶段规划</a> · <a href="../v2.7.0/index.html">上一冻结基线 v2.7.0</a>。</p><p>追加修订 1（2026-10-15）：目标保护与 P2 指令支持 VENUE / UPPER_MANAGED；管理模式交易所仅挂 P1 保险，保险有效即受保护且可按正常风险门加仓。管理价与收盘超出余量须严格位于保险以内，开仓按距离加余量同预算 sizing；同量管理声明只校验记录，两向切换保留保险。上层 5/15 分钟 K 线收盘触发模块仍待 v2.9.0。</p><p><a href="01_交易系统层式样书.html#s1-022">S1-022 / T1-19</a> · <a href="01_交易系统层设计书.html#upper-managed-design">设计 18.9</a> · <a href="02_策略化框架层式样书.html#s2-032">S2-032 / T2-27</a> · <a href="02_策略化框架层设计书.html#upper-managed-design">设计 14.9</a>。</p><div class="table-wrap"><table><thead><tr><th>范围 / 状态</th><th>本版落点或后续出口</th></tr></thead><tbody><tr><td>R1～R6 / 待代码与验收</td><td>S1-016～021、T1-13～18；有限测试网事实见 P1 18.1，不代表自动实现已验收。insurance_stop_fraction 生产值未标定；只定义参数/校验，不填生产常数。</td></tr>
+<tr><td>R7～R10 / 待代码与契约导出</td><td>S2-028～031、T2-23～26；重发缺少止损计划的已知问题在本版定义修复，实施前仍未关闭。公开止损指令与因子观测同级，权限不自授。</td></tr>
+<tr><td>R11 / 待代码与验收</td><td>VENUE / UPPER_MANAGED、管理价与 overshoot_allowance、正常保险保护状态、零订单声明更新及安全模式切换；收盘触发、余量/保险比例标定与交易验收未完成。</td></tr>
+<tr><td>v2.9.0 / 独立上层式样待验证</td><td>行情判断模块（模型判断消息面作为基线因子）；动态止损模块（噪声表、棘轮式移动止损、判断失效出场、重新入场）。本版仅准备下层兼容，不设计或实现两模块。</td></tr>
+<tr><td>执行方法 / 待实验</td><td>IOC 限价、只挂单等订单类型，等待盘口执行成本实验后另定；TRAILING_STOP_MARKET 仅记录为可选交易所能力，本版不采用。</td></tr>
+<tr><td>运行 / 保持</td><td>v2.7.0 历史 K 线方向判断撤回、空基线及方向分量只记录继续有效；影子目标为零，前向检验暂停。新模块启用、生产标定与 LIVE 准入另行验证。</td></tr></tbody></table></div><p>文档顺序为式样 → 配对设计 → 后续代码 PR。contracts/v2 由代码 PR 导出；文档/契约/CI 通过不等于交易运行或实盘准入通过。</p></section>
+<section id="revision-v290">
+<h2>v2.9.0 设计修订</h2>
+<p>2026-10-16，Change-Type: specification。按用户 2026-10-15～16 决定（“信任模型的判断，吃下猜错的成本，抓住猜对的机会”）：模型每 30 分钟研判消息面（不给价格），研判按新编号或方向改变注入情绪账本并按半衰期衰减；正常波动表只用于止损；收盘止损 + 交易所硬止损 + P1 保险止损三层；仓位按风险比例与止损距离倒推；+1R 后整笔转入行情基线，止损只平仓、基线保留，模型连续两次确认后重开，基线只在模型反向两次或失效条件出现时归零。本版只修订 P2/P3 文档，P1、P4、P5 继承正文并更新版本元信息；代码与契约待后续 PR。</p>
+<p><a href="02_策略化框架层式样书.html#dynamic-stop-spec">P2 式样第 11 章</a> · <a href="02_策略化框架层设计书.html#dynamic-stop-design">P2 设计第 15 章</a> · <a href="03_SOXLUSDT_JEV应用实例式样书.html#dynamic-stop-instance">P3 式样第 8 章</a> · <a href="03_SOXLUSDT_JEV应用实例设计书.html#dynamic-stop-instance-design">P3 设计第 28 章</a> · <a href="开发规划书.html#current">同步阶段规划</a> · <a href="../v2.8.0/index.html">上一冻结基线 v2.8.0</a>。</p>
+<div class="table-wrap"><table><thead><tr><th>范围 / 状态</th><th>本版落点或后续出口</th></tr></thead><tbody>
+<tr><td>v2.8.0 / 已实现</td><td>R1～R11 代码与契约已合并（#101、#102），测试网完整套件通过；保险生产比例仍未标定。</td></tr>
+<tr><td>P2 S2-033～038 / 待代码</td><td>风险单位仓位、收盘止损退出与收盘止损价、止损后再入场门、判断链亏损上限、预排事件前降险、贡献转入基线；未声明即与 v2.8.0 相同。</td></tr>
+<tr><td>P3 S3-023～031 / 待代码</td><td>新闻采集、模型研判、注入规则、正常波动表（Go）、风险比例与三层止损、移动止损、基线状态机、判断链与事件前降险、E15 六套规则。</td></tr>
+<tr><td>运行 / E15</td><td>代码与 SIM 闭环后影子新建 run（保险比例实验值、允许做空）启动 E15；中期约 2 周，结论约 6～8 周；不构成实盘准入。</td></tr>
+<tr><td>执行方法 / 待实验</td><td>执行订单类型等盘口成本实验（E16）结果后另定。</td></tr></tbody></table></div><p>文档顺序为式样 → 配对设计 → 后续代码 PR；文档/契约/CI 通过不等于交易运行或实盘准入通过。</p></section>
+<section id="revision-v2100">
+<h2>v2.10.0 设计修订</h2>
+<p>2026-10-16，Change-Type: specification。按用户 2026-10-16 要求（上线管理台，看到 E15 的实时情况；选择“直接正式补管理台”，入口沿用原项目的公网域名）：P3 新增研判、止损与基线的只读查询（式样 S3-032，设计第 29 章），P4 新增“研判与止损”页（S4-017，设计第 16 章）与经认证隧道的远程访问（S4-018，修订 S4-015 部署范围）。第 8 章的研判、止损与基线规则不变；页面只读，不新增写操作。E15 假设账本页面仍登记为未实现。P1、P2、P5 只更新版本元信息。代码与契约待后续 PR。</p>
+<p><a href="03_SOXLUSDT_JEV应用实例式样书.html#s3-032">P3 式样 S3-032</a> · <a href="03_SOXLUSDT_JEV应用实例设计书.html#dynamic-read-design">P3 设计第 29 章</a> · <a href="04_Web管理台式样书.html#s4-017">P4 式样 S4-017/018</a> · <a href="04_Web管理台设计书.html#dynamic-view-design">P4 设计第 16 章</a> · <a href="开发规划书.html">同步阶段规划</a> · 上一冻结基线 v2.9.0。</p>
+</section>
+<section id="revision-v2110">
+<h2>v2.11.0 设计修订</h2>
+<p>2026-10-17，Change-Type: specification。按用户 2026-10-17 要求（页面上的 K 线和浮动盈亏每分钟才变一次，太慢，改用推送；用户选择“两层都做，分两步”）：P4 在“研判与止损”页增加交易所公开行情的实时参考层（式样 S4-019，设计第 17 章）。管理台服务端订阅公开推送，经 SSE 推给浏览器，显示参考标记价、参考浮盈、正在形成的 K 线；不参与账务与决策，账本仍以 P1 为准。第二步把 P1 行情采集改为推送，会改变 E15 的实验条件，在 E15 中期报告（2026-10-30）之后另行发布。P1、P2、P3、P5 只更新版本元信息。代码与契约待后续 PR。</p>
+<p><a href="04_Web管理台式样书.html#s4-019">P4 式样 S4-019</a> · <a href="04_Web管理台设计书.html#live-market-design">P4 设计第 17 章</a> · <a href="开发规划书.html">同步阶段规划</a> · <a href="../v2.10.0/index.html">上一冻结基线 v2.10.0</a>。</p>
+</section>
+<section id="revision-v2111">
+<h2>v2.11.1 设计修订</h2>
+<p>2026-10-20，Change-Type: design。业务式样不变。影子 E15 两次停摆（2026-10-18 04:35～21:54 JST、2026-10-20 05:03～09:54 JST）与 P2 CPU 偏高，原因都是只增不减的数据被整份读取或复制。P2 设计第 16 章补登已合并的修正（#116～#119，原以 code-only 合并，与先设计后实现的规则不符，本版补齐）：决策输入把 P1 目标决策编号、已关闭保护单与已耗尽贡献换成数量与摘要；已存聚合解码上限 16 MiB（请求仍 4 MiB）；P1 审计按页增量读取、只留 TARGET_SET；情绪账本按已解码前缀增量加载；已存聚合按字段复用 schema 校验；账本前缀逐条比较。P1、P3、P4、P5 只更新版本元信息。</p>
+<p><a href="02_策略化框架层设计书.html#state-growth-design">P2 设计第 16 章</a> · <a href="开发规划书.html">同步阶段规划</a> · <a href="../v2.11.0/index.html">上一冻结基线 v2.11.0</a>。</p>
+</section>
+<section id="revision-v2112">
+<h2>v2.11.2 设计修订</h2>
+<p>2026-10-21，Change-Type: design，代码在同一 PR 中实现。业务式样不变。影子 E15 第三次中断：P2 分层账本漏记了一笔在结算之后才可见的开仓成交，账本数量与 P1 实际持仓不一致，对象被冻结增险，且该冻结只有重新激活才能解除。2026-10-21 06:36 JST 研判转多、空单平仓后一直无法开多。P2 设计第 17 章规定：迟到的成交与资金费在上次结算时刻补记（含漏掉区间的收益补正）并审计 LAYER_FACT_LATE；数量与 P1 不一致时采用 P1 数量、审计 LAYER_QUANTITY_RECONCILED 并只冻结当轮；冻结状态每次结算重新判定，日记录不守恒仍持续冻结。</p>
+<p><a href="02_策略化框架层设计书.html#layer-late-design">P2 设计第 17 章</a> · <a href="开发规划书.html">同步阶段规划</a> · <a href="../v2.11.1/index.html">上一冻结基线 v2.11.1</a>。</p>
+</section>
+<section id="revision-v2113">
+<h2>v2.11.3 设计修订</h2>
+<p>2026-10-21，Change-Type: design，代码在同一 PR 中实现。业务式样不变。P3 仓位管理每轮用“交易所止损 ± 最新初始距离指令的缓冲”覆盖收盘止损，而初始距离指令在持仓期间每 15 分钟续报，收盘止损随之漂移，可能向不利方向放宽（E15 第三批多单开仓计划 90.748，实际被改为 90.634 再到 90.134；第二批空单 116.734 被改为 117.076）。P3 设计第 30 章规定：收盘止损在开仓时按 entry − close_distance 冻结，之后只由已核验的移动止损向有利方向推进；旧批次从开仓记录恢复。</p>
+<p><a href="03_SOXLUSDT_JEV应用实例设计书.html#close-stop-frozen-design">P3 设计第 30 章</a> · <a href="开发规划书.html">同步阶段规划</a> · <a href="../v2.11.2/index.html">上一冻结基线 v2.11.2</a>。</p>
+</section>
+<section id="revision-v2114">
+<h2>v2.11.4 设计修订</h2>
+<p>2026-10-21，Change-Type: design，代码在同一 PR 中实现。业务式样不变。P1 采集器先读运行版本再提交命令，期间若 P2 写目标或执行器先提交，P1 返回 409，采集器原先直接退出、由 systemd 30 秒后重启（E15 两天 5 次，每次约 90 秒无行情点与模拟帧）。P1 设计第 19 章规定：409 时重新读取版本重试，最多 3 次；常驻模式下单轮失败记录 COLLECT_FAILED 后等待下一轮，不退出进程。</p>
+<p><a href="01_交易系统层设计书.html#collector-conflict-design">P1 设计第 19 章</a> · <a href="开发规划书.html">同步阶段规划</a> · <a href="../v2.11.3/index.html">上一冻结基线 v2.11.3</a>。</p>
+</section>
+<section id="revision-v2115">
+<h2>v2.11.5 设计修订</h2>
+<p>2026-10-22，Change-Type: design，代码在同一 PR 中实现。业务式样不变。P3 仓位管理器每轮只读最近 40 分钟 K 线，停机超过 40 分钟时停机期间的收盘价不进入 best_close，移动止损与转基线会被错过（E15 2026-10-18 停摆）。P3 设计第 31 章规定：有持仓批次时从 last_bar_at 起补读（最多 7 天），逐根按原规则处理。另：P2 止损指令改为按读到快照的时刻校验价格（#124，code-only，符合既有设计“缺失或陈旧才拒绝”）。另：标签 v2.11.5 于 2026-10-22 误打在 45a44db（#124 合并提交，比本版文档早一个提交），版本标签按仓库规则不可删除或移动；v2.11.5 文档基线以本版合并到 main 的提交为准，见同名 Release 说明。</p>
+<p><a href="03_SOXLUSDT_JEV应用实例设计书.html#recovery-bars-design">P3 设计第 31 章</a> · <a href="开发规划书.html">同步阶段规划</a> · <a href="../v2.11.4/index.html">上一冻结基线 v2.11.4</a>。</p>
+</section>
+<section id="revision-v2120">
+<h2>v2.12.0 设计修订</h2>
+<p>2026-10-22，Change-Type: specification，代码在同一 PR 中实现。P3 式样 S3-027 修订：单笔风险比例 = 基础比例 × 信心系数 × 回撤系数（上限 2%），信心 1～5 对应 0.25 / 0.5 / 0.75 / 1 / 1，取与持仓同方向的最近一次研判。原式样“信心只由档位比例体现”在研判注入叠加时失效（池强度长期处于最高档），与 2026-10-15 已定参数不符；用户 2026-10-22 决定补上。凯利维持 S3-027 原规则（满 30 批自动启用，不冻结）。</p>
+<p><a href="03_SOXLUSDT_JEV应用实例式样书.html#s3-027">P3 式样 S3-027</a> · <a href="03_SOXLUSDT_JEV应用实例设计书.html#confidence-risk-design">P3 设计第 32 章</a> · <a href="开发规划书.html">同步阶段规划</a> · <a href="../v2.11.5/index.html">上一冻结基线 v2.11.5</a>。</p>
+</section>
+<section id="revision-v2121">
+<h2>v2.12.1 设计修订</h2>
+<p>2026-10-22，Change-Type: design，代码在同一 PR 中实现。业务式样不变。v2.12.0 第 32 章“风险比例变化时立即重报”把回撤系数的逐轮浮动也当成变化，INITIAL_DISTANCE 指令每 5 分钟重报，P2 状态写入与幂等记录增长翻倍并引起抢写冲突。P3 设计第 33 章改为：方向、几何、信心变化或过半 TTL 才重报。</p>
+<p><a href="03_SOXLUSDT_JEV应用实例设计书.html#confidence-refresh-design">P3 设计第 33 章</a> · <a href="开发规划书.html">同步阶段规划</a> · <a href="../v2.12.0/index.html">上一冻结基线 v2.12.0</a>。</p>
+</section>
+<section id="revision-v2130">
+<h2>v2.13.0 设计修订</h2>
+<p>2026-10-23，Change-Type: specification，代码在同一 PR 中实现。P3 式样新增第 10 章：S3-033 阶梯止损（每满一个步长收盘止损上移一级，第 1 级保本）与 S3-034 研判跟随（不自己研判，经只读查询逐条跟随另一实例），以及实验 E20 的登记（SOXLUSDT、4% 阶梯、跟随 E15，计划在用户的币安模拟盘真实下单，模拟盘执行方式另行发布）。P3 设计新增第 34 章。两条均由实例配置开关控制，E15 不启用。本版标签为 <code>v2.13.0-beta</code>（用户指定为实验性版本）。</p>
+<p><a href="03_SOXLUSDT_JEV应用实例式样书.html#ladder-follow-spec">P3 式样第 10 章</a> · <a href="03_SOXLUSDT_JEV应用实例设计书.html#ladder-follow-design">P3 设计第 34 章</a> · <a href="开发规划书.html">同步阶段规划</a> · <a href="../v2.12.1/index.html">上一冻结基线 v2.12.1</a>。</p>
+</section>
+<section id="revision-v2140">
+<h2>v2.14.0 设计修订</h2>
+<p>用户 2026-10-23 决定系统只有模拟盘与实盘两种运行方式，模拟盘路径尽量与实盘一致。P1 式样新增第 6 章 S1-023，P1 设计新增第 20 章：模拟盘为 SIM 环境下由交易所执行器创建的运行，与实盘共用执行器、下单、对账、保护与恢复规则，地址固定为模拟盘；内部撮合改为测试与回放工具。P3 式样更新 S3-005（模拟盘经用户批准可不设名义上限）与 E20 登记。代码同 PR 实现；已在运行的 E15 不受影响。</p>
+</section>
+<section id="revision-v2141">
+<h2>v2.14.1 设计修订</h2>
+<p>E20 启动后首条研判时发现：E15 只读查询的研判时刻精确到秒，跟随者以“游标后 1 纳秒”查询时，游标所在那条研判会被再次返回；v2.13.0 设计把它判为应答无效，整页拒绝，下一条新研判也就永远读不到。P3 设计 34.2 改为跳过不晚于游标的条目。同时记载 FOLLOW 状态键由迁移 009 允许（code-only 修复 PR #131）。式样不变。</p>
+</section>
+<section id="revision-v2142">
+<h2>v2.14.2 设计修订</h2>
+<p>E20 运行中发现：模拟盘运行的时钟会被交易所执行器的账户同步推进，采集器一轮的快照时刻可能因此落后于运行时钟而被拒（MARKET_CLOCK_INVALID）。P1 设计新增第 21 章：交易接口客户端带回 P1 问题码；采集器遇此码以新时刻重提一次。式样不变。</p>
+</section>
+<section id="revision-v2143">
+<h2>v2.14.3 设计修订</h2>
+<p>E15 影子运行中发现：position-manager 的止损指令写入与 P2 决策周期、P1 采集器在同一 5 分钟边界竞争，一次重试不够，交易快照冲突也未重试，整轮失败。P3 设计新增第 35 章：版本冲突与交易快照冲突最多 3 次重提。式样不变。</p>
+</section>
+<section id="revision-v2144">
+<h2>v2.14.4 设计修订</h2>
+<p>E20/E21/E22 运行中发现：跟随模式复制的研判没有输入清单哈希，第一条方向研判的评分被 P2 拒绝，跟随停住。P3 设计新增第 36 章：研判没有输入哈希时，评分以研判记录本身的摘要作为输入清单哈希；引用的快讯没有标题时仍作为证据保留，跟随者先存条目再重放，停住的跟随者可自行恢复。式样不变。</p>
+</section>
+<section id="revision-v2145">
+<h2>v2.14.5 设计修订</h2>
+<p>E20（币安模拟盘）运行中发现：建仓后交易所执行器每次对账都报 EXTERNAL_ACCOUNT_DIFFERENCE，运行停在 RECOVERY_CHECK。交易所的权益按它自己的标记价计算，运行按采集到的标记价计算，两者相差几个跳动。P1 设计新增第 22 章：权益对账把交易所的持仓（数量、均价）按运行的标记价重估后加钱包余额，再与运行权益比较；钱包余额、持仓数量、均价仍按原容差严格比较。式样不变。</p>
+</section>
+<section id="revision-v2146">
+<h2>v2.14.6 设计修订</h2>
+<p>E20（币安模拟盘）运行中发现：调度器在读交易快照之前取周期时刻，交易所执行器的账户同步约每 16.7 秒推进一次运行时钟，若在读取期间提交，快照时刻晚于周期时刻，本轮以 FUTURE_TRADING_SNAPSHOT 跳过；调度间隔约为同步间隔的两倍，相位锁住时连续十余分钟失败并漏掉 5 分钟周期。P2 设计新增第 18 章：未指定时刻的周期在读完快照后取时刻；指定时刻的周期照旧拒绝更晚的快照。式样不变。</p>
+</section>
+<section id="revision-v2147">
+<h2>v2.14.7 设计修订</h2>
+<p>E20（币安模拟盘）运行中发现：多单 2.13 加仓 0.72 后，交易所执行器向保护工作池声明“不支持保护重叠”，覆盖 2.85 的新保险与新上层止损每次都以 ATOMIC_PROTECTION_CAPABILITY_UNVERIFIED 被拒、关闭后又重新生成（约每 17 秒一次，170 代），交易所上只剩覆盖 2.13 的两张旧止损，运行转为 DEGRADED、持仓 UNPROTECTED 并停在 RECOVERY_CHECK。P1 设计新增第 23 章：模拟盘运行的交易所执行器按第 18 章已核验的交易所事实（同一持仓可并存多张 reduceOnly STOP_MARKET）声明支持保护重叠，替换按先挂新、确认后撤旧执行；实盘仍只取审核过的就绪记录。账户同步查询到已请求撤销、但交易所上仍有效的旧单时保持撤销中，不再写回 ACTIVE_VERIFIED 使旧单遗留在交易所。式样不变。</p>
+</section>
+<section id="revision-v2148">
+<h2>v2.14.8 设计修订</h2>
+<p>按用户 2026-10-26 反馈修订管理台“研判与止损”页的 K 线图（P4 设计第 18 章）。① 纵轴原先放宽到包含全部止损横线，止损离价格远时 K 线被压成一条线；改为与 TradingView 默认一致，纵轴只按 K 线缩放，范围外的横线列在图下，勾选“纵轴包含全部止损线”才放宽。② 鼠标滚轮原先只缩放时间轴；在右侧价格轴上滚动改为缩放纵轴，图内仍缩放时间，拖动价格轴缩放、双击价格轴或“纵轴自动”按钮恢复自动。③ 图表原先在每次数据刷新时重建，缩放和平移被重置；改为只建一次，数据、横线和标记原地更新。④ 止损横线原先取第一条非 CANCELLED 的保护记录，会画出已 CLOSED 的旧代次（E15 平空转多后显示 105.20 / 97.84 两条空单时期的止损）；改为只取仍保护持仓的代次，先 ACTIVE_VERIFIED，再按代次取最新。式样不变。</p>
+</section>
+<section id="revision-v2149">
+<h2>v2.14.9 设计修订</h2>
+<p>按用户 2026-10-26 要求，“研判与止损”页 K 线图按住图内拖动可向任意方向平移（P4 设计 18.6）。图表库只在纵轴自动缩放关闭时才随拖动平移价格，且在拖动开始时决定；默认自动缩放下拖动只能左右移动。现在拖动在纵向移动 4 像素后关闭自动缩放并按指针位移平移价格范围，左右仍由库处理；“纵轴自动”或双击价格轴恢复。式样不变。</p>
+</section>
+<section id="revision-v21410">
+<h2>v2.14.10 设计修订</h2>
+<p>E20（币安模拟盘）10-27 00:05 JST 运行中发现：P3 阶梯把上层止损从 72.71 上移到 84.05，新单提交后紧接的查询没有确认，工作池把新代次留在 UNKNOWN；账户同步随后查询到新单在交易所上有效，直接写成 ACTIVE_VERIFIED。工作池只处理 UNKNOWN 等待办状态，确认新代次时才会撤销它替换的旧代次，于是旧单 72.71 一直留在交易所，同一持仓挂着两张上层止损。P1 设计新增 23.4：账户同步查询到 UNKNOWN 或 DISPATCHING 的保护在交易所有效时保持原状态，交给工作池确认并撤销旧代次；工作池对“新代次已有效、所替换的旧代次仍有效且未请求撤销”的情况也撤销旧代次，已遗留的旧单由系统自行撤销。式样不变。</p>
+</section>
+<section id="revision-v2150">
+<h2>v2.15.0 设计修订</h2>
+<p>按用户 2026-10-27 的要求：影子实验（系统内部模拟撮合）在管理台直接显示按真实资金费计算的持仓盈亏；模拟盘同时显示模拟盘实际盈亏与按真实资金费计算的盈亏；以后换实盘，账面盈亏必须来自交易所而不是系统计算。起因：币安模拟盘的资金费率多次顶到 +0.75% 上限，同期真实盘为 0～±0.04%，E20 账上资金费 +5.87，按真实盘费率只有 +0.03；内部撮合不结算资金费。P1 式样新增 S1-024（盈亏来源规则与真实资金费参考），设计第 24 章；P4 式样新增 S4-020，设计第 19 章。参考值不入账，不影响权益、风控、仓位与交易。</p>
+</section><section id="revision-v2160"><h2>v2.16.0 设计修订</h2><p>按用户 2026-10-27 的要求（“我在前端 K 线图上看到的研判不是实际决定开仓的研判？那显示还有什么作用。改”）。原先“研判与止损”页的 K 线图在每次研判（每 30 分钟）都画方向与信心，但按 S3-025 只有注入、作废原链与修订会改变仓位依据，其余研判只记录；判断链在 FLAT 期间仍显示原方向，图上的“多3”与实际开仓时点对不上。P4 式样 S4-017 修订：图上默认只标改变了仓位依据的研判，并标出本批开仓与平仓；未生效的研判可勾选后以灰点显示；研判时间线逐条注明“注入 / 作废原链 / 修订”或“仅记录，未改变仓位”。P4 设计第 20 章：按 P3 动作记录的编号前缀与时刻关联研判，不新增读取路由，不改 P3。代码同 PR；其余文档继承正文并更新版本元信息。</p></section><section id="revision-v2170"><h2>v2.17.0 设计修订</h2><p>按用户 2026-10-27 的决定（“改”）：E20 在币安模拟盘上运行，模拟盘 SOXLUSDT 资金费率多次顶到 +0.75%/8h，而真实盘接近 0。P2 无交易带含“预期持有期内的资金费”，E20 取模拟盘费率，10-26 05:01 JST 的加仓（0.72，暴露差 1.22%）被 1.2%～2.4% 的带宽挡了约 9.5 小时，同期按真实盘费率的 E21/E22 立即加仓（B27）。P1 式样 S1-024 修订 / 设计 24.6：品种信息另给最近一次真实盘结算记录作为参考费率，交易层自身仍不使用。P2 式样 S2-043（新增第 12 章）/ 设计第 19 章：实例可登记 funding_source=REFERENCE，以参考费率作为框架的资金费估计（无交易带与分层账本的资金费估计），取不到时用登记的备用年化费率；账务资金费仍以交易层入账为准。代码同 PR；其余文档继承正文并更新版本元信息。</p></section><section id="revision-v2180"><h2>v2.18.0 设计修订</h2><p>E20 运行中发现（B28）：10-27 05:45Z 的 5 分钟收盘越过收盘止损，P3 提交的收盘止损退出请求被框架受理，05:55Z 周期的归零目标下发时被 P1 以版本冲突拒绝（与采集器等写入竞争），而框架在生成决策时已把请求记为“已执行”，之后不再处理，仓位未平；P3 在提交退出后停止移动止损，止损停在旧位置。P2 式样 S2-034 修订 / 设计第 20 章：归零目标被拒或过期时，退出请求回到“已受理”，下一周期再次下发；自该 K 线收盘起 30 分钟内有效，过时仍未执行（同一批次仍在持仓）则记为“已过期”并留痕，不当作止损已发生。P3 式样 S3-027 修订 / 设计第 37 章：提交退出后超过同一有效期仓位仍在同一周期，记录“退出未执行”、告警并恢复移动与阶梯止损。代码同 PR；其余文档继承正文并更新版本元信息。</p></section><section id="revision-v2190"><h2>v2.19.0 设计修订</h2><p>用户 2026-10-28 指出：管理台上完全看不到阶梯止损。“研判与止损”页只列收盘止损价与 +1R 移动止损启动价，看不出当前止损来自初始止损、移动止损还是阶梯、阶梯在第几级、下一级在哪里，等待执行的收盘止损退出也不显示（B28 期间 E20 的阶梯冻结因此在页面上无从察觉）。P3 式样 S3-032 修订 / 设计第 38 章：当前批次另给出收盘止损的来源、登记的阶梯步长、当前级数与锁定价、下一级的触发收盘价与上移后的收盘止损，以及尚待执行的收盘止损退出及其有效期。P4 式样 S4-017 修订 / 设计第 21 章：止损表与 K 线图增列“阶梯下一级触发价”，收盘止损注明来源与级数，待执行的退出以标记提示；动作时间线写明移动止损的理由（阶梯 / 移动）与“退出未执行（已过期）”。只读显示，不改变交易逻辑。代码同 PR；其余文档继承正文并更新版本元信息。</p></section><section id="revision-v2191"><h2>v2.19.1 设计修订</h2><p>部署前发现：管理台按实例只读契约以 JSON Schema 校验下层返回，v2.19.0 把 batch 的 stop_source、ladder、exit_pending 列为必填；E15 的实例接口仍是旧版（10-30 升级），其“研判与止损”页会因缺字段被判为下层返回无效。P3 设计第 38 章补充：三项为可省略字段（无值时省略），实例契约与管理台投影随之重新生成；P4 设计第 21 章补充：缺省时页面不显示阶梯与来源（来源写“未记录”）。式样不变。代码同 PR；其余文档继承正文并更新版本元信息。</p></section><section id="revision-v2192"><h2>v2.19.2 设计修订</h2><p>S2-034 规定收盘止损退出请求“通过后立即下发归零目标”，原实现却要等下一个决策周期：请求在本周期决策之后才受理时，归零晚一整个周期（5 分钟）。E22 在 2026-10-29 05:35 JST 的退出即如此：周期截止 05:35:06，请求 05:35:15 受理，05:40 才下发，成交价比同时刻的 E21 低约 1.4%（B29）。P2 设计第 21 章补充：本周期已决策、请求仍为“已受理”时，调度器下一次轮询即在周期外单独下发归零。式样不变；代码同 PR；其余文档继承正文并更新版本元信息。</p></section><section id="revision-v2193"><h2>v2.19.3 设计修订</h2><p>P2 状态随同向研判链持续增长（B13）：决策输入压缩（第 16 章）只把已用完的贡献换成数量与摘要，仍生效的贡献整行保留；同向研判每多一次就多一条生效贡献，而保留期内每条决策都带着整份列表。E22 实测 118 条决策、平均 22 条生效贡献，贡献行占决策 4.0 MB 中的 2.1 MB，E15 内部状态每 3 小时约增 0.3 MB。P2 设计第 22 章补充：决策中的生效贡献只保留开案与归因读取的 6 个字段，完整行换成数量与摘要。input_hash 仍按完整输入计算，开案与归因结果不变。式样不变；代码同 PR；其余文档继承正文并更新版本元信息。</p></section><section id="revision-v2194"><h2>v2.19.4 设计修订</h2><p>v2.19.3 部署后实测 E22 新决策：贡献池 10.5 KB（35 条生效贡献，旧格式约 29 KB），但 input_snapshot.prepricing 仍有 7.9 KB——它为池中每条贡献（含已用完的）各存一条预定价评估，E22 已 66 条，随历史研判只增不减。P2 设计第 22 章补充 22.1：prepricing 只保留生效贡献对应评分的评估，其余换成数量与摘要。领域层不读取决策中的 prepricing，行为不变。式样不变；代码同 PR；其余文档继承正文并更新版本元信息。</p></section><section id="revision-v2195"><h2>v2.19.5 设计修订</h2><p>影子运行 E15 10-30 00:05 JST：研判方向翻转，P3 一轮内撤回约 60 条旧贡献，与 P2 调度、反馈同时写状态。position-manager 在这一轮已向 P2 提交初始距离止损指令（版本 N，P2 接受），随后基线步骤遇版本冲突，整轮状态未保存，本地版本计数仍为 N−1；此后每轮都以 N 提交，P2 按“版本须大于已接受版本”拒绝（STOP_DIRECTIVE_VERSION_CONFLICT），失败又使状态不保存，仓位管理从此停滞（B30）。P3 设计第 39 章：版本号取本地计数与 P2 现列同类指令最大版本中的较大者加一；初始距离指令遇非 CAS 的 409 时只告警并保存已分配的计数。式样不变；代码同 PR；其余文档继承正文并更新版本元信息。</p></section><section id="revision-v2196"><h2>v2.19.6 当前设计修订</h2><p>用户反馈管理台右上角的显示时区切换“好像失效”。查明：切换只作用于数据表格的值和研判与止损页的若干时间；每个区块标题下的“读取 / 事实时间 / 供应商允许重试时间”和 K 线图的时间轴、十字线标签始终是 UTC，最显眼的时间不随切换变化。式样 S4-003 要求显示时区可选择、记录保持绝对时间。P4 设计第 22 章：页面上显示的绝对时间全部按所选时区格式化，查询参数、传输和图表数据仍用 UTC。式样不变；代码同 PR；其余文档继承正文并更新版本元信息。</p></section>
+
+
+</article><footer>HTML 是本版唯一发布正文。图表为内嵌 SVG，无需联网或运行脚本。文档通过不代表程序实现、交易运行或实盘准入通过。</footer></main></div></body></html>

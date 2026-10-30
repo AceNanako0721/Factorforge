@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Factorforge Docker 日志持久化先行试验</title>
+<style>body{margin:0;background:#f5f7fa;color:#1c2938;font:16px/1.7 system-ui,sans-serif;overflow-wrap:anywhere}main{max-width:980px;margin:auto;padding:28px 20px 64px}h1{font-size:28px}h2{font-size:21px;margin-top:32px}a{color:#145aaf}code{overflow-wrap:anywhere}pre{white-space:pre-wrap;background:#e9eef5;padding:16px;border-radius:8px}table{width:100%;border-collapse:collapse;background:white}th,td{border:1px solid #ccd6e1;padding:9px;text-align:left;vertical-align:top}.result{border-left:4px solid #24796a;background:#e4f2ec;padding:14px}.scroll{overflow-x:auto}svg{width:100%;min-width:600px;background:white}nav{display:flex;flex-wrap:wrap;gap:16px}</style></head>
+<body><main>
+<p>日期：2026-10-30 · 试验基线：v2.19.6 / e3e9db0 · 本地分支：lan · 类型：先行试验，非生产实现</p>
+<h1>容器删除重建后保留运行日志</h1>
+<p class="result">12 项实际 Docker 检查通过。合成子进程的 stdout/stderr 经实验包装器双写后，删除旧容器不会删除独立目录中的历史记录，新容器继续追加；大小轮转、正常终止和错误退出行为得到验证。未接入 Factorforge 生产进程，不能表述为整套 Compose 已完成。</p>
+<nav><a href="#method">方法</a><a href="#results">结果</a><a href="#limits">限制</a><a href="#reproduce">复现</a></nav>
+<h2 id="method">方法与隔离范围</h2>
+<p>从测试目录的 Go 源码交叉编译 Linux/ARM64 静态二进制，构建 FROM scratch 实验镜像。单服务 Compose 使用无网络、无端口、只读根文件系统、非 root UID/GID、cap_drop ALL、no-new-privileges、64 MiB 内存、0.25 CPU、32 个进程上限，仅挂载本次 runtime 下的合成日志目录。没有使用或修改现有项目的镜像、数据库、配置或凭据。</p>
+<div class="scroll"><svg viewBox="0 0 860 220" role="img" aria-label="子进程输出经实验包装器双写到Docker日志与独立持久目录；容器删除后保留目录">
+<defs><marker id="arrow" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L6,3Z" fill="#52728e"/></marker></defs>
+<g fill="#eaf0f8" stroke="#8ba1ba"><rect x="20" y="80" width="200" height="60" rx="8"/><rect x="285" y="80" width="240" height="60" rx="8"/><rect x="610" y="25" width="230" height="60" rx="8"/><rect x="610" y="140" width="230" height="60" rx="8"/></g>
+<g font-size="17" text-anchor="middle" fill="#1c2938"><text x="120" y="107">合成子进程</text><text x="120" y="129" font-size="14">stdout / stderr</text><text x="405" y="107">实验日志包装器</text><text x="405" y="129" font-size="14">文件锁 / 同步 / 轮转 / 信号转发</text><text x="725" y="51">Docker local 日志</text><text x="725" y="72" font-size="14">随容器生命周期管理</text><text x="725" y="166">独立持久目录</text><text x="725" y="187" font-size="14">容器重建后仍在</text></g>
+<g fill="none" stroke="#52728e" stroke-width="2" marker-end="url(#arrow)"><path d="M220 110 H285"/><path d="M525 110 H565 V55 H610"/><path d="M565 110 V170 H610"/></g></svg></div>
+<p>实验写入先追加并同步持久文件，再输出到 Docker；子进程使用独立进程组，包装器转发 SIGTERM/SIGINT，并等待输出管道排空与退出。持久文件采用 0600、非阻塞独占锁及大小轮转。此原型只用于考察方法，不冻结生产日志格式、错误处理和保留策略。</p>
+<p>试验参数：每份持久日志最多 16 KiB，3 份备份加当前文件，总上限 64 KiB；Docker local 驱动单独设置每份 16 KiB、2 份。轮转场景生成 300 条约 1 KiB 的合成行。参数为实验值，不是生产默认或标定常数。</p>
+<h2 id="results">实际结果</h2>
+<table><thead><tr><th>检查</th><th>实际结果</th></tr></thead><tbody>
+<tr><td>1. 双路输出</td><td>stdout 的 BOOT 与 stderr 的 STDERR 标记同时出现在 Docker logs 和持久文件。</td></tr>
+<tr><td>2. 同容器重启</td><td>容器 ID 不变，Docker logs 和持久文件保留重启前输出，并出现第二次启动记录。</td></tr>
+<tr><td>3. 信号传递</td><td>SIGTERM 到达子进程，TERM 尾日志写入持久文件。</td></tr>
+<tr><td>4. 删除旧容器</td><td>对已删除 ID 执行 docker logs 失败，独立目录中的 BOOT 仍可读取。</td></tr>
+<tr><td>5. 创建替代容器</td><td>新容器 ID 与旧 ID 不同，新 BOOT 追加成功，旧 stdout、stderr、TERM 均保留。</td></tr>
+<tr><td>6. 第二写入者</td><td>同目录的第二个包装器被文件锁拒绝，原进程继续运行。</td></tr>
+<tr><td>7. 正常停止</td><td>子进程最后的 TERM 被保留，容器以 0 退出。</td></tr>
+<tr><td>8. 轮转容量与权限</td><td>恰好 4 个日志文件，均不超过 16 KiB，模式均为 0600，总占用 64795 字节，低于 65536 字节上限。</td></tr>
+<tr><td>9. 轮转内容</td><td>最新 FLOOD_END 与 TERM 保留；最早 BOOT 已按保留上限淘汰，明确证明“持久化”不等于无限保留。</td></tr>
+<tr><td>10. 异常退出码</td><td>子进程主动退出 37，容器保持退出码 37，退出前日志已排空保存。</td></tr>
+<tr><td>11. 不可写目录</td><td>只读挂载导致包装器以 73 拒绝启动，输出稳定错误码，子进程没有启动。</td></tr>
+<tr><td>12. 既有服务</td><td>试验前后原有 34 个运行容器的 ID 和启动时间一致。</td></tr>
+</tbody></table>
+<p>所有本次实验容器和镜像已回收；合成日志、Compose 场景配置、构建日志及 result.json 保留在被忽略的 runtime/docker-log-lab-20261030t044256-16639。未连接模型、交易所、生产数据库或真实业务服务。check-layout 与本实验目录的 go vet 均通过。</p>
+<h2 id="limits">结论与未验证边界</h2>
+<p>可采用“Docker 近期排障日志 + 独立持久化运行日志 + PostgreSQL 业务审计”的分工；只配置 Docker 日志轮转不足以满足跨容器删除保留要求。仅挂载一个目录也不会自动捕获 stdout/stderr，必须实际接入写入或采集机制。</p>
+<ol>
+<li>这是合成进程的 Linux/ARM64 实验，不是生产 Go/Bun/PostgreSQL 的日志接入验收，也没有启用完整 Factorforge Compose。</li>
+<li>未测试宿主断电、SIGKILL、真实磁盘满或 I/O 失败、子孙进程逃离进程组、长时间高负载；文件同步不证明这些场景零丢失。</li>
+<li>轮转按字节拆分，记录可能跨文件边界；生产格式、服务/运行关联字段、脱敏、按时长保留和总容量需要在设计中明确。</li>
+<li>实验在日志不可写时拒绝启动；生产运行中磁盘故障如何告警、降级并保证减险/保护继续，需要结合交易门禁设计，不能直接照搬“杀死执行进程”。</li>
+<li>持久目录不等于备份；数据库中的订单、成交和风控审计继续作为业务事实，不能由控制台日志替代。数据卷备份恢复与跨主机迁移另行验收。</li>
+</ol>
+<p>本次未改变已发布业务式样、设计或 E15/E20 的运行准入状态，VERSION 保持 2.19.6。正式生产接入须先修订对应设计及当前规划状态，再实现，实验代码不得直接挂入生产入口。</p>
+<h2 id="reproduce">源码与复现</h2>
+<p><a href="../../tests/engineering/experiments/dockerlogs/README.md">试验使用说明</a> · <a href="../../tests/engineering/experiments/dockerlogs/main.go">宿主生命周期检查程序</a> · <a href="../../tests/engineering/experiments/dockerlogs/probe/main.go">合成子进程与实验包装器</a></p>
+<pre>go run ./tests/engineering/experiments/dockerlogs --run
+go run ./tools/check-layout
+go vet ./tests/engineering/experiments/dockerlogs/...</pre>
+<p>必须显式传入 --run。每次生成独有项目名、镜像标签和输出目录，成功或失败均尝试清理自身资源，失败时报告清理错误；不提供全局 prune 或其他项目名的操作入口。</p>
+</main></body></html>
