@@ -640,10 +640,6 @@ export function DynamicView({
                 {t(record(status.noise ?? null).generated_at)}
               </dd>
             </div>
-            <div>
-              <dt>E15 假设账本</dt>
-              <dd>未实现</dd>
-            </div>
           </dl>
         </section>
         <section className="panel" aria-label="新闻来源">

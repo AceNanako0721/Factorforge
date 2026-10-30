@@ -1,0 +1,211 @@
+{
+  "absolute_price_proxy_validated": true,
+  "beta": "0",
+  "calibrations": [
+    "news-judgment-conf-map-v1"
+  ],
+  "claim_weights": {
+    "NEWS_JUDGMENT": "1"
+  },
+  "cleanup_fraction_of_initial": "0.25",
+  "cleanup_threshold": "0.001",
+  "composition": {
+    "adjustment": {
+      "cap": "1",
+      "event_only_cap": "1",
+      "scale": "1",
+      "state": "ENABLED"
+    },
+    "allow_short_baseline": true,
+    "assessment": null,
+    "baseline": [
+      {
+        "evidence_ref": "E15-registration-20261016",
+        "factor_id": "news-baseline",
+        "max_age_seconds": 3600,
+        "state": "ENABLED",
+        "weight": "1"
+      }
+    ],
+    "chain_loss": {
+      "max_loss_r": "3",
+      "profit_offsets": false
+    },
+    "levels": [
+      {
+        "enter": "0.2",
+        "exit": "0.1",
+        "exposure": "0.25"
+      },
+      {
+        "enter": "0.4",
+        "exit": "0.3",
+        "exposure": "0.5"
+      },
+      {
+        "enter": "0.6",
+        "exit": "0.5",
+        "exposure": "0.75"
+      },
+      {
+        "enter": "0.8",
+        "exit": "0.7",
+        "exposure": "1"
+      }
+    ],
+    "missing_policy": "ZERO",
+    "pre_event": [
+      {
+        "after_seconds": 600,
+        "before_seconds": 1800,
+        "certainty_required": "CONFIRMED",
+        "event_type": "MACRO_CPI",
+        "reduce_factor": "0.5"
+      },
+      {
+        "after_seconds": 600,
+        "before_seconds": 1800,
+        "certainty_required": "CONFIRMED",
+        "event_type": "MACRO_NFP",
+        "reduce_factor": "0.5"
+      },
+      {
+        "after_seconds": 600,
+        "before_seconds": 1800,
+        "certainty_required": "CONFIRMED",
+        "event_type": "MACRO_FOMC",
+        "reduce_factor": "0.5"
+      },
+      {
+        "after_seconds": 600,
+        "before_seconds": 1800,
+        "certainty_required": "CONFIRMED",
+        "event_type": "EARNINGS_LEADER",
+        "reduce_factor": "0.5"
+      }
+    ],
+    "rebalance": {
+      "adjust_interval_seconds": 0,
+      "band_floor": "0.01",
+      "band_ratio_of_unit": "0.2",
+      "expected_hold_seconds": 86400,
+      "funding_fallback_annual": "0.1",
+      "reverse_confirm_seconds": 0
+    },
+    "reentry": {
+      "cooldown_seconds": 1800,
+      "qualifying_inputs": [
+        "NEW_CONTRIBUTION",
+        "BASELINE_RECONFIRM"
+      ]
+    },
+    "scheduled": {
+      "cap": "0",
+      "state": "DISABLED"
+    },
+    "sizing": {
+      "max_risk_fraction": "0.02",
+      "mode": "RISK_UNIT",
+      "require_initial_distance": true
+    },
+    "transfer": {
+      "combined_tolerance": "0.05",
+      "factor_id": "news-baseline"
+    }
+  },
+  "cooldown_seconds": 300,
+  "cycle_seconds": 300,
+  "epsilon": "1E-10",
+  "event_cap": "1",
+  "event_half_life_approved": true,
+  "event_ttl_seconds": 604800,
+  "experiment_calibrations": [
+    "news-judgment-conf-map-v1"
+  ],
+  "family_cap": "1",
+  "fee_rate": "0.0004",
+  "gamma": "0.001",
+  "gap_fraction": "0.001",
+  "group_limits": {
+    "DEFAULT": "4000"
+  },
+  "half_life_bounds": [
+    "14400",
+    "259200"
+  ],
+  "judgment_event_types": [
+    "NEWS_JUDGMENT"
+  ],
+  "label_cost_band": "0.003",
+  "label_noise_band": "0.01",
+  "label_seconds": 86400,
+  "learning_mode": "FROZEN",
+  "levels": [
+    {
+      "enter": "0.2",
+      "exit": "0.1",
+      "exposure": "0.25"
+    },
+    {
+      "enter": "0.4",
+      "exit": "0.3",
+      "exposure": "0.5"
+    },
+    {
+      "enter": "0.6",
+      "exit": "0.5",
+      "exposure": "0.75"
+    },
+    {
+      "enter": "0.8",
+      "exit": "0.7",
+      "exposure": "1"
+    }
+  ],
+  "lifecycle_fraction": "0.5",
+  "liquidity_budget": "100000",
+  "max_bar_gap_seconds": 900,
+  "max_loss_cases": 1000,
+  "max_new_risk": 1000,
+  "max_noise_fraction": "0.25",
+  "max_price_age_seconds": 600,
+  "max_stop_fraction": "0.25",
+  "micro_distance": "0.002",
+  "min_adjustment": "0.05",
+  "noise_quantile": "0.9",
+  "noise_window": 48,
+  "numerical_tolerance": "1E-10",
+  "object_cap": "3",
+  "object_loss_budget": "80",
+  "observation_max_seconds": 432000,
+  "observation_min_seconds": 3600,
+  "observation_multiplier": "2",
+  "portfolio_gross_limit": "4000",
+  "portfolio_net_limit": "4000",
+  "portfolio_stress_limit": "1000",
+  "prepricing_modes": {
+    "NEWS_JUDGMENT": "NOT_ASSESSED"
+  },
+  "quality_state": "EXPERIMENT_ONLY",
+  "realization_disabled_types": [
+    "NEWS_JUDGMENT"
+  ],
+  "regime_confirmations": 3,
+  "regime_dwell_seconds": 3600,
+  "regime_enter": "1.5",
+  "regime_exit": "1",
+  "rubrics": [
+    "news-judgment-rubric-v1"
+  ],
+  "sigma_ref": "0.0023",
+  "slippage_fraction": "0.0005",
+  "source_manifest": "E15-registration-20261016",
+  "target_ttl_seconds": 600,
+  "unknown_regime_multiplier": "1",
+  "verification_manifests": [
+    "news-traceable-v1"
+  ],
+  "version": "e15-policy-v1",
+  "window_anchor": "2026-10-16T00:00:00Z",
+  "window_seconds": 86400
+}

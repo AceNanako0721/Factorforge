@@ -149,7 +149,9 @@ test("S4-017 judgment and stop page on desktop and phone width", async ({
   await expect(page.getByText("仅记录，未改变仓位", { exact: true })).toBeVisible();
   await page.getByLabel("显示未生效的研判（灰点）").check();
   await page.getByLabel("显示未生效的研判（灰点）").uncheck();
-  await expect(page.getByText("未实现", { exact: true })).toBeVisible();
+  // v2.20.0: the fixed "E15 假设账本 / 未实现" row is gone (S3-031 offline replay).
+  await expect(page.getByText("E15 假设账本")).toHaveCount(0);
+  await expect(page.getByText("未实现", { exact: true })).toHaveCount(0);
   await expect(page.getByText("PRIVATE RAW")).toHaveCount(0);
   // S4-020: the fixture run is internal matching, so the PnL block shows the
   // real-funding total with system-computed sources only.

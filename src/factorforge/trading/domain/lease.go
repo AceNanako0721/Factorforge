@@ -30,7 +30,12 @@ func (l *ExecutorLease) Acquire(holder string, now time.Time, duration time.Dura
 	}
 	until := now.Add(duration)
 	if l.Holder == holder && l.Until != nil && l.Until.After(now) {
-		l.Until = &until
+		// v2.20.1: renew only once half the lease has elapsed, so a holder
+		// polling at a quarter of the lease or faster does not rewrite the run
+		// on every poll and still never lets the lease lapse.
+		if l.Until.Sub(now) <= duration/2 {
+			l.Until = &until
+		}
 		return l.Epoch, nil
 	}
 	if l.Holder != "" {
