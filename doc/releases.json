@@ -366,6 +366,12 @@
    "change_kind": "specification",
    "date": "2026-10-30",
    "summary": "Rewrite the specification and design books from the current code as Markdown; keep only the current baseline in the tree (earlier versions via tags); neutral example values; retire the v1.1 contracts. Fixes: kept protection plans count in the portfolio stress limit; console next-page cursors, stale panels after a failed request and judgment-page export; oversized provider responses are delivery-unknown."
+  },
+  {
+   "version": "2.21.1",
+   "change_kind": "design",
+   "date": "2026-10-31",
+   "summary": "Strategy store: a failed binding query reports STORE_UNAVAILABLE instead of OBJECT_BINDING_CHANGED; only a missing or different binding is a binding change."
   }
  ]
 }

@@ -1,6 +1,6 @@
 # Web 管理台设计书
 
-版本：2.21.0
+版本：2.21.1
 
 对应式样书：[04_Web管理台式样书](04_Web管理台式样书.md)。本书说明 `src/factorforge/applications/console` 的实现。
 
