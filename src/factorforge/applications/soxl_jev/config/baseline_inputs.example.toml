@@ -1,4 +1,4 @@
-# 合并到唯一私有 config/config.toml。该片段不包含真实地址、凭据或提示词。
+# 合并到本地的 config/config.toml 中使用。
 [application.baseline_inputs]
 environment = "SIM"
 instance_id = ""

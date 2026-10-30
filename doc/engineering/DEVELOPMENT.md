@@ -9,14 +9,14 @@
 - Node.js 与 pnpm：P4 前端的构建和测试。
 - Node.js 与 Bun：P5 模型接入模块。
 
-私有配置：
+本地配置：
 
 ```sh
 go run ./tools/init-private-config     # 从 config/config.example.toml 生成 config/config.toml，不覆盖已有文件
 go run ./tools/install-hooks           # 安装仓库的 Git hooks
 ```
 
-`config/config.toml` 和 `prompts/` 下的真实文件都被 Git 忽略，权限应为 0600。仓库中只有空模板，模板不能直接运行。
+`config/config.toml` 和 `prompts/` 下的本地文件都被 Git 忽略，权限应为 0600。仓库中只有空模板，模板不能直接运行。
 
 ## 检查与测试
 
@@ -47,7 +47,7 @@ npm --prefix src/factorforge/applications/model_access run test:omp
 node tools/check-model-access.mjs
 ```
 
-测试只使用虚构数据，不读取真实配置，不访问真实交易所或模型供应商。
+测试只使用虚构数据，不读取本地配置，不访问真实交易所或模型供应商。
 
 ## P1 交易系统层
 
@@ -78,7 +78,7 @@ runtime/go-bin/testnet-acceptance --postgres-bin <PostgreSQL 目录> --isolation
 runtime/go-bin/testnet-acceptance --postgres-bin <PostgreSQL 目录> --authorize-testnet-orders --max-notional 100
 ```
 
-会下单的验收必须显式加 `--authorize-testnet-orders`，单笔名义金额不超过 100 USDT，并要求测试账户已平仓且没有其他挂单。验收只在本轮私有目录中建立数据库和进程。
+会下单的验收必须显式加 `--authorize-testnet-orders`，单笔名义金额不超过 100 USDT，并要求测试账户已平仓且没有其他挂单。验收只在本轮的临时目录中建立数据库和进程。
 
 ## P2 策略化框架层
 
@@ -132,7 +132,7 @@ runtime/go-bin/console-api --profile runtime/console/profile.json
 ```sh
 npm --prefix src/factorforge/applications/model_access ci --ignore-scripts
 npm --prefix src/factorforge/applications/model_access run build     # 输出到 runtime/model-access-build
-go run ./tools/init-model-access                                      # 在私有配置中补上模型配置块
+go run ./tools/init-model-access                                      # 在本地配置中补上模型配置块
 node runtime/model-access-build/entrypoints/cli.js menu --config config/config.toml
 ```
 

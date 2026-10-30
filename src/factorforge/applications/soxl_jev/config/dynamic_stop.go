@@ -10,9 +10,8 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
-// DynamicProfile is the private role profile of the judgment worker and
-// position manager. Credentials and real values live
-// only in the ignored profile; dynamic_stop.example.toml is an empty template.
+// DynamicProfile is the local role profile of the judgment worker and
+// position manager; dynamic_stop.example.toml is its empty template.
 type DynamicProfile struct {
 	InstanceID  string `toml:"instance_id"`
 	Environment string `toml:"environment"`

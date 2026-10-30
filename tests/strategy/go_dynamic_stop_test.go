@@ -683,3 +683,16 @@ func TestT228RiskUnitOpensAfterGateWithUnchangedLevel(t *testing.T) {
 		t.Fatal("delayed batch must open at the unchanged level", d.TargetQuantity, d.ReasonCodes)
 	}
 }
+
+// A newer initial-distance directive without risk_fraction replaces a valid
+// one: no batch opens (the instance withdraws its directive this way).
+func TestT228WithdrawnInitialDirectiveOpensNoBatch(t *testing.T) {
+	s, o, _, snap, id, at := riskUnitFixture(t)
+	store, clock := adapters.NewMemory(s), adapters.NewReplay(at)
+	service := app.Service{Store: store, Clock: clock, Trading: &compositionTrading{snap: snap}}
+	submitInitial(t, service, s, o, id, clock.Now(), "LONG", 1, nil)
+	submitInitial(t, service, s, o, id, clock.Now(), "LONG", 2, func(r *sd.StopDirectiveCommand) { r.RiskFraction = nil })
+	if d := tick(t, store, clock, snap, id); d.TargetQuantity.Sign() != 0 || !sd.Has(d.ReasonCodes, "RISK_UNIT_DIRECTIVE_MISSING") {
+		t.Fatal("opened from a withdrawn directive", d.TargetQuantity, d.ReasonCodes)
+	}
+}

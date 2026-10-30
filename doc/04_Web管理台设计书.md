@@ -1,6 +1,6 @@
 # Web 管理台设计书
 
-版本：2.21.1
+版本：2.21.2
 
 对应式样书：[04_Web管理台式样书](04_Web管理台式样书.md)。本书说明 `src/factorforge/applications/console` 的实现。
 
@@ -15,7 +15,7 @@
 | `adapters` | 下层只读 HTTP 客户端（`HTTPRead`）、交易所公开行情推送（`MarketStream`） |
 | `ports` | `ReadClient` 接口 |
 | `api` | HTTP 处理、OpenAPI 文档 |
-| `config` | 私有配置的读取、校验与派生 |
+| `config` | 本地配置的读取、校验与派生 |
 | `entrypoints/console-api` | 服务进程 |
 | `web` | 浏览器前端（React + TypeScript，Vite 构建） |
 
@@ -32,11 +32,11 @@ flowchart LR
   S -->|wss 公开推送| V[交易所]
 ```
 
-1. 运维在私有配置 `config/config.toml` 的 `[console]` 表中登记管理台。
+1. 运维在本地配置 `config/config.toml` 的 `[console]` 表中登记管理台。
 2. `tools/prepare-console-profile` 读取它（`-config`），校验后写出派生文件（`-out`，默认 `runtime/console/profile.json`）。
 3. `console-api --profile <派生文件>` 启动服务。
 
-**私有文件读取（`privateRead`）**：两个文件都必须是普通文件（不跟随符号链接）、不允许组和其他用户的任何权限、不超过 16 MiB，否则返回 `PRIVATE_PROFILE_REQUIRED`。
+**本地文件读取（`privateRead`）**：两个文件都必须是普通文件（不跟随符号链接）、不允许组和其他用户的任何权限、不超过 16 MiB，否则返回 `PRIVATE_PROFILE_REQUIRED`。
 
 **派生（`config.Prepare`）**：把 TOML 解码为 `Profile` 并调用 `Validate`。写出的 JSON 分为两部分：`settings`（不含用户的 `Profile`）和 `users`（用户凭据单独一组）。目标文件以独占方式新建，权限 0600；已存在时返回 `PROFILE_ALREADY_EXISTS_OR_UNWRITABLE`，不覆盖。
 
@@ -102,7 +102,7 @@ flowchart LR
 
 **用户与范围**：`users` 见 2.3，`bindings` 见 2.2。`bindings` 至少一条，`selection_id` 不能重复；每个用户的 `selection_ids` 必须都在 `bindings` 中。
 
-示例（中性值）：
+示例：
 
 ```toml
 [console]
@@ -442,7 +442,7 @@ max_retries = 3
 | 验收 | 主要测试 |
 |---|---|
 | T4-01、T4-11、T4-12 | `tests/applications/console`：会话挑战、CSRF、重放、Cookie 属性与撤权；范围越权；隐私投影、重复键、UTC 与游标；导出 |
-| T4-02、T4-10、T4-14 | 下层各服务独立失败、未配置、夹具模式限制、私有配置文件 |
+| T4-02、T4-10、T4-14 | 下层各服务独立失败、未配置、夹具模式限制、本地配置文件 |
 | T4-04～T4-09 | 实例级列表的对象范围、案例有限形状、报告范围 |
 | T4-15、T4-19 | 研判与止损视图的区块与时间范围、旧版实例接口缺少阶梯字段时的兼容 |
 | T4-16 | 登记隧道主机、主机名检查、跨站导航只取静态页面 |

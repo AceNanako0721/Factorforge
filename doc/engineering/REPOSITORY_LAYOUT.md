@@ -16,7 +16,7 @@ Factorforge/
 ├── contracts/                   # 公开接口契约（v2/ 为当前版本）
 ├── doc/                         # 式样书、设计书与工程说明
 ├── tools/                       # 构建、检查、配置派生工具
-├── config/ / prompts/           # 只提交空模板；真实文件被 Git 忽略
+├── config/ / prompts/           # 只提交空模板；本地文件被 Git 忽略
 ├── runtime/                     # 被 Git 忽略：构建产物、数据库、日志
 └── VERSION
 ```

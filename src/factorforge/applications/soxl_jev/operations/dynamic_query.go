@@ -199,6 +199,7 @@ type storedPlan struct {
 	Fraction    float64        `json:"risk_fraction"`
 	Equity      float64        `json:"equity"`
 	DirectiveID string         `json:"directive_id"`
+	Withdrawn   bool           `json:"withdrawn"`
 }
 type storedPosition struct {
 	NoiseID  string       `json:"noise_id"`
@@ -355,7 +356,7 @@ func (q DynamicQuery) Status(ctx context.Context, p d.ReadPrincipal) (Record, er
 			v.Batch.ExitPending = &DynamicExitPendView{ExitID: b.ExitID, BarCloseAt: at.UTC(), ExpiresAt: at.Add(d.CloseExitValidity).UTC()}
 		}
 	}
-	if pl := pos.Initial; pl != nil {
+	if pl := pos.Initial; pl != nil && !pl.Withdrawn {
 		v.NextEntry = &DynamicEntryPlanView{Direction: direction(pl.Direction), Price: decimal(pl.Price), Distance: decimal(pl.Distance), CloseDistance: decimal(pl.CloseDist), RiskFraction: decimal(pl.Fraction), Equity: decimal(pl.Equity), TierHours: pl.Geometry.Tier, Session: pl.Geometry.Session, DirectiveID: pl.DirectiveID}
 		if at, ok := directiveTime(pl.DirectiveID); ok {
 			v.NextEntry.PlannedAt = &at
