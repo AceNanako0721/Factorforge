@@ -53,5 +53,7 @@ services:
       - ${FF_DEEPSEEK_MAX_TOKENS:-32768}
       - --thinking
       - ${FF_DEEPSEEK_THINKING:-on}
+      - --lang
+      - ${FF_DEEPSEEK_LANG:-en}
       - --out
       - /evidence

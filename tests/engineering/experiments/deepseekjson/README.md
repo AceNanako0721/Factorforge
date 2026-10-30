@@ -16,9 +16,14 @@ chmod 600 runtime/deepseek-json-lab/key
 
 ```sh
 sh tests/engineering/experiments/deepseekjson/run.sh --run --dry   # 只校验请求结构，不联网
-sh tests/engineering/experiments/deepseekjson/run.sh --run         # 默认 thinking=on，32K 上限
+sh tests/engineering/experiments/deepseekjson/run.sh --run         # 默认英文指令，thinking=on，32K 上限
 FF_DEEPSEEK_THINKING=off sh tests/engineering/experiments/deepseekjson/run.sh --run
+FF_DEEPSEEK_LANG=zh sh tests/engineering/experiments/deepseekjson/run.sh --run
 ```
+
+中英指令对照：两版使用完全相同的新闻、字段规则和「分析文字用简体中文」要求，只改变指令语言。分别用 `FF_DEEPSEEK_LANG=en` 与 `FF_DEEPSEEK_LANG=zh` 各跑一轮，比较 JSON 合法率、编号错误、方向一致性、中文输出符合度和 token 成本。
+
+后续 TODO：接入真实新闻源后，用私有真实提示词和真实中英混合新闻重跑同一对照；当前合成实验不能替代真实新闻质量验证。
 
 5 个合成场景（2 个明显利多、2 个明显利空、1 个混合）× 每组重复 4 次，共 20 次调用。场景标签是设计出来的预期，不是市场真值；`label_accuracy` 只反映面值有效性，`consistency` 反映同一场景多次运行的方向一致性。
 

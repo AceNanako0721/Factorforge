@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -72,5 +73,22 @@ func TestCredentialOnlyProbeTransportCannotWriteOrChangePaths(t *testing.T) {
 	}
 	if _, err := transport.Request(context.Background(), "GET", "/fapi/v3/account", nil, false); err != nil || inner.calls != 1 {
 		t.Fatal("allowed account read rejected")
+	}
+}
+
+func TestMarketTradeRetentionBounds(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "retention.toml")
+	for _, tc := range []struct {
+		days int
+		ok   bool
+	}{{0, true}, {7, true}, {30, true}, {-1, false}, {6, false}} {
+		data := "[runtime]\nenvironment='SIM'\n[trading]\nmarket_trade_retention_days=" + strconv.Itoa(tc.days) + "\n"
+		if err := os.WriteFile(path, []byte(data), 0600); err != nil {
+			t.Fatal(err)
+		}
+		_, err := c.Load(path)
+		if (err == nil) != tc.ok {
+			t.Fatalf("days=%d err=%v", tc.days, err)
+		}
 	}
 }

@@ -11,8 +11,9 @@ compose="docker compose -p ff-deepseek-json-lab-$$ -f $root/tests/engineering/ex
 export FF_DEEPSEEK_EVIDENCE="$lab"
 export FF_DEEPSEEK_ROOT="$root"
 export FF_DEEPSEEK_PKG="$root/tests/engineering/experiments/deepseekjson"
+export FF_DEEPSEEK_LANG="${FF_DEEPSEEK_LANG:-en}"
 if [ "${2:-}" = --dry ]; then
-  FF_DEEPSEEK_KEY=/dev/null $compose run --rm --no-deps probe go run ./tests/engineering/experiments/deepseekjson --key-file /private/key --dry
+  FF_DEEPSEEK_KEY=/dev/null $compose run --rm --no-deps probe go run ./tests/engineering/experiments/deepseekjson --key-file /private/key --dry --lang "$FF_DEEPSEEK_LANG"
   exit 0
 fi
 [ -f "$key" ] || { echo "missing $key (single line, chmod 600)" >&2; exit 3; }

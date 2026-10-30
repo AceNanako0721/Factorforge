@@ -34,6 +34,12 @@ func TestT319NewsRecapFreshnessAndLiveLicence(t *testing.T) {
 	if d.NewsFresh(now.Add(-2*time.Hour), false, 5, now, time.Hour) || !d.NewsFresh(now.Add(-10*time.Minute), false, 5, now, time.Hour) || d.NewsFresh(now.Add(-time.Minute), true, 0, now, time.Hour) {
 		t.Fatal("freshness gate")
 	}
+	if v, ok := monitoring.ParseRSSPublished("Thu, 29 Oct 2026 08:30:00 EDT"); !ok || v.Format(time.RFC3339) != "2026-10-29T12:30:00Z" {
+		t.Fatalf("EDT date %v %v", v, ok)
+	}
+	if _, ok := monitoring.ParseRSSPublished("Thu, 29 Oct 2026 08:30:00 CEST"); ok {
+		t.Fatal("unknown zone must stay unparsed")
+	}
 	rss := []byte(`<rss><channel><item><title>Fed minutes show officials split</title><link>https://example.com/a</link><description><![CDATA[<p>Officials said inflation risks</p>]]></description><pubDate>Thu, 16 Oct 2026 02:00:00 GMT</pubDate></item><item><title>SOX index rises 2%</title><link>https://example.com/b</link></item></channel></rss>`)
 	items, err := monitoring.ParseNewsFeed(monitoring.NewsFeed{SourceID: "fixture-rss", Kind: "RSS", LicenseScope: "PUBLIC"}, rss, now)
 	if err != nil || len(items) != 2 || items[0].Summary != "Officials said inflation risks" || items[0].Recap || !items[1].Recap || items[0].ItemID != d.NewsItemID("fixture-rss", "https://example.com/a", "Fed minutes show officials split") {
@@ -345,6 +351,16 @@ func (f fakeModel) Generate(_ context.Context, _, _ string) (d.SemanticGeneratio
 	return d.SemanticGeneration{Provider: "fixture", Model: "fixture-model", PromptHash: strings.Repeat("a", 64), Text: f.text}, f.err
 }
 
+type promptRecorder struct {
+	input string
+	text  string
+}
+
+func (r *promptRecorder) Generate(_ context.Context, _, input string) (d.SemanticGeneration, error) {
+	r.input = input
+	return d.SemanticGeneration{Provider: "fixture", Model: "fixture-model", PromptHash: strings.Repeat("a", 64), Text: r.text}, nil
+}
+
 type fakeFramework struct {
 	events     []dto.EventCommand
 	scores     []dto.ScoreCommand
@@ -472,6 +488,78 @@ func TestT320JudgmentWorkerFreshnessFallbackAndInjection(t *testing.T) {
 		t.Fatal("all failed", j, err)
 	}
 	_ = store
+}
+
+func TestJudgmentResumeKeepsCappedEvidence(t *testing.T) {
+	at := time.Date(2026, 10, 16, 3, 1, 0, 0, time.UTC)
+	key := d.NewsItem{ItemID: "item-key-000001", Source: "fixture-rss", Title: "NVIDIA expands Rubin deployment", Summary: "cloud capacity", PublishedAt: at.Add(-10 * time.Minute), ReceivedAt: at.Add(-2 * time.Hour), LicenseScope: "PUBLIC"}
+	answer := `{"direction":"LONG","confidence":3,"horizon_hours":48,"thesis":"rubin","key_item_ids":["item-key-0"],"counter_points":"c","invalidation":"cancel","previous_invalidated":false,"invalidation_item_ids":[]}`
+	w, store, fw, _ := judgmentWorker(at, fakeModel{text: answer}, []monitoring.FeedResult{{SourceID: "fixture-rss", Items: []d.NewsItem{key}}})
+	if err := w.Collect(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.Judge(context.Background()); err != nil || len(fw.events) != 1 {
+		t.Fatalf("first judge %v %d", err, len(fw.events))
+	}
+	// More items received before the judgment push the key item out of the
+	// capped window used to re-derive inputs during resume.
+	for i := 0; i < 150; i++ {
+		id := fmt.Sprintf("item-new-%06d", i)
+		received := at.Add(-time.Hour)
+		item := d.NewsItem{ItemID: id, Source: "fixture-rss", Title: "later item", Summary: "s", PublishedAt: at.Add(-50 * time.Minute), ReceivedAt: received, LicenseScope: "PUBLIC"}
+		if err := store.AppendRecord(context.Background(), "NEWS", id, received, item); err != nil {
+			t.Fatal(err)
+		}
+	}
+	delete(store.states, "INJECTION")
+	delete(store.vers, "INJECTION")
+	w.Clock = func() time.Time { return at.Add(time.Minute) }
+	_, err := w.Judge(context.Background())
+	if err != nil || len(fw.events) != 2 {
+		t.Fatalf("resume lost evidence: %v events=%d", err, len(fw.events))
+	}
+}
+
+func TestNewsFeedAcceptsHTMLEntities(t *testing.T) {
+	now := time.Date(2026, 10, 16, 3, 0, 0, 0, time.UTC)
+	rss := []byte(`<?xml version="1.0" encoding="us-ascii"?><rss><channel><item><title>GDP advance&ndash;third quarter</title><link>https://example.com/gdp</link><description>Personal income &amp; outlays</description><pubDate>Thu, 16 Oct 2026 02:00:00 GMT</pubDate></item></channel></rss>`)
+	items, err := monitoring.ParseNewsFeed(monitoring.NewsFeed{SourceID: "fixture-rss", Kind: "RSS", LicenseScope: "PUBLIC"}, rss, now)
+	if err != nil || len(items) != 1 || !strings.Contains(items[0].Title, "–") || items[0].Summary != "Personal income & outlays" {
+		t.Fatalf("entity parse %+v %v", items, err)
+	}
+}
+
+func TestNewsInputExcludesExpiredPublished(t *testing.T) {
+	at := time.Date(2026, 10, 16, 3, 1, 0, 0, time.UTC)
+	item := func(id, title string, published time.Time) d.NewsItem {
+		return d.NewsItem{ItemID: id, Source: "fixture-rss", Title: title, Summary: title + " summary", PublishedAt: published, ReceivedAt: at.Add(-time.Minute), LicenseScope: "PUBLIC"}
+	}
+	expired := item("item-expired-01", "OLD FOMC MAY", at.Add(-2*time.Hour))
+	boundary := item("item-boundary-1", "BOUNDARY OLD", at.Add(-time.Hour))
+	unknown := item("item-unknown-01", "UNKNOWN TIME", time.Time{})
+	fresh := item("item-fresh-0001", "FRESH NVIDIA", at.Add(-10*time.Minute))
+	answer := `{"direction":"LONG","confidence":3,"horizon_hours":48,"thesis":"fresh","key_item_ids":["item-fresh-0001"],"counter_points":"c","invalidation":"reverse","previous_invalidated":false,"invalidation_item_ids":[]}`
+	rec := &promptRecorder{text: answer}
+	w, _, fw, _ := judgmentWorker(at, rec, []monitoring.FeedResult{{SourceID: "fixture-rss", Items: []d.NewsItem{expired, boundary, unknown, fresh}}})
+	if err := w.Collect(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	j, err := w.Judge(context.Background())
+	if err != nil || !j.OK || len(fw.events) != 1 {
+		t.Fatal("judge", j, err)
+	}
+	for _, want := range []string{"FRESH NVIDIA", "UNKNOWN TIME", "BOUNDARY OLD"} {
+		if !strings.Contains(rec.input, want) {
+			t.Fatalf("prompt missing %q", want)
+		}
+	}
+	if strings.Contains(rec.input, "OLD FOMC MAY") {
+		t.Fatal("expired item reached the prompt")
+	}
+	evidence := fw.events[0].Event.EvidenceRefs
+	if len(evidence) != 1 || evidence[0].EvidenceID != fresh.ItemID {
+		t.Fatalf("evidence %+v", evidence)
+	}
 }
 
 func positionManager(at time.Time) (*workers.PositionManager, *memDynamic, *fakeFramework, *fakeTrading, *fakeAlerts) {

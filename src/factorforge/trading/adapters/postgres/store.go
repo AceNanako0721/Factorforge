@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"strings"
 	"sync"
+	"time"
 )
 
 //go:embed migrations/*.sql
@@ -47,7 +48,17 @@ func Open(ctx context.Context, dsn, environment string) (*Store, error) {
 	}
 	return &Store{pool: pool, environment: environment, schema: schema, candleBackfilled: map[string]bool{}}, nil
 }
-func (s *Store) Close()              { s.pool.Close() }
+func (s *Store) Close() { s.pool.Close() }
+
+// PruneMarketTrades deletes at most batch rows older than before through the
+// definer function; the API role has no table-level DELETE (design 25).
+func (s *Store) PruneMarketTrades(ctx context.Context, before time.Time, batch int) (int64, error) {
+	var removed int64
+	if err := s.pool.QueryRow(ctx, "SELECT "+s.table("prune_market_trade")+"($1,$2)", before, batch).Scan(&removed); err != nil {
+		return 0, sqlError(err)
+	}
+	return removed, nil
+}
 func (s *Store) Environment() string { return s.environment }
 func (s *Store) key(key d.RunKey) error {
 	if key.Environment != s.environment {
@@ -97,6 +108,14 @@ func Initialize(ctx context.Context, dsn, environment string) error {
 			return sqlError(err)
 		}
 	}
+	// 004 alters the generic market_trade relation, so it runs after creation.
+	script, err := migrations.ReadFile("migrations/004_trade_retention.sql")
+	if err != nil {
+		return failure("MIGRATION_UNAVAILABLE", 503)
+	}
+	if _, err = tx.Exec(ctx, strings.ReplaceAll(strings.ReplaceAll(string(script), "__SCHEMA__", schema), "__ENVIRONMENT__", environment)); err != nil {
+		return sqlError(err)
+	}
 	role := "factorforge_" + strings.ToLower(environment)
 	var exists bool
 	if err = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM pg_roles WHERE rolname=$1)", role).Scan(&exists); err != nil {
@@ -107,7 +126,7 @@ func Initialize(ctx context.Context, dsn, environment string) error {
 			return sqlError(err)
 		}
 	}
-	for _, query := range []string{"REVOKE ALL ON ALL TABLES IN SCHEMA " + schema + " FROM PUBLIC", "GRANT USAGE ON SCHEMA " + schema + " TO " + role, "GRANT SELECT,INSERT,UPDATE ON ALL TABLES IN SCHEMA " + schema + " TO " + role, "REVOKE UPDATE,DELETE ON " + schema + ".audit_event," + schema + ".market_candle FROM " + role, "REVOKE DELETE ON " + schema + ".command_dedup," + schema + ".market_trade FROM " + role} {
+	for _, query := range []string{"REVOKE ALL ON ALL TABLES IN SCHEMA " + schema + " FROM PUBLIC", "GRANT USAGE ON SCHEMA " + schema + " TO " + role, "GRANT SELECT,INSERT,UPDATE ON ALL TABLES IN SCHEMA " + schema + " TO " + role, "REVOKE UPDATE,DELETE ON " + schema + ".audit_event," + schema + ".market_candle FROM " + role, "REVOKE DELETE ON " + schema + ".command_dedup," + schema + ".market_trade FROM " + role, "GRANT EXECUTE ON FUNCTION " + schema + ".prune_market_trade(timestamptz,integer) TO " + role} {
 		if _, err = tx.Exec(ctx, query); err != nil {
 			return sqlError(err)
 		}
@@ -152,12 +171,12 @@ func loginAllowed(ctx context.Context, connection reader) error {
 	return nil
 }
 
-func (s *Store) load(ctx context.Context, connection reader, key d.RunKey, lock bool) (*d.Aggregate, bool, error) {
+func (s *Store) load(ctx context.Context, connection reader, key d.RunKey, lock bool) (*d.Aggregate, bool, []byte, error) {
 	if err := s.key(key); err != nil {
-		return nil, false, err
+		return nil, false, nil, err
 	}
 	if err := loginAllowed(ctx, connection); err != nil {
-		return nil, false, err
+		return nil, false, nil, err
 	}
 	query := "SELECT snapshot_text IS NOT NULL AND snapshot_text::jsonb=payload, CASE WHEN snapshot_text IS NOT NULL AND snapshot_text::jsonb=payload THEN snapshot_text ELSE payload::text END FROM " + s.table("trading_run") + " WHERE account_id=$1 AND run_id=$2"
 	if lock {
@@ -167,41 +186,41 @@ func (s *Store) load(ctx context.Context, connection reader, key d.RunKey, lock 
 	var data []byte
 	if err := connection.QueryRow(ctx, query, key.AccountID, key.RunID).Scan(&ordered, &data); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, false, failure("RUN_NOT_FOUND", 404)
+			return nil, false, nil, failure("RUN_NOT_FOUND", 404)
 		}
-		return nil, false, sqlError(err)
+		return nil, false, nil, sqlError(err)
 	}
 	var run d.Aggregate
 	if json.Unmarshal(data, &run) != nil || d.Validate(run) != nil {
-		return nil, false, failure("STORE_SNAPSHOT_INVALID", 503)
+		return nil, false, nil, failure("STORE_SNAPSHOT_INVALID", 503)
 	}
 	var count, last int64
 	if err := connection.QueryRow(ctx, "SELECT count(*),COALESCE(max(sequence),0) FROM "+s.table("audit_event")+" WHERE account_id=$1", key.AccountID).Scan(&count, &last); err != nil {
-		return nil, false, sqlError(err)
+		return nil, false, nil, sqlError(err)
 	}
 	if count != last {
-		return nil, false, failure("AUDIT_MUTATION_FORBIDDEN", 503)
+		return nil, false, nil, failure("AUDIT_MUTATION_FORBIDDEN", 503)
 	}
 	// Only pre-upgrade payloads carry an audit prefix. Verify it before dropping
 	// it; normal reads never load historical audit payloads.
 	if run.Audit != nil {
 		if int64(len(run.Audit)) != count {
-			return nil, false, failure("AUDIT_MUTATION_FORBIDDEN", 503)
+			return nil, false, nil, failure("AUDIT_MUTATION_FORBIDDEN", 503)
 		}
 		for i, event := range run.Audit {
 			var data []byte
 			if err := connection.QueryRow(ctx, "SELECT payload FROM "+s.table("audit_event")+" WHERE account_id=$1 AND sequence=$2", key.AccountID, i+1).Scan(&data); err != nil {
-				return nil, false, sqlError(err)
+				return nil, false, nil, sqlError(err)
 			}
 			var stored d.Object
 			if json.Unmarshal(data, &stored) != nil || !equalJSON(stored, event) {
-				return nil, false, failure("AUDIT_MUTATION_FORBIDDEN", 503)
+				return nil, false, nil, failure("AUDIT_MUTATION_FORBIDDEN", 503)
 			}
 		}
 	}
 	run.Audit = []d.Object{}
 	run.AuditCount = count
-	return &run, ordered, nil
+	return &run, ordered, data, nil
 }
 func (s *Store) Read(ctx context.Context, key d.RunKey) (*d.Aggregate, error) {
 	var run *d.Aggregate
@@ -266,7 +285,7 @@ func (s *Store) Transaction(ctx context.Context, key d.RunKey, apply func(*d.Agg
 		return sqlError(err)
 	}
 	defer tx.Rollback(ctx)
-	run, ordered, err := s.load(ctx, tx, key, true)
+	run, ordered, stored, err := s.load(ctx, tx, key, true)
 	if err != nil {
 		return err
 	}
@@ -294,9 +313,14 @@ func (s *Store) Transaction(ctx context.Context, key d.RunKey, apply func(*d.Agg
 	if err = s.persist(ctx, tx, run, prior, auditCount, candles); err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, "UPDATE "+s.table("trading_run")+" SET version=$1,payload=$2::jsonb,snapshot_text=$3 WHERE account_id=$4", run.Version, data, string(data), key.AccountID)
-	if err != nil {
-		return sqlError(err)
+	// Idle executor ticks must not rewrite a multi-megabyte snapshot. The row is
+	// locked above and the bytes already equal the serialized aggregate, so the
+	// update is a no-op; skipping it preserves every projection and audit write.
+	if !ordered || !bytes.Equal(stored, data) {
+		_, err = tx.Exec(ctx, "UPDATE "+s.table("trading_run")+" SET version=$1,payload=$2::jsonb,snapshot_text=$3 WHERE account_id=$4", run.Version, data, string(data), key.AccountID)
+		if err != nil {
+			return sqlError(err)
+		}
 	}
 	if err = tx.Commit(ctx); err != nil {
 		return sqlError(err)
@@ -398,7 +422,13 @@ func (s *Store) persist(ctx context.Context, tx pgx.Tx, run *d.Aggregate, prior 
 					continue
 				}
 			}
-			if _, err := tx.Exec(ctx, "INSERT INTO "+s.table(table)+"(account_id,resource_id,payload) VALUES($1,$2,$3::jsonb) "+conflict(table), run.RunKey.AccountID, identity, []byte(value)); err != nil {
+			query := "INSERT INTO " + s.table(table) + "(account_id,resource_id,payload) VALUES($1,$2,$3::jsonb) " + conflict(table)
+			if table == "market_trade" {
+				// v2.21.2 retention reads a real timestamp column; keep it in
+				// step with the validated payload on every insert.
+				query = "INSERT INTO " + s.table(table) + "(account_id,resource_id,payload,observed_at) VALUES($1,$2,$3::jsonb,(($3::jsonb)->>'observed_at')::timestamptz) " + conflict(table)
+			}
+			if _, err := tx.Exec(ctx, query, run.RunKey.AccountID, identity, []byte(value)); err != nil {
 				return sqlError(err)
 			}
 		}

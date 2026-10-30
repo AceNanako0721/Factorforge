@@ -1,10 +1,13 @@
 package monitoring
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"encoding/xml"
+	"io"
 	"strconv"
+	"strings"
 	"time"
 
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/domain"
@@ -71,7 +74,21 @@ func ParseNewsFeed(feed NewsFeed, raw []byte, received time.Time) ([]d.NewsItem,
 				} `xml:"item"`
 			} `xml:"channel"`
 		}
-		if xml.Unmarshal(raw, &doc) != nil {
+		decoder := xml.NewDecoder(bytes.NewReader(raw))
+		// Feeds such as BEA use HTML entities (for example &ndash;) that plain
+		// XML rejects; the stdlib table keeps the expansion bounded.
+		decoder.Entity = xml.HTMLEntity
+		// BEA declares us-ascii while serving valid UTF-8 bytes; accept the
+		// ASCII label as-is and keep every other charset out of the parser.
+		decoder.CharsetReader = func(charset string, input io.Reader) (io.Reader, error) {
+			switch strings.ToLower(strings.TrimSpace(charset)) {
+			case "us-ascii", "ascii":
+				return input, nil
+			default:
+				return nil, d.Fail("NEWS_FEED_INVALID", 422)
+			}
+		}
+		if decoder.Decode(&doc) != nil {
 			return nil, d.Fail("NEWS_FEED_INVALID", 422)
 		}
 		for _, it := range doc.Channel.Items {

@@ -23,6 +23,9 @@ ENTRYPOINT ["/usr/local/bin/ff-runtime","run","--","/usr/local/bin/docker-entryp
 CMD ["postgres"]
 FROM postgres AS core
 STOPSIGNAL SIGTERM
+# Public roots are required for direct venue/model HTTPS. The private gateway
+# CA stays at /trust/ca.pem; SSL_CERT_DIR adds these system roots at runtime.
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY --from=go-build /out/ /usr/local/bin/
 COPY --from=web-build /app/runtime/web-build/ /app/runtime/web-build/
 COPY contracts/ /app/contracts/

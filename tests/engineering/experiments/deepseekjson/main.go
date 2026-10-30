@@ -14,16 +14,23 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 )
 
 const (
 	endpoint = "https://api.deepseek.com/chat/completions"
 	// Synthetic items only. The real prompt is private and must not be copied
 	// into this experiment; prompt shape mirrors the production template.
-	instructions = `You are an event-sentiment judge for one instrument. Read the news below and answer with one JSON object only.
+	// Both variants require Chinese analytical text so the trial isolates the
+	// instruction language instead of the output language.
+	instructionsEN = `You are an event-sentiment judge for one instrument. Read the news below and answer with one JSON object only.
 Output valid json with exactly these fields and no others:
 {"direction":"LONG|SHORT|FLAT","confidence":1,"horizon_hours":24,"thesis":"...","key_item_ids":["..."],"counter_points":"...","invalidation":"...","previous_invalidated":false,"invalidation_item_ids":[]}
-Rules: confidence is an integer 1-5; horizon_hours is an integer 1-720; LONG or SHORT requires at least one key_item_id copied from the input and a non-empty invalidation; FLAT may use empty lists; every id must be one presented below.`
+Rules: confidence is an integer 1-5; horizon_hours is an integer 1-720; LONG or SHORT requires at least one key_item_id copied from the input and a non-empty invalidation; FLAT may use empty lists; every id must be one presented below. Write thesis, counter_points and invalidation in Simplified Chinese; keep JSON field names and enum values unchanged.`
+	instructionsZH = `你是一个标的的事件情绪判断器。阅读下面的新闻，只返回一个 JSON 对象。
+只输出这些字段：
+{"direction":"LONG|SHORT|FLAT","confidence":1,"horizon_hours":24,"thesis":"...","key_item_ids":["..."],"counter_points":"...","invalidation":"...","previous_invalidated":false,"invalidation_item_ids":[]}
+规则：confidence 为 1 至 5 的整数；horizon_hours 为 1 至 720 的整数；LONG 或 SHORT 必须至少引用一个输入中的 key_item_id，并给出非空的 invalidation；FLAT 可使用空列表；所有编号必须来自输入。thesis、counter_points、invalidation 用简体中文书写；JSON 字段名和枚举值保持不变。`
 )
 
 type scenario struct {
@@ -135,6 +142,7 @@ type runResult struct {
 	Scenario         string `json:"scenario"`
 	Expected         string `json:"expected"`
 	Thinking         string `json:"thinking"`
+	Lang             string `json:"lang"`
 	HTTPStatus       int    `json:"http_status"`
 	FinishReason     string `json:"finish_reason,omitempty"`
 	Empty            bool   `json:"empty"`
@@ -144,6 +152,8 @@ type runResult struct {
 	Confidence       int    `json:"confidence,omitempty"`
 	HorizonHours     int    `json:"horizon_hours,omitempty"`
 	ThesisBytes      int    `json:"thesis_bytes"`
+	ChineseFields    int    `json:"chinese_fields"`
+	ChineseOK        bool   `json:"chinese_ok"`
 	ReasoningBytes   int    `json:"reasoning_bytes"`
 	ContentBytes     int    `json:"content_bytes"`
 	PromptTokens     int    `json:"prompt_tokens"`
@@ -159,15 +169,20 @@ func main() {
 	reps := flag.Int("reps", 4, "repetitions per scenario")
 	maxTokens := flag.Int("max-tokens", 32768, "completion token ceiling")
 	mode := flag.String("thinking", "on", "thinking mode: on or off")
+	lang := flag.String("lang", "en", "instruction language: en or zh")
 	out := flag.String("out", "/evidence", "evidence directory")
 	dry := flag.Bool("dry", false, "validate request shape only; no network call")
 	flag.Parse()
+	if *lang != "en" && *lang != "zh" {
+		fmt.Fprintln(os.Stderr, "lang must be en or zh")
+		os.Exit(2)
+	}
 
-	payload := buildRequest(*model, *maxTokens, *mode)
+	payload := buildRequest(*model, *maxTokens, *mode, *lang)
 	if *dry {
 		raw, _ := json.MarshalIndent(payload, "", "  ")
-		fmt.Printf("dry-run model=%s thinking=%s scenarios=%d scenario=%s system_bytes=%d user_bytes=%d\n%s\n",
-			*model, *mode, len(scenarios), scenarios[0].Name, len(payload.Messages[0].Content), len(payload.Messages[1].Content), raw)
+		fmt.Printf("dry-run model=%s thinking=%s lang=%s scenarios=%d scenario=%s system_bytes=%d user_bytes=%d\n%s\n",
+			*model, *mode, *lang, len(scenarios), scenarios[0].Name, len(payload.Messages[0].Content), len(payload.Messages[1].Content), raw)
 		return
 	}
 	key := strings.TrimSpace(readFile(*keyFile))
@@ -190,18 +205,18 @@ func main() {
 	results := make([]runResult, 0, len(scenarios)**reps)
 	for _, s := range scenarios {
 		for i := 0; i < *reps; i++ {
-			r := runOnce(client, key, *model, *maxTokens, *mode, s)
+			r := runOnce(client, key, *model, *maxTokens, *mode, *lang, s)
 			r.Index = len(results) + 1
 			results = append(results, r)
 			if raw, err := json.Marshal(r); err == nil {
 				evidence.Write(append(raw, '\n'))
 				evidence.Sync()
 			}
-			fmt.Printf("run %2d %-20s expected=%-5s got=%-5s valid=%t finish=%s %dms tokens=%d/%d\n",
-				r.Index, r.Scenario, r.Expected, r.Direction, r.JSONOK && r.ValidationError == "", r.FinishReason, r.LatencyMillis, r.PromptTokens, r.CompletionTokens)
+			fmt.Printf("run %2d %-20s expected=%-5s got=%-5s valid=%t zh=%t finish=%s %dms tokens=%d/%d\n",
+				r.Index, r.Scenario, r.Expected, r.Direction, r.JSONOK && r.ValidationError == "", r.ChineseOK, r.FinishReason, r.LatencyMillis, r.PromptTokens, r.CompletionTokens)
 		}
 	}
-	sum := summarise(results, *mode)
+	sum := summarise(results, *mode, *lang)
 	raw, _ := json.MarshalIndent(sum, "", "  ")
 	if err := os.WriteFile(*out+"/summary.json", raw, 0o600); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -210,12 +225,16 @@ func main() {
 	fmt.Println(string(raw))
 }
 
-func buildRequest(model string, maxTokens int, mode string) request {
+func buildRequest(model string, maxTokens int, mode, lang string) request {
 	var r request
 	r.Model = model
 	r.ResponseFormat.Type = "json_object"
 	r.MaxTokens = maxTokens
 	r.Stream = false
+	instructions := instructionsEN
+	if lang == "zh" {
+		instructions = instructionsZH
+	}
 	r.Messages = []message{
 		{Role: "system", Content: instructions},
 		{Role: "user", Content: scenarios[0].News},
@@ -226,9 +245,9 @@ func buildRequest(model string, maxTokens int, mode string) request {
 	return r
 }
 
-func runOnce(client *http.Client, key, model string, maxTokens int, mode string, s scenario) runResult {
-	r := runResult{Scenario: s.Name, Expected: s.Expected, Thinking: mode}
-	payload := buildRequest(model, maxTokens, mode)
+func runOnce(client *http.Client, key, model string, maxTokens int, mode, lang string, s scenario) runResult {
+	r := runResult{Scenario: s.Name, Expected: s.Expected, Thinking: mode, Lang: lang}
+	payload := buildRequest(model, maxTokens, mode, lang)
 	payload.Messages[1].Content = s.News
 	body, _ := json.Marshal(payload)
 	req, err := http.NewRequest(http.MethodPost, endpoint, bytes.NewReader(body))
@@ -294,7 +313,23 @@ func runOnce(client *http.Client, key, model string, maxTokens int, mode string,
 	}
 	r.Direction, r.Confidence, r.HorizonHours = out.Direction, out.Confidence, out.HorizonHours
 	r.ThesisBytes = len(out.Thesis) + len(out.Invalidation) + len(out.CounterPoints)
+	for _, text := range []string{out.Thesis, out.CounterPoints, out.Invalidation} {
+		if text != "" && containsHan(text) {
+			r.ChineseFields++
+		}
+	}
+	r.ChineseOK = containsHan(out.Thesis) && (out.CounterPoints == "" || containsHan(out.CounterPoints)) && (out.Invalidation == "" || containsHan(out.Invalidation))
 	return r
+}
+
+// containsHan is only a language check; it says nothing about judgment quality.
+func containsHan(text string) bool {
+	for _, r := range text {
+		if unicode.Is(unicode.Han, r) {
+			return true
+		}
+	}
+	return false
 }
 
 // validate mirrors the production strict answer rules; JSON mode does not
@@ -327,11 +362,13 @@ func validate(out answer, inputIDs []string) error {
 	return nil
 }
 
-func summarise(results []runResult, mode string) map[string]any {
+func summarise(results []runResult, mode, lang string) map[string]any {
 	lat := []int64{}
 	counts := map[string]int{}
 	correct := 0
 	valid := 0
+	chineseOK := 0
+	chineseIncomplete := 0
 	byScenario := map[string]map[string]int{}
 	tokens := 0
 	for _, r := range results {
@@ -360,6 +397,11 @@ func summarise(results []runResult, mode string) map[string]any {
 		if r.JSONOK && r.ValidationError == "" {
 			valid++
 			counts["valid"]++
+			if r.ChineseOK {
+				chineseOK++
+			} else {
+				chineseIncomplete++
+			}
 			if r.Direction == r.Expected {
 				correct++
 			}
@@ -393,8 +435,11 @@ func summarise(results []runResult, mode string) map[string]any {
 	}
 	return map[string]any{
 		"thinking":           mode,
+		"lang":               lang,
 		"runs":               len(results),
 		"valid":              valid,
+		"chinese_ok":         chineseOK,
+		"chinese_incomplete": chineseIncomplete,
 		"counts":             counts,
 		"label_accuracy":     accuracy,
 		"consistency":        consistency,

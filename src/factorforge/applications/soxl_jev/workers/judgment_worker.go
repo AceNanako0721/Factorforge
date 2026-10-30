@@ -39,6 +39,7 @@ type JudgmentFramework interface {
 	RegisterEvent(ctx context.Context, request dto.EventCommand, revision bool) (dto.Event, error)
 	Submit(ctx context.Context, request dto.ScoreCommand) (dto.AdmissionReceipt, error)
 }
+
 // JudgmentSource reads another instance's judgments in follower mode
 // (S3-034): strictly after since, oldest first.
 type JudgmentSource interface {
@@ -135,7 +136,7 @@ func (w *JudgmentWorker) Follow(ctx context.Context) error {
 			return err
 		}
 		if j.Reason != "NEWS_STALE" && j.JudgmentID > state.LastJudgment {
-			recent, older, _, err := w.inputs(ctx, j.At)
+			recent, older, _, err := w.inputs(ctx, j.At, false, nil)
 			if err != nil {
 				return err
 			}
@@ -208,7 +209,7 @@ func (w *JudgmentWorker) Judge(ctx context.Context) (d.Judgment, error) {
 	if err = w.resume(ctx, &state, &version); err != nil {
 		return j, err
 	}
-	recent, older, fresh, err := w.inputs(ctx, now)
+	recent, older, fresh, err := w.inputs(ctx, now, true, nil)
 	if err != nil {
 		return j, err
 	}
@@ -254,7 +255,10 @@ func (w *JudgmentWorker) resume(ctx context.Context, state *d.InjectionState, ve
 	if err != nil || last == nil || !last.OK || last.JudgmentID == state.LastJudgment || last.JudgmentID <= state.LastJudgment {
 		return err
 	}
-	recent, older, _, err := w.inputs(ctx, last.At)
+	// The judgment timestamp is truncated to the second while its inputs were
+	// read just after that instant; include the boundary second so a resume
+	// does not lose evidence received during it.
+	recent, older, _, err := w.inputs(ctx, last.At.Add(time.Second), false, last.InputIDs)
 	if err != nil {
 		return err
 	}
@@ -452,18 +456,29 @@ func (w *JudgmentWorker) versioned(ctx context.Context, fn func(dto.Command) err
 	return err
 }
 
-func (w *JudgmentWorker) inputs(ctx context.Context, now time.Time) ([]d.NewsItem, []d.NewsItem, bool, error) {
+func (w *JudgmentWorker) inputs(ctx context.Context, now time.Time, enforceAge bool, required []string) ([]d.NewsItem, []d.NewsItem, bool, error) {
 	s := w.Settings
 	rows, err := w.Store.Records(ctx, "NEWS", now.Add(-s.OlderWindow), now.Add(time.Second), 5000)
 	if err != nil {
 		return nil, nil, false, err
 	}
 	recent, older := []d.NewsItem{}, []d.NewsItem{}
+	all := []d.NewsItem{}
 	for _, raw := range rows {
 		var x d.NewsItem
 		if json.Unmarshal(raw, &x) != nil || x.Recap || x.ReceivedAt.After(now) {
 			continue
 		}
+		// Design 40: a feed backlog carries old publication times under a new
+		// received time; judge only items still inside the registered age.
+		published := x.PublishedAt
+		if published.IsZero() {
+			published = x.ReceivedAt
+		}
+		if enforceAge && s.MaxNewsAge > 0 && published.Before(now.Add(-s.MaxNewsAge)) {
+			continue
+		}
+		all = append(all, x)
 		if now.Sub(x.ReceivedAt) <= s.RecentWindow {
 			recent = append(recent, x)
 		} else {
@@ -475,6 +490,28 @@ func (w *JudgmentWorker) inputs(ctx context.Context, now time.Time) ([]d.NewsIte
 	}
 	if len(older) > s.MaxOlder {
 		older = older[len(older)-s.MaxOlder:]
+	}
+	// Resume must see the exact evidence of the judgment it replays; those
+	// items may have fallen outside the capped current window.
+	if len(required) > 0 {
+		need := map[string]bool{}
+		for _, id := range required {
+			need[id] = true
+		}
+		have := map[string]bool{}
+		for _, x := range append(append([]d.NewsItem{}, recent...), older...) {
+			have[x.ItemID] = true
+		}
+		for _, x := range all {
+			if !need[x.ItemID] || have[x.ItemID] {
+				continue
+			}
+			if now.Sub(x.ReceivedAt) <= s.RecentWindow {
+				recent = append(recent, x)
+			} else {
+				older = append(older, x)
+			}
+		}
 	}
 	sources := map[string]NewsSourceState{}
 	if _, err = w.Store.LoadState(ctx, "NEWS_SOURCES", &sources); err != nil {

@@ -39,6 +39,7 @@ func run() error {
 		return err
 	}
 	defer store.Close()
+	go pruneMarketTrades(ctx, store, config.Trading.MarketTradeRetentionDays)
 	if *restrict {
 		readPaths := []string{*configPath, "/etc/ssl", "/etc/localtime", "/etc/resolv.conf", "/etc/hosts", "/etc/nsswitch.conf", "/dev/null", "/dev/urandom"}
 		if err = isolation.RestrictFilesystem(readPaths, nil); err != nil {

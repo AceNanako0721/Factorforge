@@ -161,6 +161,8 @@ permissions = []
 storage_path = ""
 account_currency = ""
 reconciliation_tolerance = ""
+# 0 disables pruning; a configured value must be at least 7 days.
+market_trade_retention_days = 0
 # Populate from registered policy/cost records, never production defaults.
 account_policy = {}
 cost_model = {}

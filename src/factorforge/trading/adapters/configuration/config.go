@@ -34,6 +34,8 @@ type Config struct {
 		StoragePath             string         `toml:"storage_path"`
 		AccountCurrency         string         `toml:"account_currency"`
 		ReconciliationTolerance string         `toml:"reconciliation_tolerance"`
+		// Zero disables pruning; otherwise the schema floor is seven days.
+		MarketTradeRetentionDays int `toml:"market_trade_retention_days"`
 		AccountPolicy           map[string]any `toml:"account_policy"`
 		CostModel               map[string]any `toml:"cost_model"`
 		LiveReadiness           map[string]any `toml:"live_readiness"`
@@ -63,6 +65,9 @@ func Load(path string) (Config, error) {
 	}
 	if config.Runtime.Environment != "SIM" && config.Runtime.Environment != "LIVE" {
 		return config, invalid("ENVIRONMENT_UNSUPPORTED", 422)
+	}
+	if config.Trading.MarketTradeRetentionDays < 0 || config.Trading.MarketTradeRetentionDays > 0 && config.Trading.MarketTradeRetentionDays < 7 {
+		return config, invalid("PRIVATE_CONFIGURATION_INVALID", 503)
 	}
 	for _, value := range []float64{config.Trading.Health.TimeoutSeconds, config.Trading.Signed.TimeoutSeconds, config.Trading.Signed.PollSeconds, config.Trading.Signed.BudgetWindowSeconds} {
 		if math.IsNaN(value) || math.IsInf(value, 0) || value < 0 || value > float64(math.MaxInt64)/float64(1e9) {

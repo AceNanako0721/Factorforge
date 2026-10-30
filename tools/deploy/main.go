@@ -414,7 +414,10 @@ func (d *deployment) profiles() error {
 	if e != nil {
 		return e
 	}
-	schema := map[string]any{"environment": "SIM", "instance_id": object(d.raw, "strategy")["instance_id"], "dsn": d.dsn("ff_admin"), "roles": d.o.Database.Roles, "version": strings.TrimSpace(string(version))}
+	// The schema job binds the P3 application instance, which is the runtime
+	// identity. [strategy].instance_id belongs to the P2 strategy profile and
+	// may still be empty before business configuration is complete.
+	schema := map[string]any{"environment": "SIM", "instance_id": object(d.raw, "runtime")["instance_id"], "dsn": d.dsn("ff_admin"), "roles": d.o.Database.Roles, "version": strings.TrimSpace(string(version))}
 	b, _ = json.Marshal(schema)
 	return write(filepath.Join(d.profile, "operator/schema.json"), b)
 }
@@ -476,8 +479,10 @@ func (d *deployment) doctor() error {
 			missing = append(missing, "profile."+name)
 		}
 	}
-	if _, e := ic.LoadModelAccess(filepath.Join(d.profile, "judgment-worker/model.toml")); e != nil {
+	if access, e := ic.LoadModelAccess(filepath.Join(d.profile, "judgment-worker/model.toml")); e != nil {
 		missing = append(missing, "profile.judgment-worker/model.toml")
+	} else if !access.Enabled {
+		missing = append(missing, "model_access.enabled")
 	}
 	judgment, profileErr := ic.LoadDynamic(filepath.Join(d.profile, "judgment-worker/config.toml"))
 	if profileErr == nil {

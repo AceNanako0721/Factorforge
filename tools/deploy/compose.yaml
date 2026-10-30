@@ -15,6 +15,7 @@ x-runtime: &runtime
   networks: [private]
   environment:
     SSL_CERT_FILE: /trust/ca.pem
+    SSL_CERT_DIR: /etc/ssl/certs
   logging: &logging
     driver: local
     options: {max-size: 10m, max-file: "3"}
@@ -78,7 +79,9 @@ services:
       - {type: bind, source: '${FF_DATA_ROOT}/tls/trust', target: /trust, read_only: true, bind: {create_host_path: false}}
   replay-executor:
     <<: *runtime
-    command: ["replay-executor","--config","/profile/config.toml","--run-id","${FF_RUN_ID:?}","--executor-id","factorforge-internal"]
+    # Internal replay runs carry no operational lease policy, so the executor
+    # must not claim a lease it never acquires.
+    command: ["replay-executor","--config","/profile/config.toml","--run-id","${FF_RUN_ID:?}"]
     depends_on:
       postgres: {condition: service_healthy}
     volumes:

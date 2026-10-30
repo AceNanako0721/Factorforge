@@ -21,9 +21,6 @@ run_id = ""
 
 [[models]]
 name = ""
-bun_path = ""
-provider = ""
-account_id = 0
 model = ""
 timeout_seconds = 0
 
