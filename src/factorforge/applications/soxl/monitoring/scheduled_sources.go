@@ -132,6 +132,10 @@ func ParseOfficialSchedule(raw []byte, s OfficialScheduleSource) ([]d.ScheduleCa
 			if kind == "" || r.Tips == "Yes" {
 				continue
 			}
+			// Announced but not yet scheduled: there is no date to register.
+			if r.AuctionDate == "" {
+				continue
+			}
 			if len(r.AuctionDate) < 10 || len(r.AnnouncementDate) < 10 || r.CUSIP == "" {
 				return bad()
 			}

@@ -126,6 +126,24 @@ func TestP3OfficialTreasuryWithoutLongAuctions(t *testing.T) {
 	}
 }
 
+// A security that is announced but whose auction date is not yet published
+// (auctionDate is null) is not a schedule yet; it must not invalidate the page.
+func TestP3OfficialTreasuryAnnouncedWithoutAuctionDate(t *testing.T) {
+	raw := []byte(`[
+	 {"cusip":"91282CRX1","announcementDate":"2026-11-04T00:00:00","auctionDate":null,"originalSecurityTerm":"","securityTerm":"10-Year","closingTimeCompetitive":null,"tips":null},
+	 {"cusip":"912810UY2","announcementDate":"2026-11-04T00:00:00","auctionDate":"","originalSecurityTerm":"","securityTerm":"30-Year","closingTimeCompetitive":"","tips":"No"},
+	 {"cusip":"91282CSA0","announcementDate":"2026-10-08T00:00:00","auctionDate":"2026-10-14T00:00:00","originalSecurityTerm":"10-Year","securityTerm":"9-Year 11-Month","closingTimeCompetitive":"01:00 PM","tips":"No"}]`)
+	rows, e := monitoring.ParseOfficialSchedule(raw, monitoring.OfficialScheduleSource{Kind: "TREASURY", SourceRef: "td-official"})
+	if e != nil || len(rows) != 1 || rows[0].EventType != "AUCTION_10Y" || rows[0].Period != "91282CSA0-2026-10-08" {
+		t.Fatal("announced-only securities must be skipped, scheduled ones kept", rows, e)
+	}
+	// A scheduled auction with a malformed date still invalidates the page.
+	bad := []byte(`[{"cusip":"91282CSA0","announcementDate":"2026-10-08T00:00:00","auctionDate":"2026","originalSecurityTerm":"10-Year","securityTerm":"10-Year","closingTimeCompetitive":"01:00 PM","tips":"No"}]`)
+	if _, e = monitoring.ParseOfficialSchedule(bad, monitoring.OfficialScheduleSource{Kind: "TREASURY", SourceRef: "td-official"}); e == nil {
+		t.Fatal("malformed auction date accepted")
+	}
+}
+
 type scheduledFixture struct{ rows []d.ScheduleCandidate }
 
 func (s *scheduledFixture) Schedules(context.Context, time.Time) ([]d.ScheduleCandidate, error) {
