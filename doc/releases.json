@@ -384,6 +384,12 @@
    "change_kind": "framework",
    "date": "2026-10-31",
    "summary": "Layers become an abstract dependency order registered in doc/layers.json: trading, strategy, application and operations, each holding any number of modules and specs. The web console and model access move to the operations layer (src/factorforge/operations). The application module is renamed soxl. The unused event-analysis path and the watchlist are removed from the application, its read API and the console; the application now provides news judgment, stop and position management and scheduled calendars."
+  },
+  {
+   "version": "3.0.1",
+   "change_kind": "design",
+   "date": "2026-10-31",
+   "summary": "Calendar worker: a Treasury auction listed without an auction date yet no longer invalidates the whole page and stops the schedule update; it is skipped until the date is published."
   }
  ]
 }
