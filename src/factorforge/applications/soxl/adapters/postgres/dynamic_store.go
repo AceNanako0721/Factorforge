@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -129,9 +130,18 @@ func (s *Store) SaveState(ctx context.Context, key string, expected int64, at ti
 	return nil
 }
 
+// sameJSON compares two JSON documents by value; numbers keep their exact text
+// so large integers that differ are never treated as equal.
 func sameJSON(a, b []byte) bool {
-	var x, y any
-	if json.Unmarshal(a, &x) != nil || json.Unmarshal(b, &y) != nil {
+	decode := func(raw []byte) (any, bool) {
+		dec := json.NewDecoder(bytes.NewReader(raw))
+		dec.UseNumber()
+		var v any
+		return v, dec.Decode(&v) == nil
+	}
+	x, okA := decode(a)
+	y, okB := decode(b)
+	if !okA || !okB {
 		return false
 	}
 	ra, _ := json.Marshal(x)

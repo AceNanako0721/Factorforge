@@ -202,5 +202,29 @@ func (s *Store) VerifyRole(ctx context.Context) error {
 			return d.Fail("STORAGE_ROLE_NOT_ISOLATED", 403)
 		}
 	}
-	return nil
+	// A database created by an earlier release also holds tables this release
+	// no longer uses. The login must not gain write access to them, and only
+	// the writer may still read the few shared ones it could always read.
+	rows, err := s.pool.Query(ctx, `SELECT c.relname,has_any_column_privilege(session_user,c.oid,'SELECT'),
+ has_any_column_privilege(session_user,c.oid,'UPDATE'),has_any_column_privilege(session_user,c.oid,'INSERT'),
+ has_table_privilege(session_user,c.oid,'DELETE,TRUNCATE,TRIGGER')
+ FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+ WHERE n.nspname=$1 AND c.relkind IN('r','p','v','m','f') AND c.relname NOT IN('worker_grant','dynamic_record','dynamic_state')`, s.schema)
+	if err != nil {
+		return safe(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var name string
+		var read, write, insert, remove bool
+		if err = rows.Scan(&name, &read, &write, &insert, &remove); err != nil {
+			return safe(err)
+		}
+		readable := s.kind == "DYNAMIC" && d.Has([]string{"budget", "raw_evidence_manifest", "routing_receipt", "operation_fact"}, name)
+		insertable := s.kind == "DYNAMIC" && name == "operation_fact"
+		if remove || write || insert && !insertable || read && !readable {
+			return d.Fail("STORAGE_ROLE_NOT_ISOLATED", 403)
+		}
+	}
+	return safe(rows.Err())
 }

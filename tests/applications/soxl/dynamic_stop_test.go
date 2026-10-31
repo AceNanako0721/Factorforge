@@ -880,6 +880,26 @@ func TestP3DynamicStorePostgresAppendCASAndIsolation(t *testing.T) {
 	if v, e := store.LoadState(ctx, "INJECTION", &state); e != nil || v != 2 || state["sequence"] != 2 {
 		t.Fatal("cas", v, state, e)
 	}
+	// Replays compare numbers exactly: integers beyond float precision differ.
+	if e = store.AppendRecord(ctx, "JUDGMENT", "j3", at, map[string]any{"n": int64(9007199254740992)}); e != nil {
+		t.Fatal(e)
+	}
+	if e = store.AppendRecord(ctx, "JUDGMENT", "j3", at, map[string]any{"n": int64(9007199254740993)}); e == nil {
+		t.Fatal("large integer change accepted as an identical replay")
+	}
+	// A table left behind by an earlier release must not widen a login.
+	if _, e = admin.Exec(ctx, "CREATE TABLE instance_pipeline_sim.legacy_budget(x int)"); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = admin.Exec(ctx, "GRANT UPDATE ON instance_pipeline_sim.legacy_budget TO fixture_dynamic_dynamic_read"); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = pg.OpenStore(ctx, dsns["DYNAMIC_READ"], binding, "DYNAMIC_READ", 100000); providerError(e) != "STORAGE_ROLE_NOT_ISOLATED" {
+		t.Fatal("read login with write access to a legacy table accepted", e)
+	}
+	if _, e = admin.Exec(ctx, "REVOKE UPDATE ON instance_pipeline_sim.legacy_budget FROM fixture_dynamic_dynamic_read"); e != nil {
+		t.Fatal(e)
+	}
 	// The read identity cannot write dynamic records.
 	reader, e := pg.OpenStore(ctx, dsns["DYNAMIC_READ"], binding, "DYNAMIC_READ", 100000)
 	if e != nil {

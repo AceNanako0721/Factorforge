@@ -19,7 +19,7 @@ import (
 )
 
 // RunCalendar registers official schedules with the strategy framework once
-// per half hour until it is stopped, or once with --once.
+// per hour, half past, until it is stopped, or once with --once.
 func RunCalendar() error {
 	path := flag.String("config", "", "Private canonical config/config.toml")
 	once := flag.Bool("once", false, "One bounded worker iteration")
