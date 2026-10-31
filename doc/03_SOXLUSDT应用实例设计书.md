@@ -1,6 +1,6 @@
 # SOXLUSDT 应用实例设计书
 
-版本：3.0.1
+版本：3.1.0
 
 对应式样书：[03_SOXLUSDT应用实例式样书](03_SOXLUSDT应用实例式样书.md)。源码在 `src/factorforge/applications/soxl`，测试在 `tests/applications/soxl`。文中出现的数值，凡是代码里写死的照实写出；其余都是登记值，这里只说明作用，不给实际取值。
 
