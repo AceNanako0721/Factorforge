@@ -138,7 +138,8 @@ func TestPublicGuardTemplateShapesAndDocumentContainers(t *testing.T) {
 			t.Fatal("accepted nonempty template")
 		}
 	}
-	legacy := strings.Split(preSemanticTemplate(string(config)), "# P2 scoped API access only.")[0]
+	previous, _ := previousTemplate()
+	legacy := strings.Split(preSemanticTemplate(string(previous)), "# P2 scoped API access only.")[0]
 	// The historical fixture predates both the P2 section and P3 read API.
 	start, end := strings.Index(legacy, "[application.read_api]"), strings.Index(legacy, "[trading]")
 	if start >= 0 && end > start {
@@ -150,7 +151,7 @@ func TestPublicGuardTemplateShapesAndDocumentContainers(t *testing.T) {
 	prompt, _ := os.ReadFile(filepath.Join(root, "prompts/prompts.example.json"))
 	var value map[string]any
 	json.Unmarshal(prompt, &value)
-	value["questions"].([]any)[0].(map[string]any)["instructions"] = "private text"
+	value["judgment_template"] = "private text"
 	prompt, _ = json.Marshal(value)
 	if guard.TemplateIssue("prompts/prompts.example.json", prompt, false) == "" {
 		t.Fatal("prompt instructions accepted")
@@ -159,6 +160,11 @@ func TestPublicGuardTemplateShapesAndDocumentContainers(t *testing.T) {
 	legacyPrompt := []byte(`{"schema_version":1,"asset_kind":"EXAMPLE_OR_MOCK","production_ready":false,"prompt_version":"","instructions":"","state_template":"","questions":[{"id":"direction","type":"Choice","instructions":"","criteria":[],"choices":["NEGATIVE","NEUTRAL","POSITIVE"]},{"id":"impact","type":"Score","instructions":"","criteria":[],"scale_ref":""},{"id":"facts","type":"Noul","instructions":"","criteria":[]}]}`)
 	if guard.TemplateIssue("prompts/prompts.example.json", legacyPrompt, false) == "" || guard.TemplateIssue("prompts/prompts.example.json", legacyPrompt, true) != "" {
 		t.Fatal("legacy empty prompt must be accepted only in history")
+	}
+	// The previous release's empty question-set shape is accepted only in history.
+	previousPrompt := []byte(guard.PreviousPromptTemplate())
+	if guard.TemplateIssue("prompts/prompts.example.json", previousPrompt, false) == "" || guard.TemplateIssue("prompts/prompts.example.json", previousPrompt, true) != "" {
+		t.Fatal("previous empty prompt must be accepted only in history")
 	}
 	changedLegacy := bytes.Replace(legacyPrompt, []byte(`"instructions":""`), []byte(`"instructions":"private"`), 1)
 	if guard.TemplateIssue("prompts/prompts.example.json", changedLegacy, true) == "" || guard.TemplateIssue("prompts/prompts.example.json", prompt, true) == "" {
@@ -185,7 +191,7 @@ func TestPublicGuardTemplateShapesAndDocumentContainers(t *testing.T) {
 }
 
 func TestPublicGuardHistoricalSearchTemplateIsExactAndHistoryOnly(t *testing.T) {
-	config, e := os.ReadFile(filepath.Join(repoRoot(t), "config/config.example.toml"))
+	config, e := previousTemplate()
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -196,7 +202,7 @@ func TestPublicGuardHistoricalSearchTemplateIsExactAndHistoryOnly(t *testing.T) 
 	if legacy == body || guard.TemplateIssue("config/config.example.toml", []byte(legacy), true) != "" || guard.TemplateIssue("config/config.example.toml", []byte(legacy), false) == "" {
 		t.Fatal("pre-v2.1.5 format not confined to history")
 	}
-	for _, invalid := range []string{strings.Replace(legacy, "jev_api_key = \"\"", "jev_api_key = \"short\"", 1), legacy + "\n[unexpected]\nvalue = \"\"\n", strings.Replace(body, block, strings.Replace(block, "token = \"\"", "token = \"short\"", 1), 1)} {
+	for _, invalid := range []string{strings.Replace(legacy, "search_api_key = \"\"", "search_api_key = \"short\"", 1), legacy + "\n[unexpected]\nvalue = \"\"\n", strings.Replace(body, block, strings.Replace(block, "token = \"\"", "token = \"short\"", 1), 1)} {
 		for _, history := range []bool{true, false} {
 			if guard.TemplateIssue("config/config.example.toml", []byte(invalid), history) == "" {
 				t.Fatal("historical policy admitted nonempty or unknown fields")

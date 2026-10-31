@@ -2,7 +2,7 @@ import {
   test,
   expect,
   type Page,
-} from "../../src/factorforge/applications/console/web/node_modules/@playwright/test/index.mjs";
+} from "../../src/factorforge/operations/console/web/node_modules/@playwright/test/index.mjs";
 async function login(page: Page) {
   await page.goto("/overview");
   await page.getByLabel("用户名", { exact: true }).fill("fixture-user");
@@ -37,14 +37,6 @@ test("native SIM facts, detail, final candles, export, failures and logout", asy
   await page.getByRole("link", { name: "事件与评分", exact: true }).click();
   await page.getByRole("button", { name: "详情", exact: true }).first().click();
   await expect(page.getByRole("dialog")).toBeVisible();
-  await page
-    .getByRole("button", { name: "evidence-fixture", exact: true })
-    .click();
-  await expect(
-    page.getByText("Synthetic original <img src=x onerror=alert(1)>", {
-      exact: true,
-    }),
-  ).toBeVisible();
   expect(await page.locator('img[src="x"]').count()).toBe(0);
   await page.getByRole("button", { name: "关闭", exact: true }).click();
   await page.getByRole("link", { name: "行情", exact: true }).click();
@@ -58,18 +50,17 @@ test("native SIM facts, detail, final candles, export, failures and logout", asy
   await page.getByRole("button", { name: "应用范围" }).click();
   await expect(page.getByRole("img", { name: "已记录最终K线" })).toBeVisible();
   await page.getByRole("link", { name: "总览", exact: true }).click();
-	await page.getByRole("link", { name: "周期报告", exact: true }).click();
-	await expect(page.getByText("fixture-periodic-report", {exact:true}).first()).toBeVisible();
-	await page.getByText("7 个字段", {exact:true}).first().click();
-	await expect(page.getByText("未知或未成熟比例", {exact:true})).toBeVisible();
-	await expect(page.getByText("0.5", {exact:true})).toBeVisible();
-	await page.screenshot({path:"../../../../../runtime/console-report-detail.png",fullPage:true});
-	await page.getByRole("link", { name: "总览", exact: true }).click();
   await page.locator("summary").filter({ hasText: "导出" }).click();
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "JSON", exact: true }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe("factorforge-overview.json");
+  // The judgment and stop page is the P3-backed view; its panels go stale
+  // when the application listener stops answering.
+  await page.getByRole("link", { name: "研判与止损", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "账户事实", exact: true }),
+  ).toBeVisible();
   await page.evaluate(() =>
     fetch("/fixture/state?action=offline", {
       method: "POST",
@@ -77,7 +68,7 @@ test("native SIM facts, detail, final candles, export, failures and logout", asy
     }),
   );
   await page.getByRole("button", { name: "刷新", exact: false }).click();
-  await expect(page.getByText("STALE · 陈旧结果")).toBeVisible();
+  await expect(page.getByText("STALE · 陈旧结果").first()).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "账户事实", exact: true }),
   ).toBeVisible();
@@ -234,10 +225,10 @@ test("narrow keyboard navigation and revocation clears selected data", async ({
     ),
   ).toBe(true);
   await page.getByRole("button", { name: "展开导航" }).click();
-  await page.getByRole("link", { name: "采集与运维", exact: true }).focus();
+  await page.getByRole("link", { name: "运维", exact: true }).focus();
   await page.keyboard.press("Enter");
   await expect(
-    page.getByRole("heading", { name: "采集与运维", exact: true }),
+    page.getByRole("heading", { name: "运维", exact: true }),
   ).toBeVisible();
   await page.evaluate(() =>
     fetch("/fixture/state?action=revoke", {

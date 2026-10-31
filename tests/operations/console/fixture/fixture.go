@@ -1,0 +1,334 @@
+// Package fixture owns synthetic in-memory native P1/P2/P3 listeners for console
+// and browser tests. It never loads private config, exchanges or model services.
+package fixture
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	ia "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl/api"
+	id "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl/domain"
+	iope "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl/operations"
+	ca "github.com/AceNanako0721/Factorforge/src/factorforge/operations/console/adapters"
+	app "github.com/AceNanako0721/Factorforge/src/factorforge/operations/console/application"
+	cd "github.com/AceNanako0721/Factorforge/src/factorforge/operations/console/domain"
+	sa "github.com/AceNanako0721/Factorforge/src/factorforge/strategy/adapters"
+	sapi "github.com/AceNanako0721/Factorforge/src/factorforge/strategy/api"
+	sapp "github.com/AceNanako0721/Factorforge/src/factorforge/strategy/application"
+	sd "github.com/AceNanako0721/Factorforge/src/factorforge/strategy/domain"
+	tm "github.com/AceNanako0721/Factorforge/src/factorforge/trading/adapters/memory"
+	ts "github.com/AceNanako0721/Factorforge/src/factorforge/trading/adapters/sim"
+	ta "github.com/AceNanako0721/Factorforge/src/factorforge/trading/api"
+	tapp "github.com/AceNanako0721/Factorforge/src/factorforge/trading/application"
+	td "github.com/AceNanako0721/Factorforge/src/factorforge/trading/domain"
+	dec "github.com/AceNanako0721/Factorforge/src/factorforge/trading/domain/decimal"
+	tw "github.com/AceNanako0721/Factorforge/src/factorforge/trading/workers"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"sync/atomic"
+	"time"
+)
+
+type World struct {
+	Selection                   cd.Selection
+	Client                      ca.HTTPRead
+	Trading, Strategy, Instance *httptest.Server
+	TradingStore                *tm.Store
+	StrategyStore               *sa.MemoryStore
+	Sessions                    *app.SessionService
+	Registry                    *app.SelectionRegistry
+	Policy                      cd.Policy
+	User                        cd.User
+	DisableInstance             atomic.Bool
+	RejectReads                 atomic.Bool
+	Writes                      atomic.Int64
+}
+
+func (w *World) Close() {
+	if w.Trading != nil {
+		w.Trading.Close()
+	}
+	if w.Strategy != nil {
+		w.Strategy.Close()
+	}
+	if w.Instance != nil {
+		w.Instance.Close()
+	}
+}
+func New(root string) (*World, error) {
+	ctx := context.Background()
+	w := &World{}
+	raw, e := os.ReadFile(filepath.Join(root, "tests/trading/fixtures/go_service.json"))
+	if e != nil {
+		return nil, e
+	}
+	var f struct {
+		FixtureOnly bool   `json:"fixture_only"`
+		Oracle      string `json:"oracle_commit"`
+		Cases       []struct {
+			Operation string
+			Error     json.RawMessage
+			Initial   json.RawMessage
+			Input     map[string]json.RawMessage
+		}
+	}
+	if json.Unmarshal(raw, &f) != nil || !f.FixtureOnly || f.Oracle != "e97c9e9a380d105a7e96933bdd325e1d9af06d93" {
+		return nil, fmt.Errorf("fixture provenance")
+	}
+	var run td.Aggregate
+	var principal td.Principal
+	var command td.Command
+	var order td.OrderRequest
+	for _, row := range f.Cases {
+		if row.Operation == "submit_order" && (len(row.Error) == 0 || string(row.Error) == "null") {
+			if json.Unmarshal(row.Initial, &run) != nil || json.Unmarshal(row.Input["principal"], &principal) != nil || json.Unmarshal(row.Input["command"], &command) != nil || json.Unmarshal(row.Input["request"], &order) != nil {
+				return nil, fmt.Errorf("trading fixture")
+			}
+			break
+		}
+	}
+	if run.RunKey.RunID == "" {
+		return nil, fmt.Errorf("missing fixture")
+	}
+	// requires an explicit insurance policy; synthetic fixture value only.
+	fraction := value("0.5")
+	run.Policy.InsuranceStopFraction = &fraction
+	run.Policy.InsuranceTriggerKind = "MARK"
+	run.Policy.InsuranceQualityState = "EXPERIMENT_ONLY"
+	w.TradingStore = tm.New("SIM")
+	if e = w.TradingStore.Create(ctx, &run); e != nil {
+		return nil, e
+	}
+	service := &tapp.Service{Store: w.TradingStore, Simulator: &ts.Broker{}}
+	order.OrderType = "MARKET"
+	order.LimitPrice = nil
+	order.TimeInForce = "GTC"
+	command.RequestID = "console-fixture-order"
+	command.IdempotencyKey = "console-fixture-order"
+	result, e := service.SubmitOrder(ctx, principal, command, order, nil)
+	if e != nil {
+		return nil, e
+	}
+	if result["state"] != "RESERVED" {
+		return nil, fmt.Errorf("fixture order")
+	}
+	if worked, err := (&tw.Executor{Store: w.TradingStore, Broker: &ts.Adapter{}}).Tick(ctx, run.RunKey); err != nil || !worked {
+		return nil, fmt.Errorf("fixture executor: %v", err)
+	}
+	after, e := w.TradingStore.Read(ctx, run.RunKey)
+	if e != nil {
+		return nil, e
+	}
+	at := run.Clock.Add(time.Minute)
+	command.ExpectedVersion = after.Version
+	command.RequestID = "console-fixture-frame"
+	command.IdempotencyKey = command.RequestID
+	points := []td.MarketPoint{}
+	for _, p := range run.Points.Values() {
+		p.ObservedAt = at
+		p.ReceivedAt = at
+		p.AvailableAt = at
+		points = append(points, *p)
+	}
+	candle := &td.Candle{InstrumentKey: order.InstrumentKey, Interval: "1m", OpenAt: at.Add(-time.Minute), CloseAt: at, AvailableAt: at, Open: value("100"), High: value("105"), Low: value("99"), Close: value("101"), Volume: value("20"), SourceID: "fixture", Final: true, Revision: 1}
+	if _, e = service.AdvanceReplay(ctx, principal, command, td.ReplayFrame{At: at, InstrumentKey: order.InstrumentKey, Points: points, Liquidity: value("20"), Candle: candle}); e != nil {
+		return nil, e
+	}
+	state, worker, create, e := strategy(root)
+	if e != nil {
+		return nil, e
+	}
+	create.Object.TradingRunKey = sd.RunBinding{Environment: "SIM", AccountID: run.RunKey.AccountID, RunID: run.RunKey.RunID}
+	create.Object.InstrumentKey = sd.InstrumentBinding{Venue: order.InstrumentKey.Venue, Product: order.InstrumentKey.Product, InstrumentID: order.InstrumentKey.InstrumentID}
+	create.Object.OwnerID = order.OwnerID
+	w.StrategyStore = sa.NewMemory(state)
+	clock := sa.NewReplay(at)
+	if _, e = (&sapp.Service{Store: w.StrategyStore, Clock: clock}).Create(ctx, worker, create); e != nil {
+		return nil, e
+	}
+	// The event comes from the same real framework command boundary.
+	event := sd.Event{EventID: "fixture-event", FamilyID: "fixture-family", FactVersion: 1, Relation: "NEW", SubjectID: "fixture-entity", EventType: "earnings", OccurredAt: at.Add(-time.Minute), FirstPublicAt: at.Add(-time.Minute), EvidenceRefs: []sd.EvidenceRef{{EvidenceID: "evidence-fixture", ContentHash: id.ContentDigest([]byte("Synthetic original <img src=x onerror=alert(1)>")), SourceID: "fixture-source", LicenceRef: "fixture-licence", FirstPublicAt: at.Add(-time.Minute), ReceivedAt: at, AvailableAt: at, SpanRefs: []string{"fixture-span"}, VerificationRef: "fixture-verified"}}, Claims: []sd.Claim{}, ObjectIDs: []string{create.Object.ObjectID}, State: "QUARANTINED", Novelty: value("0")}
+	snapshot, _ := w.StrategyStore.Read(ctx, state.InstanceID)
+	eventCommand := sd.EventCommand{Command: sd.Command{SchemaVersion: "strategy-2.0", RequestID: "console-event", IdempotencyKey: "console-event", ExpectedVersion: snapshot.Version, Reason: "fixture only"}, Event: event}
+	if _, e = (&sapp.Service{Store: w.StrategyStore, Clock: clock}).RegisterEvent(ctx, worker, eventCommand); e != nil {
+		return nil, e
+	}
+	public := sd.PublicPrincipal{PrincipalID: "fixture-console", InstanceID: state.InstanceID, Environment: "SIM", Scopes: []sd.ApiScope{sd.Query}}
+	readPolicy := sapp.ReadPolicy{DefaultLimit: 2, MaxLimit: 20, MaxRecords: 1000, CursorAge: time.Minute, CursorKey: []byte("synthetic-console-public-query-key")}
+	handler, e := sapi.New(sapi.Options{Store: w.StrategyStore, Clock: clock, Tokens: map[string]sd.Identity{"fixture-p2-read": public}, ReadPolicy: readPolicy})
+	if e != nil {
+		return nil, e
+	}
+	w.Strategy = httptest.NewServer(w.guard(handler))
+	readPrincipal := principal
+	readPrincipal.Permissions = []string{"read"}
+	w.Trading = httptest.NewServer(w.guard(ta.New(service, map[string]td.Principal{"fixture-p1-read": readPrincipal})))
+	binding := id.Binding{InstanceID: state.InstanceID, Environment: "SIM"}
+	instancePolicy := iope.ReadPolicy{DefaultLimit: 2, MaxLimit: 20, MaxRecords: 1000, MaxStateBytes: 1 << 20, CursorAge: time.Minute, CursorKey: []byte("synthetic-console-instance-query-key")}
+	// Dynamic records are recent so the page's rolling window shows them.
+	dynamic := &iope.DynamicQuery{Store: newDynamicStore(binding, time.Now().UTC().Add(-30*time.Minute).Truncate(time.Second)), Clock: wallClock{}, Policy: instancePolicy}
+	ih, e := ia.New(ia.Options{Tokens: map[string]id.ReadPrincipal{"fixture-p3-read": {PrincipalID: "fixture-console", Binding: binding, Read: true, AuthorizationVersion: "fixture-auth"}}, Dynamic: dynamic})
+	if e != nil {
+		return nil, e
+	}
+	w.Instance = httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		if w.DisableInstance.Load() {
+			rw.WriteHeader(503)
+			return
+		}
+		w.guard(ih).ServeHTTP(rw, r)
+	}))
+	w.Selection = cd.Selection{ID: "fixture-selection", DeploymentID: "fixture-local", Environment: "SIM", InstanceID: state.InstanceID, ObjectID: create.Object.ObjectID, TradingRunKey: run.RunKey, InstrumentKey: order.InstrumentKey, OwnerID: order.OwnerID, BindingVersion: "fixture-binding-v1"}
+	w.Client = ca.HTTPRead{Bindings: map[string]ca.Services{w.Selection.ID: {Trading: ca.Service{URL: w.Trading.URL, Token: "fixture-p1-read", FixtureOnly: true}, Strategy: ca.Service{URL: w.Strategy.URL, Token: "fixture-p2-read", FixtureOnly: true}, Instance: ca.Service{URL: w.Instance.URL, Token: "fixture-p3-read", FixtureOnly: true}}}, Timeout: 5 * time.Second, MaxBytes: 1 << 20}
+	w.Policy = cd.Policy{SessionTTL: time.Hour, ChallengeTTL: time.Minute, RateWindow: time.Minute, CursorTTL: time.Minute, RequestTimeout: 10 * time.Second, MaxAttempts: 100, MaxSessions: 20, MaxChallenges: 100, MaxBytes: 1 << 20, MaxRecords: 1000, DefaultLimit: 2, MaxLimit: 20, MaxPages: 10, CursorKey: []byte("synthetic-console-signed-cursor-key")}
+	hash, e := app.HashPassword("fixture-pass", 100)
+	if e != nil {
+		return nil, e
+	}
+	w.User = cd.User{ID: "fixture-user", Name: "本地 SIM 验收", Username: "fixture-user", PasswordHash: hash, SelectionIDs: []string{w.Selection.ID}, Capabilities: []string{"view", "export"}, AuthorizationVersion: "fixture-auth-v1"}
+	w.Registry, e = app.NewRegistry([]cd.Selection{w.Selection})
+	if e != nil {
+		return nil, e
+	}
+	w.Sessions, e = app.NewSessions([]cd.User{w.User}, w.Policy, 1000, time.Now)
+	return w, e
+}
+func (w *World) guard(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		if r.Method != "GET" {
+			w.Writes.Add(1)
+		}
+		if w.RejectReads.Load() {
+			rw.WriteHeader(403)
+			return
+		}
+		next.ServeHTTP(rw, r)
+	})
+}
+
+func strategy(root string) (*sd.StrategyState, sd.WorkloadIdentity, sd.CreateObject, error) {
+	raw, e := os.ReadFile(filepath.Join(root, "tests/strategy/fixtures/go_replay.json"))
+	if e != nil {
+		return nil, sd.WorkloadIdentity{}, sd.CreateObject{}, e
+	}
+	var r map[string]any
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.UseNumber()
+	if dec.Decode(&r) != nil || r["fixture_only"] != true || r["source_commit"] != "e97c9e9a380d105a7e96933bdd325e1d9af06d93" {
+		return nil, sd.WorkloadIdentity{}, sd.CreateObject{}, fmt.Errorf("provenance")
+	}
+	nodes := r["nodes"].(map[string]any)
+	var expand func(any) any
+	expand = func(v any) any {
+		switch x := v.(type) {
+		case map[string]any:
+			if ref, ok := x["$fixture_ref"].(string); ok {
+				return expand(nodes[ref])
+			}
+			out := map[string]any{}
+			for k, y := range x {
+				out[k] = expand(y)
+			}
+			return out
+		case []any:
+			out := []any{}
+			for _, y := range x {
+				out = append(out, expand(y))
+			}
+			return out
+		default:
+			return x
+		}
+	}
+	decode := func(v any, target any) error { raw, _ := json.Marshal(v); return sd.DecodeJSON(raw, target) }
+	for _, entry := range r["cases"].([]any) {
+		item := expand(entry).(map[string]any)
+		if item["kind"] != "create" {
+			continue
+		}
+		var state sd.StrategyState
+		var worker sd.WorkloadIdentity
+		var create sd.CreateObject
+		input := item["input"].(map[string]any)
+		for _, pair := range []struct {
+			value  any
+			target any
+		}{{expand(r["states"].(map[string]any)[item["before"].(string)]), &state}, {input["identity"], &worker}, {input["command"], &create.Command}, {input["obj"], &create.Object}, {input["policy"], &create.Policy}, {input["params"], &create.Parameters}} {
+			if e = decode(pair.value, pair.target); e != nil {
+				return nil, worker, create, e
+			}
+		}
+		return &state, worker, create, nil
+	}
+	return nil, sd.WorkloadIdentity{}, sd.CreateObject{}, fmt.Errorf("missing create")
+}
+
+func value(s string) dec.Value {
+	v, e := dec.Parse(s)
+	if e != nil {
+		panic(e)
+	}
+	return v
+}
+
+type wallClock struct{}
+
+func (wallClock) Now() time.Time { return time.Now().UTC() }
+
+// dynamicStore is a synthetic record set behind the real P3 read API
+// . It has no write method, like DYNAMIC_READ.
+type dynamicStore struct {
+	binding id.Binding
+	at      time.Time
+	states  map[string]json.RawMessage
+	records []id.DynamicRecord
+	news    map[string]json.RawMessage
+}
+
+func newDynamicStore(b id.Binding, at time.Time) *dynamicStore {
+	raw := func(v any) json.RawMessage { x, _ := json.Marshal(v); return x }
+	batch := map[string]any{"cycle_id": "fixture-cycle", "direction": -1, "entry": 107.8, "opened_at": at.Add(-time.Hour), "geometry": map[string]any{"tier": 72, "session": "OVERNIGHT", "r": 0.16, "buffer": 0.017, "trail": 0.16, "requested_tier": 72}, "budget": 40, "best_close": 103, "last_bar_at": at, "close_stop": 125.2, "trailing": false, "transferred": false}
+	return &dynamicStore{binding: b, at: at,
+		states: map[string]json.RawMessage{
+			"POSITION":     raw(map[string]any{"noise_id": "fixture-noise", "noise_at": at.Add(-2 * time.Hour), "batch": batch, "baseline": map[string]any{"phase": "", "started_at": "0001-01-01T00:00:00Z", "suspended_at": "0001-01-01T00:00:00Z"}, "equity_peak": 4010, "ladder": map[string]any{"step": 0.04, "round_trip_cost": 0.001}}),
+			"INJECTION":    raw(map[string]any{"active": map[string]any{"direction": "SHORT", "confidence": 3, "event_ids": []string{"e1"}, "chain_id": "fixture-chain", "since": at.Add(-2 * time.Hour)}, "last_judgment": "fixture-judgment"}),
+			"NEWS_SOURCES": raw(map[string]any{"fixture-feed": map[string]any{"failing": false, "last_success": at}}),
+		},
+		records: []id.DynamicRecord{
+			{DynamicRecordKey: id.DynamicRecordKey{At: at.Add(-time.Hour), Kind: "STOP_EVENT", ID: "open-fixture-cycle"}, Payload: raw(map[string]any{"kind": "OPEN", "batch": batch})},
+			{DynamicRecordKey: id.DynamicRecordKey{At: at.Add(-2 * time.Hour), Kind: "JUDGMENT", ID: "fixture-judgment"}, Payload: raw(map[string]any{"judgment_id": "fixture-judgment", "at": at.Add(-2 * time.Hour), "ok": true, "provider": "gpt", "model": "fixture", "raw": "PRIVATE RAW", "input_ids": []string{"fixture-news"}, "output": map[string]any{"direction": "SHORT", "confidence": 3, "horizon_hours": 48, "thesis": "synthetic thesis", "key_item_ids": []string{"fixture-news"}, "invalidation": "synthetic"}})},
+			// A later judgment that P3 only recorded: no action under its id (S4-017).
+			{DynamicRecordKey: id.DynamicRecordKey{At: at.Add(-90 * time.Minute), Kind: "JUDGMENT", ID: "fixture-judgment-2"}, Payload: raw(map[string]any{"judgment_id": "fixture-judgment-2", "at": at.Add(-90 * time.Minute), "ok": true, "provider": "gpt", "model": "fixture", "input_ids": []string{"fixture-news"}, "output": map[string]any{"direction": "FLAT", "confidence": 3, "horizon_hours": 24, "thesis": "synthetic flat thesis", "key_item_ids": []string{"fixture-news"}, "invalidation": "synthetic"}})},
+			{DynamicRecordKey: id.DynamicRecordKey{At: at.Add(-2 * time.Hour), Kind: "ACTION", ID: "fixture-judgment-INJECT-0-e1"}, Payload: raw(map[string]any{"kind": "INJECT", "reason": "FIRST_DIRECTION", "direction": "SHORT", "confidence": 3, "chain_id": "fixture-chain", "event_id": "e1"})},
+		},
+		news: map[string]json.RawMessage{"fixture-news": raw(map[string]any{"source": "fixture-feed", "title": "Synthetic headline", "published_at": at.Add(-3 * time.Hour), "license_scope": "PUBLIC", "link": "https://private.invalid"})},
+	}
+}
+func (s *dynamicStore) Binding() id.Binding { return s.binding }
+func (s *dynamicStore) StateWithVersion(_ context.Context, key string) (json.RawMessage, int64, time.Time, error) {
+	if v, ok := s.states[key]; ok {
+		return v, 1, s.at, nil
+	}
+	return nil, 0, time.Time{}, nil
+}
+func (s *dynamicStore) RecordPage(_ context.Context, kinds []string, since, until time.Time, before *id.DynamicRecordKey, _ bool, limit int) ([]id.DynamicRecord, error) {
+	out := []id.DynamicRecord{}
+	for _, r := range s.records {
+		if id.Has(kinds, r.Kind) && !r.At.Before(since) && r.At.Before(until) && (before == nil || r.At.Before(before.At)) && len(out) < limit {
+			out = append(out, r)
+		}
+	}
+	return out, nil
+}
+func (s *dynamicStore) RecordsByID(_ context.Context, _ string, ids []string) (map[string]json.RawMessage, error) {
+	out := map[string]json.RawMessage{}
+	for _, i := range ids {
+		if v, ok := s.news[i]; ok {
+			out[i] = v
+		}
+	}
+	return out, nil
+}

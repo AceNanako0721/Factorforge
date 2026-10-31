@@ -2,27 +2,27 @@ import {
   describe,
   it,
   expect,
-} from "../../src/factorforge/applications/console/web/node_modules/vitest/dist/index.js";
+} from "../../src/factorforge/operations/console/web/node_modules/vitest/dist/index.js";
 import {
   compare,
   scalar,
-} from "../../src/factorforge/applications/console/web/src/schemas/display";
+} from "../../src/factorforge/operations/console/web/src/schemas/display";
 import {
   query,
   checkResponse,
   type Selection,
   type Response,
-} from "../../src/factorforge/applications/console/web/src/api/client";
+} from "../../src/factorforge/operations/console/web/src/api/client";
 import {
   candleData,
   offChart,
   panRange,
   scaleRange,
   zoomRange,
-} from "../../src/factorforge/applications/console/web/src/features/market-chart";
-import { chartMarkers, currentProtection, judgmentEffects, ladderInfo } from "../../src/factorforge/applications/console/web/src/features/dynamic-page";
-import { chartTick, chartTime, displayTime } from "../../src/factorforge/applications/console/web/src/features/display-settings";
-import { fundingGap, pnlRows } from "../../src/factorforge/applications/console/web/src/features/pnl-panel";
+} from "../../src/factorforge/operations/console/web/src/features/market-chart";
+import { chartMarkers, currentProtection, judgmentEffects, ladderInfo } from "../../src/factorforge/operations/console/web/src/features/dynamic-page";
+import { chartTick, chartTime, displayTime } from "../../src/factorforge/operations/console/web/src/features/display-settings";
+import { fundingGap, pnlRows } from "../../src/factorforge/operations/console/web/src/features/pnl-panel";
 describe("read-only browser semantics", () => {
   it("retains exact monetary strings and sorts without rounding", () => {
     expect(

@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "layers": [
+    {"id": "L1", "name": "交易层", "summary": "行情、订单、保护、账务与恢复；不依赖任何其他层", "uses": []},
+    {"id": "L2", "name": "策略层", "summary": "把外部输入合成为目标仓位的通用框架", "uses": ["L1"]},
+    {"id": "L3", "name": "应用层", "summary": "面向一个交易对象的具体应用", "uses": ["L1", "L2"]},
+    {"id": "L4", "name": "运维层", "summary": "观察、模型接入、归档等支撑模块；读取其他层的公开接口", "uses": ["L1", "L2", "L3"]}
+  ],
+  "modules": [
+    {"id": "P1", "name": "交易系统", "layer": "L1", "path": "src/factorforge/trading", "tests": "tests/trading", "languages": ["go"], "standard": true, "public": ["api/dto", "api/views"]},
+    {"id": "P2", "name": "策略化框架", "layer": "L2", "path": "src/factorforge/strategy", "tests": "tests/strategy", "languages": ["go"], "standard": true, "public": ["api/dto", "api/client"]},
+    {"id": "P3", "name": "SOXLUSDT 应用", "layer": "L3", "path": "src/factorforge/applications/soxl", "tests": "tests/applications/soxl", "languages": ["go"], "standard": false, "public": ["api/dto", "api/client"]},
+    {"id": "P4", "name": "Web 管理台", "layer": "L4", "path": "src/factorforge/operations/console", "tests": "tests/operations/console", "languages": ["go", "typescript"], "standard": false, "public": ["api/dto", "api/client"]},
+    {"id": "P5", "name": "模型接入", "layer": "L4", "path": "src/factorforge/operations/model_access", "tests": "tests/operations/model_access", "languages": ["typescript"], "standard": false, "public": [], "protocol": "contracts/v2/model-access"}
+  ],
+  "specs": [
+    {"id": "S1", "name": "交易系统", "layer": "L1", "modules": ["P1"], "spec": "doc/01_交易系统式样书.md", "design": "doc/01_交易系统设计书.md"},
+    {"id": "S2", "name": "策略化框架", "layer": "L2", "modules": ["P2"], "spec": "doc/02_策略化框架式样书.md", "design": "doc/02_策略化框架设计书.md"},
+    {"id": "S3", "name": "SOXLUSDT 应用", "layer": "L3", "modules": ["P3"], "spec": "doc/03_SOXLUSDT应用实例式样书.md", "design": "doc/03_SOXLUSDT应用实例设计书.md"},
+    {"id": "S4", "name": "Web 管理台", "layer": "L4", "modules": ["P4"], "spec": "doc/04_Web管理台式样书.md", "design": "doc/04_Web管理台设计书.md"},
+    {"id": "S5", "name": "模型接入", "layer": "L4", "modules": ["P5"], "spec": "doc/05_模型接入模块式样书.md", "design": "doc/05_模型接入模块设计书.md"}
+  ]
+}

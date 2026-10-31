@@ -16,7 +16,7 @@ import (
 // DocumentPairs lists the specification/design pairs of the current baseline.
 // Each pair is doc/<pair>式样书.md (what and why, acceptance) plus
 // doc/<pair>设计书.md (how the code implements it).
-var DocumentPairs = []string{"01_交易系统层", "02_策略化框架层", "03_SOXLUSDT应用实例", "04_Web管理台", "05_模型接入模块"}
+var DocumentPairs = []string{"01_交易系统", "02_策略化框架", "03_SOXLUSDT应用实例", "04_Web管理台", "05_模型接入模块"}
 
 // FieldCoverage names the configuration types whose every JSON/TOML field must
 // be explained in the design book where the logic that uses it is described.

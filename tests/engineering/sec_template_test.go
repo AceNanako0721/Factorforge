@@ -18,12 +18,16 @@ func preSECTemplate(text string) string {
 // The SEC identity stays an empty public field; the exact earlier
 // template is accepted only as frozen history, never as the current shape.
 func TestSECIdentityTemplateBoundary(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "config/config.example.toml"))
+	raw, err := previousTemplate()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(raw), secTemplateBlock) || guard.TemplateIssue("config/config.example.toml", raw, false) != "" {
-		t.Fatal("current template must contain the empty SEC identity block")
+	current, err := os.ReadFile(filepath.Join(repoRoot(t), "config/config.example.toml"))
+	if err != nil || strings.Contains(string(current), secTemplateBlock) || guard.TemplateIssue("config/config.example.toml", current, false) != "" {
+		t.Fatal("current template must be exact and carry no pipeline block")
+	}
+	if !strings.Contains(string(raw), secTemplateBlock) || guard.TemplateIssue("config/config.example.toml", raw, true) != "" || guard.TemplateIssue("config/config.example.toml", raw, false) == "" {
+		t.Fatal("previous template must be accepted only as history")
 	}
 	old := preSECTemplate(string(raw))
 	if guard.TemplateIssue("config/config.example.toml", []byte(old), true) != "" || guard.TemplateIssue("config/config.example.toml", []byte(old), false) == "" {

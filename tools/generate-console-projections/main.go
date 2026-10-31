@@ -45,7 +45,7 @@ func main() {
 	}
 	data, _ := json.MarshalIndent(out, "", "  ")
 	data = append(data, '\n')
-	path := filepath.FromSlash("src/factorforge/applications/console/domain/projections.json")
+	path := filepath.FromSlash("src/factorforge/operations/console/domain/projections.json")
 	if len(os.Args) > 1 && os.Args[1] == "--check" {
 		old, _ := os.ReadFile(path)
 		if !bytes.Equal(old, data) {

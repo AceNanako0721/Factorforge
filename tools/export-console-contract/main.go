@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/console/api"
+	"github.com/AceNanako0721/Factorforge/src/factorforge/operations/console/api"
 	"os"
 )
 

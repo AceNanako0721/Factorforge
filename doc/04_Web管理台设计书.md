@@ -1,8 +1,8 @@
 # Web 管理台设计书
 
-版本：2.22.0
+版本：3.0.0
 
-对应式样书：[04_Web管理台式样书](04_Web管理台式样书.md)。本书说明 `src/factorforge/applications/console` 的实现。
+对应式样书：[04_Web管理台式样书](04_Web管理台式样书.md)。本书说明 `src/factorforge/operations/console` 的实现。
 
 ## 1 结构
 
@@ -133,13 +133,13 @@ max_retries = 3
 - `deployment_id`、`environment`（`SIM` 或 `LIVE`）、`instance_id`：部署、环境和实例。
 - `account_id`、`run_id`：交易层的运行键，与 `environment` 一起组成 `TradingRunKey`。
 - `venue`、`product`、`instrument_id`：交易对象。`product` 必须是 `LINEAR_PERPETUAL`。
-- `object_id`：策略框架的观测对象，可以为空。为空时，策略框架的读取返回“不适用”，周期报告的读取被拒绝（`OBJECT_SCOPE_REQUIRED`）；`/capabilities` 把依赖观测对象的页面都标为 `NOT_APPLICABLE`。
+- `object_id`：策略框架的观测对象，可以为空。为空时，策略框架的读取返回“不适用”，需要对象范围的资源读取被拒绝（`OBJECT_SCOPE_REQUIRED`）；`/capabilities` 把依赖观测对象的页面都标为 `NOT_APPLICABLE`。
 - `owner_id`：交易层的归属标识。
 - `binding_version`：绑定版本，由运维在绑定变化时更换，前端用它判断响应是否属于当前绑定。
 
 所有标识都必须满足 `^[A-Za-z0-9_.-]{1,128}$`（`domain.ID`）。
 
-`services` 登记这个范围读取的三个下层服务（`adapters.Services`）：`trading`（P1）、`strategy`（P2）、`instance`（P3）。每个服务（`adapters.Service`）有：
+`services` 登记这个范围读取的三个下层服务（`adapters.Services`）：`trading`（P1）、`strategy`（P2）、`instance`（P3，只提供研判、止损与基线状态的读取）。每个服务（`adapters.Service`）有：
 
 - `url`：服务根地址，不含用户信息、路径、查询或片段。必须是 `https`；只有服务的 `fixture_only` 开启、主机为本机地址且范围环境为 `SIM` 时允许 `http`。
 - `token`：该服务的只读 Bearer 令牌，只在服务端使用。
@@ -218,7 +218,7 @@ max_retries = 3
 |---|---|
 | 交易层 | 健康接口的 `schema_version` 为 `trading-2.0`、环境与范围一致、`upper_layers_required` 为假；运行的 `run_key` 等于范围的运行键；产品列表中有范围的交易对象 |
 | 策略框架 | 观测对象为空时“不适用”；健康接口为 `strategy-2.0`、环境一致、监听者为 `PUBLIC_RESEARCH`；在对象目录中（最多翻 `max_pages` 页，游标不前进即视为响应无效）找到观测对象；对象详情的对象、实例、环境、归属、运行键和交易对象都与范围一致 |
-| 应用实例 | 健康接口（或研判状态接口）为 `instance-2.0`，环境和实例与范围一致 |
+| 应用实例 | 研判状态接口的 `schema_version` 为 `instance-2.0`，环境和实例与范围一致 |
 
 不一致返回 `BINDING_MISMATCH`（409）。这是硬错误：整次读取失败，前端整页拒绝显示，而不是显示为空。其他核验失败只让该服务的区块不可用，不影响其他服务。
 
@@ -232,19 +232,17 @@ max_retries = 3
 
 | 视图 | 资源 |
 |---|---|
-| `overview` | `account` `positions` `protections` `run` `object` `pool` `decisions` `instance.health` |
+| `overview` | `account` `positions` `protections` `run` `object` `pool` `decisions` |
 | `dynamic` | `dynamic.status` `dynamic.judgments` `dynamic.actions` `account` `positions` `protections` `object` `candles` |
 | `market` | `candles` `points` `instruments` |
 | `events` / `events/{event_id}` | `events` / `event` `scores` |
-| `evidence/{evidence_id}` | `evidence` |
 | `sentiment` | `pool` `ledger` |
 | `decisions` | `decisions` `strategy.targets` `trading.targets` `positions` |
 | `execution` | `positions` `orders` `fills` `protections` `income` `owners` `external-facts` |
 | `cases` / `cases/{case_id}` | `cases` / `cases` `attributions` `counterfactuals` |
 | `learning` | `parameters` `learning` `activations` `validation` |
-| `operations` | `trading.operations` `alerts` `object` `instance.health` `sources` `jobs` `budgets` |
-| `reports` | `reports` |
-| `audit` | `trading.audit` `strategy.audit` `instance.audit` |
+| `operations` | `trading.operations` `alerts` `object` |
+| `audit` | `trading.audit` `strategy.audit` |
 
 每个路由登记了所属服务、路径模板和允许的下层查询参数。路由表是固定的，浏览器不能指定任意下层路径。
 
@@ -256,10 +254,9 @@ max_retries = 3
 |---|---|
 | `market` | `interval` `start` `end`（必填） |
 | `dynamic` | `interval` `start` `end`（必填）、`from` `to` |
-| `events` `reports` `audit` `learning` | `from` `to` |
+| `events` `audit` `learning` | `from` `to` |
 | `event` | `revision` |
 | `sentiment` | `contribution_id` |
-| `operations` | `queue_kind` `state` |
 
 - 未列出的参数、重复的参数、空值都返回 `QUERY_PARAMETER_INVALID`。
 - 时间必须是以 `Z` 结尾的 RFC 3339 UTC 时间，起点必须早于终点。
@@ -270,7 +267,7 @@ max_retries = 3
 
 1. 按资源找到路由和服务，取范围登记的服务地址与令牌（第 2.2 节的规则）。
 2. 浏览器参数只传路由允许的那几个。服务端再强制加上范围参数：交易层资源（健康接口除外）加 `environment`、`account_id`、`run_id`，K 线另加 `venue`、`instrument_id`；需要对象范围的策略框架资源加 `object_id`。
-3. 路径模板中的运行、实例、对象标识取自范围，事件、案例、任务、证据标识取自页面路径；替换后仍有未填的占位符则拒绝。
+3. 路径模板中的运行、实例、对象标识取自范围，事件、案例标识取自页面路径；替换后仍有未填的占位符则拒绝。
 4. 发 GET，带 `Authorization: Bearer <token>`；不走代理，不跟随重定向，超时 `timeout_seconds`。
 5. 下层的错误状态映射为：401/403 → `LOWER_SCOPE_REVOKED`，404 → `LOWER_NOT_FOUND`，409 → `LOWER_SNAPSHOT_CHANGED`，422 → `LOWER_FILTER_INVALID`，429 → `LOWER_RATE_LIMITED`（保留下层的 `Retry-After`），其他 → `LOWER_UNAVAILABLE`。
 6. 响应超过 `max_bytes` 返回 `LOWER_RESPONSE_BUDGET`；不是 JSON 返回 `LOWER_RESPONSE_INVALID`。
@@ -279,13 +276,13 @@ max_retries = 3
 
 下层响应不直接交给浏览器，而是先按冻结的公开契约投影：
 
-- **契约来源**：`domain/projections.json` 由 `tools/generate-console-projections` 从 `contracts/v2/{trading,strategy,instances}/openapi.json` 的 200 响应生成，嵌入二进制。`--check` 校验它与契约一致。
+- **契约来源**：`domain/projections.json` 由 `tools/generate-console-projections` 从 `contracts/v2/{trading,strategy,instances}/openapi.json`（其中 `instances` 只含研判、止损与基线状态的三个路由） 的 200 响应生成，嵌入二进制。`--check` 校验它与契约一致。
 - **完整校验**：响应先严格解码（拒绝重复键），再按该路由的 JSON Schema（2020-12，离线加载，正则匹配限时）校验。不通过返回 `LOWER_RESPONSE_INVALID`。
 - **逐字段投影**：只复制契约中声明的字段。时间字段必须是以 `Z` 结尾的 UTC 时间。金额保留原 JSON 字符串，不转成浮点。
-- **禁止字段**：`input_snapshot`、`command_payload`、`detail`、`prompt`、`prompt_text`、`instructions`、`provider_output`、`provider_input`、`principal_id`、`url`、`raw_text` 一律不输出。唯一例外是证据详情视图（`evidence`）可以输出 `raw_text`，前提是下层已经按许可返回了它；导出永远不输出原文。
+- **禁止字段**：`input_snapshot`、`command_payload`、`detail`、`prompt`、`prompt_text`、`instructions`、`provider_output`、`provider_input`、`principal_id`、`url`、`raw_text` 一律不输出。
 - **开放字典**：契约中允许任意键的字典，只有登记的几种（如 `cash_balances`、`values`、`bounds`、`pnl_components`）按其值的模式逐项投影，键必须是合法标识；其他开放字典不输出。
 - **有限形状**：策略框架的 `risk_lots`、`entry_snapshot`、`manifest`、`result` 在下层契约中是开放结构，管理台用固定的有限形状（`publicMask`）投影并再次校验。
-- **对象范围**：策略框架资源必须有观测对象。参数、学习决策和验证记录这三个实例级列表，只保留属于观测对象（或作用域为 `*`）的行。实例的周期报告剔除明细属于其他对象的行（没有明细的报告保留）。
+- **对象范围**：策略框架资源必须有观测对象。参数、学习决策和验证记录这三个实例级列表，只保留属于观测对象（或作用域为 `*`）的行。
 
 ### 6.5 区块、分页与状态（`ReadQuery.Read`）
 
@@ -323,7 +320,7 @@ max_retries = 3
 `GET /api/v2/console/export?view=…&format=json|csv&selection_id=…`：
 
 - 用户必须有 `export` 能力，否则返回 `EXPORT_FORBIDDEN`。
-- 可导出的视图是全部列表视图（不含事件、案例和证据详情），参数规则与页面相同，内容就是页面读到的那一页。原文永不导出。
+- 可导出的视图是全部列表视图（不含事件和案例详情），参数规则与页面相同，内容就是页面读到的那一页。
 - JSON 与页面响应相同。
 - CSV 每个标量值一行，列为 `selection_id, binding_version, generated_at, source, state, field, value`。字段路径按键排序展开。以 `=`、`+`、`-`、`@`、制表符或回车开头的值前加单引号，防止被表格软件当作公式。
 - CSV 超过 `max_bytes` 返回 `EXPORT_BUDGET`；JSON 的大小由页面读取的预算限制。
@@ -441,7 +438,7 @@ max_retries = 3
 
 | 验收 | 主要测试 |
 |---|---|
-| T4-01、T4-11、T4-12 | `tests/applications/console`：会话挑战、CSRF、重放、Cookie 属性与撤权；范围越权；隐私投影、重复键、UTC 与游标；导出 |
+| T4-01、T4-11、T4-12 | `tests/operations/console`：会话挑战、CSRF、重放、Cookie 属性与撤权；范围越权；隐私投影、重复键、UTC 与游标；导出 |
 | T4-02、T4-10、T4-14 | 下层各服务独立失败、未配置、夹具模式限制、本地配置文件 |
 | T4-04～T4-09 | 实例级列表的对象范围、案例有限形状、报告范围 |
 | T4-15、T4-19 | 研判与止损视图的区块与时间范围、旧版实例接口缺少阶梯字段时的兼容 |

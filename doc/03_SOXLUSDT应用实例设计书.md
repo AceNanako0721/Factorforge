@@ -1,8 +1,8 @@
 # SOXLUSDT 应用实例设计书
 
-版本：2.22.0
+版本：3.0.0
 
-对应式样书：[03_SOXLUSDT应用实例式样书](03_SOXLUSDT应用实例式样书.md)。源码在 `src/factorforge/applications/soxl_jev`，测试在 `tests/applications/soxl_jev`。文中出现的数值，凡是代码里写死的照实写出；其余都是登记值，这里只说明作用，不给实际取值。
+对应式样书：[03_SOXLUSDT应用实例式样书](03_SOXLUSDT应用实例式样书.md)。源码在 `src/factorforge/applications/soxl`，测试在 `tests/applications/soxl`。文中出现的数值，凡是代码里写死的照实写出；其余都是登记值，这里只说明作用，不给实际取值。
 
 ## 1 结构
 
@@ -10,15 +10,12 @@
 
 | 包 | 职责 |
 |---|---|
-| `domain` | 研判解析与注入决策、正常波动表、止损几何、风险比例、基线状态、管道记录、读模型 |
-| `workers` | 研判工作器、仓位管理器、采集与路由、分析工作器、关注清单工作器 |
-| `analysis` | 研判提示词渲染、事件分析服务（JEV）客户端、关注清单分析、候选校验 |
-| `monitoring` | 新闻源、RSS、SEC 申报、搜索路由、日线与分钟 K 线、官方日程源 |
-| `evidence` | 原文核验、人工标注抽取、证据提案、语义候选 |
-| `routing` | 证据进入分析之前的确定性路由 |
-| `submission` | 调用 P2 与 P1 公开接口的客户端、研判跟随源 |
-| `operations` | 初始化、日历、复核材料、只读查询服务 |
-| `reports` | 周期报告与通知投递 |
+| `domain` | 研判解析与注入决策、正常波动表、止损几何、风险比例、基线状态、预排日程类型、身份与错误 |
+| `workers` | 研判工作器、仓位管理器 |
+| `analysis` | 研判提示词渲染 |
+| `monitoring` | 新闻源与 RSS 时间、官方日程源、受限抓取、分钟 K 线 |
+| `submission` | 调用 P2 与 P1 公开接口的客户端、研判跟随源、时段计划安装 |
+| `operations` | 交易所日历、日程登记、研判与止损的只读查询、日历编译 |
 | `adapters/postgres` | 实例自己的存储 |
 | `adapters/modelaccess` | 调用模型接入模块（P5）的通道 |
 | `config` | 各角色的本地配置 |
@@ -28,34 +25,27 @@
 
 | 进程 | 作用 |
 |---|---|
-| `judgment-worker` | 采集新闻、定时研判、写入 P2（研判路径）；跟随模式下改为读取另一实例的研判 |
+| `judgment-worker` | 采集新闻、定时研判、写入 P2；跟随模式下改为读取另一实例的研判 |
 | `position-manager` | 正常波动表、初始止损指令、移动与阶梯止损、收盘止损退出、转基线、基线状态 |
-| `soxl-jev-api` | 只读接口 |
-| `ingest-worker` | 原文采集、搜索补全、抽取与路由、登记事件、分配分析任务（事件路径） |
-| `research-analysis-worker`、`trading-analysis-worker` | 领取研究队列或交易队列，调用分析服务，提交评分 |
-| `calendar-worker` | 官方日程登记为 P2 的预排事件，安装时段计划 |
-| `watchlist-worker` | 关注清单检索、分析、通知与只记录观测 |
-| `instance-cli` | 运维命令（第 8 章） |
+| `soxl-api` | 只读接口 |
+| `calendar-worker` | 官方日程登记为 P2 的预排事件 |
+| `instance-cli` | 运维命令（第 7 章） |
 
-事件路径的工作进程各自只读本角色的派生配置（`WorkerProfile`）：配置里出现其他角色的凭据时拒绝启动（`INSTANCE_PROFILE_CONTAINS_PEER_CREDENTIALS`），文件必须是绝对路径下的普通文件，大小有上限，TOML 不接受未知字段。研判工作器与仓位管理器共用一份 `DynamicProfile`（第 2.1 节）。只读接口和日程、关注清单进程读取本地配置中的对应节。
+研判工作器与仓位管理器共用一份 `DynamicProfile`（第 2.1 节）；只读接口读本地配置的 `read_api` 节（第 5 章），日程进程读 `calendar` 节（第 4.1 节），运维命令读 `storage` 节（第 7 章）。
 
 ### 1.3 存储
 
-实例使用自己的数据库 schema，迁移文件在 `adapters/postgres/migrations`。只读投影在 `instance_<环境>`，供应商预算在 `instance_provider_control`，其余在 `instance_pipeline_<环境>`：
+实例使用自己的数据库 schema `instance_pipeline_<环境>`（固定的标识符），迁移文件是 `adapters/postgres/migrations/001_storage.sql`：
 
-| 迁移 | 表 | 用途 |
-|---|---|---|
-| 001 | 只读投影 | 提供给只读接口的投影 |
-| 002 | 证据清单、路由回执、研究与交易的分析任务、提交发件箱 | 事件路径 |
-| 003 | 运行事实、框架报告 | 健康与报告 |
-| 004 | 搜索状态 | 搜索缓存与配额 |
-| 005 | 供应商预算、工作授权 | 调用额度 |
-| 006 | 关注清单已处理周期 | 去重 |
-| 007 | `dynamic_record`、`dynamic_state` | 研判路径的记录与状态 |
-| 008 | 只读登录 | 研判路径的只读查询 |
-| 009 | 跟随游标 | 研判跟随 |
+- **`worker_grant`**：登录角色与实例、环境、身份种类（`DYNAMIC`、`DYNAMIC_READ`）的绑定。每个登录只能看到自己的一行，绑定写入后不可改。
+- **`dynamic_record`**：研判与止损记录，只追加，数据库触发器拒绝更新与删除。
+- **`dynamic_state`**：按键保存的状态，带版本号。
 
-研判路径的存储（`DynamicStore`）：
+两种身份：`DYNAMIC`（研判工作器与仓位管理器）读写记录与状态，`DYNAMIC_READ`（只读接口）只读。行级安全使每个身份只看到自己实例的行。
+
+打开存储（`OpenStore`）时核验登录角色：不是超级用户，不能建库、建角色、绕过行级安全，只属于所请求身份的角色，在其他 schema 没有任何权限，在本 schema 内每张表的权限恰为该身份应有的权限。不符返回 `STORAGE_ROLE_NOT_ISOLATED`；绑定的实例或环境不符返回 `STORAGE_SCOPE_FORBIDDEN`。初始化与授权是管理员操作（`InitializeStorage`、`GrantStorage`，经 `instance-cli`），工作进程和只读接口不持有管理员连接。
+
+存储操作（`Store`）：
 
 - **记录 `dynamic_record`**：只追加。按种类区分：`NEWS`、`JUDGMENT`、`ACTION`、`NOISE`、`STOP_EVENT`。同一编号再写入相同内容时忽略，内容不同时返回 `DYNAMIC_RECORD_CONFLICT`。
 - **状态 `dynamic_state`**：按键保存，带版本号，用比较并交换（CAS）更新。键包括 `NEWS_SOURCES`、`INJECTION`、`POSITION`、跟随游标。
@@ -302,208 +292,54 @@ P2 用这条指令冻结批次数量（P2 设计 6.1）。
 
 持仓归零时结束批次，记一条种类为 `CLOSE` 的 `STOP_EVENT` 记录，并按第 3.5 节判断是否暂停基线。批次结果（R）在 P2 案例结案后由 `outcomes` 计入（每轮先执行，所以可能在同一轮）。
 
-## 4 事件路径
+## 4 预排日程
 
-### 4.1 配置
+### 4.1 配置（`config/calendar.go`）
 
-每个工作角色读一份派生出来的本地配置 `WorkerProfile`：
-
-- **角色与模式**：`schema_version` 必须为 1。`role` 取 `INGEST`、`RESEARCH` 或 `TRADING`。`mode` 取 `mock`（夹具）或 `jev`。
-- **`settings`**：`PipelineSettings`，各项如下：
-  - 身份：`environment`（目前只接受 `SIM`）、`instance_id`、`object_id`。
-  - 阶段：`stage`，取 `R0`、`R1` 或 `R2`。
-  - 资产：`assets_file` 是登记资产文件（第 4.2 节）；`fixture_input_file` 是夹具模式的输入。
-  - 时间：`poll_seconds` 是轮询间隔，`timeout_seconds` 是单轮超时，`lease_seconds` 是分析任务的租约，`task_ttl_seconds` 是任务有效期。
-  - 上限：`max_input_bytes`、`max_outboxes`、`max_framework_pages`。
-  - 预算分区：`research_bucket`、`trading_bucket`。
-  - 版本：`question_set_version`、`prompt_version`、`rubric_version`、`calibration_version`、`model_version`。
-- **`access`**：`WorkerAccess`，即该角色的数据库 `database_url` 和 P2 接口 `framework_url`、`framework_token`。
-- **分析角色专用**：`provider_url`、`provider_token`、`prompt_file`。
-- **采集角色专用**：
-  - 搜索后端列表 `search_backends`：每个 `SearchAccess` 有 `id`、`kind`、`endpoint`、`token`。也可以用单个后端的 `search_url`、`search_token`。两种写法不能同时出现。
-  - P1 只读：`trading_read_url`、`trading_read_token`。
-  - 报告读取：`report_read_url`、`report_read_token`。
-  - SEC 访问身份：`sec_user_agent`。
-
-完整的本地配置把以上各角色合在一份文件里，由 `prepare-instance-profiles` 派生出各角色的配置（`instance-cli` 多数命令读它；`export-evidence` 读派生的 `INGEST` 配置）：
-
-- `mode`。
-- `credentials` 节：`framework_api_token`、`trading_api_token`、`jev_api_key`、`search_api_key`。
-- `services` 节：`framework_api_url`、`trading_api_url`、`jev_api_url`、`search_api_url`。
-- `application` 下的 `prompt_file` 与 `pipeline` 节：`search_backends`、`settings`、`ingest`、`research`、`trading` 各角色的接入，`sec` 节的 `user_agent`。
-- 只读投影的发布：`publication` 节（`PublicationAccess`）有 `database_url`、`source_version`、`max_records`、`max_bytes`。
-
-### 4.2 登记资产（`PipelineAssets`）
-
-资产文件登记以下内容，全部带版本：
-
-- **版本与范围**：`version`、`fixture_only`。
-- **来源**：`sources` 是来源登记 `SourceRegistration`，每个来源有：
-  - `source_id`、`version`。
-  - 许可：`licence_ref`、`licence_verified`。
-  - 用途：`allow_original`（只读接口可返回原文；原文本身总是随证据保存）、`allow_analysis`（可分析）、`allow_provider`（可发给分析服务）。
-  - 范围与有效期：`environments`、`enabled`、`valid_from` 到 `valid_until`。
-  - 时效：`max_age`。
-- **对象映射**：`mappings` 是 `EntityMapping`，即主体到对象的映射（`version`、`subject_id`、`object_id`、`valid_from`、`valid_until`）。
-- **路由政策**：`routing_policy` 是 `RoutingPolicy`，包括 `version`、`binding`、`object_id`、启用的 `event_types`、`calibration_version`，以及 `calibration_verified`、`provider_verified` 两个核验标记。
-- **事件计划**：`event_plans` 是 `EventPlan`，按原文哈希登记（复核过的材料按证据编号另有计划，优先使用；`review-` 编号的证据缺少材料时不回退到哈希计划）：事件编号 `event_id`、事件族 `family_id`、类型 `event_type`、关系 `relation`、事实版本 `fact_version`、父事件 `parent_event_id`、发生时刻 `occurred_at`、新颖度 `novelty`，以及评分的上一版本 `previous_score_id`、版本号 `score_version` 和修订类型 `revision_kind`。模型不能自行编造事实或修订关系。
-- **人工标注**：`annotations` 是 `Annotation`，即复核过的抽取结果（`content_hash`、`extractor_id`、`version`、`verification_manifest`、`claims`、`spans`、`complete`）。复核过的证据文件另由 `reviewed_evidence_files` 登记。
-- **原文来源**：
-  - `rss`：`RSSRegistration`，包括 `feed_url`、`source_id`、`licence_ref`、`hosts`、`max_items`、`lookback_seconds`、`publication_time_verified`。
-  - `sec_filings`：`SECRegistration`，包括 `source_id`、`licence_ref`、公司列表 `companies`（`ticker` 与 `cik`）、8-K 项目 `items`、`lookback_seconds`、`max_filings`、`max_metadata_bytes`、请求间隔 `min_interval_ms`；`fixture_base` 只用于夹具。
-- **分析标定**：`calibration` 是分析服务的标定映射（第 4.5 节）。
-- **搜索**：
-  - `search_plans`：搜索计划 `SearchPlan`，包括 `version`、`source_id`、`query`、`count`。
-  - `search_routing`：搜索路由政策 `SearchRoutingPolicy`（第 4.3 节）。
-  - `search_source_hosts`：搜索结果主机到来源的映射。
-- **日历与报告**：`calendar_file` 或 `calendar`（第 5.1 节），`report_schedule`（第 5.4 节）。
-- **初始化**：`bootstrap` 是 `BootstrapAsset`，即创建 P2 对象的请求 `request`、名义上限 `notional_cap`、交易策略版本 `trading_policy_version`（第 8 章）。
-
-### 4.3 采集（`IngestCycle`、`monitoring`）
-
-- **原文来源**：
-  - RSS：只取时间窗口内发布的条目；一轮轮询全部成功后，才把本轮的链接记为已抓（中途失败时下一轮会重抓）。证据身份为“来源 + 链接”。
-  - SEC 8-K：从 EDGAR 取登记公司的 8-K 新闻稿附件，只取原始申报、不含修正；EDGAR 受理时间只作为供应商发布时间，不当作首次公开时间。
-  - 访问限制：所有请求只能去登记的主机，有大小上限和超时。
-- **搜索补全（`SearchRouter`）**：按路由政策在多个搜索后端之间分配。政策有 `version`、`timeout_seconds`、`lease_seconds`、结果缓存 `cache_ttl_seconds` 与 `max_cache_entries`、`max_result_urls`，以及后端列表 `providers`。每个后端有：
-  - `id`、`kind`、`version`。
-  - 配额：从 `window_anchor` 起每 `window_seconds` 最多 `max_requests` 次，两次之间至少 `min_interval_milliseconds`。
-  - `timeout_seconds`；失败后冷却 `cooldown_seconds`。
-
-  调用前先占额，完成时按租约比较并交换；失败和回执丢失都按已用额度计算。
-- **一轮的顺序**：
-  1. 逐个来源轮询；单个来源失败不影响其他来源。
-  2. 先处理所有独立取得的原文。
-  3. 再用剩余时间做搜索补全。
-  4. 每一步的成败都记为运行事实（`RecordFact`），原始错误文本不落库。
-
-### 4.4 抽取、路由与登记事件（`IngestWorker.Process`）
-
-1. **核验原文**：UTC 时间、不晚于当前、内容哈希一致、不超过字节上限。同一证据编号已保存时，沿用首次保存的内容；来源或许可不同时返回 `EVIDENCE_ID_CONFLICT`。
-2. **抽取**：抽取失败时，只保存原文和失败事实，不进入分析队列。抽取器是人工标注（`AnnotatedExtractor`），没有通用文本解析器。
-3. **路由（`routing.Evaluate`）**：
-
-| 条件 | 去向 |
-|---|---|
-| 来源未启用、许可未核验、不允许分析、不在有效期或环境内 | `QUARANTINE`（`SOURCE_OR_LICENCE_NOT_APPROVED`） |
-| 不允许发给分析服务 | `QUARANTINE`（`PROVIDER_DISCLOSURE_NOT_APPROVED`） |
-| 抽取不完整或没有事实 | `QUARANTINE`（`EXTRACTION_INCOMPLETE`） |
-| 首次公开时间缺失、超过来源时效，或时间顺序不合理 | `RESEARCH`（`EVIDENCE_AVAILABILITY_OR_FRESHNESS_UNVERIFIED`） |
-| 对象映射无效或主体不匹配 | `RESEARCH`（`ENTITY_MAPPING_NOT_APPROVED`、`SUBJECT_NOT_MAPPED`） |
-| 事件类型未启用 | `RESEARCH`（`EVENT_TYPE_NOT_ENABLED`） |
-| 分析服务或标定未核验 | `RESEARCH`（`PROVIDER_OR_CALIBRATION_UNVERIFIED`） |
-| 其他 | `TRADING_CANDIDATE` |
-
-   抽取核验失败或没有登记事件计划时，一律 `QUARANTINE`。路由回执的编号由抽取结果、路由政策、来源登记和映射共同决定；这些都不变时，重复处理沿用首次回执。
-
-4. **资格窗口（`EligibilityWindow`）**：按首次公开时间、来源时效与有效期（交易候选另加映射有效期），以及首次路由时刻 + 任务有效期，冻结任务的截止时刻。重复轮询不能延长窗口。研究路由缺少首次公开时间时不处理；超过来源时效时返回 `EVIDENCE_EXPIRED`，不登记事件也不入队。
-5. **登记事件**：按事件计划向 P2 登记事件（状态 `VERIFIED`）。
-6. **放入队列**：交易候选进入交易队列，研究路由进入研究队列，各带截止时刻和预算分区。撤回（`RETRACTION`）登记成功后即结束，不创建分析任务。入队前该分区必须已登记预算：入队检查有效期和 `max_jobs`，领取任务时检查 `max_concurrent`。
-
-### 4.5 分析（`AnalysisWorker`、`analysis/jev_http.go`）
-
-两个分析角色分别领取研究队列和交易队列的任务，带租约。
-
-1. **校验任务**：绑定一致；交易队列只接受 `TRADING_CANDIDATE`；未过截止；资格窗口有记录；P2 中已有对应事件版本。否则按原因记为失败、过期或弃权。
-2. **调用分析服务**：剩余时间作为传输超时。只发送已核验、已授权的事实与哈希，不发送原文全文、私有路径、凭据或账户状态。
-3. **标定映射 `CalibrationMapping`**：
-   - 版本：版本、量表版本、评分者版本。
-   - 档位：影响、相关度、预期覆盖、半衰期各自的取值档。
-   - 固定值：可信度、质量、新颖度、提前计价。
-   - 事实支持的最低概率，以及是否已核验。
-   - 方向和事件类型取服务的分类结果；逐事实的支持度是标量。影响、相关度、预期覆盖、半衰期四个分量由服务返回的各档概率（允许 0.01 的舍入误差）按档位加权求期望得到（`mapScore`）。
-4. **校验候选（`analysis.Validate`）**：不合格时弃权（`CANDIDATE_NOT_ADMITTED`）。合格时生成评分命令放入提交发件箱（`SubmissionOutbox`），由 `Dispatch` 向 P2 提交，记下准入回执。`Dispatch` 先查询 P2 是否已有回执（已有时即使过期也确认），再判断过期；提交时刷新期望版本，遇到聚合版本冲突留待下一轮。
-
-   已开始调用分析服务、但还没保存候选的任务，在租约失效后记为 `PROVIDER_DELIVERY_UNKNOWN`，不再次调用；已有候选时直接复用。
-5. **调用额度**：由供应商预算控制。`instance-cli register-provider-budget` 从单独的输入文件读取 `ProviderBudgetRegistration`，登记一个调用池政策 `policy`（`ProviderPoolPolicy`）和若干授权 `grants`（`ProviderGrant`）：
-   - 调用池政策：`pool_id`、`version`、有效期 `valid_from` 到 `valid_until`、总调用 `max_calls`、并发 `max_concurrent`、启动间隔 `min_start_interval_millis`、请求大小 `max_request_bytes`，以及按队列分区的 `partitions`（各有 `max_calls` 与 `max_concurrent`）。
-   - 授权：数据库登录 `login`、绑定 `binding`、队列 `queue_kind`、所属调用池 `pool_id`。
-
-   计数在数据库里统一维护，管理操作不重置计数。
-
-### 4.6 语义候选与复核材料
-
-这部分供人工复核，不直接进入交易：
-
-- **证据提案（`PrepareProposal`）**：按登记术语目录切出段落与术语位置。提案里没有事实、完整性或核验标记，只是复核材料。
-- **语义候选（`ExtractSemanticFile`、`CompileSemanticCandidates`）**：`ExtractSemanticFile` 经 P5 调用模型，只发送原文段落和所选目录；`CompileSemanticCandidates` 编译回答，检查格式、目录引用和引用定位，任一处不合格整份拒绝（主体或项目可以是 `UNKNOWN`，断言可以是 `UNCERTAIN` 或 `HYPOTHETICAL`）。精确引用只用于定位。
-
-  配置 `SemanticSettings` 来自规范配置文件的语义节：
-  - 开关与通道：`enabled`、`bun_path`、`provider`、`account_id`、`model`。
-  - 时间：`timeout_seconds`、`cleanup_seconds`。
-  - 上限：`max_events`、`max_quote_bytes`。
-
-  每次调用前先写下尝试记录，失败或结果未知时不会复用同一输出名。
-- **复核与导出**：`instance-cli` 的复核编译、渲染与导出命令，只处理本地运行目录下的文件（第 8 章）。
-
-## 5 日程与关注清单
-
-### 5.1 配置（`config/baseline_inputs.go`）
-
-日程与关注清单两个角色读 `BaselineInputConfig`：
+日程进程读 `CalendarConfig`（本地配置的 `[application.calendar]` 节）：
 
 - **身份**：`environment`、`instance_id`、`object_id`。
 - **资产文件**：`assets_file`。
-- **数据库**：`database_url`；研究分区的数据库 `research_database_url`。
 - **P2 接口**：`framework_url`、`framework_token`。
-- **限制**：`timeout_seconds`、`max_bytes`、`max_pages`、可参考的历史报告数 `max_history_reports`、文章截断 `max_article_chars`。
-- **日线来源**：`daily_kind`、`daily_endpoint`、`daily_licence`；行情快照接口的凭据 `alpaca_key`、`alpaca_secret`。
-- **分析服务**：`provider_endpoint`、`provider_token`、`model_version`、提示词 `prompt_file` 与 `prompt_version`。
-- **通知与访问身份**：通知地址 `webhook_url`、SEC 访问身份 `sec_user_agent`。
-- **搜索后端**：`search_backends`。
+- **限制**：`timeout_seconds`、`max_bytes`、`max_pages`。
+- **访问身份**：SEC 访问身份 `sec_user_agent`。
 
-资产文件 `BaselineInputAssets` 登记：
+资产文件 `CalendarAssets` 是一份封闭的 JSON（出现未知字段或重复键即拒绝），登记：
 
 - **日历**：`calendar`（`Calendar`：`version`、时区 `zone`、`valid_from` 到 `valid_until`、交易日列表 `sessions`，每个交易日有 `date`、`open_local`、`close_local`）。
-- **关注对象与主题**：`watchlist`（每项有代码、名称、关键词）与 `themes`；研判观测的证据引用 `assessment_evidence_ref`。
 - **官方日程**：`schedules`（`ScheduleRegistration`）。每项有：
   - 种类与地址：`kind`、`url`。
   - 来源：`source_id`、`source_ref`。
   - 内容：主体 `subject`、所属期间 `period` 与下一期间 `next_period`、发布时刻 `release_time`、年份 `year`。
   - 访问限制：允许的主机 `hosts`、请求间隔 `min_interval_seconds`。
-- **来源**：来源登记 `sources`，来源等级 `grades`，官方来源标记 `official`，主体映射 `subjects`。
-- **检索**：搜索的 `search_routing`、`search_plans`、`search_source_hosts`，以及 `rss`、`sec_filings`（同第 4.2 节）。
+- **来源**：来源登记 `sources`（`SourceRegistration`：`source_id`、`version`、`licence_ref`、`licence_verified`、`allow_original`、`allow_analysis`、`allow_provider`、`environments`、`enabled`、`valid_from`、`valid_until`、`max_age`），官方来源标记 `official`。
 
-### 5.2 日程登记（`calendar-worker`）
+每条日程的来源必须已启用、许可已核验、允许分析并标为官方，并登记了 `source_ref` 与请求间隔，否则启动时返回 `SCHEDULE_SOURCE_LICENCE_REQUIRED`。
+
+### 4.2 日程登记（`calendar-worker`）
 
 - **官方日程源（`OfficialScheduleSource`）**：从官方页面读取议息会议、国债拍卖、就业与物价发布等日程，以及公司投资者关系页的财报日期。各页面的解析规则写在代码中，发布时刻显式登记，页面本身的发布时间不当作财报日期。SEC 8-K 的 2.02 项生成实际的财报记录；登记了 `next_period` 时，按受理时间 + 91 天生成下一期的 `ESTIMATED` 日程。
 - **登记为预排事件（`ScheduleCalendar.Tick`）**：每条日程登记为 P2 的预排事件，编号由内容决定（`ScheduleID`）。确定程度、改期与取消形成新的修订；已有 `CONFIRMED` 日程时，后来的 `ESTIMATED` 候选被忽略。实际财报日期比旧记录偏离超过一个交易日时，先记录 `SCHEDULE_ACTUAL_DATE_DEVIATION` 报告，再提交修订。
 - **财报窗口**：按交易日（考虑节假日、提前收市和夏令时）计算窗口时刻，随日程一起提交（`EarningsOffsets`）。日历覆盖不足时，日程照常提交但不带窗口（沿用模板的偏移），覆盖齐全后再补交窗口修订。
-- **时段计划**：日历转换为 P2 的时段计划，由 `ingest-worker` 启动时经 `InstallCalendar` 安装（P2 设计 7.1 第 5 步）。已发布的日历版本不可改，续期只能从已登记的边界向后追加，不能借刷新得到新的次数额度。
+- **时段计划**：日历转换为 P2 的时段计划，由 `submission` 的 `InstallCalendar` 安装（P2 设计 7.1 第 5 步）。已发布的日历版本不可改，续期只能从已登记的边界向后追加，不能借刷新得到新的次数额度。
 
-### 5.3 关注清单（`watchlist-worker`）
+## 5 只读接口（`soxl-api`）
 
-1. **周期**：常规交易时段每 1 小时，其他时段每 4 小时。周期编号固定，重启和单次运行都是幂等的，停机期间的周期不补跑。
-2. **检索**：经搜索路由检索关注对象和主题的新闻，加上官方来源。按规范化链接去重，保留来源等级更高的一条；等级为 P0～P3，官方来源必须是 P0。
-3. **异常行情（`WatchMoves`）**：取当日价格相对前收的涨跌，以过去 20 个交易日的日涨跌标准差为尺度，超过 2.5 倍即为异常。这只是幅度标尺，不判断方向。
-4. **分析**：把去重后的文章和最近若干份历史报告中已知的事件一起交给分析服务（`WatchJev.Assess`），得到事件列表和板块观点（只有方向；强制减险恒为否，服务若给出强制减险则拒绝该结果）。异常行情由第 3 步计算，只在常规交易时段的周期检查。
-5. **通知与观测**：
-   - 只有出现重大新增信息或异常行情时，经 `webhook_url` 发送通知（`Webhook.Deliver`），通知不触发交易。
-   - 板块观点作为研判因子的观测提交给 P2，研判因子为只记录状态。
-   - 已记录的报告就是本周期的产出，提交失败后不会再次调用分析服务。
+配置 `ReadAPI`（本地配置的 `[application.read_api]` 节）：
 
-### 5.4 周期报告（`reports.Scheduled`）
-
-按 `report_schedule` 记录周期报告：从 `anchor` 起每 `period_seconds` 一期，每类来源的记录最多 `max_records` 条（学习记录和案例按读取到的整个列表检查）。只记录最近一个已结束的周期一次，不补跑漏掉的周期，也不重新调用模型或改变框架的生效决定。
-
-## 6 只读接口（`soxl-jev-api`）
-
-配置 `ReadAPI`：
-
-- **身份与数据库**：`environment`、`instance_id`、`database_url`，研判路径的只读登录 `dynamic_database_url`。
-- **访问令牌与主体**：`token`、`principal_id`、授权版本 `authorization_version`、允许查看原文的来源 `original_sources`。
+- **身份与数据库**：`environment`、`instance_id`，只读登录 `dynamic_database_url`。
+- **访问令牌与主体**：`token`、`principal_id`、授权版本 `authorization_version`。
 - **监听**：`host`、`port`、`timeout_seconds`。
 - **查询限制**：
   - 条数：`query_default_limit`、`query_max_limit`、`query_max_records`。
-  - 大小：快照上限 `query_max_snapshot_bytes`、原文上限 `query_max_original_bytes`。
+  - 大小：单条状态与记录的上限 `query_max_state_bytes`。
   - 游标：`query_cursor_age_seconds`、`query_cursor_key`。
 
 接口（前缀 `/api/v2/instances/{instance_id}`，全部为 `GET`）：
 
 | 路径 | 内容 |
 |---|---|
-| `/health`、`/sources`、`/analysis-jobs`、`/analysis-jobs/{id}`、`/evidence/{id}`、`/budgets`、`/reports`、`/audit` | 事件路径的运行事实。只有来源许可和调用者权限都允许时才给原文，否则只给元数据和限制原因 |
-| `/dynamic/status` | 研判路径的当前状态（`DynamicQuery.Status`） |
+| `/dynamic/status` | 研判与止损的当前状态（`DynamicQuery.Status`） |
 | `/dynamic/judgments` | 研判记录，按时间倒序分页 |
 | `/dynamic/actions` | 动作记录，按时间倒序分页；初始止损指令的下发（种类为 `INITIAL` 的止损事件）不列出 |
 
@@ -518,51 +354,36 @@ P2 用这条指令冻结批次数量（P2 设计 6.1）。
 
 研判记录不含提示词、原始回答、用量和新闻正文。实盘绑定下，许可为 `SIM_ONLY` 的来源只返回来源与编号，不返回标题。游标签名并绑定查询范围，篡改时拒绝。查询不触发任何搜索、模型或写入。
 
-## 7 只读接口之外的读取
+## 6 只读接口之外的读取
 
 P3 读取下层的内容：
 
 - **P1**：只经只读令牌读取持仓、保护、K 线和权益（`submission/trading_read.go`、`trading_dynamic.go`）。
-- **P2**：研判路径经工作负载接口读取对象、池、决策、案例、止损指令和预排日程（`submission/dynamic_client.go`）；研究分析和周期报告经公开研究接口读取（`framework_client.go`、`report_read.go`）。
+- **P2**：研判路径经工作负载接口读取对象、池、决策、案例、止损指令和预排日程（`submission/dynamic_client.go`）；日程登记与时段计划经公开命令接口写入（`framework_client.go`、`time_intervals.go`）。
 
 所有 P2 写入都走公开命令接口，带幂等键和期望版本。
 
-## 8 运维工具（`instance-cli`）
+## 7 运维工具（`instance-cli`）
 
 `instance-cli` 的 `action` 取以下值，所有命令都不下单：
 
 | 命令 | 作用 |
 |---|---|
-| `init-storage` | 初始化实例存储 |
-| `register-provider-budget` | 登记供应商调用池与授权（第 4.5 节） |
-| `publish-projection` | 向只读投影发布一个新版本；`expected-version` 为现有版本，首次发布用 −1 |
-| `prepare-evidence` | 生成证据提案 |
-| `extract-candidates` | 生成语义候选 |
-| `compile-evidence` | 编译复核过的证据 |
-| `prepare-review`、`render-review` | 生成与渲染复核材料 |
-| `compile-calendar` | 编译交易所日历 |
-| `export-evidence` | 导出证据 |
+| `init-storage` | 初始化实例存储（第 1.3 节） |
+| `grant-storage` | 把一个登录角色绑定到 `DYNAMIC` 或 `DYNAMIC_READ` 身份；参数 `login`、`kind` |
+| `compile-calendar` | 把交易所的日历快照编译成日历文件；参数 `input`、`output`、`max-bytes` |
 
-输出文件只允许在仓库的本地运行目录下，父目录和文件本身都不能是符号链接；输入文件必须是普通文件。两者都有明确的字节上限。
+`init-storage` 与 `grant-storage` 读本地配置的 `[application.storage]` 节（`StorageAdmin`）：`environment`、`instance_id`，以及管理员连接 `admin_database_url`。
 
-**创建 P2 对象（`Bootstrap.Run`）**：
+`compile-calendar` 不读任何凭据：输入是一个普通文件，输出只能是仓库本地运行目录下的新文件，父目录和文件本身都不能是符号链接，已存在的文件不覆盖（`PRIVATE_OUTPUT_EXISTS`），输入与输出都有字节上限。
 
-- 环境必须是 `SIM`，阶段为 `R0`～`R2`。
-- 名义上限为正且不超过 4000（代码上限）。
-- 非夹具模式只接受指定的交易所永续合约。
-- P1 运行的执行方式是 `REPLAY` 或 `SHADOW`，账户绑定一致，品种规则已登记。
-- 已有对象时，绑定必须一致，否则返回 `INSTANCE_EXISTING_BINDING_MISMATCH`。
+## 8 验证
 
-## 9 验证
-
-| 验收 | 主要测试（`tests/applications/soxl_jev`） |
+| 验收 | 主要测试（`tests/applications/soxl`） |
 |---|---|
-| T3-01、T3-09、T3-10 | 初始化与绑定、名义上限、实盘准入阻断 |
-| T3-02～T3-07 | 采集、来源许可、路由、事件计划、分析任务、标定映射、发件箱、故障降级 |
-| T3-08、T3-17 | 日历窗口、时段计划、官方日程与修订 |
-| T3-11～T3-14 | 报告、评测记录、本地资产校验、恢复 |
-| T3-15、T3-28、T3-32 | 只读接口：分区、许可、游标、只读身份、阶梯显示 |
-| T3-16、T3-18 | 无内置基线、关注清单的去重、异常行情、通知与只记录观测 |
+| T3-01、T3-28、T3-32 | 存储身份与只读接口：角色隔离、分区、游标、只读身份、阶梯显示、接口契约 |
+| T3-08、T3-17 | 日历窗口、时段计划、官方日程与修订、日历配置与封闭资产、日历编译 |
+| T3-16 | 无内置基线分量 |
 | T3-19～T3-21 | 新闻采集与复述剔除、研判解析与校验、通道切换、注入决策全部分支 |
 | T3-22 | 正常波动表与离线重算逐格对照 |
 | T3-23～T3-26、T3-29、T3-31 | 止损几何、风险比例、移动与阶梯、收盘退出与过期、转基线与基线状态、事件前降险，含 P3 → P2 → P1 内部撮合闭环 |

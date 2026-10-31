@@ -53,7 +53,7 @@ func main() {
 		}
 	}
 	os.MkdirAll("runtime/go-bin", 0755)
-	cmd := exec.Command("go", "build", "-trimpath", "-o", "runtime/go-bin/console-api", "./src/factorforge/applications/console/entrypoints/console-api")
+	cmd := exec.Command("go", "build", "-trimpath", "-o", "runtime/go-bin/console-api", "./src/factorforge/operations/console/entrypoints/console-api")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if e := cmd.Run(); e != nil {

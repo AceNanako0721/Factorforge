@@ -78,10 +78,24 @@ func asMap(value any) map[string]any {
 	}
 	return map[string]any{}
 }
+
+// PreviousConfigTemplate is the config template shape of the previous release.
+func PreviousConfigTemplate() string { return previousConfig + expectedConsole + expectedModelAccess }
+
+// PreviousPromptTemplate is the prompt template shape of the previous release.
+func PreviousPromptTemplate() string { return previousPrompts }
+
 func TemplateIssue(name string, data []byte, historical bool) string {
+	issue := templateIssue(name, data, historical, expectedConfig, expectedPrompts)
+	if issue != "" && historical && templateIssue(name, data, historical, previousConfig, previousPrompts) == "" {
+		return ""
+	}
+	return issue
+}
+func templateIssue(name string, data []byte, historical bool, configText, promptText string) string {
 	var actual, expected map[string]any
 	if name == "config/config.example.toml" {
-		if toml.Unmarshal(data, &actual) != nil || toml.Unmarshal([]byte(expectedConfig+expectedConsole+expectedModelAccess), &expected) != nil {
+		if toml.Unmarshal(data, &actual) != nil || toml.Unmarshal([]byte(configText+expectedConsole+expectedModelAccess), &expected) != nil {
 			return "invalid-template-format"
 		}
 		// Enforce a complete, exact empty shape, including short arbitrary secrets.
@@ -215,7 +229,7 @@ func TemplateIssue(name string, data []byte, historical bool) string {
 		}
 		return "unrecognized-template-field"
 	}
-	if json.Unmarshal(data, &actual) != nil || json.Unmarshal([]byte(expectedPrompts), &expected) != nil {
+	if json.Unmarshal(data, &actual) != nil || json.Unmarshal([]byte(promptText), &expected) != nil {
 		return "invalid-template-format"
 	}
 	if equalJSON(actual, expected) {

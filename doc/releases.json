@@ -378,6 +378,12 @@
    "change_kind": "specification",
    "date": "2026-10-31",
    "summary": "Application instance: when no new batch may open (risk fraction not above zero, or every hard stop beyond the insurance stop), the still-valid initial-distance directive is withdrawn by a newer one without a risk fraction, so the strategy layer opens no batch from the old one. Documentation describes local configuration, prompts and credentials in plain terms; unused test fixtures removed."
+  },
+  {
+   "version": "3.0.0",
+   "change_kind": "framework",
+   "date": "2026-10-31",
+   "summary": "Layers become an abstract dependency order registered in doc/layers.json: trading, strategy, application and operations, each holding any number of modules and specs. The web console and model access move to the operations layer (src/factorforge/operations). The application module is renamed soxl. The unused event-analysis path and the watchlist are removed from the application, its read API and the console; the application now provides news judgment, stop and position management and scheduled calendars."
   }
  ]
 }

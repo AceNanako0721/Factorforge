@@ -1,5 +1,6 @@
-// Package layoutguard checks source placement and Go imports without executing
-// source, loading private assets, or relying on Python.
+// Package layoutguard checks source placement and Go imports against the layer
+// registry (doc/layers.json) without executing source, loading private assets,
+// or relying on Python.
 package layoutguard
 
 import (
@@ -13,10 +14,16 @@ import (
 	"strings"
 )
 
-const module = "github.com/AceNanako0721/Factorforge/src/factorforge/"
+const module = "github.com/AceNanako0721/Factorforge/"
+
+var standardAreas = []string{"domain", "application", "ports", "adapters", "api", "workers", "entrypoints"}
 
 func Check(root string) ([]string, error) {
-	failures := []string{}
+	registry, err := LoadRegistry(root)
+	if err != nil {
+		return nil, err
+	}
+	failures := registry.Validate()
 	// Read only registered/unignored paths; ignored configuration and runtime
 	// files are never inspected. Tiny non-Git import fixtures remain supported.
 	if _, err := os.Stat(filepath.Join(root, ".git")); err == nil {
@@ -29,6 +36,7 @@ func Check(root string) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
+		failures = append(failures, registry.CheckFiles(root)...)
 		registered := []string{".github", ".githooks", "src", "tests", "contracts", "doc", "tools", "config", "prompts"}
 		for _, name := range strings.Split(string(data), "\x00") {
 			parts := strings.Split(name, "/")
@@ -41,14 +49,14 @@ func Check(root string) ([]string, error) {
 			if strings.HasSuffix(name, ".py") && name != "contracts/check_contract.py" {
 				failures = append(failures, name+": retired Python source in active tree")
 			}
-			if strings.HasPrefix(name, "src/") && (strings.HasSuffix(name, ".ts") || strings.HasSuffix(name, ".mjs")) {
-				if len(parts) < 6 || parts[2] != "applications" || !has([]string{"console", "model_access"}, parts[3]) {
+			if strings.HasPrefix(name, "src/") && (strings.HasSuffix(name, ".ts") || strings.HasSuffix(name, ".mjs") || strings.HasSuffix(name, ".tsx")) {
+				if m := registry.moduleOf(name); m == nil || !has(m.Languages, "typescript") {
 					failures = append(failures, name+": unregistered JavaScript/TypeScript module")
 				}
 			}
 		}
 	}
-	err := filepath.WalkDir(filepath.Join(root, "src"), func(path string, entry os.DirEntry, err error) error {
+	err = filepath.WalkDir(filepath.Join(root, "src"), func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -63,33 +71,30 @@ func Check(root string) ([]string, error) {
 			return err
 		}
 		name := filepath.ToSlash(relative)
-		parts := strings.Split(name, "/")
 		fail := func(reason string) { failures = append(failures, name+": "+reason) }
-		if len(parts) < 5 || parts[1] != "factorforge" {
-			fail("Go source outside registered layer area")
+		own := registry.moduleOf(name)
+		if own == nil {
+			fail("Go source outside registered module")
 			return nil
 		}
-		layer, area := parts[2], parts[3]
-		if layer != "trading" && layer != "strategy" && layer != "applications" {
-			fail("unregistered layer")
+		if !has(own.Languages, "go") {
+			fail("Go source in a module that does not declare Go")
 			return nil
 		}
 		if strings.HasSuffix(name, "_test.go") {
 			fail("tests belong under tests")
 			return nil
 		}
-		if layer != "applications" && !has([]string{"domain", "application", "ports", "adapters", "api", "workers", "entrypoints"}, area) {
-			fail("unregistered layer area")
+		rest := strings.TrimPrefix(strings.TrimPrefix(name, own.Path), "/")
+		area, _, _ := strings.Cut(rest, "/")
+		if strings.Count(rest, "/") == 0 {
+			fail("Go source directly in the module root")
+			return nil
 		}
-		own := module + layer + "/"
-		if layer == "applications" {
-			if len(parts) < 6 || !has([]string{"soxl_jev", "console", "model_access"}, parts[3]) {
-				fail("unregistered application or source area")
-				return nil
-			}
-			own += parts[3] + "/"
-			area = parts[4]
+		if own.Standard && !has(standardAreas, area) {
+			fail("unregistered module area")
 		}
+		base := module + own.Path + "/"
 		file, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
 		if err != nil {
 			return err
@@ -99,37 +104,28 @@ func Check(root string) ([]string, error) {
 			if err != nil {
 				return err
 			}
-			if layer == "trading" && strings.HasPrefix(imported, module) && !strings.HasPrefix(imported, module+"trading/") {
-				fail("upward layer import")
-			}
-			if layer == "strategy" && strings.HasPrefix(imported, module+"applications/") {
-				fail("upward layer import")
-			}
-			if layer == "strategy" && strings.HasPrefix(imported, module+"trading/") && !prefix(imported, module+"trading/api/", []string{"dto", "views"}) {
-				fail("strategy requires public trading DTO/client")
-			}
-			if layer == "applications" {
-				if strings.HasPrefix(imported, module+"trading/") && !prefix(imported, module+"trading/api/", []string{"dto", "views"}) {
-					fail("application requires public trading DTO/client")
-				}
-				if strings.HasPrefix(imported, module+"strategy/") && !prefix(imported, module+"strategy/api/", []string{"dto", "client"}) {
-					fail("application requires public strategy DTO/client")
-				}
-				if strings.HasPrefix(imported, module+"applications/") && !strings.HasPrefix(imported, own) {
-					other := strings.TrimPrefix(imported, module+"applications/")
-					app, _, found := strings.Cut(other, "/")
-					if !found || !prefix(imported, module+"applications/"+app+"/api/", []string{"dto", "client"}) {
-						fail("peer applications require HTTP or public DTO/client")
+			if strings.HasPrefix(imported, module+"src/factorforge/") {
+				target := registry.moduleOf(strings.TrimPrefix(imported, module))
+				switch {
+				case target == nil:
+					fail("import of an unregistered path")
+				case target.ID != own.ID:
+					public := prefix(imported, module+target.Path+"/", target.Public)
+					switch {
+					case target.Layer != own.Layer && !registry.uses(own.Layer, target.Layer):
+						fail("upward layer import")
+					case !public:
+						fail("module " + own.ID + " requires the public packages of module " + target.ID)
 					}
 				}
 			}
-			if area == "domain" && strings.HasPrefix(imported, own) && !strings.HasPrefix(imported, own+"domain") {
+			if area == "domain" && strings.HasPrefix(imported, base) && !strings.HasPrefix(imported, base+"domain") {
 				fail("domain depends on outer package")
 			}
-			if has([]string{"application", "operations", "reports", "routing", "submission"}, area) && prefix(imported, own, []string{"api", "workers", "adapters", "entrypoints"}) {
+			if has([]string{"application", "operations", "reports", "routing", "submission"}, area) && prefix(imported, base, []string{"api", "workers", "adapters", "entrypoints"}) {
 				fail("reversed application dependency")
 			}
-			if (area == "ports" || area == "adapters") && prefix(imported, own, []string{"application", "api", "workers", "entrypoints"}) {
+			if (area == "ports" || area == "adapters") && prefix(imported, base, []string{"application", "api", "workers", "entrypoints"}) {
 				fail("adapter/port depends on application entry")
 			}
 			if (area == "domain" || area == "ports") && (imported == "net" || strings.HasPrefix(imported, "net/") || imported == "os/exec" || strings.HasPrefix(imported, "github.com/jackc/pgx")) {
