@@ -1,0 +1,12 @@
+# 合并到本地的 config/config.toml 中使用。
+[application.calendar]
+environment = "SIM"
+instance_id = ""
+object_id = "SOXLUSDT"
+assets_file = ""
+framework_url = ""
+framework_token = ""
+timeout_seconds = 0
+max_bytes = 0
+max_pages = 0
+sec_user_agent = ""

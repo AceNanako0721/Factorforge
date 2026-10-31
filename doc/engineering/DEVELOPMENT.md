@@ -35,21 +35,21 @@ go test -race ./tests/strategy
 P4 前端与 P5：
 
 ```sh
-cd src/factorforge/applications/console/web
+cd src/factorforge/operations/console/web
 pnpm install --frozen-lockfile --ignore-scripts
 pnpm test
 pnpm test:browser                      # 需要先安装 Playwright 的 Chromium
 cd -
 
-npm --prefix src/factorforge/applications/model_access ci --ignore-scripts
-npm --prefix src/factorforge/applications/model_access test
-npm --prefix src/factorforge/applications/model_access run test:omp
+npm --prefix src/factorforge/operations/model_access ci --ignore-scripts
+npm --prefix src/factorforge/operations/model_access test
+npm --prefix src/factorforge/operations/model_access run test:omp
 node tools/check-model-access.mjs
 ```
 
 测试只使用虚构数据，不读取本地配置，不访问真实交易所或模型供应商。
 
-## P1 交易系统层
+## P1 交易系统（L1 交易层）
 
 ```sh
 go run ./tools/build-trading           # 二进制输出到 runtime/go-bin
@@ -80,7 +80,7 @@ runtime/go-bin/testnet-acceptance --postgres-bin <PostgreSQL 目录> --authorize
 
 会下单的验收必须显式加 `--authorize-testnet-orders`，单笔名义金额不超过 100 USDT，并要求测试账户已平仓且没有其他挂单。验收只在本轮的临时目录中建立数据库和进程。
 
-## P2 策略化框架层
+## P2 策略化框架（L2 策略层）
 
 ```sh
 go run ./tools/build-strategy
@@ -95,31 +95,29 @@ runtime/go-bin/strategy-feedback --config config/config.toml
 
 单次命令：`factorforge-strategy [--internal] <命令> --file <请求>`，例如 `create-object`、`create-event`、`submit-score`、`show-pool`。以工作负载身份执行（`--internal`）只允许在 SIM。
 
-## P3 应用实例
+## P3 SOXLUSDT 应用（L3 应用层）
 
 ```sh
-go run ./tools/build-instance                          # 接口、采集、分析、运维工具
-go build -o runtime/bin/ ./src/factorforge/applications/soxl_jev/entrypoints/...
-go run ./tools/prepare-instance-profiles --config config/config.toml --output runtime/instance-profiles
+go run ./tools/build-instance                          # 接口、研判、仓位管理、日程与运维命令，输出到 runtime/bin
 runtime/bin/instance-cli --action init-storage --config config/config.toml
+runtime/bin/instance-cli --action grant-storage --kind DYNAMIC --login <登录角色> --config config/config.toml
 ```
 
-各工作进程只读取派生的角色配置（`--config`），可加 `--once` 只运行一轮：
+各进程读取本地配置的对应节，可加 `--once` 只运行一轮（日程进程）：
 
-| 进程 | 作用 |
-|---|---|
-| `soxl-jev-api` | 只读接口 |
-| `judgment-worker`、`position-manager` | 新闻研判、止损与仓位管理 |
-| `ingest-worker`、`research-analysis-worker`、`trading-analysis-worker` | 事件路径的采集与分析 |
-| `calendar-worker`、`watchlist-worker` | 预排日程、关注清单 |
-| `instance-cli` | 运维操作（建库、登记、发布投影、语义候选等） |
+| 进程 | 作用 | 配置 |
+|---|---|---|
+| `soxl-api` | 只读接口 | `[application.read_api]` |
+| `judgment-worker`、`position-manager` | 新闻研判、止损与仓位管理 | 角色配置 `DynamicProfile` |
+| `calendar-worker` | 预排日程 | `[application.calendar]` |
+| `instance-cli` | 运维操作：建库、授权、编译交易所日历 | `[application.storage]` |
 
 模型调用经 P5 进行，需要先构建 P5（见下）。
 
-## P4 Web 管理台
+## P4 Web 管理台（L4 运维层）
 
 ```sh
-cd src/factorforge/applications/console/web && pnpm build && cd -    # 输出到 runtime/web-build
+cd src/factorforge/operations/console/web && pnpm build && cd -    # 输出到 runtime/web-build
 go run ./tools/build-console --web-build runtime/web-build           # 输出 runtime/go-bin/console-api
 go run ./tools/prepare-console-profile --config config/config.toml --out runtime/console/profile.json
 runtime/go-bin/console-api --profile runtime/console/profile.json
@@ -130,8 +128,8 @@ runtime/go-bin/console-api --profile runtime/console/profile.json
 ## P5 模型接入模块
 
 ```sh
-npm --prefix src/factorforge/applications/model_access ci --ignore-scripts
-npm --prefix src/factorforge/applications/model_access run build     # 输出到 runtime/model-access-build
+npm --prefix src/factorforge/operations/model_access ci --ignore-scripts
+npm --prefix src/factorforge/operations/model_access run build     # 输出到 runtime/model-access-build
 go run ./tools/init-model-access                                      # 在本地配置中补上模型配置块
 node runtime/model-access-build/entrypoints/cli.js menu --config config/config.toml
 ```

@@ -130,10 +130,10 @@ jobs:
         with:
           node-version: '22.23.1'
       - name: Install pinned frontend dependencies without lifecycle scripts
-        working-directory: src/factorforge/applications/console/web
+        working-directory: src/factorforge/operations/console/web
         run: npm exec --yes --package=pnpm@10.33.0 -- pnpm install --frozen-lockfile --ignore-scripts
       - name: Typecheck, build and test browser read semantics
-        working-directory: src/factorforge/applications/console/web
+        working-directory: src/factorforge/operations/console/web
         run: |
           npm exec --yes --package=pnpm@10.33.0 -- pnpm build
           npm exec --yes --package=pnpm@10.33.0 -- pnpm test
@@ -164,12 +164,12 @@ jobs:
           bun-version: '1.3.14'
       - name: Install locked SDK and verify isolated model process without accounts
         run: |
-          npm --prefix src/factorforge/applications/model_access ci --ignore-scripts
+          npm --prefix src/factorforge/operations/model_access ci --ignore-scripts
           node tools/check-model-access.mjs
-          npm --prefix src/factorforge/applications/model_access test
-          npm --prefix src/factorforge/applications/model_access run test:omp
+          npm --prefix src/factorforge/operations/model_access test
+          npm --prefix src/factorforge/operations/model_access run test:omp
       - name: Verify Go semantic candidates and public Bun protocol without accounts
         run: |
-          go test ./tests/applications/soxl_jev -run Semantic -count=1
+          go test ./tests/applications/soxl -run Semantic -count=1
         env:
           FACTORFORGE_REQUIRE_MODEL_PROTOCOL: ${{ runner.os == 'Linux' && '1' || '0' }}

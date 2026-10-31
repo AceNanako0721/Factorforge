@@ -1,4 +1,4 @@
-import { defineConfig } from "../../src/factorforge/applications/console/web/node_modules/@playwright/test/index.mjs";
+import { defineConfig } from "../../src/factorforge/operations/console/web/node_modules/@playwright/test/index.mjs";
 export default defineConfig({
   testDir: ".",
   testMatch: "*.browser.ts",

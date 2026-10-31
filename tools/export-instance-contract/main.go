@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl_jev/api"
+	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl/api"
 	"os"
 )
 

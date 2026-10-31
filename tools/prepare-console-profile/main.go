@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/console/config"
+	"github.com/AceNanako0721/Factorforge/src/factorforge/operations/console/config"
 	"os"
 )
 

@@ -2,8 +2,6 @@ package engineering_test
 
 import (
 	guard "github.com/AceNanako0721/Factorforge/tools/repoguard"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -19,7 +17,7 @@ func preSemanticTemplate(text string) string {
 	return text
 }
 func TestSemanticEmptyTemplateAndFrozenHistory(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "config/config.example.toml"))
+	raw, err := previousTemplate()
 	if err != nil {
 		t.Fatal(err)
 	}

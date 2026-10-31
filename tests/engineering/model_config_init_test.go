@@ -86,7 +86,7 @@ func TestModelConfigInitializationPreservesPrivateBytesAndRespectsLock(t *testin
 }
 
 func TestHistoricalModelTemplatePathsAreExactAndHistoryOnly(t *testing.T) {
-	config, err := os.ReadFile(filepath.Join(repoRoot(t), "config/config.example.toml"))
+	config, err := previousTemplate()
 	if err != nil {
 		t.Fatal(err)
 	}

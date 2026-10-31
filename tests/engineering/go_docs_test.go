@@ -12,7 +12,7 @@ import (
 func docsFixture(t *testing.T, version string) string {
 	t.Helper()
 	root := t.TempDir()
-	put(t, root, "doc/README.md", "# 文档\n\n版本："+version+"\n\n[交易式样](01_交易系统层式样书.md#目的)\n")
+	put(t, root, "doc/README.md", "# 文档\n\n版本："+version+"\n\n[交易式样](01_交易系统式样书.md#目的)\n")
 	for _, pair := range guard.DocumentPairs {
 		put(t, root, "doc/"+pair+"式样书.md", "# "+pair+"式样书\n\n版本："+version+"\n\n## 目的\n\n要求。\n")
 		put(t, root, "doc/"+pair+"设计书.md", "# "+pair+"设计书\n\n版本："+version+"\n\n见[式样](./"+pair+"式样书.md#目的)。\n")
@@ -31,7 +31,7 @@ func TestDocumentBaselineRules(t *testing.T) {
 		t.Fatal("stale version header accepted")
 	}
 	broken := docsFixture(t, "2.21.0")
-	put(t, broken, "doc/README.md", "版本：2.21.0\n[x](01_交易系统层式样书.md#不存在)\n")
+	put(t, broken, "doc/README.md", "版本：2.21.0\n[x](01_交易系统式样书.md#不存在)\n")
 	if _, err := checkBooks(broken, "2.21.0"); err == nil {
 		t.Fatal("missing anchor accepted")
 	}

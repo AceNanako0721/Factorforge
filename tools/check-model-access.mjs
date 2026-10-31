@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 const root = path.resolve(import.meta.dirname, "..");
-const base = path.join(root, "src/factorforge/applications/model_access");
+const base = path.join(root, "src/factorforge/operations/model_access");
 const require = createRequire(path.join(base, "package.json")),
   ts = require("typescript");
 const failures = [];

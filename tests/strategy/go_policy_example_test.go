@@ -14,7 +14,7 @@ import (
 // INITIAL_DISTANCE carrying risk_fraction is rejected (STOP_DIRECTIVE_INVALID)
 // and no order is ever produced.
 func TestDynamicStopPolicyExampleIsComplete(t *testing.T) {
-	data, err := os.ReadFile("../../src/factorforge/applications/soxl_jev/config/dynamic_stop_policy.example.json")
+	data, err := os.ReadFile("../../src/factorforge/applications/soxl/config/dynamic_stop_policy.example.json")
 	if err != nil {
 		t.Fatal(err)
 	}
