@@ -390,6 +390,12 @@
    "change_kind": "design",
    "date": "2026-10-31",
    "summary": "Calendar worker: a Treasury auction listed without an auction date yet no longer invalidates the whole page and stops the schedule update; it is skipped until the date is published."
+  },
+  {
+   "version": "3.1.0",
+   "change_kind": "specification",
+   "date": "2026-10-31",
+   "summary": "The application specification drops requirements that its code never implemented (product and price handling, quota and account-protection duplicates of the trading layer, restart verification, model budget, self-granted eligibility) and the matching acceptance rows; a prompt-file acceptance test is added. Contribution rules now require a requirement change to ship with its code and tests in the same pull request."
   }
  ]
 }

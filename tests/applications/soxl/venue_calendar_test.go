@@ -130,6 +130,9 @@ func TestVenueCalendarPrivateFileBoundary(t *testing.T) {
 	wd, _ := os.Getwd()
 	root := filepath.Clean(filepath.Join(wd, "..", "..", ".."))
 	t.Chdir(root)
+	if err := os.MkdirAll(filepath.Join(root, "runtime"), 0o700); err != nil {
+		t.Fatal(err)
+	}
 	dir, err := os.MkdirTemp(filepath.Join(root, "runtime"), "calendar-assets-test-")
 	if err != nil {
 		t.Fatal(err)
