@@ -6,6 +6,7 @@ import (
 	"fmt"
 	c "github.com/AceNanako0721/Factorforge/src/factorforge/trading/adapters/configuration"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/adapters/health"
+	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/adapters/hostproof"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/adapters/postgres"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/adapters/sim"
 	a "github.com/AceNanako0721/Factorforge/src/factorforge/trading/application"
@@ -16,6 +17,19 @@ import (
 	"syscall"
 	"time"
 )
+
+// ExecutorProcess returns this process's identity for the lease record and the
+// judge of a previously recorded one. If the identity cannot be read (not Linux,
+// no /proc) the instance is empty: the lease then records no process and an
+// expired lease needs a manual fence, which is reported on stderr.
+func ExecutorProcess() (string, d.ProcessProof) {
+	prober := hostproof.Prober{}
+	instance, err := prober.Self()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "EXECUTOR_PROCESS_IDENTITY_UNAVAILABLE:", err)
+	}
+	return instance, prober.Stopped
+}
 
 func Context() (context.Context, context.CancelFunc) {
 	return signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

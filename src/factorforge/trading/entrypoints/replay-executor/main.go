@@ -4,6 +4,7 @@ import (
 	"flag"
 	c "github.com/AceNanako0721/Factorforge/src/factorforge/trading/adapters/configuration"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/adapters/sim"
+	a "github.com/AceNanako0721/Factorforge/src/factorforge/trading/application"
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/trading/domain"
 	r "github.com/AceNanako0721/Factorforge/src/factorforge/trading/entrypoints/assembly"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/workers"
@@ -40,13 +41,14 @@ func run() error {
 		return err
 	}
 	var epoch int64
+	instance, proof := r.ExecutorProcess()
 	if snapshot.Policy.Operational != nil {
 		if *holder == "" {
 			return &d.Error{Code: "EXECUTOR_FENCE_REQUIRED", Status: 423}
 		}
 		err = store.Transaction(ctx, key, func(run *d.Aggregate) error {
 			var err error
-			epoch, err = run.AcquireLease(*holder, time.Now().UTC(), time.Duration(run.Policy.Operational.LeaseSeconds)*time.Second)
+			epoch, err = a.AcquireExecutorLease(run, *holder, instance, time.Now().UTC(), time.Duration(run.Policy.Operational.LeaseSeconds)*time.Second, proof)
 			run.Version++
 			return err
 		})

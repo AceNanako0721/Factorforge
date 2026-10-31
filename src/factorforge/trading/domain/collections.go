@@ -27,6 +27,17 @@ func (run *Aggregate) AcquireLease(holder string, now time.Time, duration time.D
 	}
 	return epoch, err
 }
+
+// AcquireLeaseAs is AcquireLease for an executor that records its process and
+// may take over from a holder whose process is proven stopped (ExecutorLease.AcquireAs).
+func (run *Aggregate) AcquireLeaseAs(holder, instance string, now time.Time, duration time.Duration, proof ProcessProof) (int64, string, error) {
+	lease := run.lease()
+	epoch, evidence, err := lease.AcquireAs(holder, instance, now, duration, proof)
+	if err == nil {
+		run.applyLease(lease)
+	}
+	return epoch, evidence, err
+}
 func (run *Aggregate) AssertLease(holder string, epoch int64, now time.Time) error {
 	lease := run.lease()
 	return lease.Assert(holder, epoch, now)
@@ -47,6 +58,9 @@ func (run *Aggregate) lease() ExecutorLease {
 	if run.IsolationEvidence != nil {
 		l.IsolationEvidence = *run.IsolationEvidence
 	}
+	if run.LeaseInstance != nil {
+		l.Instance = *run.LeaseInstance
+	}
 	for _, i := range run.Outbox {
 		l.Outbox = append(l.Outbox, ExecutorCommand{State: i.State, ExecutorEpoch: i.ExecutorEpoch})
 	}
@@ -62,6 +76,9 @@ func (run *Aggregate) applyLease(l ExecutorLease) {
 	run.IsolatedEpoch = l.IsolatedEpoch
 	if l.IsolationEvidence != "" || run.IsolationEvidence != nil {
 		run.IsolationEvidence = &l.IsolationEvidence
+	}
+	if l.Instance != "" || run.LeaseInstance != nil {
+		run.LeaseInstance = &l.Instance
 	}
 	run.State = l.RunState
 	for i := range run.Outbox {
