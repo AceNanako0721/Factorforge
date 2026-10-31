@@ -451,6 +451,7 @@ type Aggregate struct {
 	LeaseHolder            *string                      `json:"lease_holder"`
 	LeaseUntil             *time.Time                   `json:"lease_until"`
 	LeaseEpoch             int64                        `json:"lease_epoch"`
+	LeaseInstance          *string                      `json:"lease_instance,omitempty"`
 	IsolatedEpoch          int64                        `json:"isolated_epoch"`
 	IsolationEvidence      *string                      `json:"isolation_evidence"`
 	RejectedRequests       []Object                     `json:"rejected_requests"`

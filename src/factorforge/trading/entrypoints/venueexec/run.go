@@ -169,9 +169,10 @@ func Main(environment string) error {
 		return failure("EXECUTION_OPERATIONAL_POLICY_REQUIRED")
 	}
 	var epoch int64
+	instance, proof := r.ExecutorProcess()
 	err = store.Transaction(ctx, key, func(run *d.Aggregate) error {
 		var err error
-		epoch, err = run.AcquireLease(*holder, time.Now().UTC(), time.Duration(run.Policy.Operational.LeaseSeconds)*time.Second)
+		epoch, err = a.AcquireExecutorLease(run, *holder, instance, time.Now().UTC(), time.Duration(run.Policy.Operational.LeaseSeconds)*time.Second, proof)
 		run.Version++
 		return err
 	})

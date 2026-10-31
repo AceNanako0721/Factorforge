@@ -396,6 +396,12 @@
    "change_kind": "specification",
    "date": "2026-10-31",
    "summary": "The application specification drops requirements that its code never implemented (product and price handling, quota and account-protection duplicates of the trading layer, restart verification, model budget, self-granted eligibility) and the matching acceptance rows; a prompt-file acceptance test is added. Contribution rules now require a requirement change to ship with its code and tests in the same pull request."
+  },
+  {
+   "version": "3.2.0",
+   "change_kind": "specification",
+   "date": "2026-10-31",
+   "summary": "Trading layer: a starting executor takes over an expired lease by itself when it can prove the previous holder's process is gone (host rebooted, or the process exited in the same boot), so a host reboot no longer leaves executors waiting for a manual fence. Without that proof the manual fence is still required. Takeover evidence is stored with the lease and audited."
   }
  ]
 }
