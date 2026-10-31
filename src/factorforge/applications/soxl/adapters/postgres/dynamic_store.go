@@ -62,7 +62,8 @@ func (s *Store) AppendRecord(ctx context.Context, kind, id string, at time.Time,
 	return nil
 }
 
-// Records returns payloads of one kind recorded in [since, until), oldest first.
+// Records returns the newest limit payloads of one kind recorded in
+// [since, until), oldest first.
 func (s *Store) Records(ctx context.Context, kind string, since, until time.Time, limit int) ([]json.RawMessage, error) {
 	if err := s.dynamicRead(ctx); err != nil {
 		return nil, err
