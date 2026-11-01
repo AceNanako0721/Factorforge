@@ -419,7 +419,7 @@
    "version": "3.5.0",
    "change_kind": "specification",
    "date": "2026-11-02",
-   "summary": "Trading layer: an executor whose lease lapsed because it was itself blocked (a slow venue call, a stalled host) renews it and keeps running, as long as nobody took the lease and the epoch was not isolated. Before, the loop renewal treated its own lapsed lease as a previous executor that was not isolated and exited, which restarted the executor of a demo-account run 11 times in one three-hour window. A different holder, a newer epoch or an isolated epoch still stops the executor with EXECUTOR_LEASE_LOST."
+   "summary": "Trading layer: an executor whose lease lapsed because it was itself blocked (a slow venue call, a stalled host) renews it and keeps running, as long as nobody took the lease and the epoch was not isolated. Before, the loop renewal treated its own lapsed lease as a previous executor that was not isolated and exited. A different holder, a newer epoch or an isolated epoch still stops the executor with EXECUTOR_LEASE_LOST."
   }
  ]
 }
