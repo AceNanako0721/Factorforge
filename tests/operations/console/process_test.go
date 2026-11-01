@@ -132,6 +132,10 @@ func TestIndependentHTTPSNativeConsoleAndPrivateProfile(t *testing.T) {
 	if status != 200 || !bytes.Contains(raw, []byte(`"equity":"999.900"`)) {
 		t.Fatal("native actual SIM read", status, string(raw))
 	}
+	// S4-021: the browser pages candles within the configured max_limit.
+	if status, raw = call("GET", "/capabilities?selection_id="+s.ID, nil); status != 200 || !bytes.Contains(raw, []byte(`"max_limit":20`)) {
+		t.Fatal("capabilities max_limit", status, string(raw))
+	}
 	if status, _ = call("POST", "/events", []byte(`{}`)); status != 405 {
 		t.Fatal("write accepted")
 	}

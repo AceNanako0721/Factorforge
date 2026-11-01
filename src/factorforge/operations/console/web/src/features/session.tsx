@@ -11,6 +11,7 @@ import { ApiError, request, type Session, type Selection } from "../api/client";
 type Capabilities = {
   refresh_seconds: number;
   max_retries: number;
+  max_limit: number;
   pages: Record<string, string>;
 };
 type State = {

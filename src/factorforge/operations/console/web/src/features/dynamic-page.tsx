@@ -1,4 +1,5 @@
 import { lazy, Suspense, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   record,
   rows,
@@ -6,6 +7,7 @@ import {
   type Panel,
   type Selection,
 } from "../api/client";
+import { aggregateCandles, bucketLabel, historyRange, RANGES, readHistory, type RangeKey } from "./candle-history";
 import { displayTime, useDisplay } from "./display-settings";
 import { liveStateText, useLiveMarket } from "./live-market";
 import type { PriceLine, TimeMarker } from "./market-chart";
@@ -185,11 +187,28 @@ function StateNote({ panel }: { panel?: Panel }) {
 export function DynamicView({
   panels,
   selection,
+  maxLimit,
 }: {
   panels: Panel[];
   selection: Selection;
+  maxLimit?: number;
 }) {
   const { zone } = useDisplay();
+  // S4-021: 24 hours comes with the page; longer ranges read the 5-minute bars
+  // themselves and merge them into coarser bars here.
+  const [rangeKey, setRangeKey] = useState<RangeKey>("24h");
+  const longRange = rangeKey !== "24h" && !!maxLimit;
+  const history = useQuery({
+    queryKey: ["candle-history", selection.selection_id, selection.binding_version, rangeKey],
+    enabled: longRange,
+    staleTime: 5 * 60_000,
+    refetchInterval: 5 * 60_000,
+    retry: 1,
+    queryFn: ({ signal }) => {
+      const r = historyRange(rangeKey);
+      return readHistory(selection, r.start, r.end, maxLimit as number, signal).then((v) => ({ ...v, minutes: r.minutes }));
+    },
+  });
   const live = useLiveMarket(selection.selection_id);
   const t = (v: Json) => (typeof v === "string" ? displayTime(v, zone) : "未记录");
   const statusPanel = panelOf(panels, "dynamic.status");
@@ -210,7 +229,12 @@ export function DynamicView({
   const protectionPanel = panelOf(panels, "protections");
   const protections = rows(protectionPanel?.data ?? null).map(record);
   const candlePanel = panelOf(panels, "candles");
-  const candles = rows(candlePanel?.data ?? null);
+  const dayCandles = rows(candlePanel?.data ?? null);
+  const minutes = history.data?.minutes ?? 5;
+  const candles = useMemo(
+    () => (longRange ? aggregateCandles(history.data?.bars ?? [], minutes) : dayCandles),
+    [longRange, history.data, minutes, dayCandles],
+  );
   const lastCandle = candles
     .map(record)
     .filter((c) => c.final === true && typeof c.close_at === "string")
@@ -479,17 +503,36 @@ export function DynamicView({
 
       <section className="panel">
         <div className="panel-head">
-          <h2>{selection.instrument_key.instrument_id} · 5 分钟最终 K 线（24 小时）</h2>
+          <h2>
+            {selection.instrument_key.instrument_id} · {bucketLabel(longRange ? minutes : 5)}最终 K 线（
+            {RANGES.find((r) => r.key === rangeKey)?.label}）
+          </h2>
           <StateNote panel={candlePanel} />
         </div>
         <div className="chart-tools">
+          <span role="group" aria-label="时间范围">
+            {RANGES.map((r) => (
+              <button
+                key={r.key}
+                type="button"
+                aria-pressed={rangeKey === r.key}
+                disabled={r.key !== "24h" && !maxLimit}
+                onClick={() => setRangeKey(r.key)}
+              >
+                {r.label}
+              </button>
+            ))}
+          </span>
+          {longRange && history.isPending && <span role="status">正在读取历史 K 线…</span>}
+          {longRange && history.isError && <span role="alert">历史 K 线读取失败，请稍后重试</span>}
+          {longRange && history.data?.truncated && <span role="status">历史过长，最早的部分未读取</span>}
           <label>
             <input type="checkbox" checked={showRecorded} onChange={(e) => setShowRecorded(e.target.checked)} />
             显示未生效的研判（灰点）
           </label>
         </div>
         <Suspense fallback={<p role="status">正在装载图表…</p>}>
-          <MarketChart candles={candles} lines={lines} markers={markers} live={live.kline} />
+          <MarketChart key={rangeKey} candles={candles} lines={lines} markers={markers} live={longRange ? null : live.kline} />
         </Suspense>
         <p className="muted">
           箭头只标改变了仓位依据的研判（注入、作废原链、修订；空/多 + 信心），其余研判只记录、不改变仓位，默认不画；方块为本批开仓与平仓（P3 记录）。横线为入场价与各止损位（纵轴默认只按 K 线缩放，范围外的横线列在图下）；半透明的最后一根是交易所推送的未完成 K 线（参考），收盘后以 P1 最终 K 线为准；不画预测。

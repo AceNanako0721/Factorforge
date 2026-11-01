@@ -1,6 +1,6 @@
 # Web 管理台设计书
 
-版本：3.2.0
+版本：3.3.0
 
 对应式样书：[04_Web管理台式样书](04_Web管理台式样书.md)。本书说明 `src/factorforge/operations/console` 的实现。
 
@@ -96,7 +96,7 @@ flowchart LR
 - `refresh_seconds`：周期刷新间隔，至少 1。
 - `max_retries`：前端失败重试次数，不小于 0。
 
-两者通过 `/capabilities` 交给前端。
+两者通过 `/capabilities` 交给前端；`max_limit` 也通过它交给前端。
 
 **远程访问与实时参考**：`trusted_peers` 见第 3 章，`live_market` 见第 7 章。
 
@@ -222,7 +222,7 @@ max_retries = 3
 
 不一致返回 `BINDING_MISMATCH`（409）。这是硬错误：整次读取失败，前端整页拒绝显示，而不是显示为空。其他核验失败只让该服务的区块不可用，不影响其他服务。
 
-`GET /capabilities?selection_id=` 返回每个页面的状态（`AVAILABLE` 或 `NOT_APPLICABLE`）以及 `refresh_seconds` 和 `max_retries`。带范围时先核验三个服务，绑定不一致即拒绝；观测对象为空时，事件、事件详情、情绪、案例、案例详情和学习页为 `NOT_APPLICABLE`。
+`GET /capabilities?selection_id=` 返回每个页面的状态（`AVAILABLE` 或 `NOT_APPLICABLE`）以及 `refresh_seconds`、`max_retries` 和 `max_limit`（策略 `max_limit`，前端翻页时一页最多取这么多行）。带范围时先核验三个服务，绑定不一致即拒绝；观测对象为空时，事件、事件详情、情绪、案例、案例详情和学习页为 `NOT_APPLICABLE`。
 
 ## 6 页面读取
 
@@ -433,6 +433,17 @@ max_retries = 3
 ### 8.7 显示时区
 
 显示时区可选 UTC、`Asia/Tokyo`、`Asia/Shanghai`，保存在浏览器本地；读取失败时用 UTC，写入失败时只在本次页面中生效。它只影响显示，查询参数始终使用 UTC。
+
+### 8.7 行情图的时间范围（`candle-history`）
+
+对应式样 S4-021。默认范围仍由 `dynamicRange` 给出（24 小时、5 分钟周期，随 `dynamic` 视图一起读到）。
+
+- **范围与周期（`RANGES`、`bucketMinutes`、`historyRange`）**：24 小时、3 天、7 天、全部（最近 60 天，交易层实际保留的更少，从返回的第一根起）。周期取 5、15、30、60 分钟。终点为下一个 5 分钟整点。
+- **读取（`readHistory`）**：24 小时以外的范围，浏览器读 `market` 视图的 `candles` 区块（`source=candles`、`interval=5m`、起止时间、`limit` 取 `/capabilities` 的 `max_limit`），沿区块游标往下翻，最多 60 页。读满 60 页仍有游标时标记“最早的部分未读取”并在页面上说明。区块不可用时报错，页面显示读取失败。
+- **合并（`aggregateCandles`）**：按 UTC 时钟对齐，一个时间段里的 5 分钟最终 K 线数量必须等于 周期 ÷ 5，且开高低收都是正数，才画一根：开盘取第一根，最高取最大，最低取最小，收盘取最后一根。缺线、含未完成的线、数值无效的时间段整根不画，不估算。重复的 5 分钟线只取一根。
+- **页面（`DynamicView`）**：范围按钮在图上方；选 24 小时用页面已有的数据，其他范围用 `useQuery` 读取，5 分钟内不重读，每 5 分钟刷新一次。切换范围时图重建一次。正在形成的 K 线只在 24 小时范围里画。研判与止损标记、止损线不随范围改变（它们仍只取默认范围内读到的记录）。
+- **不改写**：只读 `market` 视图，没有写入。
+
 
 ## 9 验证
 
