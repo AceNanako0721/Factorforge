@@ -408,6 +408,12 @@
    "change_kind": "specification",
    "date": "2026-11-01",
    "summary": "Web console: the market chart on the dynamic page can show 24 hours, 3 days, 7 days or all history. Longer ranges read the trading layer's 5-minute final bars page by page and merge only complete buckets into coarser bars in the browser; a bucket with a missing bar is not drawn. The capabilities response now carries max_limit so the browser pages within the configured limit."
+  },
+  {
+   "version": "3.3.1",
+   "change_kind": "specification",
+   "date": "2026-11-01",
+   "summary": "Web console: on the dynamic page, the judgment arrows and the entry/exit squares on the market chart now cover the chart's selected range instead of only the last 72 hours, and the page says so when there is no position and therefore no stop lines."
   }
  ]
 }

@@ -195,6 +195,31 @@ test("S4-017 judgment and stop page on desktop and phone width", async ({
   expect(errors).toEqual([]);
 });
 // Runs before the revocation test: the fixture cannot restore a revoked selection.
+test("S4-021 range buttons read the longer history, marks and keep the chart drawn", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  const seen: string[] = [];
+  page.on("request", (r) => seen.push(r.url()));
+  await login(page);
+  await page.evaluate(() =>
+    fetch("/fixture/state?action=online", { method: "POST", headers: { Origin: location.origin } }),
+  );
+  await page.getByRole("link", { name: "研判与止损", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "三层止损与价格", exact: true })).toBeVisible();
+  for (const label of ["3 天", "7 天", "全部", "24 小时"]) {
+    await page.getByRole("button", { name: label, exact: true }).click();
+    await expect(page.getByRole("button", { name: label, exact: true })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator("canvas").first()).toBeVisible();
+    await page.waitForTimeout(600);
+  }
+  expect(seen.some((u) => u.includes("source=dynamic.judgments") && u.includes("from="))).toBe(true);
+  expect(seen.some((u) => u.includes("source=dynamic.actions"))).toBe(true);
+  expect(seen.some((u) => u.includes("source=candles") && u.includes("interval=5m"))).toBe(true);
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await page.screenshot({ path: "../../runtime/web-test-results/range-24h.png" });
+  expect(errors).toEqual([]);
+});
+
 test("S4-003 panel times follow the display zone", async ({ page }) => {
   await login(page);
   const read = page.locator(".metadata span", { hasText: /^读取 / }).first();
