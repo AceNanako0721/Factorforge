@@ -217,8 +217,7 @@ func Main(environment string) error {
 			return nil
 		}
 		if err = store.Transaction(ctx, key, func(run *d.Aggregate) error {
-			_, err := run.AcquireLease(*holder, time.Now().UTC(), time.Duration(run.Policy.Operational.LeaseSeconds)*time.Second)
-			return err
+			return run.RenewLease(*holder, epoch, time.Now().UTC(), time.Duration(run.Policy.Operational.LeaseSeconds)*time.Second)
 		}); err != nil {
 			return err
 		}

@@ -414,6 +414,12 @@
    "change_kind": "specification",
    "date": "2026-11-01",
    "summary": "Web console: on the dynamic page, the judgment arrows and the entry/exit squares on the market chart now cover the chart's selected range instead of only the last 72 hours, and the page says so when there is no position and therefore no stop lines."
+  },
+  {
+   "version": "3.5.0",
+   "change_kind": "specification",
+   "date": "2026-11-02",
+   "summary": "Trading layer: an executor whose lease lapsed because it was itself blocked (a slow venue call, a stalled host) renews it and keeps running, as long as nobody took the lease and the epoch was not isolated. Before, the loop renewal treated its own lapsed lease as a previous executor that was not isolated and exited. A different holder, a newer epoch or an isolated epoch still stops the executor with EXECUTOR_LEASE_LOST."
   }
  ]
 }

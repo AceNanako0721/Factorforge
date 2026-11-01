@@ -108,8 +108,7 @@ func (p *ProbeTransport) Renew(ctx context.Context) error {
 		if run.Policy.Operational == nil {
 			return reject("EXECUTOR_FENCE_REQUIRED", 423)
 		}
-		_, err := run.AcquireLease(p.Manifest.Holder, p.Clock(), time.Duration(run.Policy.Operational.LeaseSeconds)*time.Second)
-		return err
+		return run.RenewLease(p.Manifest.Holder, p.Epoch(), p.Clock(), time.Duration(run.Policy.Operational.LeaseSeconds)*time.Second)
 	})
 }
 func sameParams(a, b Params) bool {

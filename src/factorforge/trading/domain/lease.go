@@ -90,6 +90,25 @@ func (l *ExecutorLease) Acquire(holder string, now time.Time, duration time.Dura
 	}
 	return l.Epoch, nil
 }
+// Renew extends the lease for the executor that still holds it at epoch. The
+// lease may have lapsed because that executor itself was blocked (a slow venue
+// call, a stalled host); that is not a second holder. It is renewed only while
+// nobody has taken the lease since (holder and epoch unchanged) and the epoch
+// has not been isolated. Any other holder, a newer epoch or an isolation
+// ends the executor with EXECUTOR_LEASE_LOST.
+func (l *ExecutorLease) Renew(holder string, epoch int64, now time.Time, duration time.Duration) error {
+	if duration <= 0 {
+		return &Error{"LEASE_POLICY_REQUIRED", 422}
+	}
+	if epoch <= 0 || l.Holder != holder || l.Epoch != epoch || l.IsolatedEpoch == l.Epoch && l.IsolationEvidence != "" {
+		return &Error{"EXECUTOR_LEASE_LOST", 423}
+	}
+	until := now.Add(duration)
+	if l.Until == nil || !l.Until.After(now) || l.Until.Sub(now) <= duration/2 {
+		l.Until = &until
+	}
+	return nil
+}
 func (l *ExecutorLease) Assert(holder string, epoch int64, now time.Time) error {
 	if l.Holder != holder || l.Epoch != epoch || l.Until == nil || !l.Until.After(now) {
 		return &Error{"EXECUTOR_LEASE_LOST", 423}
