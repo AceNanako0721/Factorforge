@@ -8,6 +8,7 @@ import {
   bucketMinutes,
   historyRange,
   readHistory,
+  readTimelines,
 } from "../../src/factorforge/operations/console/web/src/features/candle-history";
 import { candleData } from "../../src/factorforge/operations/console/web/src/features/market-chart";
 import type { Json, Selection } from "../../src/factorforge/operations/console/web/src/api/client";
@@ -111,5 +112,28 @@ describe("S4-021 history paging", () => {
   it("fails when the candle panel is unavailable", async () => {
     stubFetch([page([], null, "UNAVAILABLE")]);
     await expect(readHistory(selection, "2026-10-31T00:00:00Z", "2026-11-01T00:05:00Z", 400)).rejects.toThrow();
+  });
+});
+
+describe("S4-021 chart marks follow the range", () => {
+  it("reads judgments and actions for the range with their own sources and cursors", async () => {
+    const mk = (source: string, rows: Json[], cursor: string | null) => ({
+      ...page([], null),
+      panels: [{ ...page([], null).panels[0], source, data: rows, cursor }],
+    });
+    const urls = stubFetch([
+      mk("dynamic.judgments", [{ judgment_id: "j1" }], "c1"),
+      mk("dynamic.actions", [{ action_id: "a1" }], null),
+      mk("dynamic.judgments", [{ judgment_id: "j2" }], null),
+    ]);
+    const out = await readTimelines(selection, "2026-10-25T00:00:00Z", "2026-11-01T00:05:00Z", 400);
+    expect(out.judgments).toHaveLength(2);
+    expect(out.actions).toHaveLength(1);
+    const q = urls.map((u) => new URL(u, "http://x"));
+    expect(q.every((u) => u.pathname.endsWith("/dynamic"))).toBe(true);
+    expect(q[0].searchParams.get("from")).toBe("2026-10-25T00:00:00Z");
+    expect(q[0].searchParams.get("to")).toBe("2026-11-01T00:05:00Z");
+    expect(q.map((u) => u.searchParams.get("source"))).toEqual(["dynamic.judgments", "dynamic.actions", "dynamic.judgments"]);
+    expect(q[2].searchParams.get("cursor")).toBe("c1");
   });
 });

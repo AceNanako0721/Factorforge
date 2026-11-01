@@ -79,30 +79,51 @@ export function aggregateCandles(records: Json[], minutes: number): Json[] {
 
 // Follow the market view's candle cursor until the range is read or the page cap
 // is reached. `truncated` tells the page that the oldest bars were not read.
-export async function readHistory(
+async function readPages(
   selection: Selection,
-  start: string,
-  end: string,
+  view: string,
+  source: string,
+  base: Record<string, string>,
   limit: number,
   signal?: AbortSignal,
 ): Promise<{ bars: Json[]; truncated: boolean }> {
   const bars: Json[] = [];
   let cursor = "";
   for (let page = 0; page < MAX_PAGES; page++) {
-    const filters: Record<string, string> = {
-      source: "candles",
-      interval: `${BASE_MINUTES}m`,
-      start,
-      end,
-      limit: String(limit),
-    };
+    const filters: Record<string, string> = { ...base, source, limit: String(limit) };
     if (cursor) filters.cursor = cursor;
-    const value = checkResponse(await request<Response>(query("/market", selection, filters), signal), selection);
-    const panel = value.panels.find((p) => p.source === "candles");
-    if (!panel || (panel.state !== "AVAILABLE" && panel.state !== "EMPTY")) throw new Error(panel?.code ?? "CANDLES_UNAVAILABLE");
+    const value = checkResponse(await request<Response>(query(view, selection, filters), signal), selection);
+    const panel = value.panels.find((p) => p.source === source);
+    if (!panel || (panel.state !== "AVAILABLE" && panel.state !== "EMPTY")) throw new Error(panel?.code ?? "READ_UNAVAILABLE");
     bars.push(...rows(panel.data));
     if (!panel.cursor) return { bars, truncated: false };
     cursor = panel.cursor;
   }
   return { bars, truncated: true };
+}
+export function readHistory(
+  selection: Selection,
+  start: string,
+  end: string,
+  limit: number,
+  signal?: AbortSignal,
+): Promise<{ bars: Json[]; truncated: boolean }> {
+  return readPages(selection, "/market", "candles", { interval: `${BASE_MINUTES}m`, start, end }, limit, signal);
+}
+
+// The chart's arrows and squares come from the judgment and action timelines,
+// which the page reads for 72 hours; a longer chart range reads them for the
+// same range so earlier entries, exits and injections are not missing.
+export async function readTimelines(
+  selection: Selection,
+  from: string,
+  to: string,
+  limit: number,
+  signal?: AbortSignal,
+): Promise<{ judgments: Json[]; actions: Json[] }> {
+  const [j, a] = await Promise.all([
+    readPages(selection, "/dynamic", "dynamic.judgments", { from, to }, limit, signal),
+    readPages(selection, "/dynamic", "dynamic.actions", { from, to }, limit, signal),
+  ]);
+  return { judgments: j.bars, actions: a.bars };
 }

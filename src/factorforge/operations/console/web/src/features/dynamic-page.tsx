@@ -7,7 +7,7 @@ import {
   type Panel,
   type Selection,
 } from "../api/client";
-import { aggregateCandles, bucketLabel, historyRange, RANGES, readHistory, type RangeKey } from "./candle-history";
+import { aggregateCandles, bucketLabel, historyRange, RANGES, readHistory, readTimelines, type RangeKey } from "./candle-history";
 import { displayTime, useDisplay } from "./display-settings";
 import { liveStateText, useLiveMarket } from "./live-market";
 import type { PriceLine, TimeMarker } from "./market-chart";
@@ -209,6 +209,18 @@ export function DynamicView({
       return readHistory(selection, r.start, r.end, maxLimit as number, signal).then((v) => ({ ...v, minutes: r.minutes }));
     },
   });
+  // The arrows and squares follow the chart's range, not the 72-hour timelines.
+  const marks = useQuery({
+    queryKey: ["chart-marks", selection.selection_id, selection.binding_version, rangeKey],
+    enabled: longRange,
+    staleTime: 5 * 60_000,
+    refetchInterval: 5 * 60_000,
+    retry: 1,
+    queryFn: ({ signal }) => {
+      const r = historyRange(rangeKey);
+      return readTimelines(selection, r.start, r.end, maxLimit as number, signal);
+    },
+  });
   const live = useLiveMarket(selection.selection_id);
   const t = (v: Json) => (typeof v === "string" ? displayTime(v, zone) : "未记录");
   const statusPanel = panelOf(panels, "dynamic.status");
@@ -360,11 +372,13 @@ export function DynamicView({
     () => judgmentEffects(judgments, actions),
     [JSON.stringify(judgments.map((j) => j.judgment_id)), JSON.stringify(actions.map((a) => a.action_id))],
   );
+  const markJudgments = longRange && marks.data ? marks.data.judgments.map(record) : judgments;
+  const markActions = longRange && marks.data ? marks.data.actions.map(record) : actions;
   const markers: TimeMarker[] = useMemo(
-    () => chartMarkers(judgments, actions, showRecorded),
+    () => chartMarkers(markJudgments, markActions, showRecorded),
     [
-      JSON.stringify(judgments.map((j) => [j.judgment_id, j.direction])),
-      JSON.stringify(actions.map((a) => a.action_id)),
+      JSON.stringify(markJudgments.map((j) => [j.judgment_id, j.direction])),
+      JSON.stringify(markActions.map((a) => a.action_id)),
       showRecorded,
     ],
   );
@@ -526,6 +540,8 @@ export function DynamicView({
           {longRange && history.isPending && <span role="status">正在读取历史 K 线…</span>}
           {longRange && history.isError && <span role="alert">历史 K 线读取失败，请稍后重试</span>}
           {longRange && history.data?.truncated && <span role="status">历史过长，最早的部分未读取</span>}
+          {!position && <span role="status">当前无持仓，图上没有止损线</span>}
+          {longRange && marks.isError && <span role="alert">研判与开平仓标记读取失败，图上只有 72 小时内的标记</span>}
           <label>
             <input type="checkbox" checked={showRecorded} onChange={(e) => setShowRecorded(e.target.checked)} />
             显示未生效的研判（灰点）
