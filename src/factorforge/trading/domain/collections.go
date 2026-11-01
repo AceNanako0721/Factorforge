@@ -38,6 +38,16 @@ func (run *Aggregate) AcquireLeaseAs(holder, instance string, now time.Time, dur
 	}
 	return epoch, evidence, err
 }
+// RenewLease is the loop renewal of an executor that holds the lease at epoch
+// (ExecutorLease.Renew).
+func (run *Aggregate) RenewLease(holder string, epoch int64, now time.Time, duration time.Duration) error {
+	lease := run.lease()
+	if err := lease.Renew(holder, epoch, now, duration); err != nil {
+		return err
+	}
+	run.applyLease(lease)
+	return nil
+}
 func (run *Aggregate) AssertLease(holder string, epoch int64, now time.Time) error {
 	lease := run.lease()
 	return lease.Assert(holder, epoch, now)
