@@ -481,7 +481,7 @@ export function Page({ name }: { name: string }) {
         </section>
       )}
       {name === "dynamic" && data.data && (
-        <DynamicView panels={panels} selection={selection} />
+        <DynamicView panels={panels} selection={selection} maxLimit={capabilities?.max_limit} />
       )}
       <div className="panel-grid">
         {panels

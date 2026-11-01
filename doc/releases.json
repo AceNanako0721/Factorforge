@@ -402,6 +402,12 @@
    "change_kind": "specification",
    "date": "2026-10-31",
    "summary": "Trading layer: a starting executor takes over an expired lease by itself when it can prove the previous holder's process is gone (host rebooted, or the process exited in the same boot), so a host reboot no longer leaves executors waiting for a manual fence. Without that proof the manual fence is still required. Takeover evidence is stored with the lease and audited."
+  },
+  {
+   "version": "3.3.0",
+   "change_kind": "specification",
+   "date": "2026-11-01",
+   "summary": "Web console: the market chart on the dynamic page can show 24 hours, 3 days, 7 days or all history. Longer ranges read the trading layer's 5-minute final bars page by page and merge only complete buckets into coarser bars in the browser; a bucket with a missing bar is not drawn. The capabilities response now carries max_limit so the browser pages within the configured limit."
   }
  ]
 }

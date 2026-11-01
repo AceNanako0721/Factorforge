@@ -12049,6 +12049,9 @@
                 "schema": {
                   "additionalProperties": false,
                   "properties": {
+                    "max_limit": {
+                      "type": "integer"
+                    },
                     "max_retries": {
                       "type": "integer"
                     },
@@ -12109,7 +12112,8 @@
                     "schema_version",
                     "pages",
                     "refresh_seconds",
-                    "max_retries"
+                    "max_retries",
+                    "max_limit"
                   ],
                   "type": "object"
                 }

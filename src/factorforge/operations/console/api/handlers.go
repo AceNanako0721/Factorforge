@@ -251,7 +251,8 @@ func New(o Options) (http.Handler, error) {
 			Pages   map[string]string `json:"pages"`
 			Refresh int               `json:"refresh_seconds"`
 			Retries int               `json:"max_retries"`
-		}{d.SchemaVersion, pages, o.RefreshSeconds, o.MaxRetries})
+			Limit   int               `json:"max_limit"`
+		}{d.SchemaVersion, pages, o.RefreshSeconds, o.MaxRetries, o.Query.Policy.MaxLimit})
 	})
 	mux.HandleFunc("GET "+Prefix+"/live", func(w http.ResponseWriter, r *http.Request) {
 		u, ok := authorize(w, r)

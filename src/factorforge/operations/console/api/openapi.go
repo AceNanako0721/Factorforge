@@ -88,7 +88,7 @@ func OpenAPI() []byte {
 	for page := range app.Views {
 		pages[page] = str
 	}
-	add("/capabilities", "get", object(map[string]any{"schema_version": str, "pages": object(pages), "refresh_seconds": integer, "max_retries": integer}, "schema_version", "pages", "refresh_seconds", "max_retries"), true, []any{param("selection_id", false, id)}, nil, "200")
+	add("/capabilities", "get", object(map[string]any{"schema_version": str, "pages": object(pages), "refresh_seconds": integer, "max_retries": integer, "max_limit": integer}, "schema_version", "pages", "refresh_seconds", "max_retries", "max_limit"), true, []any{param("selection_id", false, id)}, nil, "200")
 	// S4-019: the reference push is text/event-stream (events mark, kline,
 	// state and end), not a JSON document.
 	add("/live", "get", str, true, []any{param("selection_id", true, id)}, nil, "200")
