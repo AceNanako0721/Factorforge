@@ -465,3 +465,17 @@ func CloseStopFor(v d.StopDirective, plan d.StopPlan, direction int) *d.Decimal 
 	}
 	return &value
 }
+
+// AdoptsProtectionExit reports whether the object may take the owner epoch
+// that the trading layer raised for the object's own venue protection exit
+// (S2-034). Only a single step that flattened the position, with the target
+// still blocked for that review alone and the run normal, qualifies; any
+// other epoch change keeps the object in recovery.
+func AdoptsProtectionExit(obj *d.ObservedObject, snap *d.TradingSnapshot, epoch int) bool {
+	target := snap.Targets[obj.ObjectID]
+	if target == nil || epoch != obj.OwnerEpoch+1 || d.Number(target["owner_epoch"]) != obj.OwnerEpoch || snap.ExternalChange || snap.RunState != "NORMAL" {
+		return false
+	}
+	reasons := d.Strings(target["reasons"])
+	return d.Text(target["state"]) == "BLOCKED" && len(reasons) == 1 && reasons[0] == "PROTECTION_EXIT_REVIEW_REQUIRED" && snap.Actual[obj.ObjectID].Sign() == 0 && snap.Pending[obj.ObjectID].Sign() == 0
+}

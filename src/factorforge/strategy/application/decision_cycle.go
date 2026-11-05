@@ -152,6 +152,10 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 				if !ok {
 					return &d.Error{Code: "OWNER_SNAPSHOT_MISSING", Status: 423}
 				}
+				if AdoptsProtectionExit(obj, snap, epoch) {
+					state.AppendAudit(map[string]any{"action": "OWNER_EPOCH_ADOPTED", "object_id": obj.ObjectID, "from": obj.OwnerEpoch, "to": epoch, "reason": "PROTECTION_EXIT_REVIEW_REQUIRED", "at": d.ISO(at)})
+					obj.OwnerEpoch = epoch
+				}
 				obj.RecoveryState = "RECOVERY_REQUIRED"
 				if epoch == obj.OwnerEpoch && !snap.ExternalChange && snap.RunState == "NORMAL" {
 					obj.RecoveryState = "NORMAL"
