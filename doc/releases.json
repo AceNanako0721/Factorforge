@@ -420,6 +420,12 @@
    "change_kind": "specification",
    "date": "2026-11-02",
    "summary": "Trading layer: an executor whose lease lapsed because it was itself blocked (a slow venue call, a stalled host) renews it and keeps running, as long as nobody took the lease and the epoch was not isolated. Before, the loop renewal treated its own lapsed lease as a previous executor that was not isolated and exited. A different holder, a newer epoch or an isolated epoch still stops the executor with EXECUTOR_LEASE_LOST."
+  },
+  {
+   "version": "3.5.1",
+   "change_kind": "design",
+   "date": "2026-11-05",
+   "summary": "Trading layer: the protection and executor workers and the venue write fence now pass the same lease rule as the loop renewal. Before, they asserted a strictly valid lease, so when a venue call blocked the loop for more than a minute the executor's own lapsed lease was reported as EXECUTOR_LEASE_LOST and the executor exited, against S1-012. The fence now renews the lease in the run transaction before the change or venue call; a different holder, a newer epoch or an isolated epoch still stops the executor."
   }
  ]
 }

@@ -18,8 +18,12 @@ type Protection struct {
 	Now        func() time.Time
 }
 
-func (w *Protection) fence(run *d.Aggregate) error {
-	return (&Executor{Store: w.Store, Broker: w.Broker, ExecutorID: w.ExecutorID, LeaseEpoch: w.LeaseEpoch, Now: w.Now}).fence(run)
+func (w *Protection) executor() *Executor {
+	return &Executor{Store: w.Store, Broker: w.Broker, ExecutorID: w.ExecutorID, LeaseEpoch: w.LeaseEpoch, Now: w.Now}
+}
+func (w *Protection) fence(run *d.Aggregate) error { return w.executor().fence(run) }
+func (w *Protection) held(ctx context.Context, key d.RunKey) (*d.Aggregate, error) {
+	return w.executor().held(ctx, key)
 }
 func (w *Protection) audit(run *d.Aggregate, action string, p *d.Protection) {
 	app.Audit(run, action, d.Principal{PrincipalID: "protection-worker", Environment: run.RunKey.Environment, AccountID: run.RunKey.AccountID, Permissions: []string{}}, p.ProtectionID, app.Response{"protection_id": p.ProtectionID, "state": p.State})
@@ -37,11 +41,8 @@ func (w *Protection) update(ctx context.Context, key d.RunKey, fn func(*d.Aggreg
 	})
 }
 func (w *Protection) cancel(ctx context.Context, key d.RunKey, item *d.Protection) (bool, error) {
-	run, err := w.Store.Read(ctx, key)
+	run, err := w.held(ctx, key)
 	if err != nil {
-		return false, err
-	}
-	if err = w.fence(run); err != nil {
 		return false, err
 	}
 	pos := run.Positions.Value(item.InstrumentKey.Code())
@@ -190,11 +191,8 @@ func (w *Protection) sweep(ctx context.Context, run *d.Aggregate, key d.Instrume
 		}
 	}
 	if cancel != nil {
-		current, err := w.Store.Read(ctx, run.RunKey)
+		current, err := w.held(ctx, run.RunKey)
 		if err != nil {
-			return true, err
-		}
-		if err = w.fence(current); err != nil {
 			return true, err
 		}
 		pos := current.Positions.Value(key.Code())
@@ -255,11 +253,8 @@ func (w *Protection) Tick(ctx context.Context, key d.RunKey) (bool, error) {
 	if venue(w.Broker) && (w.ExecutorID == "" || w.LeaseEpoch <= 0 || w.Now == nil || !w.Broker.ExecutionAdmitted()) {
 		return false, fail("EXECUTOR_FENCE_REQUIRED", 423)
 	}
-	run, err := w.Store.Read(ctx, key)
+	run, err := w.held(ctx, key)
 	if err != nil {
-		return false, err
-	}
-	if err = w.fence(run); err != nil {
 		return false, err
 	}
 	for _, pos := range run.Positions.Values() {

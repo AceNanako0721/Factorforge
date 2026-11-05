@@ -55,9 +55,31 @@ func (w *Executor) fence(run *d.Aggregate) error {
 		if w.Now == nil {
 			return fail("EXECUTOR_FENCE_REQUIRED", 423)
 		}
-		return run.AssertLease(w.ExecutorID, w.LeaseEpoch, w.Now())
+		return run.HoldLease(w.ExecutorID, w.LeaseEpoch, w.Now().UTC())
 	}
 	return nil
+}
+
+// held reads the run for a venue call. A fenced executor reads it in a
+// transaction, so the renewal fence makes is stored before the call.
+func (w *Executor) held(ctx context.Context, key d.RunKey) (*d.Aggregate, error) {
+	if w.ExecutorID == "" {
+		run, err := w.Store.Read(ctx, key)
+		if err != nil {
+			return nil, err
+		}
+		return run, w.fence(run)
+	}
+	var current *d.Aggregate
+	err := w.Store.Transaction(ctx, key, func(run *d.Aggregate) error {
+		if err := w.fence(run); err != nil {
+			return err
+		}
+		var err error
+		current, err = run.Clone()
+		return err
+	})
+	return current, err
 }
 func itemFor(run *d.Aggregate, id string) *d.OutboxItem {
 	for i := range run.Outbox {
@@ -221,11 +243,7 @@ func (w *Executor) Tick(ctx context.Context, key d.RunKey) (bool, error) {
 		return worked, err
 	}
 	if w.ExecutorID != "" {
-		current, err := w.Store.Read(ctx, key)
-		if err != nil {
-			return true, err
-		}
-		if err = w.fence(current); err != nil {
+		if _, err := w.held(ctx, key); err != nil {
 			return true, err
 		}
 	}
