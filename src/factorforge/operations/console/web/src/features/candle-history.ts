@@ -101,19 +101,36 @@ async function readPages(
   }
   return { bars, truncated: true };
 }
-export function readHistory(
+// The trading layer answers a candle range in one piece and the console refuses
+// more than its record budget (5000), so a long range is read in windows of
+// WINDOW_DAYS (4032 bars). The windows are read side by side and joined oldest
+// first.
+export const WINDOW_DAYS = 14;
+
+export async function readHistory(
   selection: Selection,
   start: string,
   end: string,
   limit: number,
   signal?: AbortSignal,
 ): Promise<{ bars: Json[]; truncated: boolean }> {
-  return readPages(selection, "/market", "candles", { interval: `${BASE_MINUTES}m`, start, end }, limit, signal);
+  const step = WINDOW_DAYS * 86_400_000;
+  const iso = (ms: number) => new Date(ms).toISOString().replace(/\.\d{3}Z$/, "Z");
+  const last = Date.parse(end);
+  const windows: { start: string; end: string }[] = [];
+  for (let from = Date.parse(start); from < last; from += step)
+    windows.push({ start: iso(from), end: iso(Math.min(from + step, last)) });
+  const parts = await Promise.all(
+    windows.map((w) => readPages(selection, "/market", "candles", { interval: `${BASE_MINUTES}m`, ...w }, limit, signal)),
+  );
+  return { bars: parts.flatMap((p) => p.bars), truncated: parts.some((p) => p.truncated) };
 }
 
 // The chart's arrows and squares come from the judgment and action timelines,
 // which the page reads for 72 hours; a longer chart range reads them for the
-// same range so earlier entries, exits and injections are not missing.
+// same range so earlier entries, exits and injections are not missing. The
+// dynamic view requires a candle range on every read, so the same range rides
+// along; only the timeline sources' own from/to reach P3.
 export async function readTimelines(
   selection: Selection,
   from: string,
@@ -121,9 +138,10 @@ export async function readTimelines(
   limit: number,
   signal?: AbortSignal,
 ): Promise<{ judgments: Json[]; actions: Json[] }> {
+  const base = { interval: `${BASE_MINUTES}m`, start: from, end: to, from, to };
   const [j, a] = await Promise.all([
-    readPages(selection, "/dynamic", "dynamic.judgments", { from, to }, limit, signal),
-    readPages(selection, "/dynamic", "dynamic.actions", { from, to }, limit, signal),
+    readPages(selection, "/dynamic", "dynamic.judgments", base, limit, signal),
+    readPages(selection, "/dynamic", "dynamic.actions", base, limit, signal),
   ]);
   return { judgments: j.bars, actions: a.bars };
 }
