@@ -104,6 +104,21 @@ describe("S4-021 history paging", () => {
     expect(first.get("cursor")).toBeNull();
     expect(new URL(urls[1], "http://x").searchParams.get("cursor")).toBe("c1");
   });
+  it("reads a range longer than the window oldest first, one window per read", async () => {
+    const urls = stubFetch([
+      page([bar("2026-09-07T00:00:00Z", 1, 2, 1, 2)], null),
+      page([bar("2026-09-21T00:00:00Z", 1, 2, 1, 2)], null),
+      page([bar("2026-10-05T00:00:00Z", 1, 2, 1, 2)], null),
+    ]);
+    const out = await readHistory(selection, "2026-09-07T00:00:00Z", "2026-10-06T00:00:00Z", 400);
+    expect(out.bars).toHaveLength(3);
+    const q = urls.map((u) => new URL(u, "http://x").searchParams);
+    expect(q.map((p) => [p.get("start"), p.get("end")])).toEqual([
+      ["2026-09-07T00:00:00Z", "2026-09-21T00:00:00Z"],
+      ["2026-09-21T00:00:00Z", "2026-10-05T00:00:00Z"],
+      ["2026-10-05T00:00:00Z", "2026-10-06T00:00:00Z"],
+    ]);
+  });
   it("reports truncation when the page cap is reached", async () => {
     stubFetch(Array.from({ length: 60 }, () => page([], "more")));
     const out = await readHistory(selection, "2026-10-31T00:00:00Z", "2026-11-01T00:05:00Z", 400);
@@ -133,6 +148,10 @@ describe("S4-021 chart marks follow the range", () => {
     expect(q.every((u) => u.pathname.endsWith("/dynamic"))).toBe(true);
     expect(q[0].searchParams.get("from")).toBe("2026-10-25T00:00:00Z");
     expect(q[0].searchParams.get("to")).toBe("2026-11-01T00:05:00Z");
+    // the console's dynamic view refuses a read without a candle range
+    expect(q.every((u) => u.searchParams.get("interval") === "5m")).toBe(true);
+    expect(q[0].searchParams.get("start")).toBe("2026-10-25T00:00:00Z");
+    expect(q[0].searchParams.get("end")).toBe("2026-11-01T00:05:00Z");
     expect(q.map((u) => u.searchParams.get("source"))).toEqual(["dynamic.judgments", "dynamic.actions", "dynamic.judgments"]);
     expect(q[2].searchParams.get("cursor")).toBe("c1");
   });
