@@ -154,6 +154,9 @@ func (m *PositionManager) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	if err = m.resumeBatch(ctx, &st, position); err != nil {
+		return err
+	}
 	// An open batch reads every close since the last one it processed, so an
 	// outage does not drop closes from best_close and the trailing stop.
 	start := now.Add(-40 * time.Minute)
@@ -199,6 +202,32 @@ func (m *PositionManager) Run(ctx context.Context) error {
 	}
 	st.Noise = nil
 	return m.Store.SaveState(ctx, "POSITION", version, now, st)
+}
+
+// resumeBatch restores the batch a cycle opened when that cycle's state save
+// was lost: the OPEN record is written before the save, so opening the same
+// position cycle again at a later time would conflict with it every cycle.
+func (m *PositionManager) resumeBatch(ctx context.Context, st *PositionState, p *submission.PositionRead) error {
+	if p == nil || p.PositionCycleID == "" || st.Batch != nil && st.Batch.CycleID == p.PositionCycleID {
+		return nil
+	}
+	id := "open-" + p.PositionCycleID
+	rows, err := m.Store.RecordsByID(ctx, "STOP_EVENT", []string{id})
+	if err != nil {
+		return err
+	}
+	raw, ok := rows[id]
+	if !ok {
+		return nil
+	}
+	var open struct {
+		Batch *BatchState `json:"batch"`
+	}
+	if err = json.Unmarshal(raw, &open); err != nil || open.Batch == nil || open.Batch.CycleID != p.PositionCycleID {
+		return d.Fail("DYNAMIC_RECORD_INVALID", 422)
+	}
+	st.Batch = open.Batch
+	return nil
 }
 
 func (m *PositionManager) position(ctx context.Context) (*submission.PositionRead, error) {

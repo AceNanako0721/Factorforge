@@ -313,6 +313,15 @@ func (m *memDynamic) Records(_ context.Context, kind string, since, until time.T
 	}
 	return out, nil
 }
+func (m *memDynamic) RecordsByID(_ context.Context, kind string, ids []string) (map[string]json.RawMessage, error) {
+	out := map[string]json.RawMessage{}
+	for _, id := range ids {
+		if r, ok := m.records[kind][id]; ok {
+			out[id] = r.raw
+		}
+	}
+	return out, nil
+}
 func (m *memDynamic) LoadState(_ context.Context, key string, target any) (int64, error) {
 	if raw, ok := m.states[key]; ok {
 		return m.vers[key], json.Unmarshal(raw, target)
@@ -1043,5 +1052,38 @@ func TestT323NoWithdrawalWithoutLiveDirective(t *testing.T) {
 	}
 	if err := m.Run(context.Background()); err != nil || len(fw.directives) != 0 || !slices.Contains(alerts.codes, "RISK_FRACTION_ZERO") {
 		t.Fatal("directive without risk", len(fw.directives), alerts.codes, err)
+	}
+}
+
+// A cycle opened the batch and wrote its OPEN record, then its state save
+// was lost: the next cycles resume the recorded batch instead of failing on
+// DYNAMIC_RECORD_CONFLICT for the same position cycle.
+func TestPositionManagerResumesBatchAfterLostSave(t *testing.T) {
+	at := time.Date(2026, 10, 15, 15, 0, 5, 0, time.UTC)
+	m, store, _, tr, _ := positionManager(at)
+	clock := at
+	m.Clock = func() time.Time { return clock }
+	tr.bars = []submission.CandleRead{bar(at.Truncate(time.Minute), "100")}
+	_ = store.AppendRecord(context.Background(), "JUDGMENT", "j1", at.Add(-time.Minute), judgment("j1", at.Add(-time.Minute), "LONG", 3, []string{"n1"}, false))
+	if err := m.Run(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	tr.qty, tr.entry, tr.cycle = "10", "100", "cycle-1"
+	clock = at.Add(5 * time.Minute)
+	tr.bars = []submission.CandleRead{bar(at.Truncate(5*time.Minute).Add(5*time.Minute), "101")}
+	store.failSave = 1
+	if err := m.Run(context.Background()); err == nil {
+		t.Fatal("lost save not reported")
+	}
+	for i := 2; i <= 4; i++ {
+		clock = at.Add(time.Duration(5*i) * time.Minute)
+		tr.bars = []submission.CandleRead{bar(at.Truncate(5*time.Minute).Add(time.Duration(5*i)*time.Minute), "102")}
+		if err := m.Run(context.Background()); err != nil {
+			t.Fatal("cycle after lost save", i, err)
+		}
+	}
+	var st workers.PositionState
+	if _, err := store.LoadState(context.Background(), "POSITION", &st); err != nil || st.Batch == nil || st.Batch.CycleID != "cycle-1" || !st.Batch.OpenedAt.Equal(at.Add(5*time.Minute)) || st.Batch.BestClose != 102 {
+		t.Fatal("resumed batch", st.Batch, err)
 	}
 }

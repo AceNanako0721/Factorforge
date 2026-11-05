@@ -432,6 +432,12 @@
    "change_kind": "specification",
    "date": "2026-11-05",
    "summary": "Strategy layer: when the trading layer raises the owner epoch because the object's own venue protection order filled, and the position and pending quantity are flat, the run is normal and the target is blocked only for that review, the object adopts the new epoch and leaves recovery, with an OWNER_EPOCH_ADOPTED audit. Before, no path adopted the new epoch, so after one venue stop the object stayed in recovery and could never add risk again. External facts and any other epoch change still need review, and the re-entry gate after a stop still applies."
+  },
+  {
+   "version": "3.6.1",
+   "change_kind": "design",
+   "date": "2026-11-05",
+   "summary": "SOXLUSDT instance: the position manager writes a batch's OPEN record before it saves its state. When that save was lost, every later cycle opened the same position cycle again at a new time and failed on DYNAMIC_RECORD_CONFLICT, so the batch's close stop and trailing stop were no longer managed. The manager now restores the batch from the OPEN record before reading candles."
   }
  ]
 }

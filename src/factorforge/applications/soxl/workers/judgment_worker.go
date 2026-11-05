@@ -21,6 +21,7 @@ import (
 type DynamicStore interface {
 	AppendRecord(ctx context.Context, kind, id string, at time.Time, payload any) error
 	Records(ctx context.Context, kind string, since, until time.Time, limit int) ([]json.RawMessage, error)
+	RecordsByID(ctx context.Context, kind string, ids []string) (map[string]json.RawMessage, error)
 	LoadState(ctx context.Context, key string, target any) (int64, error)
 	SaveState(ctx context.Context, key string, expected int64, at time.Time, payload any) error
 }
