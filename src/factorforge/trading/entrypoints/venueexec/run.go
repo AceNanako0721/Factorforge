@@ -179,15 +179,16 @@ func Main(environment string) error {
 	if err != nil {
 		return err
 	}
+	// Every venue write and every loop pass renews the lease through the same
+	// rule (HoldLease), so a lease that lapsed while a call was blocked is
+	// renewed rather than reported lost.
 	transport.Fence = func(ctx context.Context) error {
-		run, err := store.Read(ctx, key)
-		if err != nil {
-			return err
-		}
-		if err = run.AssertLease(*holder, epoch, time.Now().UTC()); err != nil {
-			return err
-		}
-		return admit(run)
+		return store.Transaction(ctx, key, func(run *d.Aggregate) error {
+			if err := run.HoldLease(*holder, epoch, time.Now().UTC()); err != nil {
+				return err
+			}
+			return admit(run)
+		})
 	}
 	broker.Admitted = true
 	broker.Verified = Capabilities(bound.Environment, readiness)
@@ -215,11 +216,6 @@ func Main(environment string) error {
 	for {
 		if ctx.Err() != nil {
 			return nil
-		}
-		if err = store.Transaction(ctx, key, func(run *d.Aggregate) error {
-			return run.RenewLease(*holder, epoch, time.Now().UTC(), time.Duration(run.Policy.Operational.LeaseSeconds)*time.Second)
-		}); err != nil {
-			return err
 		}
 		if err = transport.Fence(ctx); err != nil {
 			return err

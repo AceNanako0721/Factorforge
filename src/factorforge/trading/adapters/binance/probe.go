@@ -70,11 +70,9 @@ func (p *ProbeTransport) Require(ctx context.Context) error {
 		return reject("TESTNET_PERMIT_EXPIRED", 423)
 	}
 	if !m.Manual {
-		run, err := p.Store.Read(ctx, m.Key)
-		if err != nil {
-			return err
-		}
-		return run.AssertLease(m.Holder, p.Epoch(), p.Clock())
+		return p.Store.Transaction(ctx, m.Key, func(run *d.Aggregate) error {
+			return run.HoldLease(m.Holder, p.Epoch(), p.Clock())
+		})
 	}
 	return nil
 }

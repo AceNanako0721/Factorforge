@@ -48,6 +48,19 @@ func (run *Aggregate) RenewLease(holder string, epoch int64, now time.Time, dura
 	run.applyLease(lease)
 	return nil
 }
+// HoldLease is the fence a running executor passes, inside the run
+// transaction, before it changes the run or calls the venue: the loop renewal
+// (RenewLease) under the run's lease policy, then Assert. A lease that lapsed
+// while this executor was blocked is renewed here, so the write that follows
+// still happens under a valid lease. Without a lease policy only Assert applies.
+func (run *Aggregate) HoldLease(holder string, epoch int64, now time.Time) error {
+	if run.Policy.Operational != nil && run.Policy.Operational.LeaseSeconds > 0 {
+		if err := run.RenewLease(holder, epoch, now, time.Duration(run.Policy.Operational.LeaseSeconds)*time.Second); err != nil {
+			return err
+		}
+	}
+	return run.AssertLease(holder, epoch, now)
+}
 func (run *Aggregate) AssertLease(holder string, epoch int64, now time.Time) error {
 	lease := run.lease()
 	return lease.Assert(holder, epoch, now)
