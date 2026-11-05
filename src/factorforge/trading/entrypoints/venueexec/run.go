@@ -194,7 +194,7 @@ func Main(environment string) error {
 	broker.Verified = Capabilities(bound.Environment, readiness)
 	probeHealth := &health.Probe{StoragePath: config.Trading.StoragePath, ClockOffset: health.ClockProbe(client, bound.Endpoint+"/fapi/v1/time", time.Now)}
 	protection := &workers.Protection{Store: store, Broker: broker, ExecutorID: *holder, LeaseEpoch: epoch, Now: time.Now}
-	feedback := &workers.Feedback{Store: store, Broker: broker, Tolerance: tolerance, Failed: func(code string) { fmt.Fprintln(os.Stderr, "VENUE_FEEDBACK_UNAVAILABLE", code) }}
+	feedback := &workers.Feedback{Store: store, Broker: broker, Tolerance: tolerance, Failed: func(code string) { fmt.Fprintln(os.Stderr, "VENUE_FEEDBACK_UNAVAILABLE", code, transport.LastFailure()) }}
 	executor := &workers.Executor{Store: store, Broker: broker, ExecutorID: *holder, LeaseEpoch: epoch, Now: time.Now, Health: probeHealth}
 	if *once {
 		if _, err = protection.Tick(ctx, key); err != nil {
