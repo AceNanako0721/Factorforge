@@ -68,7 +68,8 @@ func run() error {
 			if e, ok := err.(*d.Error); ok {
 				status = e.Status
 			}
-			fmt.Printf("COLLECT_FAILED %s %d\n", err.Error(), status)
+			// The venue request behind the failure, if the round failed there.
+			fmt.Printf("COLLECT_FAILED %s %d %s\n", err.Error(), status, market.LastFailure())
 		} else {
 			fmt.Printf("Collected %d points and %d completed candles\n", points, bars)
 		}

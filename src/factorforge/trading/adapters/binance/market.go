@@ -33,7 +33,12 @@ type Market struct {
 	Now              func() time.Time
 	mu               sync.Mutex
 	specs            map[string]*d.InstrumentSpec
+	failures         failures
 }
+
+// LastFailure describes the most recent public request if it failed, and is
+// empty after a success (RequestFailure).
+func (m *Market) LastFailure() string { return m.failures.String() }
 
 func (m *Market) now() time.Time {
 	if m.Now != nil {
@@ -55,24 +60,34 @@ func (m *Market) get(ctx context.Context, path string, params Params) (any, erro
 	}
 	safe := *m.Client
 	safe.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	started := time.Now()
+	failed := func(cause string, status int, code int64) {
+		m.failures.record(&RequestFailure{Path: path, Cause: cause, Status: status, VenueCode: code, Elapsed: time.Since(started)})
+	}
 	response, err := safe.Do(r)
 	if err != nil {
+		failed(networkCause(err), 0, 0)
 		return nil, reject("VENUE_MARKET_UNAVAILABLE", 503)
 	}
 	defer response.Body.Close()
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return nil, reject("VENUE_MARKET_UNAVAILABLE", 503)
-	}
 	data, err := io.ReadAll(io.LimitReader(response.Body, 16<<20+1))
-	if err != nil || len(data) > 16<<20 {
-		return nil, reject("VENUE_MARKET_UNAVAILABLE", 503)
-	}
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.UseNumber()
 	var value any
-	if decoder.Decode(&value) != nil {
+	decoded := err == nil && len(data) <= 16<<20 && decoder.Decode(&value) == nil
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		var code int64
+		if object, ok := value.(map[string]any); ok && decoded {
+			code, _ = strconv.ParseInt(text(object["code"]), 10, 64)
+		}
+		failed("STATUS", response.StatusCode, code)
 		return nil, reject("VENUE_MARKET_UNAVAILABLE", 503)
 	}
+	if !decoded {
+		failed("BODY", response.StatusCode, 0)
+		return nil, reject("VENUE_MARKET_UNAVAILABLE", 503)
+	}
+	m.failures.record(nil)
 	return value, nil
 }
 func (m *Market) Spec(key d.InstrumentKey) (*d.InstrumentSpec, error) {

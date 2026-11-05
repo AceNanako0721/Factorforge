@@ -43,7 +43,12 @@ type SignedTransport struct {
 	started, blocked                    time.Time
 	used                                int
 	lastRejection                       *int64
+	failures                            failures
 }
+
+// LastFailure describes the most recent request sent to the venue if it
+// failed, and is empty after a success (RequestFailure).
+func (t *SignedTransport) LastFailure() string { return t.failures.String() }
 
 func reject(code string, status int) error { return &d.Error{Code: code, Status: status} }
 func (t *SignedTransport) Clock() time.Time {
@@ -133,8 +138,13 @@ func (t *SignedTransport) Request(ctx context.Context, method, path string, para
 	}
 	safe := *client
 	safe.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	started := time.Now()
+	failed := func(cause string, status int, code int64) {
+		t.failures.record(&RequestFailure{Path: path, Cause: cause, Status: status, VenueCode: code, Elapsed: time.Since(started)})
+	}
 	response, err := safe.Do(request)
 	if err != nil {
+		failed(networkCause(err), 0, 0)
 		if write {
 			return nil, &ports.Ambiguous{}
 		}
@@ -155,6 +165,7 @@ func (t *SignedTransport) Request(ctx context.Context, method, path string, para
 	}
 	t.mu.Unlock()
 	if response.StatusCode >= 500 || response.StatusCode == 408 || response.StatusCode == 418 || response.StatusCode == 429 {
+		failed("STATUS", response.StatusCode, 0)
 		if write {
 			return nil, &ports.Ambiguous{}
 		}
@@ -162,6 +173,7 @@ func (t *SignedTransport) Request(ctx context.Context, method, path string, para
 	}
 	data, err := io.ReadAll(io.LimitReader(response.Body, 16<<20+1))
 	if err != nil || len(data) > 16<<20 {
+		failed("BODY", response.StatusCode, 0)
 		if write {
 			return nil, &ports.Ambiguous{}
 		}
@@ -182,6 +194,7 @@ func (t *SignedTransport) Request(ctx context.Context, method, path string, para
 			t.lastRejection = &code
 		}
 		t.mu.Unlock()
+		failed("STATUS", response.StatusCode, code)
 		if code == -2011 || code == -2013 {
 			return nil, reject("ORDER_NOT_FOUND", 404)
 		}
@@ -191,11 +204,13 @@ func (t *SignedTransport) Request(ctx context.Context, method, path string, para
 		return nil, reject("VENUE_REQUEST_REJECTED", 422)
 	}
 	if response.StatusCode >= 300 || err != nil {
+		failed("BODY", response.StatusCode, 0)
 		if write {
 			return nil, &ports.Ambiguous{}
 		}
 		return nil, reject("VENUE_QUERY_UNAVAILABLE", 503)
 	}
+	t.failures.record(nil)
 	return value, nil
 }
 func (t *SignedTransport) LastRejectionCode() *int64 {
