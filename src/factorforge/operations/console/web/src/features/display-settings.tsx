@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
+import { Select } from "antd";
 const zones = ["UTC", "Asia/Tokyo", "Asia/Shanghai"] as const;
 export type Zone = (typeof zones)[number];
 const DisplayContext = createContext<{
@@ -33,20 +34,17 @@ export function useDisplay() {
 export function DisplayZone() {
   const { zone, setZone } = useDisplay();
   return (
-    <label className="zone-select">
-      <span>显示时区</span>
-      <select
-        aria-label="显示时区"
-        value={zone}
-        onChange={(e) => setZone(e.target.value as Zone)}
-      >
-        {zones.map((z) => (
-          <option key={z}>{z}</option>
-        ))}
-      </select>
-    </label>
+    <Select
+      aria-label="显示时区"
+      size="small"
+      value={zone}
+      onChange={(v) => setZone(v)}
+      options={zones.map((z) => ({ value: z, label: zoneText[z] }))}
+      style={{ width: 92 }}
+    />
   );
 }
+const zoneText: Record<Zone, string> = { UTC: "UTC", "Asia/Tokyo": "东京", "Asia/Shanghai": "北京" };
 export function displayTime(value: string, zone: Zone): string {
   if (
     zone === "UTC" ||
@@ -67,6 +65,13 @@ function parts(seconds: number, zone: Zone): Record<string, string> {
 export function chartTime(seconds: number, zone: Zone): string {
   const p = parts(seconds, zone);
   return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute} · ${zone}`;
+}
+// Compact "MM-DD HH:mm" in the display zone for tables and cards.
+export function shortTime(value: string, zone: Zone): string {
+  const at = Date.parse(value);
+  if (!Number.isFinite(at)) return value;
+  const p = parts(at / 1000, zone);
+  return `${p.month}-${p.day} ${p.hour}:${p.minute}`;
 }
 // kind follows lightweight-charts TickMarkType: 0 year, 1 month, 2 day, 3+ time.
 export function chartTick(seconds: number, kind: number, zone: Zone): string {

@@ -1,132 +1,115 @@
-// Layout adapted from shadcn-admin authenticated-layout at the frozen MIT ref.
-// Local session replaces Clerk; no demo edit controls or trading actions.
-import { useState } from "react";
-import { Link, Outlet } from "@tanstack/react-router";
-import { request, ApiError } from "../api/client";
-import { Button } from "./button";
+// One header: the instance switch on the left, the two pages, display zone,
+// theme and logout on the right. The console stays read only.
+import { useEffect, useRef } from "react";
+import { Link, Outlet, useRouterState } from "@tanstack/react-router";
+import { Button, Empty, Layout, Segmented, Space, Spin, Tag, Tooltip, Typography } from "antd";
+import { LogoutOutlined, MoonOutlined, SunOutlined } from "@ant-design/icons";
+import { request, ApiError, type Selection } from "../api/client";
 import { Login } from "../features/login";
-import { pages } from "../features/page";
 import { DisplayZone } from "../features/display-settings";
 import { useSession } from "../features/session";
+import { useTheme } from "../features/theme";
+
+export const pages = [
+  ["flow", "实时流程"],
+  ["market", "行情与交易"],
+] as const;
+
+export function instanceName(s: Selection): string {
+  return s.instance_id.replace(/^soxl-/, "").toUpperCase();
+}
+
 export function Shell() {
-  const { session, loaded, selection, selections, choose, invalidate } =
-    useSession();
-  const [menu, setMenu] = useState(false);
+  const { session, loaded, selection, selections, choose, invalidate } = useSession();
+  const { mode, toggle } = useTheme();
+  const path = useRouterState({ select: (s) => s.location.pathname });
+  // S4-001: right after login the first allowed SIM instance opens; a scope
+  // that later becomes invalid is not replaced by another one, and a LIVE
+  // scope is never opened by itself. Nothing is stored.
+  const opened = useRef<string | null>(null);
+  useEffect(() => {
+    if (!session || selection || selections.length === 0 || opened.current === session.user_id) return;
+    opened.current = session.user_id;
+    const first = selections.find((s) => s.environment !== "LIVE");
+    if (first) choose(first);
+  }, [session, selection, selections]);
   if (!loaded)
     return (
       <main className="loading" role="status">
-        正在恢复会话…
+        <Spin /> 正在恢复会话…
       </main>
     );
   if (!session) return <Login />;
   async function logout() {
     try {
-      await request("/session", undefined, {
-        method: "DELETE",
-        headers: { "X-CSRF-Token": session?.csrf ?? "" },
-      });
+      await request("/session", undefined, { method: "DELETE", headers: { "X-CSRF-Token": session?.csrf ?? "" } });
       invalidate();
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) invalidate();
     }
   }
+  function pick(id: string) {
+    choose(selections.find((x) => x.selection_id === id) ?? null);
+  }
   return (
-    <div className="app-shell">
-      <a className="skip-link" href="#main">
-        跳到内容
-      </a>
-      <aside className={menu ? "sidebar mobile-open" : "sidebar"}>
-        <Link to="/overview" className="brand">
-          <span className="brand-symbol">F</span>
-          <span>
-            FACTORFORGE<small>观察与追溯</small>
+    <Layout className="app-shell">
+      <Layout.Header className="topbar">
+        <Space size="middle" wrap className="topbar-left">
+          <span className="brand">
+            <span className="brand-symbol">F</span>
           </span>
-        </Link>
-        <p className="nav-label">工作区 / READ ONLY</p>
-        <nav aria-label="主要导航">
-          {pages.map(([path, title, icon]) => (
-            <Link
-              key={path}
-              to={"/" + path}
-              activeProps={{ className: "nav-item active" }}
-              inactiveProps={{ className: "nav-item" }}
-              onClick={() => setMenu(false)}
-            >
-              <span aria-hidden="true">{icon}</span>
+          <Segmented
+            aria-label="切换实例"
+            value={selection?.selection_id}
+            onChange={(v) => pick(String(v))}
+            options={selections.map((s) => ({
+              value: s.selection_id,
+              label: (
+                <Tooltip title={`${s.environment} · ${s.trading_run_key.run_id} · ${s.instrument_key.instrument_id}`}>
+                  <span className="instance-option">{instanceName(s)}</span>
+                </Tooltip>
+              ),
+            }))}
+          />
+          {selection && (
+            <Tag color={selection.environment === "LIVE" ? "red" : "blue"}>
+              {selection.environment === "LIVE" ? "实盘" : "模拟"} · {selection.instrument_key.instrument_id}
+            </Tag>
+          )}
+        </Space>
+        <nav className="topnav" aria-label="页面">
+          {pages.map(([to, title]) => (
+            <Link key={to} to={"/" + to} className={path === "/" + to ? "topnav-item active" : "topnav-item"}>
               {title}
             </Link>
           ))}
         </nav>
-        <div className="sidebar-note">
-          事实与判断分别呈现
-          <br />
-          未知状态保留未知
-        </div>
-      </aside>
-      <div className="workspace">
-        <header className="topbar">
-          <Button
-            variant="ghost"
-            className="menu-toggle"
-            onClick={() => setMenu(!menu)}
-            aria-expanded={menu}
-            aria-label="展开导航"
-          >
-            ☰
-          </Button>
-          <label className="scope-select">
-            <span>查看范围</span>
-            <select
-              aria-label="查看范围"
-              value={selection?.selection_id ?? ""}
-              onChange={(e) =>
-                choose(
-                  selections.find((s) => s.selection_id === e.target.value) ??
-                    null,
-                )
-              }
-            >
-              <option value="">选择允许查看的运行</option>
-              {selections.map((s) => (
-                <option value={s.selection_id} key={s.selection_id}>
-                  {s.environment} · {s.instance_id} ·{" "}
-                  {s.instrument_key.instrument_id}
-                </option>
-              ))}
-            </select>
-          </label>
-          <span
-            className={`environment env-${selection?.environment ?? "NONE"}`}
-          >
-            {selection?.environment ?? "未选择"}
-          </span>
+        <Space className="topbar-right">
           <DisplayZone />
-          <div className="user-menu">
-            <span>{session.display_name}</span>
-            <Button variant="ghost" size="sm" onClick={logout}>
-              退出
-            </Button>
-          </div>
-        </header>
-        {selection && (
-          <div className="binding-strip">
-            <span>{selection.deployment_id}</span>
-            <span>{selection.trading_run_key.run_id}</span>
-            <span>对象 {selection.object_id || "不适用"}</span>
-            <span>绑定 {selection.binding_version}</span>
-            <span className="read-only">只读观察</span>
-          </div>
-        )}
-        <main id="main" tabIndex={-1}>
+          <Tooltip title={mode === "dark" ? "浅色" : "深色"}>
+            <Button type="text" aria-label="切换浅色或深色" icon={mode === "dark" ? <SunOutlined /> : <MoonOutlined />} onClick={toggle} />
+          </Tooltip>
+          <Typography.Text type="secondary" className="user-name">
+            {session.display_name}
+          </Typography.Text>
+          <Tooltip title="退出">
+            <Button type="text" aria-label="退出" icon={<LogoutOutlined />} onClick={logout} />
+          </Tooltip>
+        </Space>
+      </Layout.Header>
+      <Layout.Content id="main" tabIndex={-1} className="content">
+        {selection ? (
           <Outlet />
-        </main>
-        <footer className="app-footer">
-          Factorforge · 查询和来源时间始终为 UTC · 受理回执与实际成交分别展示 ·{" "}
-          <a href="/THIRD_PARTY_NOTICES.txt" target="_blank" rel="noreferrer">
-            开源许可
-          </a>
-        </footer>
-      </div>
-    </div>
+        ) : (
+          <Empty className="loading" description={selections.length === 0 ? "没有可查看的实例" : "请在左上角选择实例"} />
+        )}
+      </Layout.Content>
+      <Layout.Footer className="app-footer">
+        Factorforge 管理台 · 只读 ·{" "}
+        <a href="/THIRD_PARTY_NOTICES.txt" target="_blank" rel="noreferrer">
+          开源许可
+        </a>
+      </Layout.Footer>
+    </Layout>
   );
 }

@@ -4,10 +4,6 @@ import {
   expect,
 } from "../../src/factorforge/operations/console/web/node_modules/vitest/dist/index.js";
 import {
-  compare,
-  scalar,
-} from "../../src/factorforge/operations/console/web/src/schemas/display";
-import {
   query,
   checkResponse,
   type Selection,
@@ -20,21 +16,9 @@ import {
   scaleRange,
   zoomRange,
 } from "../../src/factorforge/operations/console/web/src/features/market-chart";
-import { chartMarkers, currentProtection, judgmentEffects, ladderInfo } from "../../src/factorforge/operations/console/web/src/features/dynamic-page";
+import { chartMarkers, currentProtection, judgmentEffects, ladderInfo, quietMarkers } from "../../src/factorforge/operations/console/web/src/features/market-model";
 import { chartTick, chartTime, displayTime } from "../../src/factorforge/operations/console/web/src/features/display-settings";
-import { fundingGap, pnlRows } from "../../src/factorforge/operations/console/web/src/features/pnl-panel";
 describe("read-only browser semantics", () => {
-  it("retains exact monetary strings and sorts without rounding", () => {
-    expect(
-      compare(
-        "1000000000000000.000000000000000002",
-        "1000000000000000.000000000000000001",
-      ),
-    ).toBe(1);
-    expect(compare("-0.000000000000000002", "-0.000000000000000001")).toBe(-1);
-    expect(scalar("0.000000000000000001")).toBe("0.000000000000000001");
-    expect(scalar(null)).not.toBe("0");
-  });
   it("builds only a scoped query and rejects another environment", () => {
     const s = {
       selection_id: "a",
@@ -123,45 +107,6 @@ describe("read-only browser semantics", () => {
     expect(panRange(range, -101, 102)!.from).toBeCloseTo(70);
     expect(panRange(range, 10, 0)).toBeNull();
   });
-  it("lays out the PnL block by basis and keeps missing figures null", () => {
-    const code = "BINANCE:LINEAR_PERPETUAL:SOXLUSDT";
-    const block = (trading: string | null, booked: string | null, reference: string | null) => ({
-      since: "2026-10-25T17:35:21Z",
-      trading,
-      booked_funding: booked,
-      reference_funding: reference,
-      booked: trading !== null && booked !== null ? String(Number(trading) + Number(booked)) : null,
-      reference: trading !== null && reference !== null ? String(Number(trading) + Number(reference)) : null,
-    });
-    const status = { source_id: "binance-mainnet-public", settlements: 12, through_at: "2026-10-27T00:00:00Z", stale: false, check: "NOT_APPLICABLE" };
-    const demo = pnlRows(
-      { basis: "VENUE", environment: "SIM", venue_observed_at: "2026-10-27T02:00:00Z", total: block("14.37", "5.87", "0.03"), positions: [{ instrument_key: { venue: "BINANCE", product: "LINEAR_PERPETUAL", instrument_id: "SOXLUSDT" }, ...block("19.3", "0.1", "0") }], reference: status, missing: [] },
-      code,
-    );
-    expect(demo.layout).toBe("DEMO");
-    expect(demo.rows.map((r) => r.label)).toEqual(["当前持仓", "累计"]);
-    expect(demo.rows[1].booked).toBeCloseTo(20.24);
-    expect(demo.rows[1].reference).toBeCloseTo(14.4);
-    expect(fundingGap(demo.rows[1])).toBeCloseTo(-5.84);
-    const system = pnlRows(
-      { basis: "SYSTEM", environment: "SIM", venue_observed_at: null, total: block("10.82", null, "0.03"), positions: [], reference: { ...status, stale: true }, missing: [] },
-      code,
-    );
-    expect(system.layout).toBe("SYSTEM");
-    expect(system.rows.map((r) => r.label)).toEqual(["累计"]);
-    expect(system.rows[0].booked).toBeNull();
-    expect(system.stale).toBe(true);
-    const unobserved = pnlRows(
-      { basis: "VENUE", environment: "LIVE", venue_observed_at: null, total: block(null, "1", "1"), positions: [], reference: { ...status, check: "DIFFERENT" }, missing: ["VENUE_ACCOUNT_NOT_OBSERVED"] },
-      code,
-    );
-    expect(unobserved.layout).toBe("LIVE");
-    expect(unobserved.rows[0].trading).toBeNull();
-    expect(unobserved.rows[0].booked).toBeNull();
-    expect(unobserved.check).toBe("DIFFERENT");
-    expect(unobserved.missing).toEqual(["VENUE_ACCOUNT_NOT_OBSERVED"]);
-    expect(pnlRows(undefined, code).layout).toBe("MISSING");
-  });
 });
 
 describe("S4-017 effective judgment markers", () => {
@@ -184,13 +129,12 @@ describe("S4-017 effective judgment markers", () => {
     expect(e.get("j-20261025T180102Z")?.kinds).toEqual(["INJECT"]);
     expect(e.has("j-20261026T030102Z")).toBe(false);
   });
-  it("marks only effective judgments unless recorded ones are asked for", () => {
-    const m = chartMarkers(judgments, actions, false);
+  it("marks only effective judgments and labels only a changed view", () => {
+    const m = chartMarkers(judgments, actions);
     expect(m.map((x) => x.text)).toEqual(["多3 作废原链", "多3 注入", "开仓 85.84"]);
     expect(m[2].shape).toBe("square");
-    const all = chartMarkers(judgments, actions, true);
-    expect(all).toHaveLength(4);
-    expect(all.find((x) => x.at === "2026-10-26T03:01:02Z")).toMatchObject({ text: "", shape: "circle" });
+    expect(m.some((x) => x.at === "2026-10-26T03:01:02Z")).toBe(false);
+    expect(quietMarkers(m).map((x) => x.text)).toEqual(["多3", "", "开仓 85.84"]);
   });
 });
 

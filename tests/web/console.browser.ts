@@ -4,164 +4,80 @@ import {
   type Page,
 } from "../../src/factorforge/operations/console/web/node_modules/@playwright/test/index.mjs";
 async function login(page: Page) {
-  await page.goto("/overview");
+  await page.goto("/flow");
   await page.getByLabel("用户名", { exact: true }).fill("fixture-user");
   await page.getByLabel("密码", { exact: true }).fill("fixture-pass");
   await page.getByRole("button", { name: "进入管理台" }).click();
-  await page.getByLabel("查看范围").selectOption("fixture-selection");
-  await expect(
-    page.getByRole("heading", { name: "总览", exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("heading", { name: "账户事实", exact: true }),
-  ).toBeVisible();
+  // The only allowed instance opens by itself on the flow page.
+  await expect(page.getByLabel("实时流程图")).toBeVisible();
+  await expect(page.locator(".flow-node").filter({ hasText: "模型研判" })).toBeVisible();
 }
-test("native SIM facts, detail, final candles, export, failures and logout", async ({
-  page,
-}) => {
+async function fixture(page: Page, action: string) {
+  await page.evaluate(
+    (a) => fetch(`/fixture/state?action=${a}`, { method: "POST", headers: { Origin: location.origin } }),
+    action,
+  );
+}
+
+test("S4-022 flow page: modules, details on demand and stale data", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await login(page);
-  await expect(page.locator(".environment")).toHaveText("SIM");
-  await page.screenshot({
-    path: "../../../../../runtime/console-desktop.png",
-    fullPage: true,
-  });
-  await page.getByRole("link", { name: "执行与账务", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: "实际成交", exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByText("FILLED · 已成交", { exact: true }).first(),
-  ).toBeVisible();
-  await page.getByRole("link", { name: "事件与评分", exact: true }).click();
-  await page.getByRole("button", { name: "详情", exact: true }).first().click();
-  await expect(page.getByRole("dialog")).toBeVisible();
-  expect(await page.locator('img[src="x"]').count()).toBe(0);
-  await page.getByRole("button", { name: "关闭", exact: true }).click();
-  await page.getByRole("link", { name: "行情", exact: true }).click();
-  await page.getByLabel("周期", { exact: true }).selectOption("1m");
-  await page
-    .getByLabel("起始 UTC", { exact: true })
-    .fill("2026-01-05T00:00:00Z");
-  await page
-    .getByLabel("结束 UTC", { exact: true })
-    .fill("2026-01-05T00:10:00Z");
-  await page.getByRole("button", { name: "应用范围" }).click();
-  await expect(page.getByRole("img", { name: "已记录最终K线" })).toBeVisible();
-  await page.getByRole("link", { name: "总览", exact: true }).click();
-  await page.locator("summary").filter({ hasText: "导出" }).click();
-  const downloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "JSON", exact: true }).click();
-  const download = await downloadPromise;
-  expect(download.suggestedFilename()).toBe("factorforge-overview.json");
-  // The judgment and stop page is the P3-backed view; its panels go stale
-  // when the application listener stops answering.
-  await page.getByRole("link", { name: "研判与止损", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: "账户事实", exact: true }),
-  ).toBeVisible();
-  await page.evaluate(() =>
-    fetch("/fixture/state?action=offline", {
-      method: "POST",
-      headers: { Origin: location.origin },
-    }),
-  );
-  await page.getByRole("button", { name: "刷新", exact: false }).click();
-  await expect(page.getByText("STALE · 陈旧结果").first()).toBeVisible();
-  await expect(
-    page.getByRole("heading", { name: "账户事实", exact: true }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "退出", exact: true }).click();
-  await expect(page.getByRole("button", { name: "进入管理台" })).toBeVisible();
-  const stored = await page.evaluate(() => ({ ...localStorage }));
-  expect(JSON.stringify(stored)).not.toContain("fixture");
+  await fixture(page, "online");
+  for (const title of ["新闻采集", "模型研判", "判断链", "信心池", "策略决策", "止损与阶梯", "执行器", "账户"])
+    await expect(page.locator(".flow-node").filter({ hasText: title })).toBeVisible();
+  // Details open only when a module is clicked, and close again.
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.locator(".flow-node").filter({ hasText: "模型研判" }).click();
+  const drawer = page.getByRole("dialog");
+  await expect(drawer).toBeVisible();
+  await expect(drawer.getByText("synthetic thesis").first()).toBeVisible();
+  await expect(drawer.getByText("PRIVATE RAW")).toHaveCount(0);
+  // Parameters are read only (S4-022).
+  await expect(drawer.getByRole("button", { name: /修\s*改/ })).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await expect(drawer).toBeHidden();
+  // S4-014: the page speaks plain language, not status codes.
+  expect(await page.locator("main").innerText()).not.toMatch(/\b[A-Z]{3,}_[A-Z_]{3,}\b/);
+  await page.screenshot({ path: "../../../../../runtime/console-flow.png", fullPage: true });
+  // The application listener stops answering: its modules say so.
+  await fixture(page, "offline");
+  await page.reload();
+  await expect(page.getByText(/暂时读不到/).first()).toBeVisible({ timeout: 15_000 });
+  await fixture(page, "online");
   expect(errors).toEqual([]);
 });
-test("a late response cannot restore data after deselection", async ({
-  page,
-}) => {
-  await login(page);
-  let release!: () => void;
-  let received!: () => void;
-  const waiting = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  const arrived = new Promise<void>((resolve) => {
-    received = resolve;
-  });
-  await page.route("**/api/v2/console/overview?**", async (route) => {
-    const response = await route.fetch();
-    received();
-    await waiting;
-    await route.fulfill({ response }).catch(() => {});
-  });
-  await page.getByRole("button", { name: "刷新", exact: false }).click();
-  await arrived;
-  await page.getByLabel("查看范围").selectOption("");
-  await expect(
-    page.getByRole("heading", { name: "先选择允许查看的运行" }),
-  ).toBeVisible();
-  release();
-  await page.unroute("**/api/v2/console/overview?**");
-  await expect(
-    page.getByRole("heading", { name: "账户事实", exact: true }),
-  ).toHaveCount(0);
-  expect(
-    await page.evaluate(() => JSON.stringify({ ...localStorage })),
-  ).not.toContain("fixture");
-});
 
-test("S4-017 judgment and stop page on desktop and phone width", async ({
-  page,
-}) => {
+test("S4-022 market page: totals, conviction, trades and folded records", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
+  const seen: string[] = [];
+  page.on("request", (r) => seen.push(r.url()));
   await login(page);
-  await page.evaluate(() =>
-    fetch("/fixture/state?action=online", {
-      method: "POST",
-      headers: { Origin: location.origin },
-    }),
-  );
-  await page.getByRole("link", { name: "研判与止损", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: "三层止损与价格", exact: true }),
-  ).toBeVisible();
-  await expect(page.getByText("收盘止损", { exact: true })).toBeVisible();
-  // the ladder's next rung and what set the close stop are listed.
-  await expect(page.getByText("阶梯第 2 级触发价", { exact: true })).toBeVisible();
-  await expect(page.getByText("来自开仓时的初始止损 · 阶梯第 1 级", { exact: true })).toBeVisible();
-  await expect(page.getByText(/阶梯步长 4\.0% · 当前第 1 级/)).toBeVisible();
+  await fixture(page, "online");
+  await page.getByRole("link", { name: "行情与交易", exact: true }).click();
+  await expect(page.getByText("权益（USDT）", { exact: true })).toBeVisible();
+  await expect(page.getByText("当前信心", { exact: true })).toBeVisible();
+  await expect(page.getByText("成交单", { exact: true })).toBeVisible();
+  await expect(page.getByRole("img", { name: "已记录最终K线" })).toBeVisible();
+  // The message lists stay folded until opened.
+  await expect(page.getByText("synthetic thesis", { exact: true })).toBeHidden();
+  await page.getByText(/^研判记录/).click();
   await expect(page.getByText("synthetic thesis", { exact: true })).toBeVisible();
-  await expect(page.getByText("注入研判 · 做空", { exact: true })).toBeVisible();
-  // the timeline says which judgment changed the position inputs.
-  await expect(page.getByText("注入（首次方向）", { exact: true })).toBeVisible();
-  await expect(page.getByText("仅记录，未改变仓位", { exact: true })).toBeVisible();
-  await page.getByLabel("显示未生效的研判（灰点）").check();
-  await page.getByLabel("显示未生效的研判（灰点）").uncheck();
-  await expect(page.getByText("未实现", { exact: true })).toHaveCount(0);
   await expect(page.getByText("PRIVATE RAW")).toHaveCount(0);
-  // S4-020: the fixture run is internal matching, so the PnL block shows the
-  // real-funding total with system-computed sources only.
-  const pnl = page.getByLabel("持仓盈亏");
-  await expect(pnl.getByRole("heading", { name: "持仓盈亏", exact: true })).toBeVisible();
-  await expect(pnl.getByText("按真实资金费合计", { exact: true })).toBeVisible();
-  await expect(pnl.getByText("系统计算").first()).toBeVisible();
-  await expect(pnl.getByText("交易所", { exact: true })).toHaveCount(0);
-  await expect(pnl.getByRole("cell", { name: /^累计/ })).toBeVisible();
-  // No settlement record in the fixture: the reference is "not obtained", not 0.
-  await expect(pnl.getByText("真实资金费尚未取得", { exact: true })).toBeVisible();
-  // S4-019 reference layer: pushed values arrive and keep changing.
-  const mark = page.getByLabel("参考标记价");
-  await expect(mark.locator("strong")).toHaveText(/^100\.\d+$/);
-  await expect(mark.locator("small")).toContainText("实时");
-  const first = await mark.locator("strong").innerText();
-  await expect(mark.locator("strong")).not.toHaveText(first);
-  await expect(page.getByText("参考标记价", { exact: true })).toBeVisible();
-  await expect(page.getByLabel("参考浮动盈亏").locator("strong")).not.toHaveText("—");
-  // the wheel over the price axis zooms prices and the page does not
-  // scroll; the toggle and reset only change the view.
+  // S4-021: the range buttons read the longer history and marks.
+  for (const label of ["3 天", "7 天", "全部", "24 小时"]) {
+    await page.getByText(label, { exact: true }).click();
+    await expect(page.locator("canvas").first()).toBeVisible();
+    await page.waitForTimeout(600);
+  }
+  // S4-021: the chosen range is highlighted; S4-019: the price says where it comes from.
+  await expect(page.locator(".ant-card .ant-segmented-item-selected")).toHaveText("24 小时");
+  await expect(page.getByText(/^(实时参考价|最新收盘)$/)).toBeVisible();
+  expect(seen.some((u) => u.includes("source=dynamic.judgments") && u.includes("from="))).toBe(true);
+  expect(seen.some((u) => u.includes("source=candles") && u.includes("interval=5m"))).toBe(true);
+  expect(seen.some((u) => u.includes("source=protections"))).toBe(true);
+  // The wheel over the price axis zooms prices; the page does not scroll.
   const host = page.getByLabel("已记录最终K线");
   await host.scrollIntoViewIfNeeded();
   const box = (await host.boundingBox())!;
@@ -169,103 +85,32 @@ test("S4-017 judgment and stop page on desktop and phone width", async ({
   await page.mouse.move(box.x + box.width - 20, box.y + box.height / 2);
   await page.mouse.wheel(0, -300);
   expect(await page.evaluate(() => window.scrollY)).toBe(before);
-  await page.mouse.move(box.x + box.width / 3, box.y + box.height / 3);
-  await page.mouse.down();
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 8 });
-  await page.mouse.up();
-  await page.getByLabel("纵轴包含全部止损线").check();
-  await page.getByRole("button", { name: "纵轴自动" }).click();
-  await page.getByLabel("纵轴包含全部止损线").uncheck();
-  await page.screenshot({
-    path: "../../../../../runtime/console-dynamic-1440.png",
-    fullPage: true,
-  });
+  await page.screenshot({ path: "../../../../../runtime/console-market-1440.png", fullPage: true });
   await page.setViewportSize({ width: 390, height: 900 });
-  await expect(
-    page.getByRole("heading", { name: "三层止损与价格", exact: true }),
-  ).toBeVisible();
-  const overflow = await page.evaluate(
-    () => document.documentElement.scrollWidth - window.innerWidth,
-  );
-  expect(overflow).toBeLessThanOrEqual(1);
-  await page.screenshot({
-    path: "../../../../../runtime/console-dynamic-390.png",
-    fullPage: true,
-  });
-  expect(errors).toEqual([]);
-});
-// Runs before the revocation test: the fixture cannot restore a revoked selection.
-test("S4-021 range buttons read the longer history, marks and keep the chart drawn", async ({ page }) => {
-  const errors: string[] = [];
-  page.on("pageerror", (e) => errors.push(e.message));
-  const seen: string[] = [];
-  page.on("request", (r) => seen.push(r.url()));
-  await login(page);
-  await page.evaluate(() =>
-    fetch("/fixture/state?action=online", { method: "POST", headers: { Origin: location.origin } }),
-  );
-  await page.getByRole("link", { name: "研判与止损", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "三层止损与价格", exact: true })).toBeVisible();
-  for (const label of ["3 天", "7 天", "全部", "24 小时"]) {
-    await page.getByRole("button", { name: label, exact: true }).click();
-    await expect(page.getByRole("button", { name: label, exact: true })).toHaveAttribute("aria-pressed", "true");
-    await expect(page.locator("canvas").first()).toBeVisible();
-    await page.waitForTimeout(600);
-  }
-  expect(seen.some((u) => u.includes("source=dynamic.judgments") && u.includes("from="))).toBe(true);
-  expect(seen.some((u) => u.includes("source=dynamic.actions"))).toBe(true);
-  expect(seen.some((u) => u.includes("source=candles") && u.includes("interval=5m"))).toBe(true);
-  await expect(page.getByRole("alert")).toHaveCount(0);
-  await page.screenshot({ path: "../../runtime/web-test-results/range-24h.png" });
+  await expect(page.getByText("当前信心", { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1);
+  await page.screenshot({ path: "../../../../../runtime/console-market-390.png", fullPage: true });
   expect(errors).toEqual([]);
 });
 
-test("S4-003 panel times follow the display zone", async ({ page }) => {
+test("S4-003 display zone and theme stay in the browser; nothing else is stored", async ({ page }) => {
   await login(page);
-  const read = page.locator(".metadata span", { hasText: /^读取 / }).first();
-  const fact = page.locator(".metadata span", { hasText: /^事实时间 \d/ }).first();
-  await expect(read).toContainText(/^读取 \d{4}-\d\d-\d\dT[\d:.]+Z · /);
-  await page.getByLabel("显示时区").selectOption("Asia/Tokyo");
-  await expect(read).toContainText(/^读取 \d{4}\/\d{1,2}\/\d{1,2} \d\d:\d\d:\d\d · Asia\/Tokyo · /);
-  await expect(fact).toContainText(/ · Asia\/Tokyo$/);
+  await page.getByLabel("显示时区").click();
+  await page.getByTitle("东京").click();
+  await page.getByRole("button", { name: "切换浅色或深色" }).click();
   await page.reload();
-  await expect(page.getByLabel("显示时区")).toHaveValue("Asia/Tokyo");
-  await page.getByLabel("查看范围").selectOption("fixture-selection");
-  await expect(page.locator(".metadata span", { hasText: /^读取 / }).first()).toContainText("Asia/Tokyo");
-  await page.getByLabel("显示时区").selectOption("UTC");
-  await expect(page.locator(".metadata span", { hasText: /^读取 / }).first()).toContainText(/Z · /);
+  await expect(page.locator(".ant-select").filter({ hasText: "东京" })).toBeVisible();
+  const stored = await page.evaluate(() => JSON.stringify({ ...localStorage }));
+  expect(stored).not.toContain("fixture");
+  await page.getByRole("button", { name: "退出" }).click();
+  await expect(page.getByRole("button", { name: "进入管理台" })).toBeVisible();
 });
-test("narrow keyboard navigation and revocation clears selected data", async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+
+// Runs last: the fixture cannot restore a revoked selection.
+test("revocation clears the instance and its data", async ({ page }) => {
   await login(page);
-  await page.screenshot({
-    path: "../../../../../runtime/console-narrow.png",
-    fullPage: true,
-  });
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth + 1,
-    ),
-  ).toBe(true);
-  await page.getByRole("button", { name: "展开导航" }).click();
-  await page.getByRole("link", { name: "运维", exact: true }).focus();
-  await page.keyboard.press("Enter");
-  await expect(
-    page.getByRole("heading", { name: "运维", exact: true }),
-  ).toBeVisible();
-  await page.evaluate(() =>
-    fetch("/fixture/state?action=revoke", {
-      method: "POST",
-      headers: { Origin: location.origin },
-    }),
-  );
-  await page.getByRole("button", { name: "刷新", exact: false }).click();
-  await expect(
-    page.getByRole("heading", { name: "先选择允许查看的运行" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("heading", { name: "账户事实", exact: true }),
-  ).toHaveCount(0);
+  await fixture(page, "revoke");
+  await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+  await expect(page.getByText("没有可查看的实例")).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator(".flow-node")).toHaveCount(0);
 });
