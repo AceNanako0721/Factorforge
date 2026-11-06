@@ -65,9 +65,9 @@ export function Shell() {
             options={selections.map((s) => ({
               value: s.selection_id,
               label: (
-                <Tooltip title={`${s.environment} · ${s.trading_run_key.run_id} · ${s.instrument_key.instrument_id}`}>
-                  <span className="instance-option">{instanceName(s)}</span>
-                </Tooltip>
+                <span className="instance-option" title={`${s.environment} · ${s.trading_run_key.run_id} · ${s.instrument_key.instrument_id}`}>
+                  {instanceName(s)}
+                </span>
               ),
             }))}
           />
