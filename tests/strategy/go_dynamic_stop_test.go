@@ -453,6 +453,15 @@ func TestT232PreEventWindowBlocksAndReducesOnce(t *testing.T) {
 	if d.TargetQuantity.Cmp(sd.Int(5)) != 0 || !sd.Has(d.ReasonCodes, "PRE_EVENT_REDUCE") {
 		t.Fatal("pre-event reduce", d.TargetQuantity, d.ReasonCodes)
 	}
+	// A reduce whose delivery was lost is issued again at the same quantity.
+	state, _ = store.Read(context.Background(), s.InstanceID)
+	state.Objects.Value(o.ObjectID).LastCycle = nil
+	store = adapters.NewMemory(state)
+	clock.Advance(at.Add(90 * time.Second))
+	snap.At = clock.Now()
+	if d = tick(t, store, clock, snap, id); d.TargetQuantity.Cmp(sd.Int(5)) != 0 || !sd.Has(d.ReasonCodes, "PRE_EVENT_REDUCE") {
+		t.Fatal("undelivered reduce not issued again", d.TargetQuantity, d.ReasonCodes)
+	}
 	state, _ = store.Read(context.Background(), s.InstanceID)
 	state.Objects.Value(o.ObjectID).LastCycle = nil
 	store = adapters.NewMemory(state)

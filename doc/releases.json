@@ -450,6 +450,12 @@
    "change_kind": "design",
    "date": "2026-11-06",
    "summary": "Web console: the chart's open and close squares and the average-entry line come from the trading layer's fills and position, so a new position shows at once instead of after the instance records its batch. A narrow chart opens on the latest bars with the newest at the right edge instead of squeezing the whole day into a phone screen, and the instance switch no longer leaves a sticky tooltip on touch screens."
+  },
+  {
+   "version": "3.7.2",
+   "change_kind": "design",
+   "date": "2026-11-06",
+   "summary": "Strategy layer: a pre-event reduce whose target delivery is rejected is issued again at the same quantity in later cycles of the window until the position reaches it. Before, the schedule was marked handled when the reduce was decided, so a rejected delivery left the full position held into the event."
   }
  ]
 }
