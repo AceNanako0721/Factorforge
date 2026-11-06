@@ -11,6 +11,7 @@ import {
   actionText,
   chartMarkers,
   quietMarkers,
+  tradeMarkers,
   currentProtection,
   directionText,
   dynamicRange,
@@ -114,20 +115,30 @@ export function MarketPage() {
     if (ladder && ladder.step !== null && ladder.nextBest !== null)
       levels.push({ title: `阶梯第 ${ladder.rung + 1} 级`, price: ladder.nextBest, color: "#7b5cc4", dashed: true, note: `收盘到达后止损移到 ${ladder.nextStop?.toFixed(2)}` });
     if (batch.trailing !== true) levels.push({ title: "移动止损启动价", price: num(batch.trail_trigger) ?? NaN, color: UP, dashed: true, note: "到达后开始跟随" });
-    levels.push({ title: "开仓价", price: num(batch.entry) ?? NaN, color: "#6b756f", note: t(batch.opened_at) });
   }
+  // The trading layer's own average entry, there from the first fill on.
+  if (position && num(position.quantity))
+    levels.push({ title: "持仓均价", price: num(position.average_entry) ?? NaN, color: "#6b756f", note: "交易层持仓" });
   const valid = levels.filter((l) => Number.isFinite(l.price));
   const lines: PriceLine[] = useMemo(() => valid.map(({ note: _, ...l }) => l), [JSON.stringify(valid.map((l) => [l.title, l.price]))]);
   const markJudgments = longRange && marks.data ? marks.data.judgments.map(record) : judgments;
   const markActions = longRange && marks.data ? marks.data.actions.map(record) : actions;
-  const markers: TimeMarker[] = useMemo(
-    () => quietMarkers(chartMarkers(markJudgments, markActions)),
-    [JSON.stringify(markJudgments.map((j) => [j.judgment_id, j.direction])), JSON.stringify(markActions.map((a) => a.action_id))],
-  );
-
   const pool = poolView(objectOf(panelOf(sentiment.panels, "pool")));
   const fills = listOf(panelOf(execution.panels, "fills"));
   const trades = useMemo(() => buildTrades(fills, mark), [JSON.stringify(fills.map((f) => f.external_fill_id ?? f.happened_at)), mark]);
+  // Opens and closes come from the fills, so a new position shows at once.
+  const markers: TimeMarker[] = useMemo(
+    () =>
+      quietMarkers([
+        ...chartMarkers(markJudgments, markActions.filter((a) => a.source !== "POSITION")),
+        ...tradeMarkers(trades),
+      ]),
+    [
+      JSON.stringify(markJudgments.map((j) => [j.judgment_id, j.direction])),
+      JSON.stringify(markActions.map((a) => a.action_id)),
+      JSON.stringify(trades.map((x) => [x.openedAt, x.closedAt])),
+    ],
+  );
 
   const equity = num(account.equity);
   const realized = num(account.realized_pnl);

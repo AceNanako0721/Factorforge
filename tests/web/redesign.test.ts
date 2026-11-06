@@ -3,6 +3,8 @@ import { buildTrades } from "../../src/factorforge/operations/console/web/src/fe
 import { judgmentOf, poolView } from "../../src/factorforge/operations/console/web/src/features/confidence";
 import { flowNodes, type FlowInput } from "../../src/factorforge/operations/console/web/src/features/flow-model";
 import { shortTime } from "../../src/factorforge/operations/console/web/src/features/display-settings";
+import { tradeMarkers } from "../../src/factorforge/operations/console/web/src/features/market-model";
+import { defaultBars } from "../../src/factorforge/operations/console/web/src/features/market-chart";
 
 const fill = (at: string, side: string, quantity: string, price: string, fee = "0.01") => ({
   happened_at: at,
@@ -123,5 +125,25 @@ describe("S4-022 compact time", () => {
   it("shows month, day and minutes in the display zone", () => {
     expect(shortTime("2026-11-05T23:40:05Z", "UTC")).toBe("11-05 23:40");
     expect(shortTime("2026-11-05T23:40:05Z", "Asia/Tokyo")).toBe("11-06 08:40");
+  });
+});
+
+describe("S4-017 chart opens and closes from fills", () => {
+  it("marks a new open at once and a close at its average price", () => {
+    const trades = buildTrades(
+      [fill("2026-11-01T00:00:00Z", "SELL", "2", "50"), fill("2026-11-01T02:00:00Z", "BUY", "2", "45"), fill("2026-11-02T00:51:00Z", "SELL", "1", "43.5")],
+      44,
+    );
+    expect(tradeMarkers(trades).map((m) => [m.at, m.text])).toEqual([
+      ["2026-11-02T00:51:00Z", "开空 43.50"],
+      ["2026-11-01T00:00:00Z", "开空 50.00"],
+      ["2026-11-01T02:00:00Z", "平仓 45.00"],
+    ]);
+  });
+  it("opens a narrow chart on the latest bars and fits a wide one", () => {
+    expect(defaultBars(288, 340)).toBe(85);
+    expect(defaultBars(288, 1400)).toBe(288);
+    expect(defaultBars(30, 340)).toBe(30);
+    expect(defaultBars(288, 0)).toBe(288);
   });
 });

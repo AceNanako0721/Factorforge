@@ -1,5 +1,6 @@
 import { record, type Json } from "../api/client";
 import type { TimeMarker } from "./market-chart";
+import type { Trade } from "./trades";
 // S4-017: Every value is a recorded lower-layer value; the
 // distances and R multiples below are display conversions only.
 export const dynamicSources = [
@@ -189,4 +190,15 @@ export function quietMarkers(markers: TimeMarker[]): TimeMarker[] {
       last = label;
       return { ...m, text: label };
     });
+}
+
+// Each trade's open and close, at the fill time and average price.
+export function tradeMarkers(trades: Trade[]): TimeMarker[] {
+  const out: TimeMarker[] = [];
+  for (const x of trades) {
+    out.push({ at: x.openedAt, text: `${x.direction === "SHORT" ? "开空" : "开多"} ${x.averageEntry.toFixed(2)}`, color: markerColor.POSITION, shape: "square" });
+    if (x.closedAt && x.averageExit !== null)
+      out.push({ at: x.closedAt, text: `平仓 ${x.averageExit.toFixed(2)}`, color: markerColor.POSITION, shape: "square" });
+  }
+  return out;
 }

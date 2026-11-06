@@ -115,6 +115,7 @@ export function MarketChart({
   dark?: boolean;
 }) {
   const div = useRef<HTMLDivElement>(null);
+  const host = div;
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const markerRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
@@ -248,7 +249,7 @@ export function MarketChart({
     if (!chart || !series) return;
     series.setData(data);
     if (!fitted.current && data.length > 0) {
-      chart.timeScale().fitContent();
+      showDefault(chart, data.length, host.current?.clientWidth ?? 0);
       fitted.current = true;
     }
     lastFinal.current = data.length > 0 ? Number(data[data.length - 1].time) : 0;
@@ -338,6 +339,18 @@ export function MarketChart({
       </p>
     </div>
   );
+}
+
+// A narrow screen opens on the latest bars (at least 4 px each), the newest
+// at the right edge; a wide one fits the whole range. "显示全部时间" fits all.
+export const MIN_BAR_PX = 4;
+export function defaultBars(count: number, width: number): number {
+  return width > 0 ? Math.min(count, Math.max(48, Math.floor(width / MIN_BAR_PX))) : count;
+}
+function showDefault(chart: IChartApi, count: number, width: number) {
+  const bars = defaultBars(count, width);
+  if (bars >= count) chart.timeScale().fitContent();
+  else chart.timeScale().setVisibleLogicalRange({ from: count - bars, to: count + 2 });
 }
 
 // S4-019: the forming bar from the venue push, drawn translucent after the
