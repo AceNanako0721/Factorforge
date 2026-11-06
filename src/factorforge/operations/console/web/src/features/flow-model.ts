@@ -4,7 +4,7 @@ import { directionText, num, text } from "./market-model";
 // S4-022: the live pipeline of one instance, from news to the account. Each
 // module gets a health and one sentence from recorded values only; the
 // details and parameters open on demand.
-export type Health = "ok" | "warn" | "error" | "idle";
+export type Health = "ok" | "warn" | "error" | "idle" | "loading";
 export type Row = { label: string; value: string };
 export type Param = { name: string; value: string; note: string };
 export type FlowNode = {
