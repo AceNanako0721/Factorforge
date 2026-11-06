@@ -41,7 +41,7 @@ func TrackBatches(state *d.StrategyState, obj *d.ObservedObject, snap *d.Trading
 				obj.RiskUnit = nil
 				ru = nil
 			}
-			obj.PreEventApplied = nil
+			obj.PreEventApplied, obj.PreEventTargets = nil, nil
 			if obj.Chain == nil || obj.Chain.Direction != batch.Direction {
 				obj.Chain = &d.ChainState{Direction: batch.Direction, LossR: d.Zero(), BatchIDs: []string{}}
 			}
@@ -193,14 +193,27 @@ func (c DecisionCycle) DynamicTarget(ctx context.Context, state *d.StrategyState
 			if opening {
 				blocked("PRE_EVENT_WINDOW")
 			}
-			if actual.Sign() == 0 || d.Has(obj.PreEventApplied, e.ScheduleID) {
+			if actual.Sign() == 0 {
 				continue
 			}
-			obj.PreEventApplied = append(obj.PreEventApplied, e.ScheduleID)
-			if protectedBreakEven(state, obj, snap, p, sample) {
-				continue
+			reduced, retry := obj.PreEventTargets[e.ScheduleID]
+			if d.Has(obj.PreEventApplied, e.ScheduleID) {
+				// A reduce whose delivery was lost is issued again until the
+				// position reaches the quantity chosen the first time.
+				if !retry || actual.Abs().Cmp(reduced) <= 0 {
+					continue
+				}
+			} else {
+				obj.PreEventApplied = append(obj.PreEventApplied, e.ScheduleID)
+				if protectedBreakEven(state, obj, snap, p, sample) {
+					continue
+				}
+				reduced = m.Step(m.Mul(actual.Abs(), rule.ReduceFactor), rules.QuantityStep, dto.TowardZero)
+				if obj.PreEventTargets == nil {
+					obj.PreEventTargets = map[string]d.Decimal{}
+				}
+				obj.PreEventTargets[e.ScheduleID] = reduced
 			}
-			reduced := m.Step(m.Mul(actual.Abs(), rule.ReduceFactor), rules.QuantityStep, dto.TowardZero)
 			if out.target.Sign() == actual.Sign() {
 				out.target = m.Mul(d.Int(actual.Sign()), d.Min(out.target.Abs(), reduced))
 			}
