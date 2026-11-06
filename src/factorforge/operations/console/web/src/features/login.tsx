@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { ApiError, request, type Session } from "../api/client";
-import { Button } from "../components/button";
+import { Alert, Button, Card, Input, Space, Typography } from "antd";
 import { useSession } from "./session";
 export function Login() {
   const { setSession } = useSession();
@@ -35,39 +35,28 @@ export function Login() {
   }
   return (
     <main className="login-page">
-      <div className="login-brand">
-        <span className="brand-symbol">F</span> FACTORFORGE
-      </div>
-      <form className="login-card" onSubmit={submit}>
-        <p className="eyebrow">LOCAL OBSERVATORY</p>
-        <h1>观察系统，追溯每个判断。</h1>
-        <p className="muted">登录后查看获准的交易运行和观测对象。</p>
-        <label>
-          用户名
-          <input name="username" autoComplete="username" required autoFocus />
-        </label>
-        <label>
-          密码
-          <input
-            name="password"
-            type="password"
-            autoComplete="current-password"
-            required
-          />
-        </label>
-        {error && (
-          <p role="alert" className="error">
-            {error}
-          </p>
-        )}
-        <Button type="submit" disabled={busy}>
-          {busy ? "正在验证…" : "进入管理台"}
-        </Button>
-        <p className="muted small">
-          管理台提供只读观察。SIM / LIVE 的运行范围会在页面中持续显示。
-        </p>
-      </form>
-      <div className="login-footer">事实 · 判断 · 执行，各自保留来源</div>
+      <Card className="login-card">
+        <form onSubmit={submit}>
+          <Space direction="vertical" size={14} style={{ width: "100%" }}>
+            <div className="login-brand">
+              <span className="brand-symbol">F</span> Factorforge
+            </div>
+            <Typography.Text type="secondary">登录后查看各实例的运行状态与交易。</Typography.Text>
+            <label>
+              用户名
+              <Input name="username" autoComplete="username" required autoFocus />
+            </label>
+            <label>
+              密码
+              <Input.Password name="password" autoComplete="current-password" required />
+            </label>
+            {error && <Alert role="alert" type="error" showIcon message={error} />}
+            <Button type="primary" htmlType="submit" block loading={busy}>
+              {busy ? "正在验证…" : "进入管理台"}
+            </Button>
+          </Space>
+        </form>
+      </Card>
     </main>
   );
 }

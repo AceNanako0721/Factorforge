@@ -600,7 +600,7 @@ func serveStatic(w http.ResponseWriter, r *http.Request, root string) {
 	}
 	path := r.URL.Path
 	name := ""
-	if d.Has([]string{"/", "/login", "/overview", "/market", "/events", "/sentiment", "/decisions", "/execution", "/cases", "/learning", "/operations", "/audit", "/dynamic"}, path) {
+	if d.Has([]string{"/", "/login", "/flow", "/overview", "/market", "/events", "/sentiment", "/decisions", "/execution", "/cases", "/learning", "/operations", "/audit", "/dynamic"}, path) {
 		name = "index.html"
 	} else if strings.HasPrefix(path, "/assets/") {
 		name = strings.TrimPrefix(path, "/")

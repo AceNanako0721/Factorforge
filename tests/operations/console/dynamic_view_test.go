@@ -122,7 +122,7 @@ func TestCrossSiteNavigationLoadsStaticOnly(t *testing.T) {
 	for _, c := range []struct {
 		path, mode string
 		code       int
-	}{{"/dynamic", "navigate", 200}, {"/api/v2/console/session", "navigate", 403}, {"/dynamic", "cors", 403}, {"/api/v2/console/capabilities", "cors", 403}} {
+	}{{"/dynamic", "navigate", 200}, {"/flow", "navigate", 200}, {"/api/v2/console/session", "navigate", 403}, {"/dynamic", "cors", 403}, {"/api/v2/console/capabilities", "cors", 403}} {
 		r := httptest.NewRequest("GET", c.path, nil)
 		r.Header.Set("Sec-Fetch-Site", "cross-site")
 		r.Header.Set("Sec-Fetch-Mode", c.mode)

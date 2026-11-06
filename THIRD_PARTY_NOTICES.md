@@ -83,17 +83,15 @@ unchanged in contracts/meta for offline validation. Its source URL, SHA-256,
 scope and Apache 2.0 license are included there. Distributions must retain the
 licenses of these dependencies and the bundled schema. Factorforge remains MIT.
 
-## shadcn-admin
+## Console interface libraries
 
-The console adapts the local layout, button variants and read-table lifecycle from [satnaing/shadcn-admin](https://github.com/satnaing/shadcn-admin/tree/e16c87f213a5ba5e45964e9b67c792105ec74d26), commit `e16c87f213a5ba5e45964e9b67c792105ec74d26`:
+The console uses the public APIs of these MIT-licensed packages, bundled into the built pages. No source is copied or adapted.
 
-- `src/components/layout/authenticated-layout.tsx`: shell/skip-to-main/sidebar organisation; local Go session replaces Clerk.
-- `src/components/ui/button.tsx`: Radix Slot and CVA variants; Factorforge styles and reduced variants.
-- `src/features/tasks/components/tasks-table.tsx`: TanStack filtering/sorting/pagination/column visibility; no editable demo/bulk deletion.
+- `antd@6.6.7` — Copyright (c) 2015-present Ant UED, https://xtech.antfin.com/
+- `@ant-design/icons@6.3.4` — Copyright (c) 2018-present Ant UED, https://xtech.antfin.com/
+- `@xyflow/react@12.12.0` (React Flow) — Copyright (c) 2019-2025 webkid GmbH; the React Flow attribution stays visible on the flow chart.
 
 MIT License
-
-Copyright (c) 2024 Sat Naing
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

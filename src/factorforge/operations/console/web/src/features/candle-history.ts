@@ -79,7 +79,7 @@ export function aggregateCandles(records: Json[], minutes: number): Json[] {
 
 // Follow the market view's candle cursor until the range is read or the page cap
 // is reached. `truncated` tells the page that the oldest bars were not read.
-async function readPages(
+export async function readPages(
   selection: Selection,
   view: string,
   source: string,

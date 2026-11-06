@@ -438,6 +438,12 @@
    "change_kind": "design",
    "date": "2026-11-05",
    "summary": "SOXLUSDT instance: the position manager writes a batch's OPEN record before it saves its state. When that save was lost, every later cycle opened the same position cycle again at a new time and failed on DYNAMIC_RECORD_CONFLICT, so the batch's close stop and trailing stop were no longer managed. The manager now restores the batch from the OPEN record before reading candles."
+  },
+  {
+   "version": "3.7.0",
+   "change_kind": "specification",
+   "date": "2026-11-06",
+   "summary": "Web console: the browser now has two pages with an instance switch at the top left. The live pipeline page draws the modules from news to the account with a live health and one sentence each, and opens a module's details and current parameters on click. The market and trades page shows the totals, the chart with stops and judgment marks, the current conviction with the share of each active judgment in the pool (hover shows the judgment and its news), the trades rebuilt from fills with volume, notional and realized or unrealized P&L and ratio, and the judgment and action records folded by default. The other views stay as read and export APIs. Built with Ant Design and React Flow; light and dark display."
   }
  ]
 }

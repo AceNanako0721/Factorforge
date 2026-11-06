@@ -104,11 +104,15 @@ export function MarketChart({
   lines = [],
   markers = [],
   live = null,
+  height = 320,
+  dark = false,
 }: {
   candles: Json[];
   lines?: PriceLine[];
   markers?: TimeMarker[];
   live?: LiveKline | null;
+  height?: number;
+  dark?: boolean;
 }) {
   const div = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -132,7 +136,7 @@ export function MarketChart({
     const host = div.current;
     if (!host) return;
     const chart = createChart(host, {
-      height: 320,
+      height,
       autoSize: true,
       layout: {
         background: { color: "#ffffff" },
@@ -225,6 +229,12 @@ export function MarketChart({
       chart.remove();
     };
   }, []);
+  useEffect(() => {
+    chartRef.current?.applyOptions({
+      layout: { background: { color: dark ? "#141414" : "#ffffff" }, textColor: dark ? "#c9d1cc" : "#34413b" },
+      grid: { vertLines: { color: dark ? "#242424" : "#edf0ea" }, horzLines: { color: dark ? "#242424" : "#edf0ea" } },
+    });
+  }, [dark]);
   // axis ticks and the crosshair label use the display zone.
   useEffect(() => {
     chartRef.current?.applyOptions({
@@ -313,15 +323,15 @@ export function MarketChart({
         aria-label="已记录最终K线"
         role="img"
         className="chart-host"
-        style={{ height: 320, position: "relative" }}
+        style={{ height, position: "relative" }}
       />
       {outside.length > 0 && (
         <p className="muted">
-          K 线范围外：{outside.map((l) => `${l.title} ${l.price}`).join("、")}（勾选“纵轴包含全部止损线”可显示）
+          K 线范围外：{outside.map((l) => `${l.title} ${l.price.toFixed(2)}`).join("、")}
         </p>
       )}
-      <p className="muted">
-        按住图内拖动可上下左右平移；滚轮在图内缩放时间，在右侧价格轴上缩放纵轴；拖动价格轴也可缩放纵轴，双击价格轴或点“纵轴自动”恢复。仅显示产品实际记录的最终 K 线；坐标为近似值，表格保留金额原值。图表：
+      <p className="muted chart-hint">
+        拖动平移 · 滚轮缩放时间 · 在价格轴上滚轮缩放纵轴 · 图表：
         <a href="https://www.tradingview.com/" target="_blank" rel="noreferrer">
           TradingView Lightweight Charts
         </a>
