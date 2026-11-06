@@ -4,12 +4,22 @@ import {
   type Page,
 } from "../../src/factorforge/operations/console/web/node_modules/@playwright/test/index.mjs";
 async function login(page: Page) {
+  // The flow page judges no module before its first read lands (S4-022).
+  let hold!: () => void;
+  const held = new Promise<void>((r) => (hold = r));
+  await page.route("**/api/v2/console/overview?**", async (route) => {
+    await held;
+    await route.continue().catch(() => {});
+  });
   await page.goto("/flow");
   await page.getByLabel("用户名", { exact: true }).fill("fixture-user");
   await page.getByLabel("密码", { exact: true }).fill("fixture-pass");
   await page.getByRole("button", { name: "进入管理台" }).click();
   // The only allowed instance opens by itself on the flow page.
   await expect(page.getByLabel("实时流程图")).toBeVisible();
+  await expect(page.locator(".flow-node").filter({ hasText: "模型研判" })).toContainText("正在读取");
+  await expect(page.getByText("未启用")).toHaveCount(0);
+  hold();
   await expect(page.locator(".flow-node").filter({ hasText: "模型研判" })).toBeVisible();
 }
 async function fixture(page: Page, action: string) {

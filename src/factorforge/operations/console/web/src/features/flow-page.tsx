@@ -11,9 +11,9 @@ import { useSession } from "./session";
 import { useTheme } from "./theme";
 import { listOf, objectOf, panelOf, useProtections, useView } from "./use-view";
 
-const healthColor: Record<Health, string> = { ok: "#2e8b57", warn: "#d08a1d", error: "#c4553f", idle: "#8c8c8c" };
-const healthText: Record<Health, string> = { ok: "正常", warn: "注意", error: "异常", idle: "未启用" };
-const badgeStatus: Record<Health, "success" | "warning" | "error" | "default"> = { ok: "success", warn: "warning", error: "error", idle: "default" };
+const healthColor: Record<Health, string> = { ok: "#2e8b57", warn: "#d08a1d", error: "#c4553f", idle: "#8c8c8c", loading: "#bfbfbf" };
+const healthText: Record<Health, string> = { ok: "正常", warn: "注意", error: "异常", idle: "未启用", loading: "读取中" };
+const badgeStatus: Record<Health, "success" | "warning" | "error" | "default" | "processing"> = { ok: "success", warn: "warning", error: "error", idle: "default", loading: "processing" };
 
 // Two rows read left to right, then right to left: news to decision on top,
 // executor to account below; the stop module feeds the executor.
@@ -75,7 +75,10 @@ export function FlowPage() {
   const object = objectOf(panelOf(overview.panels, "object"));
   const judgments = listOf(panelOf(dynamic.panels, "dynamic.judgments"));
   const protections = useProtections(listOf(panelOf(dynamic.panels, "protections")));
-  const nodes = flowNodes({
+  // Until the first read lands, no module is judged: an empty answer would
+  // otherwise read as "not enabled" or "flat".
+  const loading = dynamic.pending || overview.pending || operations.pending;
+  const judged = flowNodes({
     now: Date.now(),
     status,
     judgments,
@@ -92,6 +95,7 @@ export function FlowPage() {
     parameters: parameters.find((p) => p.version === object.parameter_version) ?? parameters[0],
     time: t,
   });
+  const nodes = loading ? judged.map((n) => ({ ...n, health: "loading" as const, headline: "正在读取…", rows: [], params: [] })) : judged;
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const flow: Node<Data>[] = nodes.map((n) => ({
     id: n.id,
@@ -113,10 +117,9 @@ export function FlowPage() {
           markerEnd: { type: MarkerType.ArrowClosed, color: healthColor[h] },
         };
       }),
-    [nodes.map((n) => n.health).join()],
+    [nodes.map((n) => n.health).join(), loading],
   );
   const current = open ? byId.get(open) : undefined;
-  const loading = dynamic.pending || overview.pending;
   const problems = nodes.filter((n) => n.health === "error" || n.health === "warn");
 
   return (
