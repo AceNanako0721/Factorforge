@@ -168,6 +168,12 @@ func TestArchivableDecisionsRequiresEveryCondition(t *testing.T) {
 			s.Reservations.Set(id, &sd.Reservation{ReservationID: id, ObjectID: template.ObjectID, WindowID: "w", State: "RESERVED"})
 			return at
 		},
+		"accepted reservation in the current window": func(s *sd.StrategyState) time.Time {
+			id := "reservation-fixture"
+			s.Outbox.Value("decision-old").ReservationID = &id
+			s.Reservations.Set(id, &sd.Reservation{ReservationID: id, ObjectID: template.ObjectID, WindowID: currentWindow(t, s, template.ObjectID, at), State: "ACCEPTED"})
+			return at
+		},
 		"open case entry": func(s *sd.StrategyState) time.Time {
 			s.Cases.Set("case-fixture", &sd.CaseRecord{CaseID: "case-fixture", ObjectID: template.ObjectID, Status: "OPEN", EntrySnapshot: map[string]any{"source_decision_id": "decision-old"}})
 			return at
@@ -193,6 +199,39 @@ func TestArchivableDecisionsRequiresEveryCondition(t *testing.T) {
 	if got := sd.ArchivableDecisions(s, at); fmt.Sprint(got) != "[decision-old]" {
 		t.Fatal("decision without target not archivable", got)
 	}
+	// A reservation that no longer occupies a window does not keep its
+	// decision: released, or accepted in a window that has passed.
+	for name, settle := range map[string]func(*sd.StrategyState) *sd.Reservation{
+		"released": func(s *sd.StrategyState) *sd.Reservation {
+			return &sd.Reservation{WindowID: currentWindow(t, s, template.ObjectID, at), State: "RELEASED"}
+		},
+		"accepted in a passed window": func(s *sd.StrategyState) *sd.Reservation {
+			return &sd.Reservation{WindowID: "passed-window", State: "ACCEPTED"}
+		},
+	} {
+		s = fresh()
+		id, r := "reservation-fixture", settle(s)
+		r.ReservationID, r.ObjectID = id, template.ObjectID
+		s.Outbox.Value("decision-old").ReservationID = &id
+		s.Reservations.Set(id, r)
+		if got := sd.ArchivableDecisions(s, at); fmt.Sprint(got) != "[decision-old]" {
+			t.Fatal(name, "reservation kept the decision", got)
+		}
+		if _, kept := s.Reservations.Get(id); !kept {
+			t.Fatal(name, "reservation removed")
+		}
+	}
+}
+
+// currentWindow is the risk window Reserve would count for the object at at.
+func currentWindow(t *testing.T, s *sd.StrategyState, objectID string, at time.Time) string {
+	t.Helper()
+	obj := s.Objects.Value(objectID)
+	window, _, err := sd.RiskWindow(s, obj, at, s.Policies.Value(obj.TimePolicyVersion))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return window
 }
 
 func TestDecisionRetentionBoundsSerializedState(t *testing.T) {
