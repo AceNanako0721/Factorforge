@@ -456,6 +456,12 @@
    "change_kind": "design",
    "date": "2026-11-06",
    "summary": "Strategy layer: a pre-event reduce whose target delivery is rejected is issued again at the same quantity in later cycles of the window until the position reaches it. Before, the schedule was marked handled when the reduce was decided, so a rejected delivery left the full position held into the event."
+  },
+  {
+   "version": "3.7.3",
+   "change_kind": "design",
+   "date": "2026-11-09",
+   "summary": "Strategy layer: command idempotency records stay in the state for 24 hours and then move to an append-only archive that replays still read, so a late replay returns the original result as before. The records had no retention, so the stored state, which a single read must keep under 16 MiB, grew with every command."
   }
  ]
 }

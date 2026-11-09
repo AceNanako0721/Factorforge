@@ -362,6 +362,7 @@ func TestFrozenP2StateTransitions(t *testing.T) {
 				}
 			}
 			expectedState, actualState := compactFrozenDecisions(states[sd.Text(item["after"])]), compactFrozenDecisions(sd.JSONValue(state))
+			actualState = projectArchivedDedup(t, store, state.InstanceID, expectedState, actualState)
 			if kind == "tick" {
 				expectedState = projectLegacyTick(expectedState)
 				actualState = projectLegacyTick(actualState)
@@ -401,6 +402,50 @@ func projectLegacyTick(v any) any {
 		return out
 	}
 	return v
+}
+
+// projectArchivedDedup restores the idempotency records the store archived and
+// drops recorded_at; both postdate the frozen oracle, whose dedup must equal
+// the live records plus the archived ones.
+func projectArchivedDedup(t *testing.T, store *adapters.MemoryStore, id string, expected, actual any) any {
+	t.Helper()
+	want, _ := sd.Object(expected)["dedup"].(map[string]any)
+	state := sd.Object(actual)
+	live, _ := state["dedup"].(map[string]any)
+	if want == nil || live == nil {
+		return actual
+	}
+	dedup := map[string]any{}
+	for key, record := range live {
+		dedup[key] = record
+	}
+	for key := range want {
+		if dedup[key] != nil {
+			continue
+		}
+		archived, err := store.ReadCommandDedup(context.Background(), id, key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if archived != nil {
+			dedup[key] = sd.JSONValue(archived)
+		}
+	}
+	for key, record := range dedup {
+		copy := map[string]any{}
+		for field, value := range sd.Object(record) {
+			if field != "recorded_at" {
+				copy[field] = value
+			}
+		}
+		dedup[key] = copy
+	}
+	out := map[string]any{}
+	for k, v := range state {
+		out[k] = v
+	}
+	out["dedup"] = dedup
+	return out
 }
 func projectCompatSnapshot(v any) any {
 	switch x := v.(type) {
