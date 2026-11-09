@@ -132,9 +132,32 @@ func CompactDecisionInput(inputs map[string]any) map[string]any {
 	return result
 }
 
+// occupying reports whether a reservation still holds its decision: one whose
+// delivery is unsettled, or an accepted one that counts against its object's
+// current risk window as Reserve counts it. A released reservation, or an
+// accepted one from a window that has passed, no longer does.
+func occupying(s *StrategyState, r *Reservation, at time.Time) bool {
+	if r.State == "RELEASED" {
+		return false
+	}
+	if r.State != "ACCEPTED" {
+		return true
+	}
+	obj := s.Objects.Value(r.ObjectID)
+	if obj == nil {
+		return true
+	}
+	p := s.Policies.Value(obj.TimePolicyVersion)
+	if p == nil {
+		return true
+	}
+	window, _, err := RiskWindow(s, obj, at, p)
+	return err != nil || window == r.WindowID
+}
+
 // ArchivableDecisions lists decisions that are settled, superseded for their
-// object, older than DecisionRetention and no longer referenced by a
-// reservation or an unfinished case.
+// object, older than DecisionRetention and no longer referenced by an
+// occupying reservation or an unfinished case.
 func ArchivableDecisions(s *StrategyState, at time.Time) []string {
 	cutoff := at.Add(-DecisionRetention)
 	latest := map[string]time.Time{}
@@ -171,7 +194,7 @@ func ArchivableDecisions(s *StrategyState, at time.Time) []string {
 				continue
 			}
 			if target.ReservationID != nil {
-				if _, reserved := s.Reservations.Get(*target.ReservationID); reserved {
+				if r, reserved := s.Reservations.Get(*target.ReservationID); reserved && occupying(s, r, at) {
 					continue
 				}
 			}
