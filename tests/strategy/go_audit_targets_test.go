@@ -67,3 +67,55 @@ func TestAuditTargetsPagesAndReadsOnlyNewRows(t *testing.T) {
 		}
 	}
 }
+
+// A fresh process reading a long audit can exceed one caller's deadline. The
+// pages read before the cancellation must count, or every later call starts
+// from zero and is cancelled again.
+func TestAuditTargetsResumeAfterCancelledRead(t *testing.T) {
+	var mu sync.Mutex
+	audit := []map[string]any{}
+	for i := 0; i < 5*adapters.AuditPageLimit+7; i++ {
+		action := "MARKET_SNAPSHOT"
+		if i%10 == 0 {
+			action = "TARGET_SET"
+		}
+		audit = append(audit, map[string]any{"sequence": i, "action": action, "request_id": fmt.Sprintf("decision-%d", i)})
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cursors, served := []int{}, 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		offset, _ := strconv.Atoi(r.URL.Query().Get("cursor"))
+		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+		cursors = append(cursors, offset)
+		end, cursor := min(offset+limit, len(audit)), any(nil)
+		if end < len(audit) {
+			cursor = strconv.Itoa(end)
+		}
+		json.NewEncoder(w).Encode(map[string]any{"items": audit[offset:end], "cursor": cursor, "snapshot_version": len(audit)})
+		if served++; served == 3 {
+			cancel()
+		}
+	}))
+	defer server.Close()
+	client := &adapters.TradingV2{URL: server.URL, Token: "t", Client: server.Client()}
+	query := url.Values{"environment": {"SIM"}, "account_id": {"a"}, "run_id": {"r"}}
+	if _, err := client.AuditTargets(ctx, query); err == nil {
+		t.Fatal("the cancelled read returned")
+	}
+	mu.Lock()
+	cursors = nil
+	mu.Unlock()
+	page, err := client.AuditTargets(context.Background(), query)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cursors) == 0 || cursors[0] < 2*adapters.AuditPageLimit {
+		t.Fatal("the second read did not resume", cursors)
+	}
+	rows := sd.Rows(page["items"])
+	if len(rows) != (len(audit)+9)/10 || rows[0]["request_id"] != "decision-0" || rows[len(rows)-1]["request_id"] != fmt.Sprintf("decision-%d", (len(audit)-1)/10*10) {
+		t.Fatal("rows", len(rows))
+	}
+}
