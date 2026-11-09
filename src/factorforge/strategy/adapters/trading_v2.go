@@ -47,6 +47,9 @@ const AuditPageLimit = 500
 // AuditTargets returns the run's TARGET_SET audit rows and the snapshot
 // version of the last page read. The audit is append-only, so earlier pages
 // are read once per process and only new rows are requested afterwards.
+// Progress is kept after every page: a fresh process may need longer than
+// one caller's deadline to read a long audit, and a cancelled read resumes
+// where it stopped instead of starting over.
 func (t *TradingV2) AuditTargets(ctx context.Context, query url.Values) (map[string]any, error) {
 	key := query.Encode()
 	t.mu.Lock()
@@ -55,6 +58,17 @@ func (t *TradingV2) AuditTargets(ctx context.Context, query url.Values) (map[str
 		cached = auditTargets{offset: c.offset, rows: append([]map[string]any{}, c.rows...)}
 	}
 	t.mu.Unlock()
+	keep := func() {
+		t.mu.Lock()
+		defer t.mu.Unlock()
+		if t.audits == nil {
+			t.audits = map[string]*auditTargets{}
+		}
+		// The capped slice keeps later appends here from sharing its array.
+		if c := t.audits[key]; c == nil || c.offset < cached.offset {
+			t.audits[key] = &auditTargets{offset: cached.offset, rows: cached.rows[:len(cached.rows):len(cached.rows)]}
+		}
+	}
 	var version any
 	for {
 		q := url.Values{}
@@ -75,18 +89,11 @@ func (t *TradingV2) AuditTargets(ctx context.Context, query url.Values) (map[str
 			}
 		}
 		cached.offset += len(items)
+		keep()
 		if page["cursor"] == nil || len(items) == 0 {
 			break
 		}
 	}
-	t.mu.Lock()
-	if t.audits == nil {
-		t.audits = map[string]*auditTargets{}
-	}
-	if c := t.audits[key]; c == nil || c.offset <= cached.offset {
-		t.audits[key] = &cached
-	}
-	t.mu.Unlock()
 	items := make([]any, len(cached.rows))
 	for i, row := range cached.rows {
 		items[i] = row
