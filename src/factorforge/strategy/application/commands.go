@@ -37,6 +37,12 @@ func Authorize(s *d.StrategyState, identity d.Identity, scope d.ApiScope, object
 	return &d.Error{Code: "PUBLIC_SCOPE_FORBIDDEN", Status: 403}
 }
 
+// DedupArchiveReader returns an archived idempotency record, or nil when the
+// key was never archived.
+type DedupArchiveReader interface {
+	ReadCommandDedup(context.Context, string, string) (map[string]any, error)
+}
+
 type Service struct {
 	Store   ports.Store
 	Clock   ports.Clock
@@ -55,7 +61,18 @@ func (s Service) Command(ctx context.Context, identity d.Identity, command d.Com
 			}
 		}
 		hash := d.Digest(map[string]any{"identity": identity.Payload(), "scope": d.ScopeName(scope), "payload": payload})
-		if old, ok := state.Dedup.Get(command.IdempotencyKey); ok {
+		old, ok := state.Dedup.Get(command.IdempotencyKey)
+		if !ok {
+			// A record older than DedupRetention lives only in the archive.
+			if reader, archived := s.Store.(DedupArchiveReader); archived {
+				var err error
+				if old, err = reader.ReadCommandDedup(ctx, state.InstanceID, command.IdempotencyKey); err != nil {
+					return err
+				}
+				ok = old != nil
+			}
+		}
+		if ok {
 			if d.Text(old["hash"]) != hash {
 				return &d.Error{Code: "IDEMPOTENCY_CONFLICT", Status: 409}
 			}
@@ -71,7 +88,11 @@ func (s Service) Command(ctx context.Context, identity d.Identity, command d.Com
 		}
 		result = d.JSONValue(value)
 		state.Version++
-		state.Dedup.Set(command.IdempotencyKey, map[string]any{"hash": hash, "result": result})
+		// Pruning follows the lookup: a record pruned in this transaction is not
+		// readable from the archive until it commits.
+		now := s.Clock.Now()
+		d.RetainDedup(state, now)
+		state.Dedup.Set(command.IdempotencyKey, map[string]any{"hash": hash, "result": result, "recorded_at": d.ISO(now)})
 		state.AppendAudit(map[string]any{"action": d.ScopeName(scope), "request_id": command.RequestID, "identity": identity.Payload(), "at": d.ISO(s.Clock.Now()), "reason": command.Reason})
 		return nil
 	})

@@ -117,7 +117,7 @@ func Initialize(ctx context.Context, dsn, environment string) error {
 				return dbError(err)
 			}
 		}
-		statements := []string{"GRANT USAGE ON SCHEMA " + name + " TO " + role, "GRANT SELECT ON ALL TABLES IN SCHEMA " + name + " TO " + role, "GRANT INSERT,UPDATE ON " + name + ".public_state TO " + role, "GRANT INSERT ON " + name + ".audit_event TO " + role, "GRANT INSERT ON " + name + ".object_owner_binding TO " + role, "GRANT INSERT ON " + name + ".stop_directive_research_archive TO " + role}
+		statements := []string{"GRANT USAGE ON SCHEMA " + name + " TO " + role, "GRANT SELECT ON ALL TABLES IN SCHEMA " + name + " TO " + role, "GRANT INSERT,UPDATE ON " + name + ".public_state TO " + role, "GRANT INSERT ON " + name + ".audit_event TO " + role, "GRANT INSERT ON " + name + ".object_owner_binding TO " + role, "GRANT INSERT ON " + name + ".stop_directive_research_archive TO " + role, "GRANT INSERT ON " + name + ".command_dedup_archive TO " + role}
 		if kind == "worker" {
 			statements = append(statements, "GRANT INSERT,UPDATE ON "+name+".internal_state TO "+role, "GRANT INSERT ON "+name+".sentiment_entry TO "+role, "GRANT INSERT ON "+name+".decision_archive TO "+role)
 			statements = append(statements, "GRANT INSERT ON "+name+".factor_observation_archive TO "+role, "GRANT INSERT ON "+name+".stop_directive_archive TO "+role)
@@ -544,6 +544,9 @@ func (s *Store) Transaction(ctx context.Context, id string, fn func(*d.StrategyS
 		return err
 	}
 	if err = d.PreserveLayerDays(before, state); err != nil {
+		return err
+	}
+	if err = s.archiveDedup(ctx, tx, id, before, state); err != nil {
 		return err
 	}
 	if err = s.archiveStops(ctx, tx, id, before, state); err != nil {

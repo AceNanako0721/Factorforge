@@ -15,6 +15,7 @@ type MemoryStore struct {
 	audits        map[string][]d.AuditRecord
 	stopArchive   map[string]map[string]*d.StopDirectiveRecord
 	factorArchive map[string]map[string]*d.FactorObservation
+	dedupArchive  map[string]map[string]map[string]any
 	archiveMu     sync.RWMutex
 	environment   string
 	FailCommit    bool
@@ -27,7 +28,7 @@ func NewMemory(state *d.StrategyState) *MemoryStore {
 		rows = append(rows, d.AuditRecord{Sequence: i + 1, Payload: row})
 	}
 	copy.AuditCount, copy.Audit = len(rows), nil
-	return &MemoryStore{states: map[string]*d.StrategyState{state.InstanceID: copy}, audits: map[string][]d.AuditRecord{state.InstanceID: rows}, stopArchive: map[string]map[string]*d.StopDirectiveRecord{}, factorArchive: map[string]map[string]*d.FactorObservation{}, environment: state.Environment}
+	return &MemoryStore{states: map[string]*d.StrategyState{state.InstanceID: copy}, audits: map[string][]d.AuditRecord{state.InstanceID: rows}, stopArchive: map[string]map[string]*d.StopDirectiveRecord{}, factorArchive: map[string]map[string]*d.FactorObservation{}, dedupArchive: map[string]map[string]map[string]any{}, environment: state.Environment}
 }
 func (s *MemoryStore) Environment() string { return s.environment }
 func (s *MemoryStore) Read(ctx context.Context, id string) (*d.StrategyState, error) {
@@ -112,6 +113,18 @@ func (s *MemoryStore) Transaction(ctx context.Context, id string, fn func(*d.Str
 			archive[key] = d.Clone(&row)
 		}
 	}
+	dedup := d.Clone(s.dedupArchive[id])
+	if dedup == nil {
+		dedup = map[string]map[string]any{}
+	}
+	for _, key := range d.AddedDedup(old, work) {
+		if dedup[key] != nil {
+			return &d.Error{Code: "STORE_STATE_INVALID", Status: 503}
+		}
+	}
+	for _, key := range d.RemovedDedup(old, work) {
+		dedup[key] = d.Clone(old.Dedup.Value(key))
+	}
 	for i, row := range work.Audit {
 		s.audits[id] = append(s.audits[id], d.AuditRecord{Sequence: old.AuditCount + i + 1, Payload: d.Clone(row)})
 	}
@@ -157,7 +170,14 @@ func (s *MemoryStore) Transaction(ctx context.Context, id string, fn func(*d.Str
 	}
 	s.states[id] = work
 	s.factorArchive[id] = archive
+	s.dedupArchive[id] = dedup
 	return nil
+}
+
+func (s *MemoryStore) ReadCommandDedup(_ context.Context, id, key string) (map[string]any, error) {
+	s.archiveMu.RLock()
+	defer s.archiveMu.RUnlock()
+	return d.Clone(s.dedupArchive[id][key]), nil
 }
 
 // The archive has a separate lock: commands read immutable archived rows while
