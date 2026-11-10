@@ -193,6 +193,63 @@ func (t *rejectingTrading) Deliver(_ context.Context, _ *sd.ObservedObject, _ *s
 	return nil, &sd.Error{Code: "VERSION_CONFLICT", Status: 409}
 }
 
+// staleTrading moves P1's aggregate version on every snapshot and refuses
+// the first deliveries as stale, as a busy run does under B8.
+type staleTrading struct {
+	compositionTrading
+	refusals  int
+	snapshots int
+	payloads  []map[string]any
+}
+
+func (t *staleTrading) Snapshot(ctx context.Context, objects []*sd.ObservedObject) (*sd.TradingSnapshot, error) {
+	t.snapshots++
+	s, err := t.compositionTrading.Snapshot(ctx, objects)
+	s.Version = 100 + t.snapshots
+	return s, err
+}
+func (t *staleTrading) Prepare(_ *sd.ObservedObject, _ *sd.TargetOutbox, s *sd.TradingSnapshot) (map[string]any, error) {
+	return map[string]any{"expected_version": s.Version}, nil
+}
+func (t *staleTrading) Deliver(_ context.Context, _ *sd.ObservedObject, item *sd.TargetOutbox, _ *sd.TradingSnapshot) (map[string]any, error) {
+	t.payloads = append(t.payloads, sd.Clone(*item.CommandPayload))
+	if len(t.payloads) <= t.refusals {
+		return nil, &sd.Error{Code: "VERSION_CONFLICT", Status: 409}
+	}
+	return map[string]any{"state": "ACK"}, nil
+}
+
+// B8: a target refused only for a stale expected_version is sent again from a
+// fresh snapshot in the same pass, so the exit is not held back a cycle.
+func TestB8StaleVersionRedeliveredInSamePass(t *testing.T) {
+	store, clock, service, snap, o, id, at, barAt := exitFixture(t)
+	if _, err := service.SubmitCloseExit(context.Background(), id, exitCommand(store, o, "exit-stale", barAt, nil)); err != nil {
+		t.Fatal(err)
+	}
+	clock.Advance(at.Add(time.Second))
+	snap.At = clock.Now()
+	d := tick(t, store, clock, snap, id)
+	trading := &staleTrading{compositionTrading: compositionTrading{snap: snap}, refusals: 2}
+	if err := (app.DecisionCycle{Store: store, Clock: clock, Trading: trading}).Dispatch(context.Background(), id); err != nil {
+		t.Fatal(err)
+	}
+	state, _ := store.Read(context.Background(), o.InstanceID)
+	if row := state.Outbox.Value(d.DecisionID); row == nil || row.State != "ACK" {
+		t.Fatal("delivery", row)
+	}
+	if r := state.ExitRequests.Value("exit-stale"); r.State != "APPLIED" || r.DecisionID != d.DecisionID {
+		t.Fatal("exit must stay applied", r.State, r.DecisionID)
+	}
+	if len(trading.payloads) != 3 {
+		t.Fatal("attempts", len(trading.payloads))
+	}
+	for i, p := range trading.payloads {
+		if sd.Text(p["expected_version"]) != sd.Text(101+i) {
+			t.Fatal("attempt", i, "sent a stale version", p)
+		}
+	}
+}
+
 // A refused close-stop exit is decided again, and expires once
 // its validity has passed with the batch still open.
 func TestT229CloseStopExitRedeliveredAfterRejectionThenExpires(t *testing.T) {

@@ -850,6 +850,10 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 	return outputs, err
 }
 
+// deliveryAttempts bounds how often one pass sends a target that P1 refused
+// only for a stale expected_version.
+const deliveryAttempts = 3
+
 func (c DecisionCycle) Dispatch(ctx context.Context, identity d.Identity) error {
 	before, err := c.Store.Read(ctx, identity.Instance())
 	if err != nil {
@@ -858,6 +862,7 @@ func (c DecisionCycle) Dispatch(ctx context.Context, identity d.Identity) error 
 	if err = Authorize(before, identity, d.Query, ""); err != nil {
 		return err
 	}
+items:
 	for _, key := range before.Outbox.Keys() {
 		item := before.Outbox.Value(key)
 		if !d.Has([]string{"PENDING", "DELIVERY_UNKNOWN"}, item.State) {
@@ -872,90 +877,100 @@ func (c DecisionCycle) Dispatch(ctx context.Context, identity d.Identity) error 
 				return err
 			}
 		}
-		now := c.Clock.Now()
-		snapshot, err := c.Trading.Snapshot(ctx, []*d.ObservedObject{obj})
-		if err != nil {
-			return err
-		}
-		m := d.Math()
-		increase := d.NewRisk(snapshot.Actual[obj.ObjectID], snapshot.Pending[obj.ObjectID], item.Decision.TargetQuantity)
-		revoked := obj.State != "ACTIVE" || len(snapshot.RiskLocks) > 0 || snapshot.RunState != "NORMAL" || snapshot.OwnerEpochs[obj.ObjectID] != item.OwnerEpoch
-		for eventID, version := range item.Decision.SourceEventVersions {
-			e := before.Events.Value(eventID)
-			if e != nil && e.State == "RETRACTED" && e.FactVersion > version {
-				revoked = true
-			}
-		}
-		if item.Decision.StopDirectiveID != nil {
-			record := findDirective(before, *item.Decision.StopDirectiveID)
-			if record == nil || stopWriterGrant(ctx, c.Store, before, record) != nil || !d.WriterAllowed(before, record.PrincipalID, record.Directive, now) || !now.Before(record.Receipt.ExpiresAt) || ValidateDirectiveSnapshot(record.Directive, obj, snapshot, before.Policies.Value(obj.TimePolicyVersion), now) != nil {
-				revoked = true
-			}
-		}
+		var now time.Time
 		status := ""
 		var reason *string
-		if d.Has(snapshot.SourceDecisions, key) {
-			status = "ACK"
-		} else if (increase || item.Decision.ProtectionOnly) && revoked {
-			status = "DELIVERY_UNKNOWN"
-			if item.State == "PENDING" {
-				status = "EXPIRED"
-			}
-			reason = d.Ptr("RISK_REVOKED_BEFORE_DELIVERY")
-		} else if !now.Before(item.ExpiresAt) {
-			status = "EXPIRED"
-			reason = d.Ptr("TARGET_EXPIRED")
-		} else {
-			proceed := false
-			err = c.Store.Transaction(ctx, identity.Instance(), func(state *d.StrategyState) error {
-				row := state.Outbox.Value(key)
-				if row == nil || !d.Has([]string{"PENDING", "DELIVERY_UNKNOWN"}, row.State) {
-					return nil
-				}
-				if row.CommandPayload == nil {
-					payload, err := c.Trading.Prepare(obj, item, snapshot)
-					if err != nil {
-						return err
-					}
-					row.CommandPayload = &payload
-				}
-				item.CommandPayload = d.Clone(row.CommandPayload)
-				row.State = "DELIVERY_UNKNOWN"
-				if item.ReservationID != nil {
-					state.Reservations.Value(*item.ReservationID).State = "UNKNOWN"
-				}
-				proceed = true
-				return nil
-			})
+		// B8: P1 refuses a target whose expected_version has gone stale and
+		// keeps nothing of the refused request, so the delivery is prepared
+		// again from a fresh snapshot in this pass instead of waiting a cycle.
+		for attempt := 1; ; attempt++ {
+			now = c.Clock.Now()
+			snapshot, err := c.Trading.Snapshot(ctx, []*d.ObservedObject{obj})
 			if err != nil {
 				return err
 			}
-			if !proceed {
-				continue
+			m := d.Math()
+			increase := d.NewRisk(snapshot.Actual[obj.ObjectID], snapshot.Pending[obj.ObjectID], item.Decision.TargetQuantity)
+			revoked := obj.State != "ACTIVE" || len(snapshot.RiskLocks) > 0 || snapshot.RunState != "NORMAL" || snapshot.OwnerEpochs[obj.ObjectID] != item.OwnerEpoch
+			for eventID, version := range item.Decision.SourceEventVersions {
+				e := before.Events.Value(eventID)
+				if e != nil && e.State == "RETRACTED" && e.FactVersion > version {
+					revoked = true
+				}
 			}
-			var deliveryErr error
-			if worker := identity.Worker(); worker != nil {
-				deliveryErr = c.Store.CheckWorkload(ctx, *worker, obj.ObjectID)
+			if item.Decision.StopDirectiveID != nil {
+				record := findDirective(before, *item.Decision.StopDirectiveID)
+				if record == nil || stopWriterGrant(ctx, c.Store, before, record) != nil || !d.WriterAllowed(before, record.PrincipalID, record.Directive, now) || !now.Before(record.Receipt.ExpiresAt) || ValidateDirectiveSnapshot(record.Directive, obj, snapshot, before.Policies.Value(obj.TimePolicyVersion), now) != nil {
+					revoked = true
+				}
 			}
-			if deliveryErr == nil {
-				_, deliveryErr = c.Trading.Deliver(ctx, obj, item, snapshot)
-			}
-			if deliveryErr == nil {
+			status, reason = "", nil
+			if d.Has(snapshot.SourceDecisions, key) {
 				status = "ACK"
+			} else if (increase || item.Decision.ProtectionOnly) && revoked {
+				status = "DELIVERY_UNKNOWN"
+				if item.State == "PENDING" {
+					status = "EXPIRED"
+				}
+				reason = d.Ptr("RISK_REVOKED_BEFORE_DELIVERY")
+			} else if !now.Before(item.ExpiresAt) {
+				status = "EXPIRED"
+				reason = d.Ptr("TARGET_EXPIRED")
 			} else {
-				var known *d.Error
-				if !errors.As(deliveryErr, &known) {
-					return deliveryErr
+				proceed := false
+				err = c.Store.Transaction(ctx, identity.Instance(), func(state *d.StrategyState) error {
+					row := state.Outbox.Value(key)
+					if row == nil || !d.Has([]string{"PENDING", "DELIVERY_UNKNOWN"}, row.State) {
+						return nil
+					}
+					if row.CommandPayload == nil || attempt > 1 {
+						payload, err := c.Trading.Prepare(obj, item, snapshot)
+						if err != nil {
+							return err
+						}
+						row.CommandPayload = &payload
+					}
+					item.CommandPayload = d.Clone(row.CommandPayload)
+					row.State = "DELIVERY_UNKNOWN"
+					if item.ReservationID != nil {
+						state.Reservations.Value(*item.ReservationID).State = "UNKNOWN"
+					}
+					proceed = true
+					return nil
+				})
+				if err != nil {
+					return err
 				}
-				status = "REJECTED"
-				if known.Status >= 500 {
-					status = "DELIVERY_UNKNOWN"
+				if !proceed {
+					continue items
 				}
-				reason = d.Ptr(known.Code)
+				var deliveryErr error
+				if worker := identity.Worker(); worker != nil {
+					deliveryErr = c.Store.CheckWorkload(ctx, *worker, obj.ObjectID)
+				}
+				if deliveryErr == nil {
+					_, deliveryErr = c.Trading.Deliver(ctx, obj, item, snapshot)
+				}
+				if deliveryErr == nil {
+					status = "ACK"
+				} else {
+					var known *d.Error
+					if !errors.As(deliveryErr, &known) {
+						return deliveryErr
+					}
+					status = "REJECTED"
+					if known.Status >= 500 {
+						status = "DELIVERY_UNKNOWN"
+					}
+					reason = d.Ptr(known.Code)
+				}
 			}
-		}
-		if err = m.Err(); err != nil {
-			return err
+			if err = m.Err(); err != nil {
+				return err
+			}
+			if status != "REJECTED" || *reason != "VERSION_CONFLICT" || attempt == deliveryAttempts {
+				break
+			}
 		}
 		err = c.Store.Transaction(ctx, identity.Instance(), func(state *d.StrategyState) error {
 			row := state.Outbox.Value(key)

@@ -462,6 +462,12 @@
    "change_kind": "design",
    "date": "2026-11-09",
    "summary": "Strategy layer: command idempotency records stay in the state for 24 hours and then move to an append-only archive that replays still read, so a late replay returns the original result as before. The records had no retention, so the stored state, which a single read must keep under 16 MiB, grew with every command."
+  },
+  {
+   "version": "3.7.4",
+   "change_kind": "design",
+   "date": "2026-11-10",
+   "summary": "Strategy layer: a target the trading layer refuses only because its expected_version went stale is prepared again from a fresh snapshot and sent up to three times in the same delivery pass. Before, it waited for the next decision cycle, so a changed target could be held back by one or more cycles while the run's version kept moving."
   }
  ]
 }
