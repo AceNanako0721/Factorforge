@@ -468,6 +468,12 @@
    "change_kind": "design",
    "date": "2026-11-10",
    "summary": "Strategy layer: a target the trading layer refuses only because its expected_version went stale is prepared again from a fresh snapshot and sent up to three times in the same delivery pass. Before, it waited for the next decision cycle, so a changed target could be held back by one or more cycles while the run's version kept moving."
+  },
+  {
+   "version": "3.7.5",
+   "change_kind": "design",
+   "date": "2026-11-11",
+   "summary": "Trading layer: when the combination check cannot be computed because a mark, rate or rule is unavailable (for example during a market-data gap), the account gate no longer adds a persistent PASSIVE_ risk lock; risk increases already fail for the same reason. A lock an earlier version added this way is removed at the next gate, and a run it alone locked returns to NORMAL when the resume conditions hold, otherwise to RECOVERY_CHECK. Before, a short data gap left the run RISK_LOCKED with no way back."
   }
  ]
 }
