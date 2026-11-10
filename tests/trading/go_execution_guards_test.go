@@ -116,6 +116,55 @@ func TestFillFailureRollsBackEarlierCreditsAndPrecisionFailure(t *testing.T) {
 		t.Fatal("failed arithmetic committed fabricated risk/cash values")
 	}
 }
+// A mark missing during a candle gap is not a passive breach, and a lock an
+// earlier version added for it goes away once the gate runs again.
+func TestMarkGapIsNotPassiveLockAndOldLockLifts(t *testing.T) {
+	run := executionSeed(t)
+	marks := 0
+	for _, key := range run.Points.Keys() {
+		if p := run.Points.Value(key); p.Kind == "MARK" {
+			p.Quality = "MISSING"
+			marks++
+		}
+	}
+	if marks == 0 {
+		t.Fatal("fixture has no mark")
+	}
+	// market.go evaluates the gate on a scratch engine during a gap and keeps
+	// the run's mutations while reporting the failure as a health issue.
+	check := d.NewEngine(run)
+	check.AssessLossGates()
+	var problem *d.Error
+	if !errors.As(check.Err(), &problem) || problem.Code != "ACCOUNT_MARK_UNKNOWN" {
+		t.Fatal("gap must still fail the gate", check.Err())
+	}
+	if len(run.RiskLocks) != 0 || run.State == "RISK_LOCKED" {
+		t.Fatal("missing mark locked the run", run.RiskLocks, run.State)
+	}
+	for _, key := range run.Points.Keys() {
+		if p := run.Points.Value(key); p.Kind == "MARK" {
+			p.Quality = "VALID"
+		}
+	}
+	state := run.State
+	run.RiskLocks = []string{"PASSIVE_ACCOUNT_MARK_UNKNOWN"}
+	run.State = "RISK_LOCKED"
+	if err := d.Mutate(run, func(e *d.Engine) { e.AssessLossGates() }); err != nil {
+		t.Fatal(err)
+	}
+	if len(run.RiskLocks) != 0 || run.State != state {
+		t.Fatal("old data-gap lock kept", run.RiskLocks, run.State, state)
+	}
+	// A real breach lock stays.
+	run.RiskLocks = []string{"PASSIVE_ACCOUNT_MARK_UNKNOWN", "PASSIVE_ACCOUNT_NET_EXPOSURE_LIMIT"}
+	run.State = "RISK_LOCKED"
+	if err := d.Mutate(run, func(e *d.Engine) { e.AssessLossGates() }); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(run.RiskLocks, []string{"PASSIVE_ACCOUNT_NET_EXPOSURE_LIMIT"}) || run.State != "RISK_LOCKED" {
+		t.Fatal("breach lock must remain", run.RiskLocks, run.State)
+	}
+}
 func TestBrokerReturnsDetachedFactsAndSeparatesLive(t *testing.T) {
 	run := executionSeed(t)
 	broker := sim.Broker{}

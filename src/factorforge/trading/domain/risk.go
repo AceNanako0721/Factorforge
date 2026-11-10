@@ -2,6 +2,7 @@ package domain
 
 import (
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/domain/decimal"
+	"strings"
 	"time"
 	_ "time/tzdata"
 )
@@ -320,6 +321,44 @@ func (e *Engine) AuthorizeOrder(request OrderRequest) decimal.Value {
 	e.CombinationRisk(&request, notional)
 	return notional
 }
+
+// dataGapCodes are the combination-check failures that mean a price, rate or
+// rule could not be read, not that a limit was exceeded.
+var dataGapCodes = []string{"ACCOUNT_MARK_UNKNOWN", "ACCOUNT_MARK_STALE", "FX_RATE_UNVERIFIED", "INSTRUMENT_RULES_UNVERIFIED"}
+
+// dropDataGapLocks removes passive locks earlier versions added for missing
+// data. A run they alone locked resumes when the resume conditions hold, and
+// goes to RECOVERY_CHECK otherwise.
+func (e *Engine) dropDataGapLocks() {
+	run := e.Run
+	kept := make([]string, 0, len(run.RiskLocks))
+	for _, lock := range run.RiskLocks {
+		if !Has(dataGapCodes, strings.TrimPrefix(lock, "PASSIVE_")) || !strings.HasPrefix(lock, "PASSIVE_") {
+			kept = append(kept, lock)
+		}
+	}
+	if len(kept) == len(run.RiskLocks) {
+		return
+	}
+	run.RiskLocks = kept
+	if run.State != "RISK_LOCKED" || len(kept) > 0 {
+		return
+	}
+	run.State = "NORMAL"
+	if len(run.RecoveryIssues) > 0 || len(run.HealthIssues) > 0 {
+		run.State = "RECOVERY_CHECK"
+	}
+	for _, o := range run.Orders.Values() {
+		if o.State == "UNKNOWN" {
+			run.State = "RECOVERY_CHECK"
+		}
+	}
+	for _, p := range run.Positions.Values() {
+		if p.Quantity.Sign() != 0 && p.ProtectionState != "ACTIVE_VERIFIED" {
+			run.State = "RECOVERY_CHECK"
+		}
+	}
+}
 func (e *Engine) AssessLossGates() decimal.Value {
 	run := e.Run
 	current := e.Equity()
@@ -336,16 +375,20 @@ func (e *Engine) AssessLossGates() decimal.Value {
 		hard = append(hard, "PASSIVE_ACCOUNT_MARGIN_LIMIT")
 	}
 	// A combination breach becomes a persistent passive lock, not a rejected frame.
+	// Missing market data is not a breach: risk increases already fail on it.
 	check := NewEngine(run)
 	check.CombinationRisk(nil, zero)
 	if err := check.Err(); err != nil {
 		if problem, ok := err.(*Error); ok {
-			hard = append(hard, "PASSIVE_"+problem.Code)
+			if !Has(dataGapCodes, problem.Code) {
+				hard = append(hard, "PASSIVE_"+problem.Code)
+			}
 		} else {
 			e.err = err
 			return zero
 		}
 	}
+	e.dropDataGapLocks()
 	for _, reason := range hard {
 		if !Has(run.RiskLocks, reason) {
 			run.RiskLocks = append(run.RiskLocks, reason)
