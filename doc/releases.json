@@ -474,6 +474,12 @@
    "change_kind": "design",
    "date": "2026-11-11",
    "summary": "Trading layer: when the combination check cannot be computed because a mark, rate or rule is unavailable (for example during a market-data gap), the account gate no longer adds a persistent PASSIVE_ risk lock; risk increases already fail for the same reason. A lock an earlier version added this way is removed at the next gate, and a run it alone locked returns to NORMAL when the resume conditions hold, otherwise to RECOVERY_CHECK. Before, a short data gap left the run RISK_LOCKED with no way back."
+  },
+  {
+   "version": "3.8.0",
+   "change_kind": "specification",
+   "date": "2026-11-11",
+   "summary": "Application layer: an optional price-state entry gate. Every hour the position manager computes price-only features from the last ten days of hourly closes and asks a registered typed-judgment model whether the market is in an uptrend, a downtrend or a range; the request names no instrument and no time. While flat, a new batch opens only when that state agrees with the direction, otherwise the initial stop directive is withdrawn until it does; open batches are not affected. When no fresh state is available the gate either blocks new batches or lets them open as without the gate, as registered. The read API and the console show the latest state and the gate decision; hourly states are recorded but not listed as actions. Unregistered instances behave as before."
   }
  ]
 }

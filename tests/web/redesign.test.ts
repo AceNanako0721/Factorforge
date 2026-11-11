@@ -119,6 +119,18 @@ describe("S4-022 live pipeline", () => {
     expect(none.headline).toContain("不使用执行器租约");
     expect(node({ ...base, run: { state: "RECOVERY_CHECK" } }, "executor").health).toBe("error");
   });
+  it("shows the price state and the entry gate while flat (S3-035)", () => {
+    const status = {
+      ...base.status,
+      price_state: { state: "UPTREND", hour_at: "2026-11-05T23:00:00Z", probabilities: { uptrend: "0.67", downtrend: "0.07", range: "0.26" } },
+      entry_gate: { open: false, reason: "PRICE_STATE_DISAGREES", direction: "SHORT", at: "2026-11-06T00:00:00Z" },
+    };
+    const stops = node({ ...base, status }, "stops");
+    expect(stops.headline).toContain("等待价格状态与研判一致");
+    expect(stops.rows.map((r) => r.value)).toEqual(["上涨趋势（上涨 67% / 下跌 7% / 震荡 26%）", "2026-11-05T23:00:00Z", "价格状态与研判不一致，暂不开仓", "做空"]);
+    expect(node({ ...base, status: { ...status, entry_gate: { ...status.entry_gate, reason: "PRICE_STATE_UNAVAILABLE" } } }, "stops").health).toBe("warn");
+    expect(node(base, "stops").rows).toEqual([]);
+  });
 });
 
 describe("S4-022 compact time", () => {

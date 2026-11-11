@@ -9,8 +9,9 @@ import (
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl/domain"
 )
 
-// MinuteKlines reads public 1-minute candles from the registered exchange
-// source for the normal-noise table only (S3-026); they never form a signal.
+// MinuteKlines reads public candles from the registered exchange source:
+// 1-minute bars for the normal-noise table (S3-026) and hourly bars for the
+// price-state input (S3-035).
 type MinuteKlines struct {
 	Fetcher *Fetcher
 	BaseURL string // e.g. https://fapi.binance.com
@@ -19,10 +20,19 @@ type MinuteKlines struct {
 
 // Range returns completed 1-minute bars whose close falls in (start, end].
 func (k MinuteKlines) Range(ctx context.Context, start, end time.Time) ([]d.MinuteBar, error) {
+	return k.klines(ctx, "1m", 60, start, end)
+}
+
+// Hours returns completed hourly bars whose close falls in (start, end].
+func (k MinuteKlines) Hours(ctx context.Context, start, end time.Time) ([]d.MinuteBar, error) {
+	return k.klines(ctx, "1h", 3600, start, end)
+}
+
+func (k MinuteKlines) klines(ctx context.Context, interval string, step int64, start, end time.Time) ([]d.MinuteBar, error) {
 	out := []d.MinuteBar{}
 	cursor := start.Unix() * 1000
 	for page := 0; page < 64 && cursor < end.Unix()*1000; page++ {
-		raw, _, err := k.Fetcher.Get(ctx, k.BaseURL+"/fapi/v1/klines?symbol="+k.Symbol+"&interval=1m&startTime="+strconv.FormatInt(cursor, 10)+"&limit=1500")
+		raw, _, err := k.Fetcher.Get(ctx, k.BaseURL+"/fapi/v1/klines?symbol="+k.Symbol+"&interval="+interval+"&startTime="+strconv.FormatInt(cursor, 10)+"&limit=1500")
 		if err != nil {
 			return nil, err
 		}
@@ -45,12 +55,12 @@ func (k MinuteKlines) Range(ctx context.Context, start, end time.Time) ([]d.Minu
 			h, e1 := strconv.ParseFloat(high, 64)
 			l, e2 := strconv.ParseFloat(low, 64)
 			c, e3 := strconv.ParseFloat(close, 64)
-			closeAt := open/1000 + 60
+			closeAt := open/1000 + step
 			if e1 != nil || e2 != nil || e3 != nil || closeAt > end.Unix() {
 				continue
 			}
 			out = append(out, d.MinuteBar{CloseAt: closeAt, High: h, Low: l, Close: c})
-			cursor = open + 60000
+			cursor = open + step*1000
 		}
 		if len(rows) < 1500 {
 			break

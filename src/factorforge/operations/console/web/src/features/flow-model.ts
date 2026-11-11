@@ -58,6 +58,13 @@ const protectionStateText: Record<string, string> = {
   NONE: "无保护单",
 };
 const roleText: Record<string, string> = { STRATEGY: "策略止损单", INSURANCE: "极端行情保护单" };
+const priceStateText: Record<string, string> = { UPTREND: "上涨趋势", DOWNTREND: "下跌趋势", RANGE: "震荡" };
+const gateReasonText: Record<string, string> = {
+  PRICE_STATE_AGREES: "价格状态与研判一致，允许开仓",
+  PRICE_STATE_DISAGREES: "价格状态与研判不一致，暂不开仓",
+  PRICE_STATE_UNAVAILABLE: "价格状态不可用，暂不开仓",
+  PRICE_STATE_IGNORED: "价格状态不可用，按无闸门时开仓",
+};
 
 function ago(now: number, at: Json): number | null {
   return typeof at === "string" && Number.isFinite(Date.parse(at)) ? Math.max(0, (now - Date.parse(at)) / 60_000) : null;
@@ -205,13 +212,36 @@ export function flowNodes(f: FlowInput): FlowNode[] {
   const batch = f.status.batch ? record(f.status.batch) : null;
   const ladder = batch?.ladder ? record(batch.ladder) : null;
   const next = f.status.next_entry ? record(f.status.next_entry) : null;
+  // S3-035: the hourly price state and, while flat, the entry gate.
+  const ps = f.status.price_state ? record(f.status.price_state) : null;
+  const gate = f.status.entry_gate ? record(f.status.entry_gate) : null;
+  const probs = ps ? record(ps.probabilities ?? null) : {};
+  const gateRows = [
+    ...(ps
+      ? [
+          {
+            label: "价格状态",
+            value: `${priceStateText[String(ps.state)] ?? String(ps.state)}（上涨 ${percent(probs.uptrend ?? null, 0)} / 下跌 ${percent(probs.downtrend ?? null, 0)} / 震荡 ${percent(probs.range ?? null, 0)}）`,
+          },
+          { label: "价格状态所属小时", value: f.time(ps.hour_at) },
+        ]
+      : []),
+    ...(gate
+      ? [
+          { label: "开仓闸门", value: gateReasonText[String(gate.reason)] ?? String(gate.reason) },
+          { label: "研判方向", value: directionText[String(gate.direction)] ?? String(gate.direction) },
+        ]
+      : []),
+  ];
   nodes.push({
     id: "stops",
     title: "止损与阶梯",
-    health: batch ? "ok" : "idle",
+    health: batch ? "ok" : gate?.reason === "PRICE_STATE_UNAVAILABLE" ? "warn" : "idle",
     headline: batch
       ? `收盘止损 ${num(batch.close_stop)?.toFixed(2) ?? "未记录"}${ladder && Number(ladder.rung) > 0 ? ` · 阶梯第 ${ladder.rung} 级` : ""}${batch.trailing === true ? " · 移动止损已启动" : ""}`
-      : "没有持仓批次",
+      : gate
+        ? `没有持仓批次 · ${gate.open === true ? "开仓闸门已放行" : "等待价格状态与研判一致"}`
+        : "没有持仓批次",
     rows: batch
       ? [
           { label: "开仓价", value: price(batch.entry) },
@@ -225,8 +255,9 @@ export function flowNodes(f: FlowInput): FlowNode[] {
                 { label: "下一级止损", value: price(ladder.next_stop) },
               ]
             : []),
+          ...gateRows,
         ]
-      : [],
+      : gateRows,
     params: [
       ...(batch
         ? [

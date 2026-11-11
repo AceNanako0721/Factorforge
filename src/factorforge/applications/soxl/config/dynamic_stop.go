@@ -100,6 +100,16 @@ type DynamicProfile struct {
 		NoiseSymbol         string   `toml:"noise_symbol"`
 		NoiseHost           string   `toml:"noise_host"`
 		EventTypes          []string `toml:"event_types"`
+		// PriceState registers the price-state entry gate (S3-035); an empty
+		// url leaves it off.
+		PriceState struct {
+			URL            string `toml:"url"`
+			APIKey         string `toml:"api_key"`
+			Model          string `toml:"model"`
+			TimeoutSeconds int    `toml:"timeout_seconds"`
+			MaxAgeMinutes  int    `toml:"max_age_minutes"`
+			OnUnavailable  string `toml:"on_unavailable"`
+		} `toml:"price_state"`
 	} `toml:"position"`
 }
 
@@ -139,6 +149,10 @@ func (p DynamicProfile) Validate() error {
 	}
 	pos := p.Position
 	bad = bad || pos.CloseMinutes != 5 && pos.CloseMinutes != 15 || pos.InsuranceFraction <= 0 || pos.InsuranceFraction >= 1 || pos.WickMultiplier <= 0 || pos.BaselineMaxShare <= 0 || pos.BaselineMaxShare > 1 || pos.DirectiveTTLMinutes <= 0 || pos.NoiseLookbackDays <= 0 || pos.PriceTick <= 0 || pos.LadderStep < 0 || pos.LadderStep >= 1
+	if ps := pos.PriceState; ps.URL != "" {
+		parsed, err := url.Parse(ps.URL)
+		bad = bad || err != nil || parsed.Scheme != "https" || parsed.Host == "" || ps.APIKey == "" || ps.Model == "" || ps.TimeoutSeconds <= 0 || ps.MaxAgeMinutes <= 0 || !d.Has([]string{d.PriceStateBlock, d.PriceStateIgnore}, ps.OnUnavailable)
+	}
 	for _, v := range p.Judgment.ImpactByConfidence {
 		bad = bad || v == ""
 	}

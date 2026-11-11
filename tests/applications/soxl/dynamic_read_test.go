@@ -133,9 +133,15 @@ func TestT328DynamicReadAPI(t *testing.T) {
 	if err = writer.AppendRecord(ctx, "STOP_EVENT", "open-cycle-1", at.Add(34*time.Minute), map[string]any{"kind": "OPEN", "batch": batch}); err != nil {
 		t.Fatal(err)
 	}
+	// S3-035: hourly price states are gate input, not actions.
+	priceState := map[string]any{"hour_at": at.Add(time.Hour), "state": "DOWNTREND", "probabilities": map[string]float64{"UPTREND": 0.07, "DOWNTREND": 0.67, "RANGE": 0.26}, "strength": 2.78, "model": "jev-1.14.0", "asked_at": at.Add(2*time.Hour + 5*time.Second), "features": map[string]float64{"ret_24h_pct": -3.1}}
+	if err = writer.AppendRecord(ctx, "STOP_EVENT", "price-state-20261016T08", at.Add(2*time.Hour), map[string]any{"kind": "PRICE_STATE", "state": priceState}); err != nil {
+		t.Fatal(err)
+	}
 	position := map[string]any{"noise_id": "noise-1", "noise_at": at.Add(-time.Hour), "versions": map[string]int{}, "batch": pending,
 		"initial":  map[string]any{"direction": -1, "geometry": map[string]any{"tier": 72, "session": "OVERNIGHT", "r": 0.16}, "price": 107.26, "distance": 19.11, "close_distance": 17.2, "risk_fraction": 0.01, "equity": 4001.03, "directive_id": "initial-20261016T072005Z"},
-		"baseline": map[string]any{"phase": "", "value": 0, "direction": 0, "started_at": "0001-01-01T00:00:00Z", "source_chain": "", "suspended_at": "0001-01-01T00:00:00Z"}, "baseline_at": at, "equity_peak": 4003.7, "outcomes": nil, "seen_cases": nil, "ladder": map[string]any{"step": 0.01, "round_trip_cost": 0.001}}
+		"baseline": map[string]any{"phase": "", "value": 0, "direction": 0, "started_at": "0001-01-01T00:00:00Z", "source_chain": "", "suspended_at": "0001-01-01T00:00:00Z"}, "baseline_at": at, "equity_peak": 4003.7, "outcomes": nil, "seen_cases": nil, "ladder": map[string]any{"step": 0.01, "round_trip_cost": 0.001},
+		"price_state": priceState, "gate": map[string]any{"open": false, "reason": "PRICE_STATE_DISAGREES", "direction": 1, "at": at.Add(2 * time.Hour)}}
 	for key, value := range map[string]any{"POSITION": position, "INJECTION": map[string]any{"seen": []string{"news-a"}, "active": map[string]any{"direction": "SHORT", "confidence": 3, "event_ids": []string{"e1", "e2"}, "chain_id": "chain-1", "since": at}, "sequence": 2, "last_judgment": "j-3"}, "NEWS_SOURCES": map[string]any{"wscn-us": map[string]any{"failing": false, "last_success": at}, "cnbc-tech": map[string]any{"failing": true, "last_success": at.Add(-time.Hour)}},
 		// S3-034: the follower cursor is stored under FOLLOW (migration 009).
 		"FOLLOW": map[string]any{"last_at": at, "last_id": "j-3"}} {
@@ -162,6 +168,12 @@ func TestT328DynamicReadAPI(t *testing.T) {
 	}
 	if v.NextEntry == nil || v.NextEntry.PlannedAt == nil || !v.NextEntry.PlannedAt.Equal(time.Date(2026, 10, 16, 7, 20, 5, 0, time.UTC)) || v.Baseline.Phase != "NONE" || v.Baseline.StartedAt != nil {
 		t.Fatalf("plan/baseline %+v %+v", v.NextEntry, v.Baseline)
+	}
+	if ps := v.PriceState; ps == nil || ps.State != "DOWNTREND" || ps.Probabilities.Downtrend != "0.67" || ps.Probabilities.Range != "0.26" || ps.Strength != "2.78" || ps.Model != "jev-1.14.0" || !ps.HourAt.Equal(at.Add(time.Hour)) {
+		t.Fatalf("price state %+v", v.PriceState)
+	}
+	if g := v.EntryGate; g == nil || g.Open || g.Reason != "PRICE_STATE_DISAGREES" || g.Direction != "LONG" {
+		t.Fatalf("entry gate %+v", v.EntryGate)
 	}
 	if v.Chain == nil || v.Chain.JudgmentCount != 2 || len(v.Sources) != 2 || v.Sources[0].SourceID != "cnbc-tech" || !v.Sources[0].Failing || status.SchemaVersion != "instance-2.0" || status.InstanceID != "soxl-example" || status.ObservedAt == nil {
 		t.Fatalf("chain/sources/meta %+v %+v %+v", v.Chain, v.Sources, status.Metadata)

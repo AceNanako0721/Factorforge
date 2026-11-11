@@ -40,6 +40,21 @@ type MinuteSource interface {
 	Range(ctx context.Context, start, end time.Time) ([]d.MinuteBar, error)
 }
 
+// HourSource and StateClassifier feed the price-state entry gate (S3-035).
+type HourSource interface {
+	Hours(ctx context.Context, start, end time.Time) ([]d.MinuteBar, error)
+}
+type StateClassifier interface {
+	Classify(ctx context.Context, f d.PriceFeatures) (d.PriceState, error)
+}
+
+// PriceStateSettings registers the gate; Enabled=false leaves entries as before.
+type PriceStateSettings struct {
+	Enabled       bool
+	MaxAge        time.Duration
+	OnUnavailable string // d.PriceStateBlock or d.PriceStateIgnore
+}
+
 type PositionSettings struct {
 	ObjectID, OwnerID, Venue, InstrumentID string
 	SourceModule, TriggerKind              string
@@ -52,6 +67,7 @@ type PositionSettings struct {
 	EventTypes                             []string
 	PriceTick                              float64
 	LadderStep                             float64 // S3-033; 0 keeps S3-028 only
+	PriceState                             PriceStateSettings
 }
 
 // BatchState is the instance view of one position cycle (S3-027～029).
@@ -104,6 +120,16 @@ type PositionState struct {
 	SeenCases  []string         `json:"seen_cases"`
 	// S3-032: the registered ladder, recorded for the read view.
 	Ladder *LadderSetting `json:"ladder,omitempty"`
+	// S3-035: the latest price state and the gate's last decision while flat.
+	PriceState *d.PriceState `json:"price_state,omitempty"`
+	Gate       *EntryGate    `json:"gate,omitempty"`
+}
+
+type EntryGate struct {
+	Open      bool      `json:"open"`
+	Reason    string    `json:"reason"`
+	Direction int       `json:"direction"`
+	At        time.Time `json:"at"`
 }
 
 type LadderSetting struct {
@@ -116,6 +142,8 @@ type PositionManager struct {
 	Framework PositionFramework
 	Trading   PositionTrading
 	Minutes   MinuteSource
+	Hours     HourSource
+	States    StateClassifier
 	Clock     func() time.Time
 	Alerts    Alerter
 	Settings  PositionSettings
@@ -190,10 +218,13 @@ func (m *PositionManager) Run(ctx context.Context) error {
 			return err
 		}
 	}
+	if s.PriceState.Enabled {
+		m.priceState(ctx, &st, now)
+	}
 	// The initial-distance directive stays fresh during a batch as well, so
 	// level increases are sized from R + buffer, never from a fallback.
 	if price > 0 {
-		if err = m.initial(ctx, &st, price, equity, now); err != nil {
+		if err = m.initial(ctx, &st, price, equity, now, qty == 0); err != nil {
 			return err
 		}
 	}
@@ -318,11 +349,21 @@ func (m *PositionManager) outcomes(ctx context.Context, st *PositionState) error
 
 // initial keeps a fresh INITIAL_DISTANCE directive for the current view so
 // the framework can open a batch with Q frozen from R + buffer (S3-027).
-func (m *PositionManager) initial(ctx context.Context, st *PositionState, price, equity float64, now time.Time) error {
+// While flat, a registered price-state gate withdraws it until the state
+// agrees with the direction (S3-035); an open batch is never gated.
+func (m *PositionManager) initial(ctx context.Context, st *PositionState, price, equity float64, now time.Time, flat bool) error {
 	s := m.Settings
 	direction, horizon, confidence, err := m.view(ctx, now)
 	if err != nil || direction == 0 {
 		return err
+	}
+	st.Gate = nil
+	if s.PriceState.Enabled && flat {
+		open, reason := d.GateEntry(st.PriceState, direction, now, s.PriceState.MaxAge, s.PriceState.OnUnavailable)
+		st.Gate = &EntryGate{Open: open, Reason: reason, Direction: direction, At: now}
+		if !open {
+			return m.withdraw(ctx, st, now, reason)
+		}
 	}
 	view, ok := m.noise(ctx, st, now)
 	if !ok {
@@ -349,7 +390,11 @@ func (m *PositionManager) initial(ctx context.Context, st *PositionState, price,
 	v := m.nextVersion(ctx, st, "INITIAL_DISTANCE")
 	id := "initial-" + now.Format("20060102T150405Z")
 	plan := InitialPlan{Direction: direction, Geometry: g, Price: price, Distance: (g.R + g.Buffer) * price, CloseDist: g.R * price, Fraction: fraction, Confidence: confidence, Equity: equity, DirectiveID: id}
-	directive := dto.StopDirective{DirectiveID: id, ObjectID: s.ObjectID, Version: v, Kind: "INITIAL_DISTANCE", PositionDirection: sideName(direction), TriggerKind: s.TriggerKind, InitialStopDistance: dec(plan.Distance), EffectiveAt: now, ValidForSeconds: int(s.DirectiveTTL.Seconds()), SourceModule: s.SourceModule, ReasonCodes: []string{"DYNAMIC_STOP_INITIAL", "TIER_" + strconv.Itoa(g.Tier) + "H", "CONFIDENCE_" + strconv.Itoa(confidence)}, Mode: "VENUE", RiskFraction: dec(fraction), CloseStopDistance: dec(plan.CloseDist)}
+	codes := []string{"DYNAMIC_STOP_INITIAL", "TIER_" + strconv.Itoa(g.Tier) + "H", "CONFIDENCE_" + strconv.Itoa(confidence)}
+	if st.Gate != nil {
+		codes = append(codes, st.Gate.Reason)
+	}
+	directive := dto.StopDirective{DirectiveID: id, ObjectID: s.ObjectID, Version: v, Kind: "INITIAL_DISTANCE", PositionDirection: sideName(direction), TriggerKind: s.TriggerKind, InitialStopDistance: dec(plan.Distance), EffectiveAt: now, ValidForSeconds: int(s.DirectiveTTL.Seconds()), SourceModule: s.SourceModule, ReasonCodes: codes, Mode: "VENUE", RiskFraction: dec(fraction), CloseStopDistance: dec(plan.CloseDist)}
 	if _, err = m.Framework.SubmitStopDirective(ctx, directive); err != nil {
 		// A version conflict keeps the allocated version, so the saved counter
 		// passes P2's head on the next cycle instead of repeating it.
@@ -402,6 +447,57 @@ func (m *PositionManager) withdraw(ctx context.Context, st *PositionState, now t
 	}
 	p.Withdrawn = true
 	return nil
+}
+
+// priceState classifies the latest completed hourly bar once (S3-035) and
+// records it. A failure keeps the previous state and is asked again next
+// cycle; the gate treats a state older than its maximum age as unavailable.
+// The record is written before the state save, so an hour already recorded
+// is taken from its record instead of asking again.
+func (m *PositionManager) priceState(ctx context.Context, st *PositionState, now time.Time) {
+	hour := now.Truncate(time.Hour).Add(-time.Hour)
+	if st.PriceState != nil && !st.PriceState.HourAt.Before(hour) {
+		return
+	}
+	id := "price-state-" + hour.Format("20060102T15")
+	if rows, err := m.Store.RecordsByID(ctx, "STOP_EVENT", []string{id}); err == nil && rows[id] != nil {
+		var rec struct {
+			State *d.PriceState `json:"state"`
+		}
+		if json.Unmarshal(rows[id], &rec) == nil && rec.State != nil && rec.State.HourAt.Equal(hour) {
+			st.PriceState = rec.State
+			return
+		}
+	}
+	bars, err := m.Hours.Hours(ctx, hour.Add(-time.Duration(d.PriceStateHours+24)*time.Hour), now)
+	if err != nil {
+		m.alert(ctx, "PRICE_STATE_UNAVAILABLE", errCode(err))
+		return
+	}
+	if len(bars) == 0 || bars[len(bars)-1].CloseAt != hour.Add(time.Hour).Unix() {
+		m.alert(ctx, "PRICE_STATE_UNAVAILABLE", "HOUR_BAR_MISSING")
+		return
+	}
+	closes := make([]float64, len(bars))
+	for i, b := range bars {
+		closes[i] = b.Close
+	}
+	f, ok := d.PriceFeaturesAt(closes)
+	if !ok {
+		m.alert(ctx, "PRICE_STATE_UNAVAILABLE", "PRICE_HISTORY_SHORT")
+		return
+	}
+	s, err := m.States.Classify(ctx, f)
+	if err != nil {
+		m.alert(ctx, "PRICE_STATE_UNAVAILABLE", errCode(err))
+		return
+	}
+	s.HourAt, s.AskedAt, s.Features = hour, now, f
+	if err = m.Store.AppendRecord(ctx, "STOP_EVENT", id, now, map[string]any{"kind": "PRICE_STATE", "state": s}); err != nil {
+		m.alert(ctx, "PRICE_STATE_UNAVAILABLE", errCode(err))
+		return
+	}
+	st.PriceState = &s
 }
 
 func lastDirectiveAt(id string) time.Time {

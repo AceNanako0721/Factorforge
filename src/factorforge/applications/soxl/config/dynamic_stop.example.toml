@@ -88,3 +88,13 @@ noise_lookback_days = 0
 noise_symbol = ""
 noise_host = ""
 event_types = []
+
+# Price-state entry gate only: a new batch opens only when the hourly price state agrees
+# with the direction. on_unavailable is BLOCK (no new batch) or IGNORE (open as without the gate).
+# [position.price_state]
+# url = ""
+# api_key = ""
+# model = ""
+# timeout_seconds = 0
+# max_age_minutes = 0
+# on_unavailable = ""
