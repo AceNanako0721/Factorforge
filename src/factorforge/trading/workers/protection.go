@@ -230,6 +230,7 @@ func (w *Protection) sweep(ctx context.Context, run *d.Aggregate, key d.Instrume
 					p.State = "CLOSED"
 				}
 			}
+			d.NewEngine(current).RefreshProtectionState(key)
 		} else if pos != nil && pos.PositionCycleID == run.Positions.Value(key.Code()).PositionCycleID && pos.RequestedMode == "UPPER_MANAGED" {
 			task.State = "CONFIRMED"
 			pos.ModeCleanupVerified = true
@@ -340,6 +341,13 @@ func (w *Protection) Tick(ctx context.Context, key d.RunKey) (bool, error) {
 			if pos.Quantity.Sign() != 0 && pos.RequestedMode == "UPPER_MANAGED" && pos.TransitionState != "STABLE" {
 				return w.sweep(ctx, run, pos.InstrumentKey, false)
 			}
+		}
+		// A run left degraded after its cleanup was already confirmed recovers here.
+		if d.ProtectionRecoverable(run) {
+			return true, w.update(ctx, key, func(current *d.Aggregate) error {
+				d.NewEngine(current).RestoreProtection()
+				return nil
+			})
 		}
 		return false, nil
 	}
