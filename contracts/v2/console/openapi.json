@@ -3700,6 +3700,39 @@
                                     }
                                   ]
                                 },
+                                "entry_gate": {
+                                  "anyOf": [
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "at": {
+                                          "format": "date-time",
+                                          "pattern": "Z$",
+                                          "type": "string"
+                                        },
+                                        "direction": {
+                                          "type": "string"
+                                        },
+                                        "open": {
+                                          "type": "boolean"
+                                        },
+                                        "reason": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "open",
+                                        "reason",
+                                        "direction",
+                                        "at"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
                                 "equity_peak": {
                                   "type": "string"
                                 },
@@ -3828,6 +3861,66 @@
                                   },
                                   "type": "array"
                                 },
+                                "price_state": {
+                                  "anyOf": [
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "asked_at": {
+                                          "format": "date-time",
+                                          "pattern": "Z$",
+                                          "type": "string"
+                                        },
+                                        "hour_at": {
+                                          "format": "date-time",
+                                          "pattern": "Z$",
+                                          "type": "string"
+                                        },
+                                        "model": {
+                                          "type": "string"
+                                        },
+                                        "probabilities": {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "downtrend": {
+                                              "type": "string"
+                                            },
+                                            "range": {
+                                              "type": "string"
+                                            },
+                                            "uptrend": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "uptrend",
+                                            "downtrend",
+                                            "range"
+                                          ],
+                                          "type": "object"
+                                        },
+                                        "state": {
+                                          "type": "string"
+                                        },
+                                        "strength": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "hour_at",
+                                        "state",
+                                        "probabilities",
+                                        "strength",
+                                        "model",
+                                        "asked_at"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
                                 "sources": {
                                   "items": {
                                     "additionalProperties": false,
@@ -3864,6 +3957,8 @@
                               "required": [
                                 "batch",
                                 "next_entry",
+                                "price_state",
+                                "entry_gate",
                                 "baseline",
                                 "chain",
                                 "noise",

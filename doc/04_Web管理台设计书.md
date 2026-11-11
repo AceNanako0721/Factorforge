@@ -1,6 +1,6 @@
 # Web 管理台设计书
 
-版本：3.7.5
+版本：3.8.0
 
 对应式样书：[04_Web管理台式样书](04_Web管理台式样书.md)。本书说明 `src/factorforge/operations/console` 的实现。
 
@@ -419,7 +419,7 @@ max_retries = 3
 | 判断链 | `dynamic.status` 的 `chain` | 没有链为未启用 |
 | 信心池 | `pool` 的净值与有效贡献数；参数取对象参数版本的 `w`、`g`、`h`、`eta`、`kappa` | 未读取为未启用 |
 | 策略决策 | `available_cutoff` 最新的决策：目标、原因码（转成中文）；对象的实际仓位、恢复状态 | 恢复状态不是 `NORMAL` 为异常；对象状态不是 `ACTIVE` 为注意 |
-| 止损与阶梯 | `dynamic.status` 的 `batch`、`next_entry`：收盘止损、阶梯、移动止损；参数为初始止损幅度、回撤、缓冲、档位、阶梯步长、单笔风险比例 | 没有批次为未启用 |
+| 止损与阶梯 | `dynamic.status` 的 `batch`、`next_entry`：收盘止损、阶梯、移动止损；参数为初始止损幅度、回撤、缓冲、档位、阶梯步长、单笔风险比例。有 `price_state` 时另列价格状态（`priceStateText` 转成中文）、三个概率与所属小时；有 `entry_gate` 时列闸门理由（`gateReasonText` 转成中文）与研判方向，没有批次时一句话说明按 `open` 写“开仓闸门已放行”或“等待价格状态与研判一致” | 没有批次为未启用；没有批次而闸门理由为 `PRICE_STATE_UNAVAILABLE` 为注意 |
 | 执行器 | `run` 的状态与下单方式，`trading.operations` 的租约与问题 | 运行状态不是 `NORMAL` 为异常；有租约但已过期、或有问题为注意；`lease_until` 为空的运行不使用租约，不算过期 |
 | 交易所 / 模拟撮合 | 持仓、对账状态、仍有效的保护单 | 对账不一致为异常；有持仓而保护未经确认为注意 |
 | 账户 | 权益、已实现与浮动盈亏、手续费、资金费、盈亏块累计（S4-020）、风控状态 | 风控状态不是 `NORMAL` 为注意 |
@@ -484,4 +484,4 @@ max_retries = 3
 | T4-16 | 登记隧道主机、主机名检查、跨站导航只取静态页面 |
 | T4-17 | 推送解析、共享与过期、重连与空闲关闭、推送的授权与会话结束 |
 | T4-18 | 盈亏块的投影 |
-| T4-03、T4-13、T4-15、T4-17～T4-22 | `tests/web`：前端单元测试（Vitest，含 `redesign.test.ts` 的成交重建、信心来源、流程状态）与浏览器测试（Playwright，使用 `tests/web/fixture` 的夹具服务） |
+| T4-03、T4-13、T4-15、T4-17～T4-23 | `tests/web`：前端单元测试（Vitest，含 `redesign.test.ts` 的成交重建、信心来源、流程状态）与浏览器测试（Playwright，使用 `tests/web/fixture` 的夹具服务） |

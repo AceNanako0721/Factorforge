@@ -105,9 +105,33 @@ type DynamicOutcomeView struct {
 	R        string `json:"r"`
 	ClosedAt string `json:"closed_at"`
 }
+// DynamicPriceStateView is the latest hourly price state (S3-035).
+type DynamicPriceStateView struct {
+	HourAt        time.Time                 `json:"hour_at"`
+	State         string                    `json:"state"`
+	Probabilities DynamicStateProbabilities `json:"probabilities"`
+	Strength      string                    `json:"strength"`
+	Model         string                    `json:"model"`
+	AskedAt       time.Time                 `json:"asked_at"`
+}
+type DynamicStateProbabilities struct {
+	Uptrend   string `json:"uptrend"`
+	Downtrend string `json:"downtrend"`
+	Range     string `json:"range"`
+}
+
+// DynamicEntryGateView is the gate's last decision while flat.
+type DynamicEntryGateView struct {
+	Open      bool      `json:"open"`
+	Reason    string    `json:"reason"`
+	Direction string    `json:"direction"`
+	At        time.Time `json:"at"`
+}
 type DynamicStatusView struct {
-	Batch          *DynamicBatchView     `json:"batch"`
-	NextEntry      *DynamicEntryPlanView `json:"next_entry"`
+	Batch          *DynamicBatchView      `json:"batch"`
+	NextEntry      *DynamicEntryPlanView  `json:"next_entry"`
+	PriceState     *DynamicPriceStateView `json:"price_state"`
+	EntryGate      *DynamicEntryGateView  `json:"entry_gate"`
 	Baseline       DynamicBaselineView   `json:"baseline"`
 	Chain          *DynamicChainView     `json:"chain"`
 	Noise          DynamicNoiseView      `json:"noise"`
@@ -223,6 +247,20 @@ type storedPosition struct {
 		R        float64 `json:"r"`
 		ClosedAt string  `json:"closed_at"`
 	} `json:"outcomes"`
+	PriceState *struct {
+		HourAt        time.Time          `json:"hour_at"`
+		State         string             `json:"state"`
+		Probabilities map[string]float64 `json:"probabilities"`
+		Strength      float64            `json:"strength"`
+		Model         string             `json:"model"`
+		AskedAt       time.Time          `json:"asked_at"`
+	} `json:"price_state"`
+	Gate *struct {
+		Open      bool      `json:"open"`
+		Reason    string    `json:"reason"`
+		Direction int       `json:"direction"`
+		At        time.Time `json:"at"`
+	} `json:"gate"`
 }
 type storedInjection struct {
 	Active *struct {
@@ -361,6 +399,14 @@ func (q DynamicQuery) Status(ctx context.Context, p d.ReadPrincipal) (Record, er
 		if at, ok := directiveTime(pl.DirectiveID); ok {
 			v.NextEntry.PlannedAt = &at
 		}
+	}
+	if ps := pos.PriceState; ps != nil {
+		pr := ps.Probabilities
+		v.PriceState = &DynamicPriceStateView{HourAt: ps.HourAt.UTC(), State: ps.State, Strength: decimal(ps.Strength), Model: ps.Model, AskedAt: ps.AskedAt.UTC(),
+			Probabilities: DynamicStateProbabilities{Uptrend: decimal(pr["UPTREND"]), Downtrend: decimal(pr["DOWNTREND"]), Range: decimal(pr["RANGE"])}}
+	}
+	if g := pos.Gate; g != nil {
+		v.EntryGate = &DynamicEntryGateView{Open: g.Open, Reason: g.Reason, Direction: direction(g.Direction), At: g.At.UTC()}
 	}
 	bl := pos.Baseline
 	phase := bl.Phase

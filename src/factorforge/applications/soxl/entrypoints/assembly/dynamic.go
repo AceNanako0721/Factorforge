@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl/adapters/jev"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl/adapters/modelaccess"
 	pg "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl/adapters/postgres"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl/analysis"
@@ -94,7 +95,12 @@ func RunDynamic(role string) error {
 			return err
 		}
 		pos := p.Position
-		m := &workers.PositionManager{Store: store, Framework: framework, Trading: trading, Minutes: monitoring.MinuteKlines{Fetcher: fetcher, BaseURL: "https://" + pos.NoiseHost, Symbol: pos.NoiseSymbol}, Clock: now, Alerts: alerts, Settings: workers.PositionSettings{ObjectID: p.ObjectID, OwnerID: pos.OwnerID, Venue: pos.Venue, InstrumentID: pos.InstrumentID, SourceModule: pos.SourceModule, TriggerKind: pos.TriggerKind, BaselineFactorID: pos.BaselineFactorID, Stop: d.StopSettings{CloseMinutes: pos.CloseMinutes, CloseQuantile: pos.CloseQuantile, WickQuantile: pos.WickQuantile, WickMultiplier: pos.WickMultiplier, TrailQuantile: pos.TrailQuantile, InsuranceFraction: pos.InsuranceFraction, InsuranceMargin: pos.InsuranceMargin}, DirectiveTTL: time.Duration(pos.DirectiveTTLMinutes) * time.Minute, ReentryWait: time.Duration(pos.ReentryWaitMinutes) * time.Minute, BaselineMaxShare: pos.BaselineMaxShare, RoundTripCost: pos.RoundTripCost, BaselineRenew: time.Duration(pos.BaselineRenewMin) * time.Minute, NoiseMaxAge: time.Duration(pos.NoiseMaxAgeHours) * time.Hour, NoiseConfig: d.NoiseConfig{Symbol: pos.NoiseSymbol, LookbackDays: pos.NoiseLookbackDays, EventPadSeconds: 3600, Hours: []int{1, 4, 24, 72}}, EventTypes: pos.EventTypes, PriceTick: pos.PriceTick, LadderStep: pos.LadderStep}}
+		klines := monitoring.MinuteKlines{Fetcher: fetcher, BaseURL: "https://" + pos.NoiseHost, Symbol: pos.NoiseSymbol}
+		m := &workers.PositionManager{Store: store, Framework: framework, Trading: trading, Minutes: klines, Hours: klines, Clock: now, Alerts: alerts, Settings: workers.PositionSettings{ObjectID: p.ObjectID, OwnerID: pos.OwnerID, Venue: pos.Venue, InstrumentID: pos.InstrumentID, SourceModule: pos.SourceModule, TriggerKind: pos.TriggerKind, BaselineFactorID: pos.BaselineFactorID, Stop: d.StopSettings{CloseMinutes: pos.CloseMinutes, CloseQuantile: pos.CloseQuantile, WickQuantile: pos.WickQuantile, WickMultiplier: pos.WickMultiplier, TrailQuantile: pos.TrailQuantile, InsuranceFraction: pos.InsuranceFraction, InsuranceMargin: pos.InsuranceMargin}, DirectiveTTL: time.Duration(pos.DirectiveTTLMinutes) * time.Minute, ReentryWait: time.Duration(pos.ReentryWaitMinutes) * time.Minute, BaselineMaxShare: pos.BaselineMaxShare, RoundTripCost: pos.RoundTripCost, BaselineRenew: time.Duration(pos.BaselineRenewMin) * time.Minute, NoiseMaxAge: time.Duration(pos.NoiseMaxAgeHours) * time.Hour, NoiseConfig: d.NoiseConfig{Symbol: pos.NoiseSymbol, LookbackDays: pos.NoiseLookbackDays, EventPadSeconds: 3600, Hours: []int{1, 4, 24, 72}}, EventTypes: pos.EventTypes, PriceTick: pos.PriceTick, LadderStep: pos.LadderStep}}
+		if ps := pos.PriceState; ps.URL != "" {
+			m.Settings.PriceState = workers.PriceStateSettings{Enabled: true, MaxAge: time.Duration(ps.MaxAgeMinutes) * time.Minute, OnUnavailable: ps.OnUnavailable}
+			m.States = jev.Client{URL: ps.URL, Key: ps.APIKey, Model: ps.Model, Timeout: time.Duration(ps.TimeoutSeconds) * time.Second}
+		}
 		return loopPosition(ctx, m, p, *once, alerts)
 	}
 	return d.Fail("DYNAMIC_ROLE_INVALID", 422)
