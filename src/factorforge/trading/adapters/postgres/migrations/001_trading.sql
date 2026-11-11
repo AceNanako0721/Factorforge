@@ -1,5 +1,8 @@
 -- Run with a schema-owner/migration role, never an API role.
 -- __SCHEMA__ and __ENVIRONMENT__ are fixed enums chosen by the installer.
+-- Initialization also runs while other runs write, so triggers, indexes and
+-- columns are created only when missing: altering them takes table locks
+-- that block or deadlock those writers.
 CREATE SCHEMA IF NOT EXISTS __SCHEMA__;
 REVOKE ALL ON SCHEMA __SCHEMA__ FROM PUBLIC;
 CREATE TABLE IF NOT EXISTS __SCHEMA__.trading_run (
@@ -17,8 +20,11 @@ CREATE TABLE IF NOT EXISTS __SCHEMA__.audit_event (
 );
 CREATE OR REPLACE FUNCTION __SCHEMA__.reject_audit_mutation() RETURNS trigger
 LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'immutable audit'; END; $$;
-DROP TRIGGER IF EXISTS immutable_audit ON __SCHEMA__.audit_event;
-CREATE TRIGGER immutable_audit BEFORE UPDATE OR DELETE ON __SCHEMA__.audit_event
-FOR EACH ROW EXECUTE FUNCTION __SCHEMA__.reject_audit_mutation();
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid='__SCHEMA__.audit_event'::regclass AND tgname='immutable_audit') THEN
+    CREATE TRIGGER immutable_audit BEFORE UPDATE OR DELETE ON __SCHEMA__.audit_event
+    FOR EACH ROW EXECUTE FUNCTION __SCHEMA__.reject_audit_mutation();
+  END IF;
+END $$;
 -- Domain records are kept as versioned JSON, in separate inspectable relations.
 -- Whole-account row locking makes their updates atomic with the account snapshot.

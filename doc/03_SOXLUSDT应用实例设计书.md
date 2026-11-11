@@ -1,6 +1,6 @@
 # SOXLUSDT 应用实例设计书
 
-版本：3.8.0
+版本：3.8.1
 
 对应式样书：[03_SOXLUSDT应用实例式样书](03_SOXLUSDT应用实例式样书.md)。源码在 `src/factorforge/applications/soxl`，测试在 `tests/applications/soxl`。文中出现的数值，凡是代码里写死的照实写出；其余都是登记值，这里只说明作用，不给实际取值。
 
@@ -44,7 +44,7 @@
 
 两种身份：`DYNAMIC`（研判工作器与仓位管理器）读写记录与状态，`DYNAMIC_READ`（只读接口）只读。行级安全使每个身份只看到自己实例的行。
 
-打开存储（`OpenStore`）时核验登录角色：不是超级用户，不能建库、建角色、绕过行级安全，只属于所请求身份的角色，在其他 schema 没有任何权限，在本 schema 内每张表的权限恰为该身份应有的权限。不符返回 `STORAGE_ROLE_NOT_ISOLATED`；绑定的实例或环境不符返回 `STORAGE_SCOPE_FORBIDDEN`。初始化与授权是管理员操作（`InitializeStorage`、`GrantStorage`，经 `instance-cli`），工作进程和只读接口不持有管理员连接。
+打开存储（`OpenStore`）时核验登录角色：不是超级用户，不能建库、建角色、绕过行级安全，只属于所请求身份的角色，在其他 schema 没有任何权限，在本 schema 内每张表的权限恰为该身份应有的权限。不符返回 `STORAGE_ROLE_NOT_ISOLATED`；绑定的实例或环境不符返回 `STORAGE_SCOPE_FORBIDDEN`。初始化与授权是管理员操作（`InitializeStorage`、`GrantStorage`，经 `instance-cli`），工作进程和只读接口不持有管理员连接。同一环境的所有实例共用这个 schema，新增实例时的初始化会在其他实例写入时执行。行级安全、策略、触发器和索引只在缺失时建立，所以不对已有表加锁。
 
 存储操作（`Store`）：
 
