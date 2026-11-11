@@ -179,6 +179,7 @@ func (e *Engine) RefreshProtectionState(key InstrumentKey) {
 	}
 	if pos.Quantity.Sign() == 0 {
 		pos.ProtectionState = "CLOSED"
+		e.RestoreProtection()
 		return
 	}
 	insurance, strategy := false, false
@@ -215,19 +216,43 @@ func (e *Engine) RefreshProtectionState(key InstrumentKey) {
 		}
 		return
 	}
-	if run.ProtectionDegraded && run.State == "DEGRADED" && len(run.RiskLocks) == 0 && len(run.RecoveryIssues) == 0 && len(run.HealthIssues) == 0 {
-		for _, p := range run.Positions.Values() {
-			if p.Quantity.Sign() != 0 && p.ProtectionState != "ACTIVE_VERIFIED" {
-				return
+	e.RestoreProtection()
+}
+
+// ProtectionRecoverable reports whether a run degraded only for incomplete
+// protection may return to NORMAL: every open position is verified, and a flat
+// instrument has its venue cleanup confirmed with no protection left open.
+func ProtectionRecoverable(run *Aggregate) bool {
+	if !run.ProtectionDegraded || run.State != "DEGRADED" || len(run.RiskLocks) > 0 || len(run.RecoveryIssues) > 0 || len(run.HealthIssues) > 0 {
+		return false
+	}
+	for _, p := range run.Positions.Values() {
+		if p.Quantity.Sign() != 0 {
+			if p.ProtectionState != "ACTIVE_VERIFIED" {
+				return false
+			}
+			continue
+		}
+		if task := run.ConditionalCleanups.Value(p.InstrumentKey.Code()); task != nil && task.State != "CONFIRMED" {
+			return false
+		}
+		for _, protection := range run.Protections.Values() {
+			if protection.InstrumentKey == p.InstrumentKey && !Has([]string{"CLOSED", "TRIGGERED"}, protection.State) {
+				return false
 			}
 		}
-		for _, o := range run.Orders.Values() {
-			if o.State == "UNKNOWN" {
-				return
-			}
+	}
+	for _, o := range run.Orders.Values() {
+		if o.State == "UNKNOWN" {
+			return false
 		}
-		run.State = "NORMAL"
-		run.ProtectionDegraded = false
+	}
+	return true
+}
+func (e *Engine) RestoreProtection() {
+	if ProtectionRecoverable(e.Run) {
+		e.Run.State = "NORMAL"
+		e.Run.ProtectionDegraded = false
 	}
 }
 func (e *Engine) queueProtection(key InstrumentKey, plan ProtectionPlan, role string, replaceID *string) *Protection {

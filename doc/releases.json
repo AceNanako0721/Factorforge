@@ -486,6 +486,12 @@
    "change_kind": "design",
    "date": "2026-11-11",
    "summary": "All layers: initializing a shared schema no longer locks tables that running instances write to. Triggers, indexes, row security, policies and added columns are created only when missing instead of dropped and recreated, so a deploy or a new instance re-running initialization neither waits for nor deadlocks with the instances already writing."
+  },
+  {
+   "version": "3.8.2",
+   "change_kind": "design",
+   "date": "2026-11-12",
+   "summary": "Trading system: a run degraded because a close filled in parts returns to NORMAL once the position is flat, the venue conditional cleanup is confirmed and every protection for the instrument is closed. Before, a flat run stayed DEGRADED and refused every new order; the executor now also restores such a run on its next idle pass."
   }
  ]
 }

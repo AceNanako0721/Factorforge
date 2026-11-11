@@ -512,6 +512,59 @@ func TestT116FlatCleanupOrphansForeignUnknownAndRestart(t *testing.T) {
 		t.Fatal("empty set not confirmed")
 	}
 }
+
+// A close filled in parts degrades the run on the partial fill; once flat and the
+// venue cleanup is confirmed, it returns to NORMAL instead of refusing every new order.
+func TestT116PartialCloseFlatRestoresNormal(t *testing.T) {
+	run, store, venue, w := liveProtectionWorker(t)
+	drainProtection(t, w, run.RunKey, 2)
+	key := run.Specs.Values()[0].Key
+	if err := store.Transaction(context.Background(), run.RunKey, func(r *d.Aggregate) error {
+		e := d.NewEngine(r)
+		r.Positions.Values()[0].Quantity = cv("0.4")
+		e.RefreshProtectionState(key)
+		if r.State != "DEGRADED" || !r.ProtectionDegraded {
+			t.Fatal("partial fill did not degrade", r.State)
+		}
+		r.Positions.Values()[0].Quantity = cv("0")
+		e.ProtectActualPosition(&d.Order{Request: d.OrderRequest{InstrumentKey: key, ReduceOnly: true}})
+		return e.Err()
+	}); err != nil {
+		t.Fatal(err)
+	}
+	current, _ := store.Read(context.Background(), run.RunKey)
+	if current.State != "DEGRADED" {
+		t.Fatal("restored before the venue cleanup", current.State)
+	}
+	foreign := "other-run-client"
+	venue.extra = []d.ConditionalOrderFact{{Instrument: key, ExternalID: "foreign", ClientID: &foreign}}
+	drainProtection(t, w, run.RunKey, 6)
+	current, _ = store.Read(context.Background(), run.RunKey)
+	if current.State != "DEGRADED" || current.ConditionalCleanups.Value(key.Code()).State != "FOREIGN" {
+		t.Fatal("restored with a foreign conditional open", current.State)
+	}
+	venue.extra = nil
+	drainProtection(t, w, run.RunKey, 2)
+	current, _ = store.Read(context.Background(), run.RunKey)
+	if current.State != "NORMAL" || current.ProtectionDegraded || current.ConditionalCleanups.Value(key.Code()).State != "CONFIRMED" {
+		t.Fatal("flat run stayed degraded", current.State, current.ProtectionDegraded)
+	}
+	// A run already stuck this way (cleanup confirmed earlier) recovers on the next idle pass.
+	if err := store.Transaction(context.Background(), run.RunKey, func(r *d.Aggregate) error {
+		r.State, r.ProtectionDegraded = "DEGRADED", true
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	drainProtection(t, w, run.RunKey, 1)
+	current, _ = store.Read(context.Background(), run.RunKey)
+	if current.State != "NORMAL" || current.ProtectionDegraded {
+		t.Fatal("stuck flat run not recovered", current.State)
+	}
+	if moved, err := w.Tick(context.Background(), run.RunKey); err != nil || moved {
+		t.Fatal("idle pass keeps writing", moved, err)
+	}
+}
 func TestT117SimFirstTriggerResidualAndReplay(t *testing.T) {
 	run := compatBase("SIM")
 	compatPosition(t, run, "BUY", "2")
