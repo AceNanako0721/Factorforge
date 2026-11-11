@@ -8,6 +8,9 @@ CREATE TABLE IF NOT EXISTS __SCHEMA__.market_candle (
     payload jsonb NOT NULL,
     PRIMARY KEY (account_id, instrument_key, interval, open_at, revision)
 );
-DROP TRIGGER IF EXISTS immutable_candle ON __SCHEMA__.market_candle;
-CREATE TRIGGER immutable_candle BEFORE UPDATE OR DELETE ON __SCHEMA__.market_candle
-FOR EACH ROW EXECUTE FUNCTION __SCHEMA__.reject_audit_mutation();
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid='__SCHEMA__.market_candle'::regclass AND tgname='immutable_candle') THEN
+    CREATE TRIGGER immutable_candle BEFORE UPDATE OR DELETE ON __SCHEMA__.market_candle
+    FOR EACH ROW EXECUTE FUNCTION __SCHEMA__.reject_audit_mutation();
+  END IF;
+END $$;

@@ -1,3 +1,6 @@
+-- Initialization also runs while other instances write (every deploy and
+-- every new instance), so triggers and indexes are created only when missing:
+-- altering them takes table locks that block or deadlock those writers.
 CREATE SCHEMA IF NOT EXISTS __SCHEMA__;
 REVOKE ALL ON SCHEMA __SCHEMA__ FROM PUBLIC;
 DO $$ BEGIN
@@ -24,8 +27,12 @@ CREATE TABLE IF NOT EXISTS __SCHEMA__.workload_capability_grant (
 CREATE TABLE IF NOT EXISTS __SCHEMA__.audit_event (
   instance_id text NOT NULL, sequence bigint NOT NULL, payload jsonb NOT NULL,
   PRIMARY KEY(instance_id,sequence));
-CREATE INDEX IF NOT EXISTS audit_event_action_sequence ON __SCHEMA__.audit_event
-  (instance_id,(payload->>'action'),sequence);
+DO $$ BEGIN
+  IF to_regclass('__SCHEMA__.audit_event_action_sequence') IS NULL THEN
+    CREATE INDEX audit_event_action_sequence ON __SCHEMA__.audit_event
+      (instance_id,(payload->>'action'),sequence);
+  END IF;
+END $$;
 CREATE TABLE IF NOT EXISTS __SCHEMA__.sentiment_entry (
   instance_id text NOT NULL, sequence bigint NOT NULL, payload jsonb NOT NULL,
   PRIMARY KEY(instance_id,sequence));
@@ -35,12 +42,21 @@ CREATE TABLE IF NOT EXISTS __SCHEMA__.decision_archive (
 REVOKE ALL ON ALL TABLES IN SCHEMA __SCHEMA__ FROM PUBLIC;
 CREATE OR REPLACE FUNCTION __SCHEMA__.reject_mutation() RETURNS trigger
 LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'immutable strategy record'; END; $$;
-DROP TRIGGER IF EXISTS immutable_audit ON __SCHEMA__.audit_event;
-CREATE TRIGGER immutable_audit BEFORE UPDATE OR DELETE ON __SCHEMA__.audit_event
-FOR EACH ROW EXECUTE FUNCTION __SCHEMA__.reject_mutation();
-DROP TRIGGER IF EXISTS immutable_ledger ON __SCHEMA__.sentiment_entry;
-CREATE TRIGGER immutable_ledger BEFORE UPDATE OR DELETE ON __SCHEMA__.sentiment_entry
-FOR EACH ROW EXECUTE FUNCTION __SCHEMA__.reject_mutation();
-DROP TRIGGER IF EXISTS immutable_decision_archive ON __SCHEMA__.decision_archive;
-CREATE TRIGGER immutable_decision_archive BEFORE UPDATE OR DELETE ON __SCHEMA__.decision_archive
-FOR EACH ROW EXECUTE FUNCTION __SCHEMA__.reject_mutation();
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid='__SCHEMA__.audit_event'::regclass AND tgname='immutable_audit') THEN
+    CREATE TRIGGER immutable_audit BEFORE UPDATE OR DELETE ON __SCHEMA__.audit_event
+    FOR EACH ROW EXECUTE FUNCTION __SCHEMA__.reject_mutation();
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid='__SCHEMA__.sentiment_entry'::regclass AND tgname='immutable_ledger') THEN
+    CREATE TRIGGER immutable_ledger BEFORE UPDATE OR DELETE ON __SCHEMA__.sentiment_entry
+    FOR EACH ROW EXECUTE FUNCTION __SCHEMA__.reject_mutation();
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid='__SCHEMA__.decision_archive'::regclass AND tgname='immutable_decision_archive') THEN
+    CREATE TRIGGER immutable_decision_archive BEFORE UPDATE OR DELETE ON __SCHEMA__.decision_archive
+    FOR EACH ROW EXECUTE FUNCTION __SCHEMA__.reject_mutation();
+  END IF;
+END $$;
