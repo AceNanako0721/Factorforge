@@ -23,8 +23,8 @@ func TargetDecision(decision *DecisionView) DecisionView {
 var CaseContributionFields = []string{"contribution_id", "family_id", "direction", "effective_at", "initial_amount", "remaining_amount"}
 
 // CompactDecisionInput replaces snapshot.bars with per-object references,
-// snapshot.source_decisions, closed protections and spent pool contributions
-// with counts and digests. The
+// snapshot.source_decisions, fills, incomes, closed protections and spent pool
+// contributions with counts and digests. The
 // caller hashes the complete inputs first; P1 keeps the bars themselves.
 func CompactDecisionInput(inputs map[string]any) map[string]any {
 	result := map[string]any{}
@@ -56,6 +56,14 @@ func CompactDecisionInput(inputs map[string]any) map[string]any {
 	if ids, ok := snapshot["source_decisions"]; ok {
 		delete(compact, "source_decisions")
 		compact["source_decisions_ref"] = map[string]any{"count": len(Strings(ids)), "digest": Digest(ids)}
+	}
+	// Fills and funding incomes are the run's whole history, so every retained
+	// decision grew with each trade and settlement; P1 keeps the rows.
+	for _, k := range []string{"fills", "incomes"} {
+		if rows, ok := snapshot[k]; ok {
+			delete(compact, k)
+			compact[k+"_ref"] = map[string]any{"count": len(Rows(rows)), "digest": Digest(rows)}
+		}
 	}
 	// Closed protections only accumulate; the decision keeps the live ones.
 	if all, ok := snapshot["protections"].(map[string]any); ok {

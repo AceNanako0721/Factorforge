@@ -498,6 +498,12 @@
    "change_kind": "design",
    "date": "2026-11-12",
    "summary": "Storage: a connection pool without pool_max_conns in its DSN holds at most 3 connections, so all service processes on one host stay under the server's max_connections; before, pgx allowed one per CPU per process and a slow disk could exhaust every connection. Trading system: the market collector also reads candles from the newest one P1 accepted from it (at most CandleRetention back, the whole retention on its first round), so an outage longer than the lookback no longer leaves a permanent candle gap that marks prices MISSING."
+  },
+  {
+   "version": "3.8.4",
+   "change_kind": "design",
+   "date": "2026-11-13",
+   "summary": "Strategy framework: a decision's stored input keeps the trading snapshot's fills and funding incomes as a count and digest, like the bars and source decisions. Both lists are the run's whole history, so each retained decision grew with every trade and settlement; the input hash is still taken over the complete inputs and P1 keeps the rows."
   }
  ]
 }
