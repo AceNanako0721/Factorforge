@@ -492,6 +492,12 @@
    "change_kind": "design",
    "date": "2026-11-12",
    "summary": "Trading system: a run degraded because a close filled in parts returns to NORMAL once the position is flat, the venue conditional cleanup is confirmed and every protection for the instrument is closed. Before, a flat run stayed DEGRADED and refused every new order; the executor now also restores such a run on its next idle pass."
+  },
+  {
+   "version": "3.8.3",
+   "change_kind": "design",
+   "date": "2026-11-12",
+   "summary": "Storage: a connection pool without pool_max_conns in its DSN holds at most 3 connections, so all service processes on one host stay under the server's max_connections; before, pgx allowed one per CPU per process and a slow disk could exhaust every connection. Trading system: the market collector also reads candles from the newest one P1 accepted from it (at most CandleRetention back, the whole retention on its first round), so an outage longer than the lookback no longer leaves a permanent candle gap that marks prices MISSING."
   }
  ]
 }

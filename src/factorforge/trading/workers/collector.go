@@ -31,6 +31,11 @@ type Collector struct {
 	ReferenceIssue string
 	referenceAt    time.Time
 	referenceSince time.Time
+	// candleSince is the open time of the newest candle P1 accepted from this
+	// collector. The next round reads candles from there, so rounds that
+	// failed (venue or network down longer than the lookback) leave no gap.
+	// Zero after start: the first round reads the whole CandleRetention.
+	candleSince time.Time
 }
 
 // ReferenceLookback is how far back the first read after start goes; P1
@@ -149,6 +154,16 @@ func (c *Collector) Collect(ctx context.Context, instrument, interval string, st
 	if err != nil {
 		return 0, 0, err
 	}
+	if floor := end.Add(-d.CandleRetention); c.candleSince.IsZero() {
+		if floor.Before(start) {
+			start = floor
+		}
+	} else if c.candleSince.Before(start) {
+		start = c.candleSince
+		if start.Before(floor) {
+			start = floor
+		}
+	}
 	bars, err := c.Market.Candles(ctx, spec.Key, interval, start, end)
 	if err != nil {
 		return 0, 0, err
@@ -220,6 +235,11 @@ func (c *Collector) Collect(ctx context.Context, instrument, interval string, st
 	}
 	if err != nil {
 		return 0, 0, err
+	}
+	for _, bar := range body.Candles {
+		if bar.OpenAt.After(c.candleSince) {
+			c.candleSince = bar.OpenAt
+		}
 	}
 	if n := len(body.FundingSettlements); n > 0 {
 		c.referenceSince = body.FundingSettlements[n-1].SettledAt.Add(time.Millisecond)
