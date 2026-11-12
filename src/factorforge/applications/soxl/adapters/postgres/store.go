@@ -147,7 +147,7 @@ func OpenStore(ctx context.Context, dsn string, b d.Binding, kind string, maxByt
 	if !d.Has(storeKinds, kind) || maxBytes <= 0 {
 		return nil, d.Fail("STORAGE_CONFIGURATION_REQUIRED", 503)
 	}
-	pool, err := pgxpool.New(ctx, dsn)
+	pool, err := openPool(ctx, dsn)
 	if err != nil {
 		return nil, safe(err)
 	}
@@ -227,4 +227,23 @@ func (s *Store) VerifyRole(ctx context.Context) error {
 		}
 	}
 	return safe(rows.Err())
+}
+
+// DefaultMaxConns caps each pool when the DSN does not set pool_max_conns.
+// pgx would otherwise allow max(4, CPUs) per process, and every service
+// process on one host together could exceed the server's max_connections.
+const DefaultMaxConns = 3
+
+// MaxConns is the connection cap of the store's pool.
+func (s *Store) MaxConns() int32 { return s.pool.Config().MaxConns }
+
+func openPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
+	config, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		return nil, err
+	}
+	if !strings.Contains(dsn, "pool_max_conns") {
+		config.MaxConns = DefaultMaxConns
+	}
+	return pgxpool.NewWithConfig(ctx, config)
 }
