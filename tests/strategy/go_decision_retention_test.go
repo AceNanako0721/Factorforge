@@ -98,6 +98,36 @@ func TestCompactDecisionInputReferencesSourceDecisions(t *testing.T) {
 	}
 }
 
+// B59: the trading snapshot carries every fill and funding income of the run;
+// a decision keeps their counts and digests so retained decisions stop growing
+// with each trade and settlement.
+func TestCompactDecisionInputReferencesFillsAndIncomes(t *testing.T) {
+	fills, incomes := []any{}, []any{}
+	for i := 0; i < 500; i++ {
+		fills = append(fills, map[string]any{"fill_id": fmt.Sprintf("fill-%d", i), "price": "64.07", "quantity": "3.28", "happened_at": "2026-11-12T14:36:31Z"})
+		incomes = append(incomes, map[string]any{"income_id": fmt.Sprintf("income-%d", i), "amount": "-0.01", "kind": "FUNDING_FEE"})
+	}
+	inputs := map[string]any{"snapshot": map[string]any{"version": 3, "bars": map[string]any{}, "fills": fills, "incomes": incomes}}
+	hash := sd.Digest(inputs)
+	compact := sd.CompactDecisionInput(inputs)
+	if sd.Digest(inputs) != hash || len(sd.Rows(sd.Object(inputs["snapshot"])["fills"])) != 500 {
+		t.Fatal("compaction mutated the hashed inputs")
+	}
+	snapshot := sd.Object(compact["snapshot"])
+	for k, rows := range map[string][]any{"fills": fills, "incomes": incomes} {
+		ref := sd.Object(snapshot[k+"_ref"])
+		if _, present := snapshot[k]; present || sd.Number(ref["count"]) != 500 || ref["digest"] != sd.Digest(rows) {
+			t.Fatal(k+" reference", ref)
+		}
+	}
+	if raw, _ := json.Marshal(compact); len(raw) > 1000 {
+		t.Fatal("compacted input too large", len(raw))
+	}
+	if sd.Digest(sd.CompactDecisionInput(compact)) != sd.Digest(compact) {
+		t.Fatal("compaction is not idempotent")
+	}
+}
+
 func TestCompactDecisionInputDropsSpentContributionsAndClosedProtections(t *testing.T) {
 	contributions := []any{map[string]any{"family_id": "live", "remaining_amount": "0.5", "state": "ACTIVE"}}
 	protections := []any{map[string]any{"protection_id": "p-live", "state": "ACTIVE_VERIFIED"}}
