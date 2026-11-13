@@ -504,6 +504,12 @@
    "change_kind": "design",
    "date": "2026-11-13",
    "summary": "Strategy framework: a decision's stored input keeps the trading snapshot's fills and funding incomes as a count and digest, like the bars and source decisions. Both lists are the run's whole history, so each retained decision grew with every trade and settlement; the input hash is still taken over the complete inputs and P1 keeps the rows."
+  },
+  {
+   "version": "3.8.5",
+   "change_kind": "design",
+   "date": "2026-11-14",
+   "summary": "Strategy framework: listing an object's stop directives takes scope=current, which returns the head directives and the last effective strategy stop in one page. SOXLUSDT instance: the position manager reads its effective stop that way instead of paging through the whole list, which keeps every superseded directive; after a month of initial-distance refreshes it exceeded the page budget, the effective stop went missing, and close-stop exits, baseline transfer and settled trailing stops stopped working."
   }
  ]
 }
