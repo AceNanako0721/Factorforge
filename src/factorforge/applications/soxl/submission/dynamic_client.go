@@ -131,7 +131,10 @@ func (c *HTTPClient) LatestDecision(ctx context.Context, id string) (*dto.Decisi
 	return latest, nil
 }
 
-// StopDirectives lists recorded directives with their receipts.
+// StopDirectives returns the head directives with their receipts and the
+// last effective strategy stop (scope=current), in one page. The full list
+// keeps every superseded directive and outgrows any page budget: each refresh
+// of the initial distance adds one.
 func (c *HTTPClient) StopDirectives(ctx context.Context, id string) ([]dto.StopDirectiveRecord, error) {
 	if !d.ValidID(id) {
 		return nil, d.Fail("FRAMEWORK_OBJECT_INVALID", 422)
@@ -139,23 +142,14 @@ func (c *HTTPClient) StopDirectives(ctx context.Context, id string) ([]dto.StopD
 	if err := c.check(ctx); err != nil {
 		return nil, err
 	}
-	out := []dto.StopDirectiveRecord{}
-	q := url.Values{}
-	for page := 0; page < c.options.MaxPages; page++ {
-		var body struct {
-			Items  []dto.StopDirectiveRecord `json:"items"`
-			Cursor string                    `json:"cursor"`
-		}
-		if err := c.call(ctx, "GET", "/objects/"+url.PathEscape(id)+"/stop-directives", q, nil, &body); err != nil {
-			return nil, err
-		}
-		out = append(out, body.Items...)
-		if body.Cursor == "" {
-			return out, nil
-		}
-		q.Set("cursor", body.Cursor)
+	var body struct {
+		Items  []dto.StopDirectiveRecord `json:"items"`
+		Cursor string                    `json:"cursor"`
 	}
-	return nil, d.Fail("FRAMEWORK_QUERY_BUDGET_EXCEEDED", 503)
+	if err := c.call(ctx, "GET", "/objects/"+url.PathEscape(id)+"/stop-directives", url.Values{"scope": {"current"}}, nil, &body); err != nil {
+		return nil, err
+	}
+	return body.Items, nil
 }
 
 // SubmitObservation posts a factor observation including reconfirm/reason.

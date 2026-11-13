@@ -10053,6 +10053,18 @@
               "minimum": 1,
               "type": "integer"
             }
+          },
+          {
+            "description": "all (default) pages every directive including the archive; current returns the head directives and the last effective strategy stop in one page and takes no cursor or limit.",
+            "in": "query",
+            "name": "scope",
+            "schema": {
+              "enum": [
+                "all",
+                "current"
+              ],
+              "type": "string"
+            }
           }
         ],
         "responses": {

@@ -207,6 +207,24 @@ func New(options Options) (http.Handler, error) {
 		if err != nil {
 			return nil, 0, err
 		}
+		switch r.URL.Query().Get("scope") {
+		case "", "all":
+		case "current":
+			if r.URL.Query().Has("cursor") || r.URL.Query().Has("limit") {
+				return nil, 0, &d.Error{Code: "STOP_DIRECTIVE_INVALID", Status: 422}
+			}
+			rows, err := app.CurrentStopDirectives(r.Context(), state, options.Store, r.PathValue("object_id"))
+			if err != nil {
+				return nil, 0, err
+			}
+			for i, row := range rows {
+				rows[i] = app.StopRecordView(state, row)
+			}
+			sort.Slice(rows, func(i, j int) bool { return rows[i].Directive.DirectiveID < rows[j].Directive.DirectiveID })
+			return map[string]any{"items": rows, "cursor": "", "snapshot_version": state.Version}, 200, nil
+		default:
+			return nil, 0, &d.Error{Code: "STOP_DIRECTIVE_INVALID", Status: 422}
+		}
 		limit := 100
 		if raw := r.URL.Query().Get("limit"); raw != "" {
 			limit, err = strconv.Atoi(raw)

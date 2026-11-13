@@ -392,6 +392,42 @@ func StopRecordView(state *d.StrategyState, record *d.StopDirectiveRecord) *d.St
 	return copy
 }
 
+// CurrentStopDirectives returns the object's head directives and the last
+// effective strategy stop, the one exit requests are checked against. Every
+// superseded directive stays in the archive, so a writer that needs only the
+// current stop must not page through all of them: refreshed initial distances
+// alone add one record per refresh.
+func CurrentStopDirectives(ctx context.Context, state *d.StrategyState, store ports.Store, object string) ([]*d.StopDirectiveRecord, error) {
+	rows := []*d.StopDirectiveRecord{}
+	for _, record := range append(state.StopDirectives.Values(), state.ResearchStopDirectives.Values()...) {
+		if record.Directive.ObjectID == object {
+			rows = append(rows, d.Clone(record))
+		}
+	}
+	effective := state.LastEffectiveStrategyStop.Value(object)
+	if effective == nil {
+		return rows, nil
+	}
+	for _, r := range rows {
+		if r.Directive.DirectiveID == effective.DirectiveID {
+			return rows, nil
+		}
+	}
+	if r := findDirective(state, effective.DirectiveID); r != nil {
+		return append(rows, d.Clone(r)), nil
+	}
+	if reader, ok := store.(StopArchiveReader); ok {
+		r, err := reader.ReadStopDirective(ctx, state.InstanceID, effective.DirectiveID)
+		if err != nil {
+			return nil, err
+		}
+		if r != nil {
+			rows = append(rows, r)
+		}
+	}
+	return rows, nil
+}
+
 func ValidTargetStop(snap *d.TradingSnapshot, obj *d.ObservedObject, plan *d.StopPlan, target d.Decimal, p *d.Policy, at time.Time) bool {
 	if plan == nil || plan.SpecVersion != d.Text(snap.Specs[obj.ObjectID]["version"]) {
 		return false
