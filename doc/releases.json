@@ -510,6 +510,12 @@
    "change_kind": "design",
    "date": "2026-11-14",
    "summary": "Strategy framework: listing an object's stop directives takes scope=current, which returns the head directives and the last effective strategy stop in one page. SOXLUSDT instance: the position manager reads its effective stop that way instead of paging through the whole list, which keeps every superseded directive; after a month of initial-distance refreshes it exceeded the page budget, the effective stop went missing, and close-stop exits, baseline transfer and settled trailing stops stopped working."
+  },
+  {
+   "version": "3.9.0",
+   "change_kind": "specification",
+   "date": "2026-11-14",
+   "summary": "SOXLUSDT instance: the price-state entry gate (S3-035) can be registered for reversals only (scope = REVERSAL): a new batch on the side of the last batch held opens without it, while the first batch and every reversal still need the state to agree. Under either scope the gate now also decides a view that turned against the batch held, whose initial-distance directive would otherwise open the reversal ungated once the batch closed."
   }
  ]
 }

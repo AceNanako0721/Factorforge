@@ -53,6 +53,7 @@ type PriceStateSettings struct {
 	Enabled       bool
 	MaxAge        time.Duration
 	OnUnavailable string // d.PriceStateBlock or d.PriceStateIgnore
+	Scope         string // d.PriceStateScopeAll or d.PriceStateScopeReversal
 }
 
 type PositionSettings struct {
@@ -123,6 +124,9 @@ type PositionState struct {
 	// S3-035: the latest price state and the gate's last decision while flat.
 	PriceState *d.PriceState `json:"price_state,omitempty"`
 	Gate       *EntryGate    `json:"gate,omitempty"`
+	// LastDirection is the side of the last batch held, which a REVERSAL
+	// gate compares a new batch with (0 before the first batch).
+	LastDirection int `json:"last_direction,omitempty"`
 }
 
 type EntryGate struct {
@@ -224,7 +228,11 @@ func (m *PositionManager) Run(ctx context.Context) error {
 	// The initial-distance directive stays fresh during a batch as well, so
 	// level increases are sized from R + buffer, never from a fallback.
 	if price > 0 {
-		if err = m.initial(ctx, &st, price, equity, now, qty == 0); err != nil {
+		held := 0
+		if qty != 0 {
+			held = int(math.Copysign(1, qty))
+		}
+		if err = m.initial(ctx, &st, price, equity, now, held); err != nil {
 			return err
 		}
 	}
@@ -349,20 +357,31 @@ func (m *PositionManager) outcomes(ctx context.Context, st *PositionState) error
 
 // initial keeps a fresh INITIAL_DISTANCE directive for the current view so
 // the framework can open a batch with Q frozen from R + buffer (S3-027).
-// While flat, a registered price-state gate withdraws it until the state
-// agrees with the direction (S3-035); an open batch is never gated.
-func (m *PositionManager) initial(ctx context.Context, st *PositionState, price, equity float64, now time.Time, flat bool) error {
+// held is the side of the position (0 when flat). A registered price-state
+// gate decides every directive that would open a new batch: while flat, and
+// while the view is against the batch held, whose close would let it open the
+// reversal. It withdraws the directive until the state agrees (S3-035); a
+// directive on the side held only sizes adds and is never gated.
+func (m *PositionManager) initial(ctx context.Context, st *PositionState, price, equity float64, now time.Time, held int) error {
 	s := m.Settings
 	direction, horizon, confidence, err := m.view(ctx, now)
 	if err != nil || direction == 0 {
 		return err
 	}
 	st.Gate = nil
-	if s.PriceState.Enabled && flat {
-		open, reason := d.GateEntry(st.PriceState, direction, now, s.PriceState.MaxAge, s.PriceState.OnUnavailable)
-		st.Gate = &EntryGate{Open: open, Reason: reason, Direction: direction, At: now}
-		if !open {
-			return m.withdraw(ctx, st, now, reason)
+	if s.PriceState.Enabled && direction != held {
+		last := held
+		if held == 0 {
+			last = st.LastDirection
+		}
+		if d.GateApplies(s.PriceState.Scope, last, direction) {
+			open, reason := d.GateEntry(st.PriceState, direction, now, s.PriceState.MaxAge, s.PriceState.OnUnavailable)
+			st.Gate = &EntryGate{Open: open, Reason: reason, Direction: direction, At: now}
+			if !open {
+				return m.withdraw(ctx, st, now, reason)
+			}
+		} else {
+			st.Gate = &EntryGate{Open: true, Reason: "PRICE_STATE_SAME_SIDE", Direction: direction, At: now}
 		}
 	}
 	view, ok := m.noise(ctx, st, now)
@@ -791,6 +810,7 @@ func (m *PositionManager) closeBatch(ctx context.Context, st *PositionState, obj
 		}
 	}
 	_ = m.Store.AppendRecord(ctx, "STOP_EVENT", safeID("close-"+b.CycleID), now, map[string]any{"kind": "CLOSE", "stopped": stopped, "batch": b})
+	st.LastDirection = b.Direction
 	st.Batch = nil
 }
 

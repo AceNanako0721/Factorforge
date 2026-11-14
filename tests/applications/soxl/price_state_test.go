@@ -276,6 +276,91 @@ func TestT333PositionManagerPriceStateGate(t *testing.T) {
 	}
 }
 
+func TestT333GateScope(t *testing.T) {
+	for _, c := range []struct {
+		scope           string
+		last, direction int
+		applies         bool
+	}{
+		{"", -1, -1, true},
+		{d.PriceStateScopeAll, -1, -1, true},
+		{d.PriceStateScopeReversal, -1, -1, false},
+		{d.PriceStateScopeReversal, 1, 1, false},
+		{d.PriceStateScopeReversal, -1, 1, true},
+		{d.PriceStateScopeReversal, 0, -1, true},
+	} {
+		if d.GateApplies(c.scope, c.last, c.direction) != c.applies {
+			t.Fatal("gate scope", c)
+		}
+	}
+}
+
+// A REVERSAL gate lets a batch on the side last held open whatever the state,
+// and still decides the first batch and every reversal; under either scope a
+// view against the batch held is decided before that batch closes.
+func TestT333PositionManagerGateReversalScope(t *testing.T) {
+	at := time.Date(2026, 10, 15, 15, 0, 5, 0, time.UTC)
+	m, store, fw, tr, _ := positionManager(at)
+	states := &fakeStates{state: "UPTREND"}
+	m.Hours, m.States = &fakeHours{}, states
+	m.Settings.PriceState = workers.PriceStateSettings{Enabled: true, MaxAge: 2 * time.Hour, OnUnavailable: d.PriceStateBlock, Scope: d.PriceStateScopeReversal}
+	_ = store.AppendRecord(context.Background(), "JUDGMENT", "j1", at.Add(-time.Minute), judgment("j1", at.Add(-time.Minute), "SHORT", 3, []string{"n1"}, false))
+	load := func() workers.PositionState {
+		var st workers.PositionState
+		_, _ = store.LoadState(context.Background(), "POSITION", &st)
+		return st
+	}
+	run := func(now time.Time) {
+		t.Helper()
+		m.Clock = func() time.Time { return now }
+		tr.bars = []submission.CandleRead{bar(now.Truncate(time.Minute), "100")}
+		if err := m.Run(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	latest := func() []string { return fw.directives[len(fw.directives)-1].ReasonCodes }
+	// The first batch has no side to follow: a short view in an uptrend waits.
+	run(at)
+	if g := load().Gate; len(fw.directives) != 0 || g == nil || g.Reason != "PRICE_STATE_DISAGREES" {
+		t.Fatal("first batch not gated", fw.directives, g)
+	}
+	// A short batch is held and closes; the side is kept.
+	states.state = "DOWNTREND"
+	run(at.Add(time.Hour))
+	tr.qty, tr.entry, tr.cycle = "-1", "100", "cycle-1"
+	run(at.Add(time.Hour + 5*time.Minute))
+	tr.qty, tr.entry, tr.cycle = "", "", ""
+	states.state = "RANGE"
+	run(at.Add(2 * time.Hour))
+	if st := load(); st.LastDirection != -1 || st.Gate == nil || !st.Gate.Open || st.Gate.Reason != "PRICE_STATE_SAME_SIDE" {
+		t.Fatal("same side after close", st.LastDirection, st.Gate)
+	}
+	if !slices.Contains(latest(), "PRICE_STATE_SAME_SIDE") || fw.directives[len(fw.directives)-1].RiskFraction == nil {
+		t.Fatal("same-side directive", latest())
+	}
+	// The view turns long while flat: a reversal, decided by the same state.
+	_ = store.AppendRecord(context.Background(), "JUDGMENT", "j2", at.Add(2*time.Hour+time.Minute), judgment("j2", at.Add(2*time.Hour+time.Minute), "LONG", 3, []string{"n2"}, false))
+	run(at.Add(2*time.Hour + 5*time.Minute))
+	if g := load().Gate; g == nil || g.Open || g.Reason != "PRICE_STATE_DISAGREES" || !slices.Contains(latest(), "DYNAMIC_STOP_WITHDRAWN") {
+		t.Fatal("reversal not gated", g, latest())
+	}
+	// Under the full gate as well, a short batch with a long view is decided
+	// now: the reversal directive is withdrawn before the batch closes.
+	m.Settings.PriceState.Scope = d.PriceStateScopeAll
+	states.state = "UPTREND"
+	run(at.Add(4 * time.Hour))
+	if g := load().Gate; g == nil || !g.Open || g.Reason != "PRICE_STATE_AGREES" || fw.directives[len(fw.directives)-1].RiskFraction == nil {
+		t.Fatal("agreeing reversal", g)
+	}
+	run(at.Add(4*time.Hour + 55*time.Minute))
+	tr.qty, tr.entry, tr.cycle = "-1", "100", "cycle-2"
+	states.state = "RANGE"
+	run(at.Add(5 * time.Hour))
+	if g := load().Gate; g == nil || g.Open || g.Reason != "PRICE_STATE_DISAGREES" || !slices.Contains(latest(), "DYNAMIC_STOP_WITHDRAWN") || fw.directives[len(fw.directives)-1].RiskFraction != nil {
+		t.Fatal("reversal while holding not gated", g, latest())
+	}
+}
+
 func TestT333PriceStateProfile(t *testing.T) {
 	var base config.DynamicProfile
 	base.InstanceID, base.Environment, base.ObjectID, base.TimeoutSeconds, base.MaxBytes = "soxl-peer", "SIM", "soxlusdt-peer", 60, 1<<20
@@ -300,7 +385,15 @@ func TestT333PriceStateProfile(t *testing.T) {
 	if err := good.Validate(); err != nil {
 		t.Fatal("gate on", err)
 	}
+	for _, scope := range []string{"ALL", "REVERSAL"} {
+		p := good
+		p.Position.PriceState.Scope = scope
+		if err := p.Validate(); err != nil {
+			t.Fatal("gate scope", scope, err)
+		}
+	}
 	for _, mutate := range []func(*config.DynamicProfile){
+		func(p *config.DynamicProfile) { p.Position.PriceState.Scope = "SAME_SIDE" },
 		func(p *config.DynamicProfile) { p.Position.PriceState.URL = "http://api.typesafe.ai/v1/systemone" },
 		func(p *config.DynamicProfile) { p.Position.PriceState.APIKey = "" },
 		func(p *config.DynamicProfile) { p.Position.PriceState.Model = "" },

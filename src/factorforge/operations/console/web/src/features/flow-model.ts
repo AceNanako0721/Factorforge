@@ -64,6 +64,7 @@ const gateReasonText: Record<string, string> = {
   PRICE_STATE_DISAGREES: "价格状态与研判不一致，暂不开仓",
   PRICE_STATE_UNAVAILABLE: "价格状态不可用，暂不开仓",
   PRICE_STATE_IGNORED: "价格状态不可用，按无闸门时开仓",
+  PRICE_STATE_SAME_SIDE: "与上一批持仓同向，不经闸门",
 };
 
 function ago(now: number, at: Json): number | null {
