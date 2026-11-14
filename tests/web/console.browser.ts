@@ -58,6 +58,34 @@ test("S4-022 flow page: modules, details on demand and stale data", async ({ pag
   expect(errors).toEqual([]);
 });
 
+test("S4-022 flow page: refreshes keep every module drawn", async ({ page }) => {
+  // React Flow hides a node it has not measured; a refresh must not drop the
+  // measured size, or a module vanishes until it is measured again.
+  await page.route("**/api/v2/console/capabilities**", async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({ response, json: { ...(await response.json()), refresh_seconds: 1 } });
+  });
+  await login(page);
+  await fixture(page, "online");
+  await expect(page.locator(".react-flow__node")).toHaveCount(9);
+  await expect(page.locator(".flow-node").filter({ hasText: "正在读取" })).toHaveCount(0);
+  const hidden = await page.evaluate(async () => {
+    const nodes = [...document.querySelectorAll<HTMLElement>(".react-flow__node")];
+    const seen = new Set<string>();
+    const watch = new MutationObserver((records) => {
+      for (const r of records) {
+        const node = r.target as HTMLElement;
+        if (node.style.visibility === "hidden") seen.add(node.dataset.id ?? "");
+      }
+    });
+    for (const n of nodes) watch.observe(n, { attributes: true, attributeFilter: ["style"] });
+    await new Promise((r) => setTimeout(r, 5000));
+    watch.disconnect();
+    return [...seen];
+  });
+  expect(hidden).toEqual([]);
+});
+
 test("S4-022 market page: totals, conviction, trades and folded records", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));

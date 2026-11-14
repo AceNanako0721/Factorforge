@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Background, Handle, MarkerType, Position, ReactFlow, type Edge, type Node, type NodeProps } from "@xyflow/react";
+import { Background, Handle, MarkerType, Position, ReactFlow, type Dimensions, type Edge, type Node, type NodeChange, type NodeProps } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { Alert, Badge, Button, Descriptions, Drawer, Empty, Space, Table, Tag, Tooltip, Typography } from "antd";
 import { record, type Json, type Selection } from "../api/client";
@@ -65,6 +65,16 @@ export function FlowPage() {
   const operations = useView("operations");
   const learning = useView("learning");
   const [open, setOpen] = useState<string | null>(null);
+  // React Flow hides a node until it has measured it. Every refresh builds
+  // new node objects, so the measured size goes back in with them: a node
+  // without one is hidden and measured again, and a measurement overtaken by
+  // the next refresh leaves it hidden for good.
+  const [sizes, setSizes] = useState<Record<string, Dimensions>>({});
+  const onNodesChange = (changes: NodeChange<Node<Data>>[]) => {
+    const next: Record<string, Dimensions> = {};
+    for (const c of changes) if (c.type === "dimensions" && c.dimensions) next[c.id] = c.dimensions;
+    if (Object.keys(next).length > 0) setSizes((s) => ({ ...s, ...next }));
+  };
 
   const status = objectOf(panelOf(dynamic.panels, "dynamic.status"));
   const decisions = listOf(panelOf(overview.panels, "decisions")).sort((a, b) =>
@@ -101,6 +111,7 @@ export function FlowPage() {
     id: n.id,
     type: "module",
     position: { x: place[n.id][0], y: place[n.id][1] },
+    measured: sizes[n.id],
     data: { node: n, selected: open === n.id },
   }));
   const edges: Edge[] = useMemo(
@@ -142,6 +153,7 @@ export function FlowPage() {
           nodes={flow}
           edges={edges}
           nodeTypes={nodeTypes}
+          onNodesChange={onNodesChange}
           colorMode={mode}
           fitView
           fitViewOptions={{ padding: 0.08, maxZoom: 1.25 }}
