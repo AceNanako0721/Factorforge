@@ -82,6 +82,20 @@ const (
 	PriceStateIgnore = "IGNORE"
 )
 
+// Which new batches the entry gate decides: every one, or only a reversal of
+// the side last held (and the first batch, when none was held yet).
+const (
+	PriceStateScopeAll      = "ALL"
+	PriceStateScopeReversal = "REVERSAL"
+)
+
+// GateApplies reports whether the gate decides a new batch in direction,
+// given the side last held (0 when none). Under REVERSAL a batch on the side
+// last held opens without it.
+func GateApplies(scope string, last, direction int) bool {
+	return scope != PriceStateScopeReversal || last != direction
+}
+
 // GateEntry decides whether a new batch in direction may open: only when the
 // latest state agrees with it. A missing state, or one whose bar closed more
 // than maxAge ago, blocks under BLOCK and lets the batch open under IGNORE.

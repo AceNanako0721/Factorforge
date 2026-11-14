@@ -129,6 +129,9 @@ describe("S4-022 live pipeline", () => {
     expect(stops.headline).toContain("等待价格状态与研判一致");
     expect(stops.rows.map((r) => r.value)).toEqual(["上涨趋势（上涨 67% / 下跌 7% / 震荡 26%）", "2026-11-05T23:00:00Z", "价格状态与研判不一致，暂不开仓", "做空"]);
     expect(node({ ...base, status: { ...status, entry_gate: { ...status.entry_gate, reason: "PRICE_STATE_UNAVAILABLE" } } }, "stops").health).toBe("warn");
+    const same = node({ ...base, status: { ...status, entry_gate: { ...status.entry_gate, open: true, reason: "PRICE_STATE_SAME_SIDE" } } }, "stops");
+    expect(same.headline).toContain("开仓闸门已放行");
+    expect(same.rows.map((r) => r.value)).toContain("与上一批持仓同向，不经闸门");
     expect(node(base, "stops").rows).toEqual([]);
   });
 });

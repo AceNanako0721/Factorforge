@@ -1,6 +1,6 @@
 # SOXLUSDT 应用实例设计书
 
-版本：3.8.5
+版本：3.9.0
 
 对应式样书：[03_SOXLUSDT应用实例式样书](03_SOXLUSDT应用实例式样书.md)。源码在 `src/factorforge/applications/soxl`，测试在 `tests/applications/soxl`。文中出现的数值，凡是代码里写死的照实写出；其余都是登记值，这里只说明作用，不给实际取值。
 
@@ -90,7 +90,7 @@
   - `min_half_life_hours`、`max_half_life_hours`：半衰期上下界。
 - **`follow` 节**：跟随模式（第 2.6 节）。`source_url`、`source_token`、`source_instance_id`、起始时刻 `since`。`source_url` 不为空即为跟随模式，此时可以不配模型和研判时刻。
 - **`position` 节**：仓位管理器的设置（第 3 章）。其中 `owner_id` 是在 P1 中的持仓归属者，`venue` 与 `instrument_id` 指定交易品种；其余字段在第 3 章用到时说明。
-- **`position.price_state` 节**：价格状态闸门（第 3.7 节）。`url` 不为空即为启用；`api_key`、`model` 是判断模型的密钥与模型名，`timeout_seconds` 是单次调用超时，`max_age_minutes` 是状态可用的最长时长，`on_unavailable` 是状态不可用时的处理（`BLOCK` 或 `IGNORE`）。
+- **`position.price_state` 节**：价格状态闸门（第 3.7 节）。`url` 不为空即为启用；`api_key`、`model` 是判断模型的密钥与模型名，`timeout_seconds` 是单次调用超时，`max_age_minutes` 是状态可用的最长时长，`on_unavailable` 是状态不可用时的处理（`BLOCK` 或 `IGNORE`），`scope` 是闸门的范围（`ALL` 或空为每个新批次，`REVERSAL` 为只管反向开仓）。
 
 校验（`Validate`）：
 
@@ -99,7 +99,7 @@
 - `wick_multiplier`、`directive_ttl_minutes`、`noise_lookback_days`、`price_tick` 为正。
 - `baseline_max_share` 在 (0, 1] 内。
 - `ladder_step` 在 [0, 1) 内。
-- 启用价格状态闸门时：`url` 为 https 地址，`api_key`、`model` 不为空，`timeout_seconds`、`max_age_minutes` 为正，`on_unavailable` 只能是 `BLOCK` 或 `IGNORE`。
+- 启用价格状态闸门时：`url` 为 https 地址，`api_key`、`model` 不为空，`timeout_seconds`、`max_age_minutes` 为正，`on_unavailable` 只能是 `BLOCK` 或 `IGNORE`，`scope` 只能为空、`ALL` 或 `REVERSAL`。
 
 不合格时返回 `DYNAMIC_PROFILE_INVALID`。
 
@@ -299,7 +299,7 @@ P2 用这条指令冻结批次数量（P2 设计 6.1）。
 
 ### 3.6 批次结束（`closeBatch`）
 
-持仓归零时结束批次，记一条种类为 `CLOSE` 的 `STOP_EVENT` 记录，并按第 3.5 节判断是否暂停基线。批次结果（R）在 P2 案例结案后由 `outcomes` 计入（每轮先执行，所以可能在同一轮）。
+持仓归零时结束批次，记一条种类为 `CLOSE` 的 `STOP_EVENT` 记录，并按第 3.5 节判断是否暂停基线。批次方向写入 `POSITION` 状态的 `last_direction`（价格状态闸门按它判断反向，第 3.7 节）。批次结果（R）在 P2 案例结案后由 `outcomes` 计入（每轮先执行，所以可能在同一轮）。
 
 ### 3.7 价格状态闸门（`priceState`、`GateEntry`）
 
@@ -322,7 +322,9 @@ P2 用这条指令冻结批次数量（P2 设计 6.1）。
 - **留存**：成功后写一条 `STOP_EVENT` 记录，编号 `price-state-<小时>`，种类 `PRICE_STATE`，内容为所属小时、状态、三个概率、强度、模型版本、判断时刻和特征；再写入 `POSITION` 状态的 `price_state`。
 - **失败**：读取、特征、判断或写记录失败时告警 `PRICE_STATE_UNAVAILABLE`（附原因），保留上一个状态，下一轮再试。
 
-**开仓闸门（`GateEntry`）**：在第 3.3 节确定方向之后、计算风险比例之前，只在没有持仓时判定：
+**开仓闸门（`GateEntry`）**：在第 3.3 节确定方向之后、计算风险比例之前，对会开出新批次的初始止损指令判定：没有持仓时，以及持仓方向与研判方向相反时（这条指令在当前批次结束后会开出反向批次）。持仓方向与研判方向相同时，指令只用于加仓定量，不判定。
+
+先看范围（`GateApplies`）：`scope` 为 `REVERSAL` 时，取上一批方向（持仓时为持仓方向，没有持仓时为 `last_direction`，第 3.6 节），与研判方向相同则不判定、直接放行，理由码 `PRICE_STATE_SAME_SIDE`；`last_direction` 为 0（此前没有批次）时照常判定。`scope` 为空或 `ALL` 时一律判定：
 
 | 情形 | 结果 | 理由码 |
 |---|---|---|
@@ -333,7 +335,7 @@ P2 用这条指令冻结批次数量（P2 设计 6.1）。
 
 - 不放行时按第 3.3 节撤回初始止损指令，理由码附上述原因；P2 没有带风险比例的指令就不开新批次。上一条指令已过期或已撤回时不再发送。
 - 放行时照常下发初始止损指令，理由码另加上表的理由码。从不放行变为放行时，已撤回的计划不算“未变”，立即重发。
-- 判定（是否放行、理由码、方向、时刻）写入 `POSITION` 状态的 `gate`。有持仓时不判定，`gate` 清空，批次内用于加仓定量的初始止损指令照常维护。
+- 判定（是否放行、理由码、方向、时刻）写入 `POSITION` 状态的 `gate`。不判定时（持仓方向与研判方向相同）`gate` 清空，批次内用于加仓定量的初始止损指令照常维护。
 - 状态在整点更新，仓位管理器每 5 分钟运行，所以状态变为不一致后最迟在下一轮撤回。
 
 ## 4 预排日程
