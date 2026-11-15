@@ -31,9 +31,6 @@ async function readSource(s: Selection, source: string, from: string, to: string
   return { items, first, truncated: true };
 }
 
-// Decisions carry their input snapshot (tens of kB each), so they start at a
-// smaller page than the other sources.
-const DECISION_LIMIT = 200;
 const MIN_LIMIT = 10;
 
 export function useReplay(order: Order | null) {
@@ -50,7 +47,7 @@ export function useReplay(order: Order | null) {
       const o = order as Order;
       const { from, to } = replayWindow(o, Date.now());
       const [decisions, plans, actions, judgments, fills] = await Promise.all(
-        ["decision-history", "dynamic.plans", "dynamic.actions", "dynamic.judgments", "fills"].map((src) => readSource(s, src, from, to, src === "decision-history" ? Math.min(limit, DECISION_LIMIT) : limit, signal)),
+        ["decision-history", "dynamic.plans", "dynamic.actions", "dynamic.judgments", "fills"].map((src) => readSource(s, src, from, to, limit, signal)),
       );
       const sizing = (decisions.first && typeof decisions.first === "object" && !Array.isArray(decisions.first) ? decisions.first.sizing : null) ?? null;
       const replay = buildReplay(o, { decisions: decisions.items, plans: plans.items, actions: actions.items, judgments: judgments.items, fills: fills.items, sizing }, s.object_id);

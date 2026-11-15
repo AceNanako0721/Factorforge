@@ -1949,10 +1949,14 @@
                 "type": "null"
               }
             ]
+          },
+          "inputs": {
+            "$ref": "#/components/schemas/DecisionInputs"
           }
         },
         "required": [
           "decision",
+          "inputs",
           "delivery_state",
           "delivery_reason"
         ],
@@ -1989,6 +1993,52 @@
           "cursor",
           "snapshot_version",
           "sizing"
+        ],
+        "type": "object"
+      },
+      "DecisionInputs": {
+        "additionalProperties": false,
+        "properties": {
+          "contributions": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "equity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pool_quality": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "equity",
+          "price",
+          "pool_quality",
+          "contributions"
         ],
         "type": "object"
       },
@@ -9851,7 +9901,7 @@
     },
     "/api/v2/strategy/objects/{object_id}/decision-history": {
       "get": {
-        "description": "S2-024: every decision of the object with available_cutoff in [from, to), archived ones included, oldest first, with the delivery state and reason of its target, and the object's current sizing limits, costs and levels (S2-033). The cursor is the last item's cutoff and decision id.",
+        "description": "S2-024: every decision of the object with available_cutoff in [from, to), archived ones included, oldest first, with the delivery state and reason of its target and the snapshot values a sizing replay reads (the input snapshot itself is left empty), and the object's current sizing limits, costs and levels (S2-033). The cursor is the last item's cutoff and decision id.",
         "operationId": "GET_DECISION_HISTORY",
         "parameters": [
           {

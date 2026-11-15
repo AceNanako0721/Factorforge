@@ -12,8 +12,9 @@ const decision = (at: string, o: { lv: number; cb: string; tg: string; ac: strin
     decision_id: "d-" + at, object_id: object, available_cutoff: at, new_level: o.lv, pool_net: o.cb, pool_plus: o.cb, pool_minus: "0",
     components: { baseline: "0", core: "0", adjustment: o.cb, combined: o.cb },
     target_quantity: o.tg, actual_quantity: o.ac, reason_codes: o.rc, stop_plan: o.sp ? { trigger_price: o.sp } : null,
-    input_snapshot: { pool: { quality: "1", contributions: [{}] }, snapshot: { equity: o.eq ?? "5000", samples: { [object]: { price: o.px ?? "50" } } } },
+    input_snapshot: {},
   },
+  inputs: { equity: o.eq ?? "5000", price: o.px ?? "50", pool_quality: "1", contributions: 1 },
   delivery_state: delivery,
   delivery_reason: null,
 });

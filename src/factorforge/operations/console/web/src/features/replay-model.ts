@@ -142,7 +142,7 @@ export function buildReplay(order: Order, input: ReplayInputs, objectId: string)
     states.push({ t: a.t, s: run });
   }
   // one decision per five-minute cycle, the delivered one first
-  const cycles = new Map<string, Record<string, Json> & { delivery: string | null }>();
+  const cycles = new Map<string, Record<string, Json> & { delivery: string | null; inputs: Record<string, Json> }>();
   for (const item of input.decisions.map(record)) {
     const d = record(item.decision);
     if (d.object_id !== objectId || typeof d.available_cutoff !== "string") continue;
@@ -151,29 +151,26 @@ export function buildReplay(order: Order, input: ReplayInputs, objectId: string)
     const key = at.toISOString();
     const delivery = typeof item.delivery_state === "string" ? item.delivery_state : null;
     const prev = cycles.get(key);
-    if (!prev || delivery === "ACK" || prev.delivery !== "ACK") cycles.set(key, { ...d, delivery });
+    if (!prev || delivery === "ACK" || prev.delivery !== "ACK") cycles.set(key, { ...d, delivery, inputs: record(item.inputs) });
   }
   const frames: Frame[] = [...cycles.values()]
     .sort((a, b) => String(a.available_cutoff).localeCompare(String(b.available_cutoff)))
     .map((d) => {
       const t = iso(d.available_cutoff);
       const c = record(d.components);
-      const input = record(d.input_snapshot);
-      const pool = record(input.pool);
-      const snap = record(input.snapshot);
-      const sample = record(record(snap.samples)[objectId]);
+      const inputs = d.inputs;
       const j = latest(okJudgments, t);
       const jl = latest(judgments, t);
       const b = latest(states, t);
       return {
         t,
-        px: n(sample.price),
-        eq: n(snap.equity),
+        px: n(inputs.price),
+        eq: n(inputs.equity),
         pn: z(d.pool_net),
         pp: z(d.pool_plus),
         pm: z(d.pool_minus),
-        nc: Array.isArray(pool.contributions) ? pool.contributions.length : 0,
-        ql: z(pool.quality),
+        nc: z(inputs.contributions),
+        ql: z(inputs.pool_quality),
         b: z(c.baseline),
         as: z(c.assessment),
         sc: z(c.scheduled),

@@ -552,6 +552,12 @@
    "change_kind": "specification",
    "date": "2026-11-15",
    "summary": "SOXLUSDT instance: the plan records contract allows null probabilities, which every initial plan has; the console refused the whole plans page and no order replay loaded (S3-032, S4-024). Console: a function page lists its inputs, formula and outputs before an order is loaded, with dashes for the numbers (S4-022)."
+  },
+  {
+   "version": "3.15.0",
+   "change_kind": "specification",
+   "date": "2026-11-15",
+   "summary": "Strategy framework: each decision in the decision history carries the inputs a sizing replay reads (equity, object price, pool quality and number of contributions) instead of the full input snapshot, which the console projection does not forward (S2-024). Console: the order replay reads these inputs, so the unit quantity of each round is recomputed in the console (S4-024)."
   }
  ]
 }

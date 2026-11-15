@@ -3431,10 +3431,14 @@
                   "type": "null"
                 }
               ]
+            },
+            "inputs": {
+              "$ref": "#/components/schemas/DecisionInputs"
             }
           },
           "required": [
             "decision",
+            "inputs",
             "delivery_state",
             "delivery_reason"
           ],
@@ -3471,6 +3475,52 @@
             "cursor",
             "snapshot_version",
             "sizing"
+          ],
+          "type": "object"
+        },
+        "DecisionInputs": {
+          "additionalProperties": false,
+          "properties": {
+            "contributions": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "equity": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "pool_quality": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "price": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "equity",
+            "price",
+            "pool_quality",
+            "contributions"
           ],
           "type": "object"
         },

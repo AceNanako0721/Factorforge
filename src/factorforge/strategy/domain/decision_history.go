@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"encoding/json"
 	"strings"
 	"time"
 )
@@ -13,11 +14,44 @@ const (
 )
 
 // DecisionHistoryItem is one decision with how its target was delivered
-// (S2-024): retained decisions and archived ones read the same way.
+// (S2-024): retained decisions and archived ones read the same way. The input
+// snapshot is left out; Inputs carries the values a replay needs from it.
 type DecisionHistoryItem struct {
-	Decision       DecisionView `json:"decision"`
-	DeliveryState  *string      `json:"delivery_state"`
-	DeliveryReason *string      `json:"delivery_reason"`
+	Decision       DecisionView   `json:"decision"`
+	Inputs         DecisionInputs `json:"inputs"`
+	DeliveryState  *string        `json:"delivery_state"`
+	DeliveryReason *string        `json:"delivery_reason"`
+}
+
+// DecisionInputs are the snapshot values a replay of the sizing reads: the
+// account equity, the object's sample price, and the pool's quality and
+// number of contributions. A value missing from the snapshot is null.
+type DecisionInputs struct {
+	Equity        *string `json:"equity"`
+	Price         *string `json:"price"`
+	PoolQuality   *string `json:"pool_quality"`
+	Contributions int     `json:"contributions"`
+}
+
+func decisionInputs(v DecisionView) DecisionInputs {
+	var snapshot map[string]any
+	if raw, err := json.Marshal(v.InputSnapshot); err == nil {
+		_ = json.Unmarshal(raw, &snapshot)
+	}
+	value := func(x any) *string {
+		if x == nil {
+			return nil
+		}
+		s := Text(x)
+		return &s
+	}
+	snap, pool := Object(snapshot["snapshot"]), Object(snapshot["pool"])
+	return DecisionInputs{
+		Equity:        value(snap["equity"]),
+		Price:         value(Object(Object(snap["samples"])[v.ObjectID])["price"]),
+		PoolQuality:   value(pool["quality"]),
+		Contributions: len(Rows(pool["contributions"])),
+	}
 }
 
 // BatchView is a risk batch as the batch list publishes it (S2-024): an open
@@ -54,7 +88,8 @@ func ParseDecisionHistoryCursor(cursor string) (time.Time, string, bool) {
 
 // NewDecisionHistoryItem attaches the delivery outcome of the decision's target.
 func NewDecisionHistoryItem(v DecisionView, outbox *TargetOutbox) DecisionHistoryItem {
-	item := DecisionHistoryItem{Decision: v}
+	item := DecisionHistoryItem{Decision: v, Inputs: decisionInputs(v)}
+	item.Decision.InputSnapshot = map[string]any{}
 	if outbox != nil {
 		state := outbox.State
 		item.DeliveryState, item.DeliveryReason = &state, outbox.Reason
