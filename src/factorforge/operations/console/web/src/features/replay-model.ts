@@ -17,7 +17,7 @@ export type Order = {
   pnl: number | null;
   r: number | null;
 };
-export type Plan = { t: string; dir: number; conf: number; rf: number; D: number; Dc: number; P: number; E: number; r: number; buf: number; tier: number; rtier: number; ses: string; trail: number };
+export type Plan = { id: string; t: string; dir: number; conf: number; rf: number; D: number; Dc: number; P: number; E: number; r: number; buf: number; tier: number; rtier: number; ses: string; trail: number };
 export type BatchState = { entry: number; cs: number; best: number | null; trailing: boolean; transferred: boolean };
 export type Judgment = { t: string; dir: string; conf: number; h: number };
 export type Frame = {
@@ -72,7 +72,7 @@ export function sizingOf(v: Json): Sizing | null {
   return { maxRF: n(s.max_risk_fraction) ?? 1, lossBudget: z(s.object_loss_budget), fee, slip, gap, cost: fee + slip + gap, band: n(s.band_ratio_of_unit), levels: s.levels.map(record).map((l) => ({ enter: z(l.enter), exit: z(l.exit), x: z(l.exposure) })) };
 }
 
-export const NO_PLAN: Plan = { t: "", dir: 0, conf: 0, rf: NaN, D: NaN, Dc: NaN, P: NaN, E: NaN, r: NaN, buf: NaN, tier: NaN, rtier: NaN, ses: "—", trail: NaN };
+export const NO_PLAN: Plan = { id: "", t: "", dir: 0, conf: 0, rf: NaN, D: NaN, Dc: NaN, P: NaN, E: NaN, r: NaN, buf: NaN, tier: NaN, rtier: NaN, ses: "—", trail: NaN };
 const n = (v: Json | undefined): number | null => {
   const x = typeof v === "string" ? Number(v) : typeof v === "number" ? v : NaN;
   return Number.isFinite(x) ? x : null;
@@ -125,7 +125,7 @@ export function buildReplay(order: Order, input: ReplayInputs, objectId: string)
   const plans: Plan[] = input.plans
     .map(record)
     .filter((p) => p.kind === "INITIAL")
-    .map((p) => ({ t: iso(p.at), dir: sideSign(p.direction), conf: z(p.confidence), rf: z(p.risk_fraction), D: z(p.distance), Dc: z(p.close_distance), P: z(p.price), E: z(p.equity), r: z(p.r), buf: z(p.buffer), tier: z(p.tier), rtier: z(p.requested_tier), ses: String(p.session ?? ""), trail: z(p.trail) }))
+    .map((p) => ({ id: String(p.directive_id ?? ""), t: iso(p.at), dir: sideSign(p.direction), conf: z(p.confidence), rf: z(p.risk_fraction), D: z(p.distance), Dc: z(p.close_distance), P: z(p.price), E: z(p.equity), r: z(p.r), buf: z(p.buffer), tier: z(p.tier), rtier: z(p.requested_tier), ses: String(p.session ?? ""), trail: z(p.trail) }))
     .sort((a, b) => a.t.localeCompare(b.t));
   const actions: (Record<string, Json> & { t: string })[] = input.actions.map(record).map((a) => Object.assign({}, a, { t: iso(a.at) })).sort((a, b) => a.t.localeCompare(b.t));
   const judgments = input.judgments.map(record).map((j) => ({ t: iso(j.at), ok: j.ok === true, dir: String(j.direction ?? ""), conf: z(j.confidence), h: z(j.horizon_hours) })).sort((a, b) => a.t.localeCompare(b.t));
@@ -153,6 +153,7 @@ export function buildReplay(order: Order, input: ReplayInputs, objectId: string)
     const prev = cycles.get(key);
     if (!prev || delivery === "ACK" || prev.delivery !== "ACK") cycles.set(key, { ...d, delivery, inputs: record(item.inputs) });
   }
+  const byDirective = new Map(plans.filter((p) => p.id).map((p) => [p.id, p]));
   const frames: Frame[] = [...cycles.values()]
     .sort((a, b) => String(a.available_cutoff).localeCompare(String(b.available_cutoff)))
     .map((d) => {
@@ -183,7 +184,8 @@ export function buildReplay(order: Order, input: ReplayInputs, objectId: string)
         rc: Array.isArray(d.reason_codes) ? d.reason_codes.map(String) : [],
         sp: n(record(d.stop_plan).trigger_price),
         delivery: d.delivery,
-        p3: latest(plans, t),
+        // the directive the decision used, else the latest plan sent
+        p3: (typeof d.stop_directive_id === "string" && byDirective.get(d.stop_directive_id)) || latest(plans, t),
         bt: b ? b.s : null,
         j: j ? { t: j.t, dir: j.dir, conf: j.conf, h: j.h } : null,
         jfail: jl && !jl.ok ? jl.t : null,
@@ -192,7 +194,9 @@ export function buildReplay(order: Order, input: ReplayInputs, objectId: string)
   let freeze: Freeze | null = null;
   const fz = frames.find((f) => f.rc.includes("STOP_DIRECTIVE_SIZED") && Math.sign(f.tg) === order.dir);
   if (fz && fz.eq !== null && fz.px !== null) {
-    const p = latest(plans.filter((x) => x.dir === order.dir), fz.t);
+    // P2 sizes from the verified directive the decision names, which can be
+    // older than the latest plan P3 has sent.
+    const p = fz.p3 && fz.p3.dir === order.dir ? fz.p3 : latest(plans.filter((x) => x.dir === order.dir), fz.t);
     if (p) freeze = { t: fz.t, E: fz.eq, P: fz.px, rf: p.rf, D: p.D, conf: p.conf, r: p.r, trail: p.trail, gap: null };
   }
   if (!freeze) {

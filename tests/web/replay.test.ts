@@ -67,6 +67,17 @@ describe("order replay", () => {
     expect(r.frames[3].bt?.entry).toBeCloseTo(50.2, 6);
   });
 
+  it("sizes from the directive the decision names, not a newer plan", () => {
+    const [, order] = buildOrders(batches);
+    const older = { ...plan("2026-11-10T06:40:05Z"), directive_id: "initial-a" };
+    const newer = { ...plan("2026-11-10T06:45:05Z"), directive_id: "initial-b", confidence: 4, risk_fraction: "0.008", distance: "7" };
+    const named = inputs.decisions.map((d) => (d.decision.reason_codes.includes("STOP_DIRECTIVE_SIZED") ? { ...d, decision: { ...d.decision, stop_directive_id: "initial-a" } } : d));
+    const r = buildReplay(order, { ...inputs, decisions: named, plans: [older, newer] }, object);
+    expect(r.freeze?.rf).toBeCloseTo(0.005, 6);
+    expect(r.freeze?.D).toBeCloseTo(5, 6);
+    expect(LEAF.stepQ.io(ctxAt(r, 1, buildOrders(batches), false)).out[0][1]).toBe("4.85");
+  });
+
   it("recovers the frozen inputs when the sizing round is missing", () => {
     const [, order] = buildOrders(batches);
     const r = buildReplay(order, { ...inputs, decisions: inputs.decisions.filter((d) => !d.decision.reason_codes.includes("STOP_DIRECTIVE_SIZED")) }, object);
