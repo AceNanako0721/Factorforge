@@ -61,7 +61,7 @@ func New(o Options) (http.Handler, error) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write(OpenAPI())
 	})
-	for _, route := range []struct{ path, resource, id string }{{"/dynamic/status", "dynamic-status", ""}, {"/dynamic/judgments", "dynamic-judgments", ""}, {"/dynamic/actions", "dynamic-actions", ""}} {
+	for _, route := range []struct{ path, resource, id string }{{"/dynamic/status", "dynamic-status", ""}, {"/dynamic/judgments", "dynamic-judgments", ""}, {"/dynamic/actions", "dynamic-actions", ""}, {"/dynamic/plans", "dynamic-plans", ""}} {
 		mux.HandleFunc("GET "+Prefix+route.path, func(w http.ResponseWriter, r *http.Request) {
 			var p *d.ReadPrincipal
 			scheme, credential, found := strings.Cut(r.Header.Get("Authorization"), " ")
@@ -112,6 +112,8 @@ func readDynamic(ctx context.Context, q *operations.DynamicQuery, p d.ReadPrinci
 		return q.Status(ctx, p)
 	case "dynamic-judgments":
 		return q.Judgments(ctx, p, f)
+	case "dynamic-plans":
+		return q.Plans(ctx, p, f)
 	default:
 		return q.Actions(ctx, p, f)
 	}

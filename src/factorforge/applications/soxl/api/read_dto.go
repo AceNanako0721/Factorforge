@@ -13,6 +13,7 @@ import (
 type DynamicStatusView = operations.DynamicStatusView
 type DynamicJudgmentView = operations.DynamicJudgmentView
 type DynamicActionView = operations.DynamicActionView
+type DynamicPlanView = operations.DynamicPlanView
 
 func readFilter(raw, resource string) (operations.Filter, error) {
 	var f operations.Filter
@@ -22,7 +23,7 @@ func readFilter(raw, resource string) (operations.Filter, error) {
 	}
 	allowed := []string{}
 	switch resource {
-	case "dynamic-judgments", "dynamic-actions":
+	case "dynamic-judgments", "dynamic-actions", "dynamic-plans":
 		allowed = []string{"from", "to", "cursor", "limit"}
 	}
 	for key, items := range values {

@@ -66,14 +66,14 @@ func shape(t reflect.Type) map[string]any {
 	}
 }
 func OpenAPI() []byte {
-	schemas := map[string]any{"DynamicStatusView": shape(reflect.TypeFor[DynamicStatusView]()), "DynamicJudgmentView": shape(reflect.TypeFor[DynamicJudgmentView]()), "DynamicActionView": shape(reflect.TypeFor[DynamicActionView]()), "Problem": shape(reflect.TypeFor[Problem]())}
+	schemas := map[string]any{"DynamicStatusView": shape(reflect.TypeFor[DynamicStatusView]()), "DynamicJudgmentView": shape(reflect.TypeFor[DynamicJudgmentView]()), "DynamicActionView": shape(reflect.TypeFor[DynamicActionView]()), "DynamicPlanView": shape(reflect.TypeFor[DynamicPlanView]()), "Problem": shape(reflect.TypeFor[Problem]())}
 	ref := func(name string) map[string]any { return map[string]any{"$ref": "#/components/schemas/" + name} }
 	paths := map[string]any{}
 	for _, r := range []struct {
 		path, view string
 		page       bool
 		query      []string
-	}{{"/dynamic/status", "DynamicStatusView", false, nil}, {"/dynamic/judgments", "DynamicJudgmentView", true, []string{"from", "to", "cursor", "limit"}}, {"/dynamic/actions", "DynamicActionView", true, []string{"from", "to", "cursor", "limit"}}} {
+	}{{"/dynamic/status", "DynamicStatusView", false, nil}, {"/dynamic/judgments", "DynamicJudgmentView", true, []string{"from", "to", "cursor", "limit"}}, {"/dynamic/actions", "DynamicActionView", true, []string{"from", "to", "cursor", "limit"}}, {"/dynamic/plans", "DynamicPlanView", true, []string{"from", "to", "cursor", "limit"}}} {
 		wrapped := shape(reflect.TypeFor[operations.Metadata]())
 		props := wrapped["properties"].(map[string]any)
 		required := wrapped["required"].([]string)

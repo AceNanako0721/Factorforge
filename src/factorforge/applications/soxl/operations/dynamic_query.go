@@ -105,6 +105,7 @@ type DynamicOutcomeView struct {
 	R        string `json:"r"`
 	ClosedAt string `json:"closed_at"`
 }
+
 // DynamicPriceStateView is the latest hourly price state (S3-035).
 type DynamicPriceStateView struct {
 	HourAt        time.Time                 `json:"hour_at"`
@@ -132,13 +133,13 @@ type DynamicStatusView struct {
 	NextEntry      *DynamicEntryPlanView  `json:"next_entry"`
 	PriceState     *DynamicPriceStateView `json:"price_state"`
 	EntryGate      *DynamicEntryGateView  `json:"entry_gate"`
-	Baseline       DynamicBaselineView   `json:"baseline"`
-	Chain          *DynamicChainView     `json:"chain"`
-	Noise          DynamicNoiseView      `json:"noise"`
-	Sources        []DynamicSourceView   `json:"sources"`
-	Outcomes       []DynamicOutcomeView  `json:"outcomes"`
-	LastJudgmentID *string               `json:"last_judgment_id"`
-	EquityPeak     string                `json:"equity_peak"`
+	Baseline       DynamicBaselineView    `json:"baseline"`
+	Chain          *DynamicChainView      `json:"chain"`
+	Noise          DynamicNoiseView       `json:"noise"`
+	Sources        []DynamicSourceView    `json:"sources"`
+	Outcomes       []DynamicOutcomeView   `json:"outcomes"`
+	LastJudgmentID *string                `json:"last_judgment_id"`
+	EquityPeak     string                 `json:"equity_peak"`
 }
 type DynamicNewsRefView struct {
 	ItemID       string     `json:"item_id"`
@@ -497,7 +498,7 @@ func (q DynamicQuery) parse(token, binding, resource string, f Filter) (*d.Dynam
 }
 
 // page reads one newest-first page of the given kinds.
-func (q DynamicQuery) page(ctx context.Context, p d.ReadPrincipal, resource string, kinds []string, f Filter) (Metadata, []d.DynamicRecord, *string, error) {
+func (q DynamicQuery) page(ctx context.Context, p d.ReadPrincipal, resource string, kinds []string, filter d.StopEventFilter, f Filter) (Metadata, []d.DynamicRecord, *string, error) {
 	if err := q.ready(); err != nil {
 		return Metadata{}, nil, nil, err
 	}
@@ -533,7 +534,7 @@ func (q DynamicQuery) page(ctx context.Context, p d.ReadPrincipal, resource stri
 	if err != nil {
 		return Metadata{}, nil, nil, err
 	}
-	rows, err := q.Store.RecordPage(ctx, kinds, since, until, before, true, f.Limit+1)
+	rows, err := q.Store.RecordPage(ctx, kinds, since, until, before, filter, f.Limit+1)
 	if err != nil {
 		return Metadata{}, nil, nil, err
 	}
@@ -548,7 +549,7 @@ func (q DynamicQuery) page(ctx context.Context, p d.ReadPrincipal, resource stri
 
 // Judgments implements GET /dynamic/judgments.
 func (q DynamicQuery) Judgments(ctx context.Context, p d.ReadPrincipal, f Filter) (Page, error) {
-	meta, rows, next, err := q.page(ctx, p, "judgments", []string{"JUDGMENT"}, f)
+	meta, rows, next, err := q.page(ctx, p, "judgments", []string{"JUDGMENT"}, d.StopEventsActions, f)
 	if err != nil {
 		return Page{}, err
 	}
@@ -630,7 +631,7 @@ func (q DynamicQuery) Judgments(ctx context.Context, p d.ReadPrincipal, f Filter
 
 // Actions implements GET /dynamic/actions.
 func (q DynamicQuery) Actions(ctx context.Context, p d.ReadPrincipal, f Filter) (Page, error) {
-	meta, rows, next, err := q.page(ctx, p, "actions", []string{"ACTION", "STOP_EVENT"}, f)
+	meta, rows, next, err := q.page(ctx, p, "actions", []string{"ACTION", "STOP_EVENT"}, d.StopEventsActions, f)
 	if err != nil {
 		return Page{}, err
 	}
@@ -688,6 +689,91 @@ func (q DynamicQuery) Actions(ctx context.Context, p d.ReadPrincipal, f Filter) 
 			}
 		}
 		if v.Kind == "" {
+			return Page{}, d.Fail("DYNAMIC_STATE_INVALID", 503)
+		}
+		items = append(items, v)
+	}
+	return Page{meta, items, next}, nil
+}
+
+// DynamicPlanView is one initial stop plan sent to the framework or one
+// hourly price state (S3-032); fields of the other kind are null.
+type DynamicPlanView struct {
+	PlanID        string            `json:"plan_id"`
+	At            time.Time         `json:"at"`
+	Kind          string            `json:"kind"`
+	DirectiveID   *string           `json:"directive_id"`
+	Direction     *string           `json:"direction"`
+	Confidence    *int              `json:"confidence"`
+	RiskFraction  *string           `json:"risk_fraction"`
+	Distance      *string           `json:"distance"`
+	CloseDistance *string           `json:"close_distance"`
+	Price         *string           `json:"price"`
+	Equity        *string           `json:"equity"`
+	Tier          *int              `json:"tier"`
+	RequestedTier *int              `json:"requested_tier"`
+	Session       *string           `json:"session"`
+	R             *string           `json:"r"`
+	Buffer        *string           `json:"buffer"`
+	Trail         *string           `json:"trail"`
+	State         *string           `json:"state"`
+	HourAt        *time.Time        `json:"hour_at"`
+	Probabilities map[string]string `json:"probabilities"`
+	Strength      *string           `json:"strength"`
+	Model         *string           `json:"model"`
+}
+
+// Plans implements GET /dynamic/plans.
+func (q DynamicQuery) Plans(ctx context.Context, p d.ReadPrincipal, f Filter) (Page, error) {
+	meta, rows, next, err := q.page(ctx, p, "plans", []string{"STOP_EVENT"}, d.StopEventsPlans, f)
+	if err != nil {
+		return Page{}, err
+	}
+	type stored struct {
+		Kind string `json:"kind"`
+		Plan *struct {
+			DirectiveID   string         `json:"directive_id"`
+			Direction     int            `json:"direction"`
+			Confidence    *int           `json:"confidence"`
+			RiskFraction  float64        `json:"risk_fraction"`
+			Distance      float64        `json:"distance"`
+			CloseDistance float64        `json:"close_distance"`
+			Price         float64        `json:"price"`
+			Equity        float64        `json:"equity"`
+			Geometry      storedGeometry `json:"geometry"`
+		} `json:"plan"`
+		State *struct {
+			State         string             `json:"state"`
+			HourAt        time.Time          `json:"hour_at"`
+			Probabilities map[string]float64 `json:"probabilities"`
+			Strength      float64            `json:"strength"`
+			Model         string             `json:"model"`
+		} `json:"state"`
+	}
+	num := func(v float64) *string { s := decimal(v); return &s }
+	items := []any{}
+	for _, r := range rows {
+		var s stored
+		if err = strictDecode(r.Payload, &s); err != nil {
+			return Page{}, err
+		}
+		v := DynamicPlanView{PlanID: r.ID, At: r.At, Kind: s.Kind}
+		switch {
+		case s.Kind == "INITIAL" && s.Plan != nil:
+			x, g := s.Plan, s.Plan.Geometry
+			dir := direction(x.Direction)
+			v.DirectiveID, v.Direction, v.Confidence = optionalString(x.DirectiveID), &dir, x.Confidence
+			v.RiskFraction, v.Distance, v.CloseDistance, v.Price, v.Equity = num(x.RiskFraction), num(x.Distance), num(x.CloseDistance), num(x.Price), num(x.Equity)
+			v.Tier, v.RequestedTier, v.Session, v.R, v.Buffer, v.Trail = &g.Tier, &g.RequestedTier, optionalString(g.Session), num(g.R), num(g.Buffer), num(g.Trail)
+		case s.Kind == "PRICE_STATE" && s.State != nil:
+			x := s.State
+			hour := x.HourAt.UTC()
+			v.State, v.HourAt, v.Strength, v.Model = optionalString(x.State), &hour, num(x.Strength), optionalString(x.Model)
+			v.Probabilities = map[string]string{}
+			for k, p := range x.Probabilities {
+				v.Probabilities[k] = decimal(p)
+			}
+		default:
 			return Page{}, d.Fail("DYNAMIC_STATE_INVALID", 503)
 		}
 		items = append(items, v)

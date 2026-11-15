@@ -126,7 +126,11 @@ func TestT328DynamicReadAPI(t *testing.T) {
 	}
 	pending["exit_id"] = "exit-cycle-1-20261016T0900"
 	for i := 0; i < 3; i++ {
-		if err = writer.AppendRecord(ctx, "STOP_EVENT", fmt.Sprintf("initial-%d", i), at.Add(time.Duration(i)*10*time.Minute), map[string]any{"kind": "INITIAL", "plan": map[string]any{"price": 107}}); err != nil {
+		plan := map[string]any{"price": 107}
+		if i == 2 {
+			plan = map[string]any{"directive_id": "initial-20261016T0620Z", "direction": -1, "confidence": 3, "risk_fraction": 0.0075, "distance": 19.07, "close_distance": 17.25, "price": 107, "equity": 4000, "geometry": map[string]any{"tier": 72, "session": "OVERNIGHT", "r": 0.1612, "buffer": 0.017, "trail": 0.1638, "requested_tier": 72}}
+		}
+		if err = writer.AppendRecord(ctx, "STOP_EVENT", fmt.Sprintf("initial-%d", i), at.Add(time.Duration(i)*10*time.Minute), map[string]any{"kind": "INITIAL", "plan": plan}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -233,6 +237,28 @@ func TestT328DynamicReadAPI(t *testing.T) {
 	inject := actions.Items[1].(operations.DynamicActionView)
 	if open.Kind != "OPEN" || open.Source != "POSITION" || open.Entry == nil || *open.Entry != "107.8" || inject.Source != "INJECTION" || inject.Direction == nil || *inject.Direction != "SHORT" {
 		t.Fatalf("actions %+v %+v", open, inject)
+	}
+
+	// S3-032: plan records are the initial plans and hourly price states the
+	// action records leave out, newest first.
+	plans, err := q.Plans(ctx, principal, operations.Filter{Limit: 50})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plans.Items) != 4 {
+		t.Fatalf("plans %+v", plans.Items)
+	}
+	state := plans.Items[0].(operations.DynamicPlanView)
+	plan := plans.Items[1].(operations.DynamicPlanView)
+	if state.Kind != "PRICE_STATE" || state.State == nil || *state.State != "DOWNTREND" || state.Probabilities["DOWNTREND"] != "0.67" || state.Distance != nil {
+		t.Fatalf("price state %+v", state)
+	}
+	if plan.Kind != "INITIAL" || plan.Direction == nil || *plan.Direction != "SHORT" || plan.Confidence == nil || *plan.Confidence != 3 || plan.RiskFraction == nil || *plan.RiskFraction != "0.0075" ||
+		plan.Distance == nil || *plan.Distance != "19.07" || plan.Tier == nil || *plan.Tier != 72 || plan.R == nil || *plan.R != "0.1612" || plan.State != nil {
+		t.Fatalf("initial plan %+v", plan)
+	}
+	if _, err = q.Plans(ctx, principal, operations.Filter{Cursor: *page.Cursor}); err == nil {
+		t.Fatal("judgment cursor reused for plans")
 	}
 
 	// LIVE hides SIM_ONLY headlines (S3-023).

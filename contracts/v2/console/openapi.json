@@ -1303,6 +1303,174 @@
                     "data": {
                       "anyOf": [
                         {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "batch_id": {
+                                "type": "string"
+                              },
+                              "budget": {
+                                "type": "string"
+                              },
+                              "case_id": {
+                                "type": "string"
+                              },
+                              "closed_at": {
+                                "format": "date-time",
+                                "type": "string"
+                              },
+                              "direction": {
+                                "type": "integer"
+                              },
+                              "exit_kind": {
+                                "type": "string"
+                              },
+                              "net_pnl": {
+                                "type": "string"
+                              },
+                              "object_id": {
+                                "type": "string"
+                              },
+                              "opened_at": {
+                                "format": "date-time",
+                                "type": "string"
+                              },
+                              "r": {
+                                "type": "string"
+                              },
+                              "truncated": {
+                                "type": "boolean"
+                              },
+                              "unit_quantity": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "batch_id",
+                              "budget",
+                              "case_id",
+                              "closed_at",
+                              "direction",
+                              "exit_kind",
+                              "net_pnl",
+                              "object_id",
+                              "opened_at",
+                              "r",
+                              "truncated",
+                              "unit_quantity"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "fetched_at": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "observed_at": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "retry_at": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "snapshot_version": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "source": {
+                      "const": "batches",
+                      "type": "string"
+                    },
+                    "source_version": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "state": {
+                      "enum": [
+                        "AVAILABLE",
+                        "EMPTY",
+                        "UNAVAILABLE",
+                        "NOT_CONFIGURED",
+                        "NOT_APPLICABLE",
+                        "FORBIDDEN",
+                        "MISSING"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "source",
+                    "state",
+                    "code",
+                    "fetched_at",
+                    "observed_at",
+                    "source_version",
+                    "snapshot_version",
+                    "data",
+                    "cursor",
+                    "retry_at"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "cursor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "data": {
+                      "anyOf": [
+                        {
                           "additionalProperties": false,
                           "properties": {
                             "cursor": {
@@ -2188,6 +2356,519 @@
                     },
                     "source": {
                       "const": "counterfactuals",
+                      "type": "string"
+                    },
+                    "source_version": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "state": {
+                      "enum": [
+                        "AVAILABLE",
+                        "EMPTY",
+                        "UNAVAILABLE",
+                        "NOT_CONFIGURED",
+                        "NOT_APPLICABLE",
+                        "FORBIDDEN",
+                        "MISSING"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "source",
+                    "state",
+                    "code",
+                    "fetched_at",
+                    "observed_at",
+                    "source_version",
+                    "snapshot_version",
+                    "data",
+                    "cursor",
+                    "retry_at"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "cursor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "data": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "cursor": {
+                              "type": "string"
+                            },
+                            "items": {
+                              "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "decision": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "actual_quantity": {
+                                        "title": "Actual Quantity",
+                                        "type": "string"
+                                      },
+                                      "available_cutoff": {
+                                        "format": "date-time",
+                                        "title": "Available Cutoff",
+                                        "type": "string"
+                                      },
+                                      "components": {
+                                        "anyOf": [
+                                          {
+                                            "additionalProperties": false,
+                                            "properties": {
+                                              "adjustment": {
+                                                "type": "string"
+                                              },
+                                              "assessment": {
+                                                "type": "string"
+                                              },
+                                              "baseline": {
+                                                "type": "string"
+                                              },
+                                              "combined": {
+                                                "type": "string"
+                                              },
+                                              "core": {
+                                                "type": "string"
+                                              },
+                                              "exposure": {
+                                                "type": "string"
+                                              },
+                                              "factors": {
+                                                "type": "null"
+                                              },
+                                              "level": {
+                                                "type": "string"
+                                              },
+                                              "observation_refs": {
+                                                "type": "null"
+                                              },
+                                              "scheduled": {
+                                                "type": "string"
+                                              },
+                                              "shadow": {
+                                                "type": "null"
+                                              },
+                                              "trigger_layer": {
+                                                "enum": [
+                                                  "BASELINE",
+                                                  "ASSESSMENT",
+                                                  "SCHEDULED",
+                                                  "ADJUSTMENT",
+                                                  "UNATTRIBUTED"
+                                                ],
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "adjustment",
+                                              "assessment",
+                                              "baseline",
+                                              "combined",
+                                              "core",
+                                              "exposure",
+                                              "factors",
+                                              "level",
+                                              "observation_refs",
+                                              "scheduled",
+                                              "shadow",
+                                              "trigger_layer"
+                                            ],
+                                            "type": "object"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "cycle_id": {
+                                        "maxLength": 160,
+                                        "minLength": 1,
+                                        "title": "Cycle Id",
+                                        "type": "string"
+                                      },
+                                      "decision_id": {
+                                        "maxLength": 160,
+                                        "minLength": 1,
+                                        "title": "Decision Id",
+                                        "type": "string"
+                                      },
+                                      "input_hash": {
+                                        "maxLength": 160,
+                                        "minLength": 1,
+                                        "title": "Input Hash",
+                                        "type": "string"
+                                      },
+                                      "new_level": {
+                                        "title": "New Level",
+                                        "type": "integer"
+                                      },
+                                      "object_id": {
+                                        "maxLength": 160,
+                                        "minLength": 1,
+                                        "title": "Object Id",
+                                        "type": "string"
+                                      },
+                                      "parameter_version": {
+                                        "maxLength": 160,
+                                        "minLength": 1,
+                                        "title": "Parameter Version",
+                                        "type": "string"
+                                      },
+                                      "pending_quantity": {
+                                        "title": "Pending Quantity",
+                                        "type": "string"
+                                      },
+                                      "pool_minus": {
+                                        "title": "Pool Minus",
+                                        "type": "string"
+                                      },
+                                      "pool_net": {
+                                        "title": "Pool Net",
+                                        "type": "string"
+                                      },
+                                      "pool_plus": {
+                                        "title": "Pool Plus",
+                                        "type": "string"
+                                      },
+                                      "previous_level": {
+                                        "title": "Previous Level",
+                                        "type": "integer"
+                                      },
+                                      "projected_exposure": {
+                                        "title": "Projected Exposure",
+                                        "type": "string"
+                                      },
+                                      "protection_only": {
+                                        "type": "boolean"
+                                      },
+                                      "raw_exposure": {
+                                        "title": "Raw Exposure",
+                                        "type": "string"
+                                      },
+                                      "reason_codes": {
+                                        "items": {
+                                          "type": "string"
+                                        },
+                                        "title": "Reason Codes",
+                                        "type": "array"
+                                      },
+                                      "source_event_versions": {
+                                        "additionalProperties": {
+                                          "type": "integer"
+                                        },
+                                        "title": "Source Event Versions",
+                                        "type": "object"
+                                      },
+                                      "stop_directive_id": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "stop_plan": {
+                                        "anyOf": [
+                                          {
+                                            "additionalProperties": false,
+                                            "properties": {
+                                              "covered_quantity": {
+                                                "title": "Covered Quantity",
+                                                "type": "string"
+                                              },
+                                              "exit_order_type": {
+                                                "const": "MARKET",
+                                                "default": "MARKET",
+                                                "title": "Exit Order Type",
+                                                "type": "string"
+                                              },
+                                              "managed_stop_price": {
+                                                "anyOf": [
+                                                  {
+                                                    "type": "string"
+                                                  },
+                                                  {
+                                                    "type": "null"
+                                                  }
+                                                ]
+                                              },
+                                              "max_slippage_bps": {
+                                                "title": "Max Slippage Bps",
+                                                "type": "string"
+                                              },
+                                              "overshoot_allowance": {
+                                                "anyOf": [
+                                                  {
+                                                    "type": "string"
+                                                  },
+                                                  {
+                                                    "type": "null"
+                                                  }
+                                                ]
+                                              },
+                                              "spec_version": {
+                                                "maxLength": 160,
+                                                "minLength": 1,
+                                                "title": "Spec Version",
+                                                "type": "string"
+                                              },
+                                              "strategy_protection_mode": {
+                                                "enum": [
+                                                  "VENUE",
+                                                  "UPPER_MANAGED"
+                                                ],
+                                                "type": "string"
+                                              },
+                                              "trigger_kind": {
+                                                "enum": [
+                                                  "MARK",
+                                                  "LAST"
+                                                ],
+                                                "title": "Trigger Kind",
+                                                "type": "string"
+                                              },
+                                              "trigger_price": {
+                                                "title": "Trigger Price",
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "trigger_kind",
+                                              "max_slippage_bps",
+                                              "spec_version"
+                                            ],
+                                            "title": "StopPlan",
+                                            "type": "object"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "target_quantity": {
+                                        "title": "Target Quantity",
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "decision_id",
+                                      "object_id",
+                                      "cycle_id",
+                                      "available_cutoff",
+                                      "pool_plus",
+                                      "pool_minus",
+                                      "pool_net",
+                                      "previous_level",
+                                      "new_level",
+                                      "raw_exposure",
+                                      "projected_exposure",
+                                      "target_quantity",
+                                      "actual_quantity",
+                                      "pending_quantity",
+                                      "stop_plan",
+                                      "parameter_version",
+                                      "input_hash",
+                                      "reason_codes"
+                                    ],
+                                    "title": "DecisionView",
+                                    "type": "object"
+                                  },
+                                  "delivery_reason": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "delivery_state": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "decision",
+                                  "delivery_state",
+                                  "delivery_reason"
+                                ],
+                                "type": "object"
+                              },
+                              "type": "array"
+                            },
+                            "sizing": {
+                              "anyOf": [
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "band_ratio_of_unit": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "fee_rate": {
+                                      "type": "string"
+                                    },
+                                    "gap_fraction": {
+                                      "type": "string"
+                                    },
+                                    "levels": {
+                                      "items": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "enter": {
+                                            "type": "string"
+                                          },
+                                          "exit": {
+                                            "type": "string"
+                                          },
+                                          "exposure": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "exposure",
+                                          "enter",
+                                          "exit"
+                                        ],
+                                        "type": "object"
+                                      },
+                                      "type": "array"
+                                    },
+                                    "max_risk_fraction": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "object_loss_budget": {
+                                      "type": "string"
+                                    },
+                                    "slippage_fraction": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "max_risk_fraction",
+                                    "object_loss_budget",
+                                    "fee_rate",
+                                    "slippage_fraction",
+                                    "gap_fraction",
+                                    "band_ratio_of_unit",
+                                    "levels"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "snapshot_version": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "items",
+                            "cursor",
+                            "snapshot_version",
+                            "sizing"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "fetched_at": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "observed_at": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "retry_at": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "snapshot_version": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "source": {
+                      "const": "decision-history",
                       "type": "string"
                     },
                     "source_version": {
@@ -3366,6 +4047,400 @@
                     },
                     "source": {
                       "const": "dynamic.judgments",
+                      "type": "string"
+                    },
+                    "source_version": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "state": {
+                      "enum": [
+                        "AVAILABLE",
+                        "EMPTY",
+                        "UNAVAILABLE",
+                        "NOT_CONFIGURED",
+                        "NOT_APPLICABLE",
+                        "FORBIDDEN",
+                        "MISSING"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "source",
+                    "state",
+                    "code",
+                    "fetched_at",
+                    "observed_at",
+                    "source_version",
+                    "snapshot_version",
+                    "data",
+                    "cursor",
+                    "retry_at"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "cursor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "data": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "cursor": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "environment": {
+                              "enum": [
+                                "SIM",
+                                "LIVE"
+                              ],
+                              "type": "string"
+                            },
+                            "instance_id": {
+                              "type": "string"
+                            },
+                            "items": {
+                              "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "at": {
+                                    "format": "date-time",
+                                    "pattern": "Z$",
+                                    "type": "string"
+                                  },
+                                  "buffer": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "close_distance": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "confidence": {
+                                    "anyOf": [
+                                      {
+                                        "type": "integer"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "direction": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "directive_id": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "distance": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "equity": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "hour_at": {
+                                    "anyOf": [
+                                      {
+                                        "format": "date-time",
+                                        "pattern": "Z$",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "kind": {
+                                    "type": "string"
+                                  },
+                                  "model": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "plan_id": {
+                                    "type": "string"
+                                  },
+                                  "price": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "probabilities": {
+                                    "type": "null"
+                                  },
+                                  "r": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "requested_tier": {
+                                    "anyOf": [
+                                      {
+                                        "type": "integer"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "risk_fraction": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "session": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "state": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "strength": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "tier": {
+                                    "anyOf": [
+                                      {
+                                        "type": "integer"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "trail": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "plan_id",
+                                  "at",
+                                  "kind",
+                                  "directive_id",
+                                  "direction",
+                                  "confidence",
+                                  "risk_fraction",
+                                  "distance",
+                                  "close_distance",
+                                  "price",
+                                  "equity",
+                                  "tier",
+                                  "requested_tier",
+                                  "session",
+                                  "r",
+                                  "buffer",
+                                  "trail",
+                                  "state",
+                                  "hour_at",
+                                  "probabilities",
+                                  "strength",
+                                  "model"
+                                ],
+                                "type": "object"
+                              },
+                              "type": "array"
+                            },
+                            "observed_at": {
+                              "anyOf": [
+                                {
+                                  "format": "date-time",
+                                  "pattern": "Z$",
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "schema_version": {
+                              "const": "instance-2.0",
+                              "type": "string"
+                            },
+                            "snapshot_version": {
+                              "type": "string"
+                            },
+                            "source_version": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "schema_version",
+                            "environment",
+                            "instance_id",
+                            "source_version",
+                            "observed_at",
+                            "snapshot_version",
+                            "items",
+                            "cursor"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "fetched_at": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "observed_at": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "retry_at": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "snapshot_version": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "source": {
+                      "const": "dynamic.plans",
                       "type": "string"
                     },
                     "source_version": {
@@ -12189,6 +13264,9 @@
                         "overview": {
                           "type": "string"
                         },
+                        "replay": {
+                          "type": "string"
+                        },
                         "sentiment": {
                           "type": "string"
                         }
@@ -14038,6 +15116,152 @@
             "schema": {
               "minimum": 1,
               "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleResponse"
+                }
+              }
+            },
+            "description": "Successful read"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Successful read"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Successful read"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Successful read"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Successful read"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Successful read"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Successful read"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Successful read"
+          }
+        },
+        "security": [
+          {
+            "consoleCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v2/console/replay": {
+      "get": {
+        "operationId": "get__replay",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "selection_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[A-Za-z0-9_.-]{1,128}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
             }
           }
         ],

@@ -1,6 +1,6 @@
 # SOXLUSDT 应用实例设计书
 
-版本：3.9.0
+版本：3.10.0
 
 对应式样书：[03_SOXLUSDT应用实例式样书](03_SOXLUSDT应用实例式样书.md)。源码在 `src/factorforge/applications/soxl`，测试在 `tests/applications/soxl`。文中出现的数值，凡是代码里写死的照实写出；其余都是登记值，这里只说明作用，不给实际取值。
 
@@ -388,6 +388,7 @@ P2 用这条指令冻结批次数量（P2 设计 6.1）。
 | `/dynamic/status` | 研判与止损的当前状态（`DynamicQuery.Status`） |
 | `/dynamic/judgments` | 研判记录，按时间倒序分页 |
 | `/dynamic/actions` | 动作记录，按时间倒序分页；初始止损指令的下发和每小时的价格状态（种类为 `INITIAL`、`PRICE_STATE` 的止损事件）不列出 |
+| `/dynamic/plans` | 计划记录（`DynamicQuery.Plans`），按时间倒序分页：只读种类为 `INITIAL`、`PRICE_STATE` 的止损事件（`RecordPage` 的 `StopEventsPlans`），逐条给出 `DynamicPlanView`；初始指令填方向、信心、风险比例、距离、价格、权益与几何，价格状态填状态、所属小时、概率、强度与模型，另一类的字段为空 |
 
 `/dynamic/status` 的批次部分包括：
 

@@ -133,3 +133,30 @@ func TestCrossSiteNavigationLoadsStaticOnly(t *testing.T) {
 		}
 	}
 }
+
+// S4-024: the order replay view reads P2 batches and decision history, P3
+// plans, actions and judgments, and P1 fills over an explicit start.
+func TestReplayViewPanelsAndRange(t *testing.T) {
+	w := world(t)
+	ctx := context.Background()
+	if _, e := query(w).Read(ctx, w.User, w.Selection.ID, "replay", "", app.Filter{}); e == nil {
+		t.Fatal("replay view without a start")
+	}
+	r, e := query(w).Read(ctx, w.User, w.Selection.ID, "replay", "", app.Filter{From: "2026-01-04T00:00:00Z", To: "2026-01-06T00:00:00Z"})
+	if e != nil {
+		t.Fatal(e)
+	}
+	panels := map[string]app.Panel{}
+	for _, p := range r.Panels {
+		panels[p.Source] = p
+	}
+	for _, source := range []string{"batches", "decision-history", "dynamic.plans", "dynamic.actions", "dynamic.judgments", "fills"} {
+		if p, ok := panels[source]; !ok || p.State != "AVAILABLE" && p.State != "EMPTY" {
+			t.Fatalf("%s %+v", source, p)
+		}
+	}
+	// The replay recomputes Q from the object's sizing view.
+	if raw, _ := json.Marshal(panels["decision-history"].Data); !strings.Contains(string(raw), "object_loss_budget") {
+		t.Fatal("decision history without sizing", string(raw))
+	}
+}

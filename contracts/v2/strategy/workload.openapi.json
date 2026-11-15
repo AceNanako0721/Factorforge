@@ -1855,6 +1855,74 @@
         ],
         "type": "object"
       },
+      "DecisionHistoryItem": {
+        "additionalProperties": false,
+        "properties": {
+          "decision": {
+            "$ref": "#/components/schemas/DecisionView"
+          },
+          "delivery_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "delivery_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "decision",
+          "delivery_state",
+          "delivery_reason"
+        ],
+        "type": "object"
+      },
+      "DecisionHistoryPage": {
+        "additionalProperties": false,
+        "properties": {
+          "cursor": {
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionHistoryItem"
+            },
+            "type": "array"
+          },
+          "sizing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SizingView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "snapshot_version": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "cursor",
+          "snapshot_version",
+          "sizing"
+        ],
+        "type": "object"
+      },
       "DecisionView": {
         "additionalProperties": false,
         "properties": {
@@ -5794,6 +5862,76 @@
         ],
         "type": "object"
       },
+      "SizingView": {
+        "additionalProperties": false,
+        "properties": {
+          "band_ratio_of_unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fee_rate": {
+            "type": "string"
+          },
+          "gap_fraction": {
+            "type": "string"
+          },
+          "levels": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "enter": {
+                  "type": "string"
+                },
+                "exit": {
+                  "type": "string"
+                },
+                "exposure": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "exposure",
+                "enter",
+                "exit"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "max_risk_fraction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "object_loss_budget": {
+            "type": "string"
+          },
+          "slippage_fraction": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "max_risk_fraction",
+          "object_loss_budget",
+          "fee_rate",
+          "slippage_fraction",
+          "gap_fraction",
+          "band_ratio_of_unit",
+          "levels"
+        ],
+        "type": "object"
+      },
       "StateCommand": {
         "additionalProperties": false,
         "properties": {
@@ -9448,6 +9586,92 @@
         "summary": "Object View"
       }
     },
+    "/api/v2/strategy/objects/{object_id}/batches": {
+      "get": {
+        "description": "S2-024: the object's risk batches (S2-033) by opening time; an open batch has a zero closed_at and an empty exit_kind.",
+        "operationId": "GET_OBJECT_BATCHES",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "object_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BatchRecord"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Risk batches"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Query refused or unavailable"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Query refused or unavailable"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Query refused or unavailable"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Query refused or unavailable"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Query refused or unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
     "/api/v2/strategy/objects/{object_id}/cases": {
       "get": {
         "operationId": "cases_api_v2_strategy_objects__object_id__cases_get",
@@ -9554,6 +9778,123 @@
           }
         ],
         "summary": "Cases"
+      }
+    },
+    "/api/v2/strategy/objects/{object_id}/decision-history": {
+      "get": {
+        "description": "S2-024: every decision of the object with available_cutoff in [from, to), archived ones included, oldest first, with the delivery state and reason of its target, and the object's current sizing limits, costs and levels (S2-033). The cursor is the last item's cutoff and decision id.",
+        "operationId": "GET_DECISION_HISTORY",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "object_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Defaults to from plus the maximum span.",
+            "in": "query",
+            "name": "to",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "maximum": 500,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionHistoryPage"
+                }
+              }
+            },
+            "description": "Decision history page"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Query refused or unavailable"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Query refused or unavailable"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Query refused or unavailable"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Query refused or unavailable"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Query refused or unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/api/v2/strategy/objects/{object_id}/decisions": {

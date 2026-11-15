@@ -387,6 +387,46 @@ func New(options Options) (http.Handler, error) {
 			return rows, 200, nil
 		})
 	}
+	registerWithAudit("GET", "/objects/{object_id}/batches", func(_ http.ResponseWriter, r *http.Request, p d.Identity) (any, int, error) {
+		state, err := query(r, p, r.PathValue("object_id"))
+		if err != nil {
+			return nil, 0, err
+		}
+		return app.ObjectBatches(state, r.PathValue("object_id")), 200, nil
+	}, false)
+	registerWithAudit("GET", "/objects/{object_id}/decision-history", func(_ http.ResponseWriter, r *http.Request, p d.Identity) (any, int, error) {
+		state, err := query(r, p, r.PathValue("object_id"))
+		if err != nil {
+			return nil, 0, err
+		}
+		q := r.URL.Query()
+		invalid := &d.Error{Code: "DECISION_HISTORY_INVALID", Status: 422}
+		from, err := time.Parse(time.RFC3339, q.Get("from"))
+		if err != nil {
+			return nil, 0, invalid
+		}
+		to := from.AddDate(0, 0, d.DecisionHistoryMaxDays)
+		if raw := q.Get("to"); raw != "" {
+			if to, err = time.Parse(time.RFC3339, raw); err != nil || !from.Before(to) || to.After(from.AddDate(0, 0, d.DecisionHistoryMaxDays)) {
+				return nil, 0, invalid
+			}
+		}
+		limit := d.DecisionHistoryMaxLimit
+		if raw := q.Get("limit"); raw != "" {
+			if limit, err = strconv.Atoi(raw); err != nil || limit < 1 || limit > d.DecisionHistoryMaxLimit {
+				return nil, 0, invalid
+			}
+		}
+		rows, next, err := app.DecisionHistory(r.Context(), state, options.Store, r.PathValue("object_id"), from.UTC(), to.UTC(), q.Get("cursor"), limit)
+		if err != nil {
+			return nil, 0, err
+		}
+		var sizing *d.SizingView
+		if obj := state.Objects.Value(r.PathValue("object_id")); obj != nil {
+			sizing = d.ObjectSizing(state, obj)
+		}
+		return map[string]any{"items": rows, "cursor": next, "snapshot_version": state.Version, "sizing": sizing}, 200, nil
+	}, false)
 	register("POST", "/cases/{case_id}/attribution-candidates", func(_ http.ResponseWriter, r *http.Request, p d.Identity) (any, int, error) {
 		var body d.AttributionCommand
 		if err := d.Decode(r.Body, &body); err != nil {
