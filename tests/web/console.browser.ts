@@ -72,7 +72,8 @@ const replayData: Record<string, unknown> = {
 };
 function replayDecisions(objectId: string) {
   const d = (at: string, lv: number, cb: string, tg: string, ac: string, rc: string[]) => ({
-    decision: { decision_id: "d-" + at, object_id: objectId, available_cutoff: at, new_level: lv, pool_net: cb, pool_plus: cb, pool_minus: "0", components: { baseline: "0", core: "0", adjustment: cb, combined: cb }, target_quantity: tg, actual_quantity: ac, reason_codes: rc, stop_plan: null, input_snapshot: { pool: { quality: "1", contributions: [{}] }, snapshot: { equity: "5000", samples: { [objectId]: { price: "50" } } } } },
+    decision: { decision_id: "d-" + at, object_id: objectId, available_cutoff: at, new_level: lv, pool_net: cb, pool_plus: cb, pool_minus: "0", components: { baseline: "0", core: "0", adjustment: cb, combined: cb }, target_quantity: tg, actual_quantity: ac, reason_codes: rc, stop_plan: null, input_snapshot: {} },
+    inputs: { equity: "5000", price: "50", pool_quality: "1", contributions: 1 },
     delivery_state: "ACK", delivery_reason: null,
   });
   return {
