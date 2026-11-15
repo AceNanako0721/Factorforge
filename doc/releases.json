@@ -528,6 +528,12 @@
    "change_kind": "specification",
    "date": "2026-11-15",
    "summary": "Console: the flow page draws the pipeline as nested block diagrams. A click shows a module's inputs, processing and outputs for the selected round; a double click opens the next level, down to function pages with the formula, the round's numbers and the function that runs it. The derivation of the opening quantity is expanded to single operations using the framework's sizing values. Below the diagram, a timeline with event nodes and the list of orders (risk batches): a closed order plays from the decision that opened it to its close, the open one follows the latest round (S4-022)."
+  },
+  {
+   "version": "3.12.0",
+   "change_kind": "specification",
+   "date": "2026-11-15",
+   "summary": "SOXLUSDT instance: the status still gives the next initial plan and the latest price state, which S3-032 had stopped stating when plan records were added (S3-032)."
   }
  ]
 }
