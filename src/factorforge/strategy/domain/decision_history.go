@@ -20,6 +20,23 @@ type DecisionHistoryItem struct {
 	DeliveryReason *string      `json:"delivery_reason"`
 }
 
+// BatchView is a risk batch as the batch list publishes it (S2-024): an open
+// batch has a null closed_at instead of the zero time.
+type BatchView struct {
+	BatchRecord
+	ClosedAt *time.Time `json:"closed_at"`
+}
+
+// NewBatchView copies the batch and leaves closed_at null while it is open.
+func NewBatchView(b *BatchRecord) BatchView {
+	v := BatchView{BatchRecord: *Clone(b)}
+	if !b.ClosedAt.IsZero() {
+		at := b.ClosedAt
+		v.ClosedAt = &at
+	}
+	return v
+}
+
 // DecisionHistoryKey orders history by availability cutoff, then decision.
 func DecisionHistoryKey(v DecisionView) string {
 	return v.AvailableCutoff.UTC().Format("2006-01-02T15:04:05.000000Z") + "|" + v.DecisionID

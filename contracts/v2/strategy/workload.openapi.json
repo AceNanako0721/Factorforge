@@ -939,6 +939,75 @@
         ],
         "type": "object"
       },
+      "BatchView": {
+        "additionalProperties": false,
+        "properties": {
+          "batch_id": {
+            "type": "string"
+          },
+          "budget": {
+            "type": "string",
+            "x-decimal": true
+          },
+          "case_id": {
+            "type": "string"
+          },
+          "closed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "direction": {
+            "type": "integer"
+          },
+          "exit_kind": {
+            "type": "string"
+          },
+          "net_pnl": {
+            "type": "string",
+            "x-decimal": true
+          },
+          "object_id": {
+            "type": "string"
+          },
+          "opened_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "r": {
+            "type": "string",
+            "x-decimal": true
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "unit_quantity": {
+            "type": "string",
+            "x-decimal": true
+          }
+        },
+        "required": [
+          "batch_id",
+          "budget",
+          "case_id",
+          "closed_at",
+          "direction",
+          "exit_kind",
+          "net_pnl",
+          "object_id",
+          "opened_at",
+          "r",
+          "truncated",
+          "unit_quantity"
+        ],
+        "type": "object"
+      },
       "CaseRecord": {
         "additionalProperties": false,
         "properties": {
@@ -9588,7 +9657,7 @@
     },
     "/api/v2/strategy/objects/{object_id}/batches": {
       "get": {
-        "description": "S2-024: the object's risk batches (S2-033) by opening time; an open batch has a zero closed_at and an empty exit_kind.",
+        "description": "S2-024: the object's risk batches (S2-033) by opening time; an open batch has a null closed_at and an empty exit_kind.",
         "operationId": "GET_OBJECT_BATCHES",
         "parameters": [
           {
@@ -9606,7 +9675,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/BatchRecord"
+                    "$ref": "#/components/schemas/BatchView"
                   },
                   "type": "array"
                 }

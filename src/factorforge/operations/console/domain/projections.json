@@ -2414,6 +2414,75 @@
           ],
           "type": "object"
         },
+        "BatchView": {
+          "additionalProperties": false,
+          "properties": {
+            "batch_id": {
+              "type": "string"
+            },
+            "budget": {
+              "type": "string",
+              "x-decimal": true
+            },
+            "case_id": {
+              "type": "string"
+            },
+            "closed_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "direction": {
+              "type": "integer"
+            },
+            "exit_kind": {
+              "type": "string"
+            },
+            "net_pnl": {
+              "type": "string",
+              "x-decimal": true
+            },
+            "object_id": {
+              "type": "string"
+            },
+            "opened_at": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "r": {
+              "type": "string",
+              "x-decimal": true
+            },
+            "truncated": {
+              "type": "boolean"
+            },
+            "unit_quantity": {
+              "type": "string",
+              "x-decimal": true
+            }
+          },
+          "required": [
+            "batch_id",
+            "budget",
+            "case_id",
+            "closed_at",
+            "direction",
+            "exit_kind",
+            "net_pnl",
+            "object_id",
+            "opened_at",
+            "r",
+            "truncated",
+            "unit_quantity"
+          ],
+          "type": "object"
+        },
         "CaseRecord": {
           "additionalProperties": false,
           "properties": {
@@ -8503,7 +8572,7 @@
       },
       "/api/v2/strategy/objects/{object_id}/batches": {
         "items": {
-          "$ref": "#/components/schemas/BatchRecord"
+          "$ref": "#/components/schemas/BatchView"
         },
         "type": "array"
       },

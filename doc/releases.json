@@ -534,6 +534,12 @@
    "change_kind": "specification",
    "date": "2026-11-15",
    "summary": "SOXLUSDT instance: the status still gives the next initial plan and the latest price state, which S3-032 had stopped stating when plan records were added (S3-032)."
+  },
+  {
+   "version": "3.12.1",
+   "change_kind": "design",
+   "date": "2026-11-15",
+   "summary": "Strategy framework: the batch list gives an open batch a null closed_at instead of the zero time, which the console projection refused, leaving the order list empty while a batch was open (S2-024). Console: the flow page uses the full window width and the diagram fills the window height (S4-022)."
   }
  ]
 }

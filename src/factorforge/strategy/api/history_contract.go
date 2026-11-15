@@ -1,6 +1,10 @@
 package api
 
-import d "github.com/AceNanako0721/Factorforge/src/factorforge/strategy/domain"
+import (
+	"encoding/json"
+
+	d "github.com/AceNanako0721/Factorforge/src/factorforge/strategy/domain"
+)
 
 // addHistoryContract publishes the batch list and the decision history (S2-024).
 func addHistoryContract(paths, schemas map[string]any) {
@@ -23,8 +27,14 @@ func addHistoryContract(paths, schemas map[string]any) {
 		"max_risk_fraction": nullable(decimal), "object_loss_budget": decimal, "fee_rate": decimal, "slippage_fraction": decimal, "gap_fraction": decimal, "band_ratio_of_unit": nullable(decimal), "levels": map[string]any{"type": "array", "items": level}}}
 	schemas["DecisionHistoryPage"] = map[string]any{"type": "object", "additionalProperties": false, "required": []string{"items", "cursor", "snapshot_version", "sizing"}, "properties": map[string]any{
 		"items": map[string]any{"type": "array", "items": ref("DecisionHistoryItem")}, "cursor": map[string]any{"type": "string"}, "snapshot_version": map[string]any{"type": "integer"}, "sizing": nullable(ref("SizingView"))}}
-	paths[Prefix+"/objects/{object_id}/batches"] = map[string]any{"get": map[string]any{"operationId": "GET_OBJECT_BATCHES", "description": "S2-024: the object's risk batches (S2-033) by opening time; an open batch has a zero closed_at and an empty exit_kind.", "security": security, "parameters": []any{object},
-		"responses": responses(map[string]any{"type": "array", "items": ref("BatchRecord")}, "Risk batches")}}
+	// BatchView is BatchRecord with closed_at null while the batch is open.
+	var batch map[string]any
+	raw, _ := json.Marshal(schemas["BatchRecord"])
+	_ = json.Unmarshal(raw, &batch)
+	batch["properties"].(map[string]any)["closed_at"] = nullable(map[string]any{"type": "string", "format": "date-time"})
+	schemas["BatchView"] = batch
+	paths[Prefix+"/objects/{object_id}/batches"] = map[string]any{"get": map[string]any{"operationId": "GET_OBJECT_BATCHES", "description": "S2-024: the object's risk batches (S2-033) by opening time; an open batch has a null closed_at and an empty exit_kind.", "security": security, "parameters": []any{object},
+		"responses": responses(map[string]any{"type": "array", "items": ref("BatchView")}, "Risk batches")}}
 	paths[Prefix+"/objects/{object_id}/decision-history"] = map[string]any{"get": map[string]any{"operationId": "GET_DECISION_HISTORY", "description": "S2-024: every decision of the object with available_cutoff in [from, to), archived ones included, oldest first, with the delivery state and reason of its target, and the object's current sizing limits, costs and levels (S2-033). The cursor is the last item's cutoff and decision id.", "security": security,
 		"parameters": []any{object,
 			map[string]any{"name": "from", "in": "query", "required": true, "schema": map[string]any{"type": "string", "format": "date-time"}},
