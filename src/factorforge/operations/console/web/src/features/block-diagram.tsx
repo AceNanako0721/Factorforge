@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
 import type { Ctx } from "./replay-model";
 import type { FlowNode, Health } from "./flow-model";
-import { GO, LEAF, SYS, type Block, type System, type Wire } from "./replay-systems";
+import { GO, LEAF, SYS, portNames, type Block, type System, type Wire } from "./replay-systems";
 
 // S4-022: one level of the module hierarchy as a block diagram. Inports on the
 // left, blocks in the middle, outports on the right; wires carry the frame's
@@ -333,14 +333,18 @@ export function formulaHtml(raw: string) {
 export function FunctionPage({ leaf, ctx }: { leaf: string; ctx: Ctx | null }) {
   const L = LEAF[leaf];
   if (!L) return null;
-  if (!ctx) return <div className="fp-empty">选择一笔订单后显示这一步的数值</div>;
   let io: ReturnType<typeof L.io> = { in: [], out: [] };
   let num = "";
-  try {
-    io = L.io(ctx);
-    num = L.num(ctx);
-  } catch {
-    num = "这一帧缺少计算所需的记录";
+  if (!ctx) {
+    io = portNames(L);
+    num = "—";
+  } else {
+    try {
+      io = L.io(ctx);
+      num = L.num(ctx);
+    } catch {
+      num = "这一帧缺少计算所需的记录";
+    }
   }
   return (
     <div className="fp">
@@ -373,9 +377,10 @@ export function FunctionPage({ leaf, ctx }: { leaf: string; ctx: Ctx | null }) {
           ))}
         </div>
       </div>
+      {!ctx && <p className="fp-go">选择一笔订单后显示这一步代入的数值</p>}
       <p className="fp-ex">{L.ex}</p>
       {L.src && <p className="fp-go">对应函数：{GO[L.src]}</p>}
-      {L.src === "freeze" && ctx.fz.gap && <p className="fp-go">{ctx.fz.gap}</p>}
+      {L.src === "freeze" && ctx?.fz.gap && <p className="fp-go">{ctx.fz.gap}</p>}
     </div>
   );
 }

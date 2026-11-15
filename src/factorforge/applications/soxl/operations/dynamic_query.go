@@ -699,28 +699,28 @@ func (q DynamicQuery) Actions(ctx context.Context, p d.ReadPrincipal, f Filter) 
 // DynamicPlanView is one initial stop plan sent to the framework or one
 // hourly price state (S3-032); fields of the other kind are null.
 type DynamicPlanView struct {
-	PlanID        string            `json:"plan_id"`
-	At            time.Time         `json:"at"`
-	Kind          string            `json:"kind"`
-	DirectiveID   *string           `json:"directive_id"`
-	Direction     *string           `json:"direction"`
-	Confidence    *int              `json:"confidence"`
-	RiskFraction  *string           `json:"risk_fraction"`
-	Distance      *string           `json:"distance"`
-	CloseDistance *string           `json:"close_distance"`
-	Price         *string           `json:"price"`
-	Equity        *string           `json:"equity"`
-	Tier          *int              `json:"tier"`
-	RequestedTier *int              `json:"requested_tier"`
-	Session       *string           `json:"session"`
-	R             *string           `json:"r"`
-	Buffer        *string           `json:"buffer"`
-	Trail         *string           `json:"trail"`
-	State         *string           `json:"state"`
-	HourAt        *time.Time        `json:"hour_at"`
-	Probabilities map[string]string `json:"probabilities"`
-	Strength      *string           `json:"strength"`
-	Model         *string           `json:"model"`
+	PlanID        string             `json:"plan_id"`
+	At            time.Time          `json:"at"`
+	Kind          string             `json:"kind"`
+	DirectiveID   *string            `json:"directive_id"`
+	Direction     *string            `json:"direction"`
+	Confidence    *int               `json:"confidence"`
+	RiskFraction  *string            `json:"risk_fraction"`
+	Distance      *string            `json:"distance"`
+	CloseDistance *string            `json:"close_distance"`
+	Price         *string            `json:"price"`
+	Equity        *string            `json:"equity"`
+	Tier          *int               `json:"tier"`
+	RequestedTier *int               `json:"requested_tier"`
+	Session       *string            `json:"session"`
+	R             *string            `json:"r"`
+	Buffer        *string            `json:"buffer"`
+	Trail         *string            `json:"trail"`
+	State         *string            `json:"state"`
+	HourAt        *time.Time         `json:"hour_at"`
+	Probabilities *map[string]string `json:"probabilities"`
+	Strength      *string            `json:"strength"`
+	Model         *string            `json:"model"`
 }
 
 // Plans implements GET /dynamic/plans.
@@ -769,10 +769,11 @@ func (q DynamicQuery) Plans(ctx context.Context, p d.ReadPrincipal, f Filter) (P
 			x := s.State
 			hour := x.HourAt.UTC()
 			v.State, v.HourAt, v.Strength, v.Model = optionalString(x.State), &hour, num(x.Strength), optionalString(x.Model)
-			v.Probabilities = map[string]string{}
+			probabilities := map[string]string{}
 			for k, p := range x.Probabilities {
-				v.Probabilities[k] = decimal(p)
+				probabilities[k] = decimal(p)
 			}
+			v.Probabilities = &probabilities
 		default:
 			return Page{}, d.Fail("DYNAMIC_STATE_INVALID", 503)
 		}

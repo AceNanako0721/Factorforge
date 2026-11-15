@@ -173,3 +173,11 @@ func TestReplayBatchesKeepOpenBatch(t *testing.T) {
 		t.Fatal("zero closed_at accepted")
 	}
 }
+
+// S4-024: an initial plan has no price-state fields; its probabilities are null.
+func TestReplayPlansKeepInitialPlan(t *testing.T) {
+	page := `{"schema_version":"instance-2.0","environment":"SIM","instance_id":"inst","source_version":"v1","observed_at":"2026-01-04T10:00:00Z","snapshot_version":"s1","cursor":null,"items":[{"plan_id":"initial-1","at":"2026-01-04T10:00:00Z","kind":"INITIAL","directive_id":"initial-1","direction":"SHORT","confidence":2,"risk_fraction":"0.005","distance":"5","close_distance":"4.5","price":"50","equity":"5000","tier":24,"requested_tier":24,"session":"WEEKEND","r":"0.1","buffer":"0.01","trail":"0.04","state":null,"hour_at":null,"probabilities":null,"strength":null,"model":null},{"plan_id":"state-1","at":"2026-01-04T10:00:05Z","kind":"PRICE_STATE","directive_id":null,"direction":null,"confidence":null,"risk_fraction":null,"distance":null,"close_distance":null,"price":null,"equity":null,"tier":null,"requested_tier":null,"session":null,"r":null,"buffer":null,"trail":null,"state":"DOWNTREND","hour_at":"2026-01-04T09:00:00Z","probabilities":{"DOWNTREND":"0.9","RANGE":"0.1","UPTREND":"0"},"strength":"2","model":"m"}]}`
+	if _, e := d.ProjectBound("dynamic", d.Routes["dynamic.plans"].Path, []byte(page), ""); e != nil {
+		t.Fatal("plans with an initial plan refused", e)
+	}
+}

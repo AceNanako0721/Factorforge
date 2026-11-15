@@ -33,6 +33,24 @@ export type System = { title: string; w: number; h: number; blocks: Block[]; wir
 type Cell = [string, string | number];
 export type Leaf = { title: string; src: string | null; glyph?: string; io: (c: Ctx) => { in: Cell[]; out: Cell[] }; sym: string; num: (c: Ctx) => string; ex: string };
 
+// A stand-in round with no records: every field reads as itself and turns
+// into NaN in arithmetic, so a leaf still names its ports before an order is
+// loaded.
+const BLANK: Ctx = new Proxy(function () {}, {
+  get: (_, k) => (k === Symbol.toPrimitive ? () => NaN : k === "length" ? 0 : BLANK),
+  apply: () => BLANK,
+}) as unknown as Ctx;
+
+export function portNames(L: Leaf): { in: Cell[]; out: Cell[] } {
+  try {
+    const io = L.io(BLANK);
+    const dash = ([k]: Cell): Cell => [k, "—"];
+    return { in: io.in.map(dash), out: io.out.map(dash) };
+  } catch {
+    return { in: [], out: [] };
+  }
+}
+
 export const fx = (v: number | null | undefined | false, d = 2) => (v === null || v === undefined || v === false || Number.isNaN(v) ? "—" : Number(v).toFixed(d));
 export const pct = (v: number | null | undefined | false, d = 3) => (v === null || v === undefined || v === false ? "—" : (v * 100).toFixed(d) + "%");
 export const sgn = (v: number) => (v > 0 ? 1 : v < 0 ? -1 : 0);

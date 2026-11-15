@@ -546,6 +546,12 @@
    "change_kind": "specification",
    "date": "2026-11-15",
    "summary": "Console: the open order in the flow page order list shows the account floating P&L from the trading layer and the R it makes of the batch budget, marked as floating (S4-022). The order replay reads decisions at most 200 per page and halves the page when a page exceeds the console response budget, so replays of objects with large decision snapshots load (S4-024)."
+  },
+  {
+   "version": "3.14.0",
+   "change_kind": "specification",
+   "date": "2026-11-15",
+   "summary": "SOXLUSDT instance: the plan records contract allows null probabilities, which every initial plan has; the console refused the whole plans page and no order replay loaded (S3-032, S4-024). Console: a function page lists its inputs, formula and outputs before an order is loaded, with dashes for the numbers (S4-022)."
   }
  ]
 }

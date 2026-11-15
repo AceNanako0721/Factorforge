@@ -1,6 +1,6 @@
 import { describe, it, expect } from "../../src/factorforge/operations/console/web/node_modules/vitest/dist/index.js";
 import { buildOrders, buildReplay, ctxAt, keyEvents, startFrame, sizingOf } from "../../src/factorforge/operations/console/web/src/features/replay-model";
-import { LEAF, SYS } from "../../src/factorforge/operations/console/web/src/features/replay-systems";
+import { LEAF, SYS, portNames } from "../../src/factorforge/operations/console/web/src/features/replay-systems";
 import { formulaHtml } from "../../src/factorforge/operations/console/web/src/features/block-diagram";
 
 // S4-022 / S4-024: a long batch opened at level 3 and added at level 4, with
@@ -108,5 +108,19 @@ describe("order replay", () => {
 
   it("keeps record values out of the formula markup", () => {
     expect(formulaHtml('a<br><span class="res">1</span><img src=x onerror=alert(1)>')).toBe('a<br><span class="res">1</span>&lt;img src=x onerror=alert(1)&gt;');
+  });
+});
+
+describe("function pages before an order is loaded", () => {
+  it("name every leaf's inputs and outputs without numbers, next to its formula", () => {
+    for (const [name, leaf] of Object.entries(LEAF)) {
+      expect(leaf.sym.length, name + " formula").toBeGreaterThan(0);
+      const io = portNames(leaf);
+      expect(io.in.length + io.out.length, name).toBeGreaterThan(0);
+      for (const [k, v] of [...io.in, ...io.out]) {
+        expect(typeof k === "string" && k.length > 0 && !k.includes("NaN"), name + " " + k).toBe(true);
+        expect(v).toBe("—");
+      }
+    }
   });
 });
