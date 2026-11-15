@@ -1,6 +1,6 @@
 # Web 管理台设计书
 
-版本：3.10.0
+版本：3.11.0
 
 对应式样书：[04_Web管理台式样书](04_Web管理台式样书.md)。本书说明 `src/factorforge/operations/console` 的实现。
 
@@ -379,7 +379,12 @@ max_retries = 3
 | `features/login.tsx` | 登录页 |
 | `features/use-view.ts` | 读取一个视图（`useView`）、刷新与陈旧值合并（`merge`）、读完全部保护（`useProtections`） |
 | `features/flow-model.ts` | 实时流程各模块的状态、说明、详情与参数（`flowNodes`） |
-| `features/flow-page.tsx` | 实时流程页（React Flow） |
+| `features/flow-page.tsx` | 实时流程页：模块图、右侧详情、时间轴与订单列表 |
+| `features/replay-model.ts` | 订单与逐轮记录（`buildOrders`、`buildReplay`、`ctxAt`） |
+| `features/replay-systems.ts` | 模块层级：每层的模块、端口、连线与函数页 |
+| `features/replay-data.ts` | 读取一笔订单的回放记录（`useReplay`） |
+| `features/block-diagram.tsx` | 模块图与函数页的绘制（SVG） |
+| `features/replay-timeline.tsx` | 时间轴 |
 | `features/market-page.tsx` | 行情与交易页 |
 | `features/market-model.ts` | 当前保护、默认范围、研判生效、图上标记、阶梯与文字对照 |
 | `features/confidence.ts` | 信心来源（`poolView`） |
@@ -390,7 +395,7 @@ max_retries = 3
 | `features/display-settings.tsx` | 显示时区 |
 | `features/theme.tsx` | 浅色与深色、Ant Design 中文配置 |
 
-界面组件用 Ant Design，流程图用 React Flow（`@xyflow/react`），路由用 TanStack Router，数据读取用 TanStack Query。路由只有 `/flow` 与 `/market`；旧页面地址（`/overview`、`/dynamic` 等）在浏览器内转到这两页，服务端对 `/flow` 也返回页面。
+界面组件用 Ant Design，模块图用 SVG 自绘，路由用 TanStack Router，数据读取用 TanStack Query。路由只有 `/flow` 与 `/market`；旧页面地址（`/overview`、`/dynamic` 等）在浏览器内转到这两页，服务端对 `/flow` 也返回页面。
 
 ### 8.2 请求与会话
 
@@ -425,8 +430,13 @@ max_retries = 3
 | 交易所 / 模拟撮合 | 持仓、对账状态、仍有效的保护单 | 对账不一致为异常；有持仓而保护未经确认为注意 |
 | 账户 | 权益、已实现与浮动盈亏、手续费、资金费、盈亏块累计（S4-020）、风控状态 | 风控状态不是 `NORMAL` 为注意 |
 
-- 布局固定为两行：上行从左到右是新闻采集到策略决策，下行从右到左是止损与阶梯、执行器、交易所、账户。连线颜色取上游模块的状态，正常时为流动的虚线。
-- 点击模块打开右侧抽屉（Ant Design `Drawer`），列出该模块的详情与参数；模型研判另列最近 6 次研判。参数表旁的“修改”按钮不可用。
+- **模块图（`BlockDiagram`）**：每一层是 `replay-systems.ts` 里的一个系统（模块、端口、连线与坐标），最外层两行：上行新闻采集到策略决策，下行行情、止损与阶梯，右侧执行器、撮合、账户。止损与阶梯到策略决策的三条线在左侧分层走线；账户和行情接入策略决策用 From 标签代替长连线。最外层模块的状态与一句话说明取 `flowNodes`；回放到过去的一轮时改用该轮的数值。连线在实时或播放时为流动的虚线，与上一轮相比有变化的模块和连线用橙色标出。可以拖动、滚轮缩放和“适应”。
+- **逐层进入**：单击选中模块，右侧（`Inspector`）列出输入、处理（函数页的公式与代入数字）与输出；最外层模块在实时状态下另列 `flowNodes` 的详情与参数，模型研判另列最近 6 次研判，参数表旁的“修改”按钮不可用。双击或回车进入下一层；系统层级为 全部模块 → 策略决策（调整层、核心层、合成、档位、档位比例、单位数量 Q、目标数量、无交易带、止损定量）→ 单位数量 Q（逐个运算）；全部模块 → 止损与阶梯（方向与信心、闸门、止损几何、风险比例、初始指令、批次止损）→ 风险比例（逐个运算）。其余模块进入各自的函数页。路径显示在顶部，可点回任意一层。
+- **函数页（`FunctionPage`）**：输入、公式与 `num` 给出的代入结果、输出、说明，以及执行这一步的文件与函数。公式文本只保留换行、下标与结果高亮三种标记，其余（包括记录里的值）一律作为文字（`formulaHtml`）。
+- **订单（`buildOrders`）**：读 `replay` 视图的 `batches`（`from` 为一天前，只为满足视图要求），最新的在前；未平仓的批次 `closed_at` 为零值。默认选中持仓中的一笔。
+- **回放记录（`useReplay`、`buildReplay`）**：窗口为开仓前 1 小时到平仓后 15 分钟（持仓中到现在），分页读取 `decision-history`、`dynamic.plans`、`dynamic.actions`、`dynamic.judgments`、`fills`（`limit` 为 `max_limit`，每个来源最多 `MAX_PAGES` 页，读不完时页面写明）。每 5 分钟一轮取一条决策，同一轮有多条时取已受理（`ACK`）的。每一轮附上当时最新的初始计划、批次状态（由开仓、移动止损、转基线、平仓动作依次得出）和最近一条成功的研判。单位数量 Q 的输入取第一条原因码含 `STOP_DIRECTIVE_SIZED` 且方向一致的决策：权益与价格取该轮快照，风险比例与距离取此前同方向的最新初始计划；这一轮不在记录里时，权益按 预算 ÷ 风险比例 还原，价格取前一轮，并在页面上写明。已平仓的订单不再重读，持仓中的每 60 秒重读一次。
+- **逐轮数值（`ctxAt`）**：开仓后到平仓前 Q 取批次记录；档位比例与登记值取决策历史的 `sizing`；权益峰值不在记录里，按 风险比例 = 1% × 信心系数 × 回撤系数（前 30 批）由初始计划的风险比例反推。
+- **时间轴（`ReplayTimeline`）**：价格线、开仓价、收盘止损阶梯线与事件节点；节点包括成交、开平仓、止损移动、转基线、档位变化、研判失败和研判转向，连续的研判失败合成一个。已平仓订单载入后从第一条方向与批次一致的决策开始，每 700 ÷ 速度 毫秒前进一轮；持仓中的订单停在最后一轮，“实时”按钮回到最后一轮并跟随新记录。
 
 ### 8.5 行情与交易页（`MarketPage`）
 
@@ -486,4 +496,4 @@ max_retries = 3
 | T4-16 | 登记隧道主机、主机名检查、跨站导航只取静态页面 |
 | T4-17 | 推送解析、共享与过期、重连与空闲关闭、推送的授权与会话结束 |
 | T4-18 | 盈亏块的投影 |
-| T4-03、T4-13、T4-15、T4-17～T4-23 | `tests/web`：前端单元测试（Vitest，含 `redesign.test.ts` 的成交重建、信心来源、流程状态）与浏览器测试（Playwright，使用 `tests/web/fixture` 的夹具服务） |
+| T4-03、T4-13、T4-15、T4-17～T4-23 | `tests/web`：前端单元测试（Vitest，含 `redesign.test.ts` 的成交重建、信心来源、流程状态，`replay.test.ts` 的订单、逐轮记录、Q 的重算与还原、连线完整性和公式转义）与浏览器测试（Playwright，使用 `tests/web/fixture` 的夹具服务；订单回放的记录由测试替换 `replay` 视图的面板数据） |
