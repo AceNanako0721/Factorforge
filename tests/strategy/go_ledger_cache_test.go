@@ -117,3 +117,64 @@ func TestSameLedgerPrefixDetectsChangedEntries(t *testing.T) {
 		t.Fatal("clone shares the ledger slice")
 	}
 }
+
+// A read that stops partway keeps the rows it decoded: the next read continues
+// after them instead of decoding the ledger from the start again.
+func TestNativeP2LedgerCacheKeepsPrefixOfStoppedRead(t *testing.T) {
+	ctx := context.Background()
+	server, err := tradingpg.StartTemporary(ctx, t.TempDir(), nativePG(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.Close()
+	if err = pg.Initialize(ctx, server.AdminDSN, "SIM"); err != nil {
+		t.Fatal(err)
+	}
+	store, err := pg.Open(ctx, server.AdminDSN, "SIM", "worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	state, _, _ := strategyBase(t)
+	if err = store.Create(ctx, state); err != nil {
+		t.Fatal(err)
+	}
+	at := time.Date(2026, 10, 20, 0, 0, 0, 0, time.UTC)
+	if err = store.Transaction(ctx, state.InstanceID, func(x *sd.StrategyState) error {
+		for i := 1; i <= 6; i++ {
+			x.Ledger = append(x.Ledger, ledgerRow(t, i, at.Add(time.Duration(i)*time.Second), "TIME"))
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	conn, err := pgx.Connect(ctx, server.AdminDSN)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close(ctx)
+	if _, err = conn.Exec(ctx, `ALTER TABLE strategy_sim.sentiment_entry DISABLE TRIGGER ALL`); err != nil {
+		t.Fatal(err)
+	}
+	exec := func(sql string) {
+		if _, err := conn.Exec(ctx, sql, state.InstanceID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// The read stops at row 4; rows 1–3 stay cached.
+	exec(`UPDATE strategy_sim.sentiment_entry SET payload='{"sequence":"broken"}' WHERE instance_id=$1 AND sequence=4`)
+	if _, err = store.Read(ctx, state.InstanceID); err == nil {
+		t.Fatal("broken row accepted")
+	}
+	// Row 2 changes behind the cache (only the last cached row is compared),
+	// and row 4 is repaired: the next read keeps rows 1–3 and reads on from 4.
+	exec(`UPDATE strategy_sim.sentiment_entry SET payload=jsonb_set(payload::jsonb,'{reason}','"CHANGED"') WHERE instance_id=$1 AND sequence=2`)
+	exec(`UPDATE strategy_sim.sentiment_entry SET payload=jsonb_set((SELECT payload::jsonb FROM strategy_sim.sentiment_entry WHERE instance_id=$1 AND sequence=5),'{sequence}','4') WHERE instance_id=$1 AND sequence=4`)
+	x, err := store.Read(ctx, state.InstanceID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(x.Ledger) != 6 || x.Ledger[1].Reason != "TIME" || x.Ledger[3].Sequence != 4 {
+		t.Fatal("prefix not kept", len(x.Ledger), x.Ledger[1].Reason)
+	}
+}
