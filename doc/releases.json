@@ -540,6 +540,12 @@
    "change_kind": "design",
    "date": "2026-11-15",
    "summary": "Strategy framework: the batch list gives an open batch a null closed_at instead of the zero time, which the console projection refused, leaving the order list empty while a batch was open (S2-024). Console: the flow page uses the full window width and the diagram fills the window height (S4-022)."
+  },
+  {
+   "version": "3.13.0",
+   "change_kind": "specification",
+   "date": "2026-11-15",
+   "summary": "Console: the open order in the flow page order list shows the account floating P&L from the trading layer and the R it makes of the batch budget, marked as floating (S4-022). The order replay reads decisions at most 200 per page and halves the page when a page exceeds the console response budget, so replays of objects with large decision snapshots load (S4-024)."
   }
  ]
 }

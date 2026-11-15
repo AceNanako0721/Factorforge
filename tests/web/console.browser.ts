@@ -61,7 +61,10 @@ test("S4-022 flow page: modules, details on demand and stale data", async ({ pag
 // S4-024: synthetic replay records for one closed long batch, served over the
 // fixture's own replay view so the selection and panel envelope stay real.
 const replayData: Record<string, unknown> = {
-  batches: [{ batch_id: "batch-2d257f18aaaa", object_id: "OBJECT", direction: 1, unit_quantity: "4.85", budget: "25", opened_at: "2026-11-10T06:45:37Z", closed_at: "2026-11-10T07:20:00Z", exit_kind: "TARGET", net_pnl: "11.2", r: "-0.45" }],
+  batches: [
+    { batch_id: "batch-2d257f18aaaa", object_id: "OBJECT", direction: 1, unit_quantity: "4.85", budget: "25", opened_at: "2026-11-10T06:45:37Z", closed_at: "2026-11-10T07:20:00Z", exit_kind: "TARGET", net_pnl: "11.2", r: "-0.45" },
+    { batch_id: "batch-5c0ffee0aaaa", object_id: "OBJECT", direction: 1, unit_quantity: "1", budget: "20", opened_at: "2026-11-10T08:00:00Z", closed_at: null, exit_kind: "", net_pnl: "0", r: "0" },
+  ],
   "dynamic.plans": { items: [{ plan_id: "p1", at: "2026-11-10T06:40:05Z", kind: "INITIAL", direction: "LONG", confidence: 3, risk_fraction: "0.005", distance: "5", close_distance: "4.5", price: "50", equity: "5000", tier: 4, requested_tier: 24, session: "OVERNIGHT", r: "0.09", buffer: "0.01", trail: "0.04" }] },
   "dynamic.actions": { items: [{ action_id: "open-1", at: "2026-11-10T06:55:05Z", kind: "OPEN", direction: "LONG", entry: "50.2", close_stop: "45.68" }] },
   "dynamic.judgments": { items: [{ at: "2026-11-10T06:31:11Z", ok: true, direction: "LONG", confidence: 3, horizon_hours: 24 }] },
@@ -82,10 +85,22 @@ function replayDecisions(objectId: string) {
 test("S4-022 flow page: drill down to the formula and replay an order", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
+  const limits: number[] = [];
   await page.route("**/api/v2/console/replay?**", async (route) => {
     const response = await route.fetch();
     const body = await response.json();
     const objectId = body.selection.object_id as string;
+    const url = new URL(route.request().url());
+    // A decision page over the response budget is asked again with a smaller limit.
+    if (url.searchParams.get("source") === "decision-history") {
+      const limit = Number(url.searchParams.get("limit"));
+      limits.push(limit);
+      if (limit >= limits[0] && limits[0] > 10) {
+        for (const p of body.panels) Object.assign(p, { state: "UNAVAILABLE", code: "LOWER_RESPONSE_BUDGET", data: {}, cursor: null });
+        await route.fulfill({ response, json: body });
+        return;
+      }
+    }
     for (const p of body.panels) {
       const data = p.source === "decision-history" ? replayDecisions(objectId) : p.source === "batches" ? (replayData.batches as { object_id: string }[]).map((b) => ({ ...b, object_id: objectId })) : replayData[p.source];
       Object.assign(p, { state: "AVAILABLE", code: null, data, cursor: null });
@@ -93,6 +108,8 @@ test("S4-022 flow page: drill down to the formula and replay an order", async ({
     await route.fulfill({ response, json: body });
   });
   await login(page);
+  // The open order shows the account's floating P&L.
+  await expect(page.locator(".rp-row").filter({ hasText: "5c0ffee0" })).toContainText("浮动");
   // The order list holds the batch; picking it plays from the opening decision.
   const row = page.locator(".rp-row").filter({ hasText: "2d257f18" });
   await expect(row).toBeVisible();
@@ -101,6 +118,7 @@ test("S4-022 flow page: drill down to the formula and replay an order", async ({
   await expect(page.locator(".tl-time")).toBeVisible();
   // Playback ends on the last round.
   await expect(page.locator(".tl-note").filter({ hasText: "第 5 / 5 轮" })).toBeVisible({ timeout: 15_000 });
+  expect(limits.some((l) => l < limits[0])).toBe(true);
   // Drill down: decision → unit quantity → the rounding step's formula.
   await page.locator('.bd .blk[aria-label="策略决策"]').dblclick();
   await expect(page.locator(".rp-crumbs")).toContainText("策略决策");
