@@ -564,6 +564,12 @@
    "change_kind": "design",
    "date": "2026-11-15",
    "summary": "Console: the order replay recomputes the unit quantity from the decision at the batch opening time, where P2 sized it, and from the initial plan of the stop directive that decision names, which can be older than the latest plan sent; the recomputed quantity matches the batch record (S4-024)."
+  },
+  {
+   "version": "3.15.2",
+   "change_kind": "design",
+   "date": "2026-11-15",
+   "summary": "Strategy framework: a query process reads its instance state once in the background at start, so the first query does not pay for decoding the whole sentiment ledger, and a ledger read that stops partway keeps the rows it decoded for the next read."
   }
  ]
 }

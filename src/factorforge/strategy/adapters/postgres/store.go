@@ -287,6 +287,8 @@ func (s *Store) load(ctx context.Context, tx pgx.Tx, id string, lock bool) (*d.S
 
 // ledger returns the instance's sentiment ledger, decoding only rows after
 // the cached prefix. The returned slice is a fresh copy the caller may append to.
+// A read that stops early (a cancelled caller) still keeps the rows it decoded,
+// so the next read continues from there.
 func (s *Store) ledger(ctx context.Context, tx pgx.Tx, id string) ([]d.LedgerEntry, error) {
 	key := s.table("sentiment_entry") + "/" + id
 	s.mu.Lock()
@@ -311,22 +313,20 @@ func (s *Store) ledger(ctx context.Context, tx pgx.Tx, id string) ([]d.LedgerEnt
 	for rows.Next() {
 		var raw []byte
 		if err = rows.Scan(&raw); err != nil {
-			rows.Close()
-			return nil, err
+			break
 		}
 		var v d.LedgerEntry
 		if d.DecodeJSON(raw, &v) != nil {
-			rows.Close()
-			return nil, failure("STORE_STATE_INVALID", 503)
+			err = failure("STORE_STATE_INVALID", 503)
+			break
 		}
 		entries = append(entries, v)
 		last = raw
 	}
-	err = rows.Err()
-	rows.Close()
-	if err != nil {
-		return nil, err
+	if err == nil {
+		err = rows.Err()
 	}
+	rows.Close()
 	if len(entries) > len(cached.entries) {
 		s.mu.Lock()
 		if s.ledgers == nil {
@@ -336,6 +336,9 @@ func (s *Store) ledger(ctx context.Context, tx pgx.Tx, id string) ([]d.LedgerEnt
 			s.ledgers[key] = ledgerRows{entries: append([]d.LedgerEntry(nil), entries...), last: last}
 		}
 		s.mu.Unlock()
+	}
+	if err != nil {
+		return nil, err
 	}
 	return entries, nil
 }

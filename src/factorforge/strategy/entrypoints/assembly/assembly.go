@@ -150,6 +150,10 @@ func Serve(ctx context.Context, c config.Config, internal bool) error {
 	if err != nil {
 		return err
 	}
+	// The first read of a new process decodes the whole sentiment ledger; do it
+	// now, outside any caller's deadline, so the first query is not the one
+	// that pays for it.
+	go func() { _, _ = runtime.Store.Read(ctx, runtime.Identity.Instance()) }()
 	server := &http.Server{Addr: net.JoinHostPort(host, strconv.Itoa(port)), Handler: handler, ReadHeaderTimeout: 10 * time.Second}
 	done := make(chan error, 1)
 	go func() { done <- server.ListenAndServe() }()
