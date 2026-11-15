@@ -17,10 +17,10 @@ async function login(page: Page) {
   await page.getByRole("button", { name: "进入管理台" }).click();
   // The only allowed instance opens by itself on the flow page.
   await expect(page.getByLabel("实时流程图")).toBeVisible();
-  await expect(page.locator(".flow-node").filter({ hasText: "模型研判" })).toContainText("正在读取");
+  await expect(page.locator('.bd .blk[aria-label="模型研判"]')).toContainText("正在读取");
   await expect(page.getByText("未启用")).toHaveCount(0);
   hold();
-  await expect(page.locator(".flow-node").filter({ hasText: "模型研判" })).toBeVisible();
+  await expect(page.locator('.bd .blk[aria-label="模型研判"]')).toBeVisible();
 }
 async function fixture(page: Page, action: string) {
   await page.evaluate(
@@ -35,18 +35,18 @@ test("S4-022 flow page: modules, details on demand and stale data", async ({ pag
   await login(page);
   await fixture(page, "online");
   for (const title of ["新闻采集", "模型研判", "判断链", "信心池", "策略决策", "止损与阶梯", "执行器", "账户"])
-    await expect(page.locator(".flow-node").filter({ hasText: title })).toBeVisible();
-  // Details open only when a module is clicked, and close again.
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-  await page.locator(".flow-node").filter({ hasText: "模型研判" }).click();
-  const drawer = page.getByRole("dialog");
-  await expect(drawer).toBeVisible();
-  await expect(drawer.getByText("synthetic thesis").first()).toBeVisible();
-  await expect(drawer.getByText("PRIVATE RAW")).toHaveCount(0);
+    await expect(page.locator(`.bd .blk[aria-label="${title}"]`)).toBeVisible();
+  // Details show only when a module is clicked, and go again.
+  const panel = page.locator(".rp-insp");
+  await expect(panel.getByText("synthetic thesis")).toHaveCount(0);
+  await page.locator('.bd .blk[aria-label="模型研判"]').click();
+  await expect(panel.getByText("synthetic thesis").first()).toBeVisible();
+  await expect(panel.getByText("PRIVATE RAW")).toHaveCount(0);
+  await page.locator('.bd .blk[aria-label="策略决策"]').click();
   // Parameters are read only (S4-022).
-  await expect(drawer.getByRole("button", { name: /修\s*改/ })).toBeDisabled();
-  await page.keyboard.press("Escape");
-  await expect(drawer).toBeHidden();
+  await expect(panel.getByRole("button", { name: /修\s*改/ })).toBeDisabled();
+  await page.getByLabel("实时流程图").click({ position: { x: 5, y: 5 } });
+  await expect(panel.getByRole("button", { name: /修\s*改/ })).toHaveCount(0);
   // S4-014: the page speaks plain language, not status codes.
   expect(await page.locator("main").innerText()).not.toMatch(/\b[A-Z]{3,}_[A-Z_]{3,}\b/);
   await page.screenshot({ path: "../../../../../runtime/console-flow.png", fullPage: true });
@@ -58,32 +58,60 @@ test("S4-022 flow page: modules, details on demand and stale data", async ({ pag
   expect(errors).toEqual([]);
 });
 
-test("S4-022 flow page: refreshes keep every module drawn", async ({ page }) => {
-  // React Flow hides a node it has not measured; a refresh must not drop the
-  // measured size, or a module vanishes until it is measured again.
-  await page.route("**/api/v2/console/capabilities**", async (route) => {
+// S4-024: synthetic replay records for one closed long batch, served over the
+// fixture's own replay view so the selection and panel envelope stay real.
+const replayData: Record<string, unknown> = {
+  batches: [{ batch_id: "batch-2d257f18aaaa", object_id: "OBJECT", direction: 1, unit_quantity: "4.85", budget: "25", opened_at: "2026-11-10T06:45:37Z", closed_at: "2026-11-10T07:20:00Z", exit_kind: "TARGET", net_pnl: "11.2", r: "-0.45" }],
+  "dynamic.plans": { items: [{ plan_id: "p1", at: "2026-11-10T06:40:05Z", kind: "INITIAL", direction: "LONG", confidence: 3, risk_fraction: "0.005", distance: "5", close_distance: "4.5", price: "50", equity: "5000", tier: 4, requested_tier: 24, session: "OVERNIGHT", r: "0.09", buffer: "0.01", trail: "0.04" }] },
+  "dynamic.actions": { items: [{ action_id: "open-1", at: "2026-11-10T06:55:05Z", kind: "OPEN", direction: "LONG", entry: "50.2", close_stop: "45.68" }] },
+  "dynamic.judgments": { items: [{ at: "2026-11-10T06:31:11Z", ok: true, direction: "LONG", confidence: 3, horizon_hours: 24 }] },
+  fills: [{ happened_at: "2026-11-10T06:51:13Z", side: "BUY", quantity: "3.88", price: "50.2" }],
+};
+function replayDecisions(objectId: string) {
+  const d = (at: string, lv: number, cb: string, tg: string, ac: string, rc: string[]) => ({
+    decision: { decision_id: "d-" + at, object_id: objectId, available_cutoff: at, new_level: lv, pool_net: cb, pool_plus: cb, pool_minus: "0", components: { baseline: "0", core: "0", adjustment: cb, combined: cb }, target_quantity: tg, actual_quantity: ac, reason_codes: rc, stop_plan: null, input_snapshot: { pool: { quality: "1", contributions: [{}] }, snapshot: { equity: "5000", samples: { [objectId]: { price: "50" } } } } },
+    delivery_state: "ACK", delivery_reason: null,
+  });
+  return {
+    items: [d("2026-11-10T06:40:00Z", 3, "0.7", "0", "0", ["RISK_UNIT_DIRECTIVE_MISSING"]), d("2026-11-10T06:45:37Z", 3, "0.7", "3.88", "0", ["STOP_DIRECTIVE_SIZED"]), d("2026-11-10T06:55:00Z", 3, "0.7", "3.88", "3.88", ["NO_TRADE_BAND"]), d("2026-11-10T07:05:38Z", 4, "1", "4.85", "3.88", ["STOP_DIRECTIVE_SIZED"]), d("2026-11-10T07:15:00Z", 0, "0", "0", "4.85", [])],
+    cursor: "",
+    sizing: { max_risk_fraction: "0.03", object_loss_budget: "60", fee_rate: "0.0005", slippage_fraction: "0.0004", gap_fraction: "0.002", band_ratio_of_unit: "0.25", levels: [0.3, 0.6, 0.8, 1].map((x, i) => ({ exposure: String(x), enter: String(0.2 * (i + 1) + 0.05), exit: String(0.2 * (i + 1) - 0.05) })) },
+  };
+}
+
+test("S4-022 flow page: drill down to the formula and replay an order", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.route("**/api/v2/console/replay?**", async (route) => {
     const response = await route.fetch();
-    await route.fulfill({ response, json: { ...(await response.json()), refresh_seconds: 1 } });
+    const body = await response.json();
+    const objectId = body.selection.object_id as string;
+    for (const p of body.panels) {
+      const data = p.source === "decision-history" ? replayDecisions(objectId) : p.source === "batches" ? (replayData.batches as { object_id: string }[]).map((b) => ({ ...b, object_id: objectId })) : replayData[p.source];
+      Object.assign(p, { state: "AVAILABLE", code: null, data, cursor: null });
+    }
+    await route.fulfill({ response, json: body });
   });
   await login(page);
-  await fixture(page, "online");
-  await expect(page.locator(".react-flow__node")).toHaveCount(9);
-  await expect(page.locator(".flow-node").filter({ hasText: "正在读取" })).toHaveCount(0);
-  const hidden = await page.evaluate(async () => {
-    const nodes = [...document.querySelectorAll<HTMLElement>(".react-flow__node")];
-    const seen = new Set<string>();
-    const watch = new MutationObserver((records) => {
-      for (const r of records) {
-        const node = r.target as HTMLElement;
-        if (node.style.visibility === "hidden") seen.add(node.dataset.id ?? "");
-      }
-    });
-    for (const n of nodes) watch.observe(n, { attributes: true, attributeFilter: ["style"] });
-    await new Promise((r) => setTimeout(r, 5000));
-    watch.disconnect();
-    return [...seen];
-  });
-  expect(hidden).toEqual([]);
+  // The order list holds the batch; picking it plays from the opening decision.
+  const row = page.locator(".rp-row").filter({ hasText: "2d257f18" });
+  await expect(row).toBeVisible();
+  await row.click();
+  await expect(page.locator(".rp-mode")).toContainText("回放 · 已平仓订单");
+  await expect(page.locator(".tl-time")).toBeVisible();
+  // Playback ends on the last round.
+  await expect(page.locator(".tl-note").filter({ hasText: "第 5 / 5 轮" })).toBeVisible({ timeout: 15_000 });
+  // Drill down: decision → unit quantity → the rounding step's formula.
+  await page.locator('.bd .blk[aria-label="策略决策"]').dblclick();
+  await expect(page.locator(".rp-crumbs")).toContainText("策略决策");
+  await page.locator('.bd .blk[aria-label="算单位数量 Q"]').dblclick();
+  await page.locator('.bd .blk[aria-label="向零取整到 0.01"]').dblclick();
+  await expect(page.locator(".fp-card")).toContainText("Q = ⌊B ÷ U⌋");
+  await expect(page.locator(".fp-port").filter({ hasText: "单位数量 Q" })).toContainText("4.85");
+  // Back to the top through the path.
+  await page.locator(".rp-crumbs button").first().click();
+  await expect(page.getByLabel("实时流程图")).toBeVisible();
+  expect(errors).toEqual([]);
 });
 
 test("S4-022 market page: totals, conviction, trades and folded records", async ({ page }) => {
@@ -150,5 +178,5 @@ test("revocation clears the instance and its data", async ({ page }) => {
   await fixture(page, "revoke");
   await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
   await expect(page.getByText("没有可查看的实例")).toBeVisible({ timeout: 20_000 });
-  await expect(page.locator(".flow-node")).toHaveCount(0);
+  await expect(page.locator(".bd .blk")).toHaveCount(0);
 });

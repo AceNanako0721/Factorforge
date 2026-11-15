@@ -1,0 +1,372 @@
+import { NO_PLAN, type Ctx } from "./replay-model";
+
+// S4-022: the module hierarchy of the order replay. Each system is drawn as a
+// block diagram (inports, blocks, outports, wires); a block opens either a
+// lower system or a function page with its formula, the numbers of the frame
+// and the Go function that runs it. Coordinates are diagram units.
+
+export type BlockKind = "sub" | "fn" | "in" | "out" | "const" | "from";
+export type Block = {
+  id: string;
+  k: BlockKind;
+  t: string;
+  st?: string;
+  x: number;
+  y: number;
+  w?: number;
+  h?: number;
+  n?: number;
+  ins?: string[];
+  outs?: string[];
+  sub?: string;
+  leaf?: string;
+  g?: string;
+  val?: string;
+  lp?: "left";
+  src?: string;
+  live?: string;
+  v?: (c: Ctx) => string;
+  warn?: (c: Ctx) => boolean;
+};
+export type Wire = { a: string; b: string; l?: string; v?: (c: Ctx) => string; mx?: number; fb?: [number, number | null][] };
+export type System = { title: string; w: number; h: number; blocks: Block[]; wires: Wire[] };
+type Cell = [string, string | number];
+export type Leaf = { title: string; src: string | null; glyph?: string; io: (c: Ctx) => { in: Cell[]; out: Cell[] }; sym: string; num: (c: Ctx) => string; ex: string };
+
+export const fx = (v: number | null | undefined | false, d = 2) => (v === null || v === undefined || v === false || Number.isNaN(v) ? "—" : Number(v).toFixed(d));
+export const pct = (v: number | null | undefined | false, d = 3) => (v === null || v === undefined || v === false ? "—" : (v * 100).toFixed(d) + "%");
+export const sgn = (v: number) => (v > 0 ? 1 : v < 0 ? -1 : 0);
+export const dirName = (d: number) => (d > 0 ? "做多" : d < 0 ? "做空" : "不持仓");
+export const jName = (d: string) => ({ LONG: "做多", SHORT: "做空", FLAT: "观望" } as Record<string, string>)[d] || d || "—";
+export const hm = (t: string | null | undefined) => (t ? t.slice(5, 10).replace("-", "/") + " " + t.slice(11, 16) : "—");
+
+// Where each function page's step runs (file · function).
+export const GO: Record<string, string> = {
+  riskFraction: "applications/soxl/domain/stop_plan.go · RiskFraction",
+  drawdown: "applications/soxl/workers/position_manager.go · initial",
+  view: "applications/soxl/workers/position_manager.go · view",
+  planStop: "applications/soxl/domain/stop_plan.go · PlanStop",
+  compose: "applications/soxl/workers/position_manager.go · initial",
+  pool: "strategy/domain/sentiment.go · Pool",
+  adjustment: "strategy/domain/composition.go · Compose",
+  core: "strategy/domain/composition.go · Compose",
+  combined: "strategy/domain/composition.go · Combined",
+  level: "strategy/domain/position.go · LevelFor",
+  target: "strategy/application/dynamic_stop.go · 目标数量",
+  band: "strategy/application/dynamic_stop.go · UnitBandHold",
+  freeze: "strategy/application/dynamic_stop.go · freezeUnit",
+  size: "strategy/application/stop_directives.go · SizeDirective",
+};
+
+const V: Record<string, (c: Ctx) => string> = {
+  judg: (c: Ctx) => c.f.j ? `${jName(c.f.j.dir)}/${c.f.j.conf} ${c.f.j.h}h` : "—",
+  pool: (c: Ctx) => `净值 ${fx(c.f.pn, 3)} · ${c.f.nc} 条`,
+  rfD: (c: Ctx) => c.f.p3 ? `f ${pct(c.f.p3.rf, 2)} D ${fx(c.f.p3.D, 2)}` : "—",
+  snap: (c: Ctx) => `权益 ${fx(c.f.eq, 2)} · 持仓 ${fx(c.f.ac, 2)}`,
+};
+export const LEAF: Record<string, Leaf> = {
+  pool: { title: "信心池汇总 Pool", src: "pool",
+    io: (c: Ctx) => ({ in: [["做多贡献剩余量之和 Plus", fx(c.f.pp, 4)], ["做空贡献剩余量之和 Minus", fx(c.f.pm, 4)], ["池内贡献条数", c.f.nc]], out: [["净值 Net", fx(c.f.pn, 4)], ["质量 Quality", fx(c.f.ql, 3)]] }),
+    sym: "Net = Σ剩余量(做多) − Σ剩余量(做空)<br>Quality = Σ(剩余量 × 质量) ÷ Σ剩余量",
+    num: (c: Ctx) => `Net = ${fx(c.f.pp, 4)} − ${fx(c.f.pm, 4)} = <span class="res">${fx(c.f.pn, 4)}</span>`,
+    ex: "每条研判按方向和信心注入一笔贡献，剩余量随时间衰减。池子把所有还没衰减完的贡献按方向加总，净值的正负就是当前偏多还是偏空。" },
+  adjustment: { title: "调整层 Adjustment", src: "adjustment",
+    io: (c: Ctx) => ({ in: [["净值 Net", fx(c.f.pn, 4)], ["Plus + Minus", fx((c.f.pp || 0) + (c.f.pm || 0), 4)], ["质量 Quality", fx(c.f.ql, 3)], ["scale / cap（登记）", "1 / 1"]], out: [["一致度 confidence", fx(c.conf, 4)], ["调整 A", fx(c.f.ad, 4)]] }),
+    sym: "confidence = Quality × |Net| ÷ (Plus + Minus + ε)<br>A = clip(Net ÷ scale, ±1) × cap × confidence",
+    num: (c: Ctx) => `confidence = ${fx(c.f.ql, 3)} × ${fx(Math.abs(c.f.pn), 4)} ÷ ${fx((c.f.pp || 0) + (c.f.pm || 0), 4)} = ${fx(c.conf, 4)}<br>A = clip(${fx(c.f.pn, 4)}, ±1) × 1 × ${fx(c.conf, 4)} = <span class="res">${fx(c.f.ad, 4)}</span>`,
+    ex: "池子净值先压到 ±1 以内，再乘一致度：多空贡献都在时一致度变低，调整幅度随之变小。全部同向时一致度为 1。" },
+  core: { title: "核心层 Core", src: "core",
+    io: (c: Ctx) => ({ in: [["基线因子 Baseline", fx(c.f.b, 4)], ["研判评估 Assessment", fx(c.f.as, 4)], ["计划事件 Scheduled", fx(c.f.sc, 4)]], out: [["核心 C", fx(c.f.co, 4)]] }),
+    sym: "C = clip(Baseline + Assessment + Scheduled, ±1)",
+    num: (c: Ctx) => `C = clip(${fx(c.f.b, 4)} + ${fx(c.f.as, 4)} + ${fx(c.f.sc, 4)}, ±1) = <span class="res">${fx(c.f.co, 4)}</span>`,
+    ex: "基线因子来自止损与阶梯模块：批次浮盈到 +1R 后转为基线，之后每 30 分钟续期。没有基线时核心为 0，方向完全由调整层决定。" },
+  combined: { title: "合成 Combined", src: "combined",
+    io: (c: Ctx) => ({ in: [["核心 C", fx(c.f.co, 4)], ["调整 A", fx(c.f.ad, 4)]], out: [["合成 X", fx(c.f.cb, 4)]] }),
+    sym: "C = 0 时：X = clip(A, ±1)<br>否则：X = C + A；若 X 与 C 反号则 X = 0；再 clip(X, ±1)",
+    num: (c: Ctx) => (c.f.co === 0 ? `C = 0 → X = clip(${fx(c.f.ad, 4)}, ±1)` : `X = ${fx(c.f.co, 4)} + ${fx(c.f.ad, 4)} → clip`) + ` = <span class="res">${fx(c.f.cb, 4)}</span>`,
+    ex: "核心层定方向时，调整层只能加强或削弱，不能把方向翻过来；翻过来时合成为 0（平仓）。" },
+  level: { title: "档位 LevelFor（带回差）", src: "level",
+    io: (c: Ctx) => ({ in: [["强度 |X|", fx(Math.abs(c.f.cb), 4)], ["上一档", c.prev ? c.prev.lv : "—"]], out: [["档位 L", c.f.lv]] }),
+    sym: "升档：|X| 达到上一档的进入阈值就升<br>降档：|X| 低于本档的退出阈值才降",
+    num: (c: Ctx) => `|X| = ${fx(Math.abs(c.f.cb), 4)}，上一档 ${c.prev ? c.prev.lv : "—"} → <span class="res">${c.f.lv} 档</span><br>进入 ${c.sz.levels.map((l) => l.enter).join(" / ")}，退出 ${c.sz.levels.map((l) => l.exit).join(" / ")}`,
+    ex: "进入和退出用不同阈值，强度在阈值附近来回时档位不会反复跳。" },
+  ratio: { title: "档位比例", src: "target",
+    io: (c: Ctx) => ({ in: [["档位 L", c.f.lv]], out: [["比例", fx(c.ratio, 2)]] }),
+    sym: "按档位查登记表的比例",
+    num: (c: Ctx) => `${c.f.lv} 档 → <span class="res">${fx(c.ratio, 2)}</span>（${c.sz.levels.map((l, i) => `${i + 1} 档 ${l.x}`).join(" · ")}）`,
+    ex: "登记表 composition.levels 的 exposure 一列。在风险单位模式下它是 Q 的比例，不是权益的比例。" },
+  target: { title: "目标数量", src: "target",
+    io: (c: Ctx) => ({ in: [["方向 sign(X)", dirName(c.dir)], ["单位数量 Q（批次内冻结）", c.Q === null ? "未冻结" : fx(c.Q, 2)], ["档位比例", fx(c.ratio, 2)]], out: [["目标数量", fx(c.f.tg, 2)]] }),
+    sym: "目标 = 方向 × ⌊Q × 比例⌋<sub>0.01</sub>",
+    num: (c: Ctx) => c.Q === null ? `本轮没有冻结的 Q → 目标 <span class="res">${fx(c.f.tg, 2)}</span>（${(c.f.rc || []).join("、")}）` : `${c.dir} × ⌊${fx(c.Q, 2)} × ${fx(c.ratio, 2)}⌋ = <span class="res">${fx(c.f.tg, 2)}</span>`,
+    ex: "开仓那一轮把 Q 冻结在批次里。之后档位升降只按比例增减数量，不重新计算 Q。" },
+  band: { title: "不交易区间 UnitBandHold", src: "band",
+    io: (c: Ctx) => ({ in: [["目标", fx(c.f.tg, 2)], ["实际持仓", fx(c.f.ac, 2)], ["区间 无交易带 × Q", c.Q === null || c.sz.band === null ? "—" : fx(c.sz.band * c.Q, 2)]], out: [["下单量", Math.abs(c.f.tg - c.f.ac) < 1e-9 || (c.Q !== null && c.sz.band !== null && Math.abs(c.f.tg - c.f.ac) < c.sz.band * c.Q && sgn(c.f.tg) === sgn(c.f.ac)) ? "不动" : fx(c.f.tg - c.f.ac, 2)]] }),
+    sym: "|目标 − 实际| < 无交易带 × Q 且同向 → 不下单",
+    num: (c: Ctx) => `|${fx(c.f.tg, 2)} − ${fx(c.f.ac, 2)}| = ${fx(Math.abs(c.f.tg - c.f.ac), 2)}` + (c.Q === null || c.sz.band === null ? "" : ` 对比 ${fx(c.sz.band * c.Q, 2)}`) + ` → <span class="res">${(c.f.rc || []).includes("NO_TRADE_BAND") ? "不下单" : "下单"}</span>`,
+    ex: "差额太小时不交易，避免为很小的调整反复付手续费。" },
+  size: { title: "止损定量 SizeDirective", src: "size",
+    io: (c: Ctx) => ({ in: [["价格 P", fx(c.f.px, 4)], ["初始距离 D", fx(c.f.p3 && c.f.p3.D, 4)], ["方向", dirName(c.dir)]], out: [["交易所止损触发价", c.f.sp ? fx(c.f.sp, 2) : "本轮不下单"]] }),
+    sym: "触发价 = P − 方向 × D，按最小价位取整（做多向上、做空向下）",
+    num: (c: Ctx) => c.f.sp ? `${fx(c.f.px, 4)} − (${c.dir}) × ${fx((c.f.p3 ?? NO_PLAN).D, 4)} ≈ <span class="res">${fx(c.f.sp, 2)}</span>` : "本轮目标没有变化，不生成新的止损计划",
+    ex: "开仓或加仓时，给交易所同时挂一张止损条件单；触发价离开仓价正好一个初始距离 D。" },
+  minf: { title: "风险比例上限", src: "freeze", glyph: "min",
+    io: (c: Ctx) => ({ in: [["指令风险比例 f", pct(c.fz.rf, 4)], ["登记上限 max_risk_fraction", pct(c.sz.maxRF, 2)]], out: [["f′", pct(Math.min(c.fz.rf, c.sz.maxRF), 4)]] }),
+    sym: "f′ = min(f, max_risk_fraction)", num: (c: Ctx) => `min(${pct(c.fz.rf, 4)}, ${pct(c.sz.maxRF, 2)}) = <span class="res">${pct(Math.min(c.fz.rf, c.sz.maxRF), 4)}</span>`,
+    ex: "P2 不完全信任上游给的比例，再按登记的最大风险比例截一次。" },
+  mulEf: { title: "权益 × 比例", src: "freeze", glyph: "×",
+    io: (c: Ctx) => ({ in: [["权益 E", fx(c.fz.E, 2)], ["f′", pct(Math.min(c.fz.rf, c.sz.maxRF), 4)]], out: [["E × f′", fx(c.fz.E * Math.min(c.fz.rf, c.sz.maxRF), 4)]] }),
+    sym: "E × f′", num: (c: Ctx) => `${fx(c.fz.E, 2)} × ${pct(Math.min(c.fz.rf, c.sz.maxRF), 4)} = <span class="res">${fx(c.fz.E * Math.min(c.fz.rf, c.sz.maxRF), 4)}</span>`,
+    ex: "这一批最多愿意亏多少。权益取开仓那一轮账户快照里的权益。" },
+  minB: { title: "对象亏损预算上限", src: "freeze", glyph: "min",
+    io: (c: Ctx) => ({ in: [["E × f′", fx(c.fz.E * Math.min(c.fz.rf, c.sz.maxRF), 4)], ["对象亏损预算（登记）", fx(c.sz.lossBudget, 0)]], out: [["预算 B", fx(Math.min(c.fz.E * Math.min(c.fz.rf, c.sz.maxRF), c.sz.lossBudget), 4)]] }),
+    sym: "B = min(E × f′, object_loss_budget)", num: (c: Ctx) => `min(${fx(c.fz.E * Math.min(c.fz.rf, c.sz.maxRF), 4)}, ${fx(c.sz.lossBudget, 2)}) = <span class="res">${fx(Math.min(c.fz.E * Math.min(c.fz.rf, c.sz.maxRF), c.sz.lossBudget), 4)}</span>`,
+    ex: "再按登记的对象亏损预算截一次，和交易层的单笔亏损上限一致。" },
+  sumCost: { title: "成本率", src: "freeze", glyph: "Σ",
+    io: (c: Ctx) => ({ in: [["手续费 fee", fx(c.sz.fee, 4)], ["滑点 slippage", fx(c.sz.slip, 4)], ["跳空准备 gap", fx(c.sz.gap, 4)]], out: [["成本率", fx(c.sz.cost, 4)]] }),
+    sym: "fee + slippage + gap", num: (c: Ctx) => `${fx(c.sz.fee, 4)} + ${fx(c.sz.slip, 4)} + ${fx(c.sz.gap, 4)} = <span class="res">${fx(c.sz.cost, 4)}</span>`,
+    ex: "按价格比例预留的往返成本和跳空，三项都是 P2 策略登记值。" },
+  mulCost: { title: "成本准备", src: "freeze", glyph: "×",
+    io: (c: Ctx) => ({ in: [["价格 P", fx(c.fz.P, 4)], ["成本率", fx(c.sz.cost, 4)]], out: [["P × 成本率", fx(c.fz.P * c.sz.cost, 6)]] }),
+    sym: "P × (fee + slippage + gap)", num: (c: Ctx) => `${fx(c.fz.P, 4)} × ${fx(c.sz.cost, 4)} = <span class="res">${fx(c.fz.P * c.sz.cost, 6)}</span>`,
+    ex: "价格取开仓那一轮的行情样本价。" },
+  sumUnit: { title: "每单位亏损（未乘乘数）", src: "freeze", glyph: "Σ",
+    io: (c: Ctx) => ({ in: [["初始距离 D", fx(c.fz.D, 6)], ["超出余量 O", "0"], ["成本准备", fx(c.fz.P * c.sz.cost, 6)]], out: [["D + O + 成本", fx(c.fz.D + c.fz.P * c.sz.cost, 6)]] }),
+    sym: "D + O + P × (fee + slippage + gap)", num: (c: Ctx) => `${fx(c.fz.D, 6)} + 0 + ${fx(c.fz.P * c.sz.cost, 6)} = <span class="res">${fx(c.fz.D + c.fz.P * c.sz.cost, 6)}</span>`,
+    ex: "D 是止损与阶梯模块给的交易所止损距离，O 只在上层托管止损时才有，初始止损指令为交易所止损时为 0。" },
+  mulUnit: { title: "合约乘数", src: "freeze", glyph: "×",
+    io: (c: Ctx) => ({ in: [["D + O + 成本", fx(c.fz.D + c.fz.P * c.sz.cost, 6)], ["合约乘数", "1"]], out: [["每单位亏损 U", fx(c.fz.D + c.fz.P * c.sz.cost, 6)]] }),
+    sym: "U = 乘数 × (D + O + 成本)", num: (c: Ctx) => `1 × ${fx(c.fz.D + c.fz.P * c.sz.cost, 6)} = <span class="res">${fx(c.fz.D + c.fz.P * c.sz.cost, 6)}</span>`,
+    ex: "SOXLUSDT 一张就是一个单位，乘数为 1。" },
+  divQ: { title: "预算 ÷ 每单位亏损", src: "freeze", glyph: "÷",
+    io: (c: Ctx) => { const B = Math.min(c.fz.E * Math.min(c.fz.rf, c.sz.maxRF), c.sz.lossBudget), U = c.fz.D + c.fz.P * c.sz.cost; return { in: [["预算 B", fx(B, 4)], ["每单位亏损 U", fx(U, 6)]], out: [["B ÷ U", fx(B / U, 6)]] }; },
+    sym: "B ÷ U", num: (c: Ctx) => { const B = Math.min(c.fz.E * Math.min(c.fz.rf, c.sz.maxRF), c.sz.lossBudget), U = c.fz.D + c.fz.P * c.sz.cost; return `${fx(B, 4)} ÷ ${fx(U, 6)} = <span class="res">${fx(B / U, 6)}</span>`; },
+    ex: "打到交易所止损时，每张大约亏 U，所以预算能买多少张就是 B ÷ U。" },
+  stepQ: { title: "按数量步长向零取整", src: "freeze", glyph: "⌊ ⌋",
+    io: (c: Ctx) => { const B = Math.min(c.fz.E * Math.min(c.fz.rf, c.sz.maxRF), c.sz.lossBudget), U = c.fz.D + c.fz.P * c.sz.cost; return { in: [["B ÷ U", fx(B / U, 6)], ["数量步长", "0.01"]], out: [["单位数量 Q", fx(Math.floor(B / U * 100) / 100, 2)]] }; },
+    sym: "Q = ⌊B ÷ U⌋<sub>0.01</sub>", num: (c: Ctx) => { const B = Math.min(c.fz.E * Math.min(c.fz.rf, c.sz.maxRF), c.sz.lossBudget), U = c.fz.D + c.fz.P * c.sz.cost; return `⌊${fx(B / U, 6)}⌋ = <span class="res">${fx(Math.floor(B / U * 100) / 100, 2)}</span>（批次记录 ${fx(c.o.q, 2)}）`; },
+    ex: "向零取整保证实际风险不超过预算。Q 冻结在这一批里，直到全部平仓。" },
+  view: { title: "方向与信心 view()", src: "view",
+    io: (c: Ctx) => ({ in: [["最近研判", c.f.j ? `${jName(c.f.j.dir)}/${c.f.j.conf} ${c.f.j.h}h` : "—"], ["最新决策合成 X", fx(c.f.cb, 4)]], out: [["方向", dirName(c.f.p3 ? c.f.p3.dir : 0)], ["预计时长", c.f.j ? c.f.j.h + "h" : "—"], ["信心", c.f.p3 ? c.f.p3.conf || "无同向" : "—"]] }),
+    sym: "方向 = sign(最新决策的 X)，没有时取最近研判<br>信心 = 最近 12 条研判里与方向相同的最新一条的信心",
+    num: (c: Ctx) => `X = ${fx(c.f.cb, 4)} → ${dirName(c.f.p3 ? c.f.p3.dir : 0)}；同向研判信心 = <span class="res">${c.f.p3 ? c.f.p3.conf || "无（按最低档）" : "—"}</span>`,
+    ex: "方向跟着策略决策走，信心看研判。最近 6 小时没有同方向的研判时，信心按最低档算。" },
+  base: { title: "基础比例", src: "riskFraction", glyph: "1%",
+    io: (c: Ctx) => ({ in: [["已平批次数 n", c.closedBefore]], out: [["基础比例", c.closedBefore < 30 ? "1%" : "¼ 凯利"]] }),
+    sym: "n < 30：1%<br>n ≥ 30：¼ × (p − (1 − p) ÷ b)，p 胜率、b 盈亏比（最近 60 批）",
+    num: (c: Ctx) => `n = ${c.closedBefore} < 30 → <span class="res">1%</span>（还差 ${Math.max(0, 30 - c.closedBefore)} 批切到凯利）`,
+    ex: "样本不够时先用固定 1%。满 30 批后按自己的胜率和盈亏比算四分之一凯利。" },
+  cf: { title: "信心系数", src: "riskFraction", glyph: "lut",
+    io: (c: Ctx) => ({ in: [["信心", c.f.p3 ? c.f.p3.conf || "无同向" : "—"]], out: [["系数", fx(c.cf, 2)]] }),
+    sym: "4～5 → 1 · 3 → 0.75 · 2 → 0.5 · 1 或没有同向研判 → 0.25", num: (c: Ctx) => `信心 ${c.f.p3 ? c.f.p3.conf || "无" : "—"} → <span class="res">${fx(c.cf, 2)}</span>`,
+    ex: "查表。研判越有把握，这一批愿意承担的风险越大。" },
+  dd: { title: "回撤", src: "drawdown", glyph: "dd",
+    io: (c: Ctx) => ({ in: [["权益 E", fx(c.f.p3 && c.f.p3.E, 2)], ["权益峰值（由比例反推）", fx(c.peak, 2)]], out: [["回撤", pct(c.dd, 3)]] }),
+    sym: "回撤 = (峰值 − E) ÷ 峰值", num: (c: Ctx) => `(${fx(c.peak, 2)} − ${fx(c.f.p3 && c.f.p3.E, 2)}) ÷ ${fx(c.peak, 2)} = <span class="res">${pct(c.dd, 3)}</span>`,
+    ex: "峰值是这个实例运行以来的最高权益。记录里没有逐轮的峰值，这里由指令中的风险比例反推（前 30 批的基础比例固定为 1%）。" },
+  ddf: { title: "回撤系数", src: "riskFraction", glyph: "max",
+    io: (c: Ctx) => ({ in: [["回撤", pct(c.dd, 3)]], out: [["系数", fx((c.ddf ?? NaN), 4)]] }),
+    sym: "max(0.25, 1 − 回撤 ÷ 10%)", num: (c: Ctx) => `max(0.25, 1 − ${pct(c.dd, 3)} ÷ 10%) = <span class="res">${fx((c.ddf ?? NaN), 4)}</span>`,
+    ex: "回撤越大开得越小，回撤到 7.5% 以后只开四分之一。" },
+  prod: { title: "相乘", src: "riskFraction", glyph: "×",
+    io: (c: Ctx) => ({ in: [["基础比例", "1%"], ["信心系数", fx(c.cf, 2)], ["回撤系数", fx((c.ddf ?? NaN), 4)]], out: [["乘积", pct(0.01 * c.cf * (c.ddf ?? NaN), 4)]] }),
+    sym: "基础比例 × 信心系数 × 回撤系数", num: (c: Ctx) => `1% × ${fx(c.cf, 2)} × ${fx((c.ddf ?? NaN), 4)} = <span class="res">${pct(0.01 * c.cf * (c.ddf ?? NaN), 4)}</span>`, ex: "三项相乘。" },
+  cap: { title: "上限 2%", src: "riskFraction", glyph: "min",
+    io: (c: Ctx) => ({ in: [["乘积", pct(0.01 * c.cf * (c.ddf ?? NaN), 4)]], out: [["风险比例 f", pct(c.f.p3 && c.f.p3.rf, 4)]] }),
+    sym: "f = min(2%, 乘积)", num: (c: Ctx) => `min(2%, ${pct(0.01 * c.cf * (c.ddf ?? NaN), 4)}) = <span class="res">${pct(c.f.p3 && c.f.p3.rf, 4)}</span>`,
+    ex: "最后封顶 2%。这个 f 随初始止损指令发给 P2。" },
+  planStop: { title: "止损几何 PlanStop", src: "planStop",
+    io: (c: Ctx) => { const p = c.f.p3 ?? NO_PLAN; return { in: [["方向", dirName(p.dir)], ["预计时长 → 请求档", (p.rtier || "—") + "h"], ["时段", p.ses || "—"], ["噪声统计表", "收盘不利偏移 / 回撤 / 影线分位数"]], out: [["持有档", (p.tier || "—") + "h"], ["R（收盘止损比例）", pct(p.r, 2)], ["缓冲 buffer", pct(p.buf, 2)], ["回撤 trail", pct(p.trail, 2)]] }; },
+    sym: "R = max(本时段, 美股盘中) 的收盘不利偏移分位数<br>buffer = 倍数 × 持有窗口内最差时段的 5 分钟影线分位数<br>R + buffer 超出保险止损时换更短的档",
+    num: (c: Ctx) => { const p = c.f.p3 ?? NO_PLAN; return `档 ${p.tier}h（请求 ${p.rtier}h，${p.ses}）→ R = <span class="res">${pct(p.r, 2)}</span>，buffer = <span class="res">${pct(p.buf, 2)}</span>`; },
+    ex: "止损距离不是拍脑袋，而是从历史噪声统计里按持有时长和交易时段查出来的；周末和隔夜时段波动大，R 也更大。" },
+  gate: { title: "价格状态闸门", src: null,
+    io: (c: Ctx) => ({ in: [["方向", dirName(c.f.p3 ? c.f.p3.dir : 0)]], out: [["放行", "见闸门判定"]] }),
+    sym: "登记了闸门的实例：价格状态与方向一致才开新批次", num: (c: Ctx) => (c.f.rc.some((r) => r.startsWith("PRICE_STATE")) ? c.f.rc.filter((r) => r.startsWith("PRICE_STATE")).join("、") : "本轮没有闸门判定"), ex: "登记了价格状态闸门的实例（P3 S3-035）开新批次前看小时级价格状态；没有登记的实例直接放行。" },
+  compose: { title: "初始止损指令", src: "compose",
+    io: (c: Ctx) => { const p = c.f.p3 ?? NO_PLAN; return { in: [["价格 P", fx(p.P, 4)], ["R", pct(p.r, 2)], ["buffer", pct(p.buf, 2)], ["风险比例 f", pct(p.rf, 4)]], out: [["初始距离 D", fx(p.D, 4)], ["收盘止损距离", fx(p.Dc, 4)], ["风险比例 f", pct(p.rf, 4)]] }; },
+    sym: "D = (R + buffer) × P<br>收盘止损距离 = R × P",
+    num: (c: Ctx) => { const p = c.f.p3 ?? NO_PLAN; return `D = (${fx(p.r, 4)} + ${fx(p.buf, 4)}) × ${fx(p.P, 4)} = <span class="res">${fx(p.D, 4)}</span><br>收盘 = ${fx(p.r, 4)} × ${fx(p.P, 4)} = <span class="res">${fx(p.Dc, 4)}</span>`; },
+    ex: "每 10 分钟重发一次，有效 15 分钟。P2 开仓时取最新一条有效指令里的 f 和 D 算 Q。" },
+  batchStop: { title: "批次止损（收盘止损 / 跟踪 / 转基线）", src: null,
+    io: (c: Ctx) => { const b = c.f.bt; return { in: [["开仓价", b ? fx(b.entry, 4) : "无持仓"], ["开仓以来最有利收盘", b ? fx(b.best, 2) : "—"], ["R / trail", b ? pct(c.fz.r, 2) + " / " + pct(c.fz.trail, 2) : "—"]], out: [["收盘止损", b ? fx(b.cs, 4) : "—"], ["跟踪 / 已转基线", b ? (b.trailing ? "是" : "否") + " / " + (b.transferred ? "是" : "否") : "—"]] }; },
+    sym: "初始：收盘止损 = 开仓价 ∓ R × 开仓价<br>浮盈 ≥ 1R：止损移到保本 + 往返成本，之后跟随最有利收盘，距离 trail<br>浮盈 ≥ 1R：批次转为基线（基线因子 = ±1）",
+    num: (c: Ctx) => { const b = c.f.bt; return b ? `开仓 ${fx(b.entry, 4)}，最有利 ${fx(b.best, 2)} → 收盘止损 <span class="res">${fx(b.cs, 4)}</span>` : "当前没有持仓批次"; },
+    ex: "5 分钟收盘越过收盘止损就提交平仓；交易所止损单在更外侧兜底。" },
+};
+
+/* ---------- systems: blocks, ports, wires ---------- */
+
+// Modules outside the sizing path open one function page each.
+Object.assign(LEAF, {
+  news: { title: "按来源定时抓取新闻", src: null, io: () => ({ in: [["新闻源", "登记的 RSS 与快讯源"]], out: [["新闻条目", "去重后的标题与发布时间"]] }), sym: "每 5 分钟逐个来源抓取，去重后交给模型研判", num: () => "逐轮的新闻不在回放记录里，详情见实时状态", ex: "新闻只是研判的输入，不直接影响仓位。某个来源失败时其余来源照常。" },
+  judge: { title: "调用模型生成研判", src: null, io: (c: Ctx) => ({ in: [["最近的新闻", "引用的标题见研判记录"]], out: [["方向", c.f.j ? jName(c.f.j.dir) : "—"], ["信心", c.f.j ? c.f.j.conf + "/5" : "—"], ["预计时长", c.f.j ? c.f.j.h + "h" : "—"]] }), sym: "每半小时一次：方向、信心 1～5、预计时长", num: (c: Ctx) => (c.f.j ? `${hm(c.f.j.t)} ${jName(c.f.j.dir)} / ${c.f.j.conf} / ${c.f.j.h}h` : "—") + (c.f.jfail ? `；${hm(c.f.jfail)} 那次失败` : ""), ex: "研判失败时这一轮不注入，信心池里已有的贡献照常衰减。" },
+  chain: { title: "同向研判连成链并注入", src: null, io: (c: Ctx) => ({ in: [["研判", c.f.j ? `${jName(c.f.j.dir)}/${c.f.j.conf}` : "—"]], out: [["注入", c.f.nc + " 条在池"]] }), sym: "同方向的研判连成判断链；按链的进展向信心池注入一笔贡献", num: (c: Ctx) => `池内有效贡献 ${c.f.nc} 条`, ex: "方向反转时旧链结束，反方向的贡献会抵消池里原来的贡献。" },
+  exec: { title: "把目标数量变成订单", src: null, io: (c: Ctx) => ({ in: [["目标数量", fx(c.f.tg, 2)], ["实际持仓", fx(c.f.ac, 2)]], out: [["下单量", Math.abs(c.f.tg - c.f.ac) > 1e-9 ? fx(c.f.tg - c.f.ac, 2) : "不下单"]] }), sym: "下单量 = 目标数量 − 实际持仓，同时挂上止损计划", num: (c: Ctx) => `${fx(c.f.tg, 2)} − ${fx(c.f.ac, 2)} = ${fx(c.f.tg - c.f.ac, 2)}`, ex: "执行器按交易层的租约运行，订单和止损单都由交易层核验后才生效。" },
+  match: { title: "按行情撮合成交", src: null, io: (c: Ctx) => ({ in: [["订单", Math.abs(c.f.tg - c.f.ac) > 1e-9 ? fx(c.f.tg - c.f.ac, 2) : "无"]], out: [["最近成交", c.lastFill ? `${c.lastFill.side === "BUY" ? "买" : "卖"} ${fx(c.lastFill.q ?? null, 2)} @ ${fx(c.lastFill.p ?? null, 2)}` : "—"]] }), sym: "内部撮合按行情价加滑点成交；模拟盘由交易所成交", num: (c: Ctx) => (c.lastFill ? `${hm(c.lastFill.t)} ${c.lastFill.side === "BUY" ? "买入" : "卖出"} ${fx(c.lastFill.q ?? null, 2)} @ ${fx(c.lastFill.p ?? null, 4)}` : "这笔订单还没有成交"), ex: "成交记录来自交易层，是实际发生的数量和价格。" },
+  account: { title: "累计成交得出持仓与权益", src: null, io: (c: Ctx) => ({ in: [["成交", c.lastFill ? hm(c.lastFill.t) : "—"]], out: [["权益", fx(c.f.eq, 2)], ["持仓", fx(c.f.ac, 2)]] }), sym: "权益 = 钱包余额 + 未实现盈亏；持仓 = 成交的累计数量", num: (c: Ctx) => `权益 ${fx(c.f.eq, 2)}，持仓 ${fx(c.f.ac, 2)}`, ex: "策略决策每一轮读取的账户快照就是这里的值。" },
+  market: { title: "采集 5 分钟行情", src: null, io: (c: Ctx) => ({ in: [["交易所行情", "成交与 K 线"]], out: [["价格", fx(c.f.px, 4)]] }), sym: "按 5 分钟收盘整理行情样本", num: (c: Ctx) => `本轮样本价 ${fx(c.f.px, 4)}`, ex: "决策、止损和闸门都用这里的价格。" },
+} as Record<string, Leaf>);
+
+export const SYS: Record<string, System> = {
+  root: { title: "全部模块", w: 1200, h: 500, blocks: [
+      { id: "news", live: "news", k: "sub", leaf: "news", t: "新闻采集", x: 20, y: 40, w: 130, h: 70, outs: ["新闻条目"], v: () => "7 个来源" },
+      { id: "judge", live: "judgment", k: "sub", leaf: "judge", t: "模型研判", x: 200, y: 40, w: 130, h: 70, ins: ["新闻"], outs: ["研判"], v: V.judg, warn: (c: Ctx) => !!c.f.jfail },
+      { id: "chain", live: "chain", k: "sub", leaf: "chain", t: "判断链", x: 380, y: 40, w: 120, h: 70, ins: ["研判"], outs: ["注入"], v: (c: Ctx) => c.f.j ? "最近 " + hm(c.f.j.t).slice(6) : "—" },
+      { id: "pool", live: "pool", k: "sub", leaf: "pool", t: "信心池", x: 550, y: 40, w: 120, h: 70, ins: ["注入"], outs: ["池"], v: V.pool },
+      { id: "strategy", live: "decision", k: "sub", sub: "strategy", t: "策略决策", st: "P2 决策循环", x: 760, y: 20, w: 190, h: 220, ins: ["信心池", "初始止损指令", "基线因子", "收盘止损退出", "账户快照", "行情样本"], outs: ["目标数量", "止损计划"], v: (c: Ctx) => `目标 ${fx(c.f.tg, 2)}` },
+      { id: "fAcc1", k: "from", t: "[账户]", src: "账户", x: 705, y: 177, w: 50, h: 24 },
+      { id: "fMkt1", k: "from", t: "[行情]", src: "行情", x: 705, y: 202, w: 50, h: 24 },
+      { id: "stop", live: "stops", k: "sub", sub: "stop", t: "止损与阶梯", st: "P3 仓位管理", x: 380, y: 300, w: 200, h: 180, ins: ["研判", "最新决策", "权益", "行情"], outs: ["初始止损指令", "基线因子", "收盘止损退出"], v: (c: Ctx) => c.f.bt ? `收盘止损 ${fx(c.f.bt.cs, 2)}` : "无持仓批次" },
+      { id: "fDec", k: "from", t: "[策略决策]", src: "策略决策 的合成 X", x: 240, y: 384, w: 100, h: 24 },
+      { id: "fAcc2", k: "from", t: "[账户]", src: "账户", x: 260, y: 412, w: 80, h: 24 },
+      { id: "market", k: "sub", leaf: "market", t: "行情", x: 20, y: 410, w: 120, h: 60, outs: ["5 分钟行情"], v: (c: Ctx) => fx(c.f.px, 2) },
+      { id: "exec", live: "executor", k: "sub", leaf: "exec", t: "执行器", x: 1020, y: 40, w: 140, h: 90, ins: ["目标数量", "止损计划"], outs: ["订单"], v: (c: Ctx) => Math.abs(c.f.tg - c.f.ac) > 1e-9 ? `下单 ${fx(c.f.tg - c.f.ac, 2)}` : "无新订单" },
+      { id: "match", live: "venue", k: "sub", leaf: "match", t: "模拟撮合", x: 1020, y: 220, w: 140, h: 70, ins: ["订单"], outs: ["成交"], v: (c: Ctx) => c.lastFill ? `${c.lastFill.side === "BUY" ? "买" : "卖"} ${fx(c.lastFill.q, 2)}@${fx(c.lastFill.p, 2)}` : "—" },
+      { id: "account", live: "account", k: "sub", leaf: "account", t: "账户", x: 1020, y: 380, w: 140, h: 70, ins: ["成交"], outs: ["权益 / 持仓"], v: (c: Ctx) => `${fx(c.f.eq, 2)} · ${fx(c.f.ac, 2)}` },
+    ], wires: [
+      { a: "news.0", b: "judge.0", l: "新闻" },
+      { a: "judge.0", b: "chain.0", l: "研判", v: V.judg },
+      { a: "chain.0", b: "pool.0", l: "注入" },
+      { a: "pool.0", b: "strategy.0", v: V.pool, mx: 715 },
+      { a: "judge.0", b: "stop.0", l: "研判", mx: 355 },
+      { a: "stop.0", b: "strategy.1", v: V.rfD, mx: 655 },
+      { a: "stop.1", b: "strategy.2", v: (c: Ctx) => fx(c.f.b, 2), mx: 675 },
+      { a: "stop.2", b: "strategy.3", v: (c: Ctx) => c.f.bt ? "价越过 " + fx(c.f.bt.cs, 2) : "—", mx: 695 },
+      { a: "fAcc1.0", b: "strategy.4" },
+      { a: "fMkt1.0", b: "strategy.5" },
+      { a: "fDec.0", b: "stop.1" },
+      { a: "fAcc2.0", b: "stop.2" },
+      { a: "market.0", b: "stop.3", l: "行情", v: (c: Ctx) => fx(c.f.px, 2), mx: 360 },
+      { a: "strategy.0", b: "exec.0", l: "目标数量", v: (c: Ctx) => fx(c.f.tg, 2), mx: 985 },
+      { a: "strategy.1", b: "exec.1", l: "止损计划", v: (c: Ctx) => c.f.sp ? "触发 " + fx(c.f.sp, 2) : "—", mx: 1000 },
+      { a: "exec.0", b: "match.0", l: "订单", fb: [[1178, null], [1178, 180], [1000, 180], [1000, null]] },
+      { a: "match.0", b: "account.0", l: "成交", fb: [[1178, null], [1178, 340], [1000, 340], [1000, null]] },
+    ] },
+  strategy: { title: "策略决策", w: 1180, h: 540, blocks: [
+      { id: "in1", k: "in", n: 1, t: "信心池", x: 20, y: 54, v: V.pool },
+      { id: "in3", k: "in", n: 3, t: "基线因子", x: 20, y: 154, v: (c: Ctx) => fx(c.f.b, 3) },
+      { id: "in4", k: "in", n: 4, t: "收盘止损退出", x: 20, y: 210, v: (c: Ctx) => c.f.bt ? "未触发" : "—" },
+      { id: "in2", k: "in", n: 2, t: "初始止损指令", x: 20, y: 300, v: V.rfD },
+      { id: "in5", k: "in", n: 5, t: "账户快照", x: 20, y: 400, v: (c: Ctx) => "权益 " + fx(c.f.eq, 2) },
+      { id: "in6", k: "in", n: 6, t: "行情样本", x: 20, y: 480, v: (c: Ctx) => fx(c.f.px, 4) },
+      { id: "adj", k: "fn", leaf: "adjustment", t: "调整层", g: "A", x: 190, y: 35, w: 130, h: 64, ins: ["池"], outs: ["A"], v: (c: Ctx) => "A " + fx(c.f.ad, 3) },
+      { id: "core", k: "fn", leaf: "core", t: "核心层", g: "C", x: 190, y: 135, w: 130, h: 64, ins: ["基线"], outs: ["C"], v: (c: Ctx) => "C " + fx(c.f.co, 3) },
+      { id: "comb", k: "fn", leaf: "combined", t: "合成", g: "X", x: 380, y: 75, w: 120, h: 80, ins: ["A", "C"], outs: ["X"], v: (c: Ctx) => "X " + fx(c.f.cb, 3) },
+      { id: "level", k: "fn", leaf: "level", t: "档位", g: "L", x: 560, y: 75, w: 120, h: 80, ins: ["|X|"], outs: ["L"], v: (c: Ctx) => c.f.lv + " 档" },
+      { id: "ratio", k: "fn", leaf: "ratio", t: "档位比例", g: "lut", x: 740, y: 75, w: 110, h: 80, ins: ["L"], outs: ["比例"], v: (c: Ctx) => fx(c.ratio, 2) },
+      { id: "q", k: "sub", sub: "riskunit", t: "风险单位 Q", st: "freezeUnit", x: 380, y: 290, w: 180, h: 190, ins: ["风险比例 f", "初始距离 D", "权益 E", "价格 P"], outs: ["Q", "预算 B"], v: (c: Ctx) => c.Q === null ? "未冻结" : "Q " + fx(c.Q, 2) },
+      { id: "target", k: "fn", leaf: "target", t: "目标数量", g: "±Q·r", x: 900, y: 150, w: 120, h: 110, ins: ["比例", "方向", "退出", "Q"], outs: ["目标"], v: (c: Ctx) => fx(c.f.tg, 2) },
+      { id: "band", k: "fn", leaf: "band", t: "不交易区间", g: "|Δ|", x: 900, y: 320, w: 120, h: 90, ins: ["目标", "实际"], outs: ["目标"], v: (c: Ctx) => (c.f.rc || []).includes("NO_TRADE_BAND") ? "不下单" : "下单" },
+      { id: "fAct", k: "from", t: "[实际持仓]", src: "账户快照里的实际持仓", x: 790, y: 368, w: 90, h: 24 },
+      { id: "size", k: "fn", leaf: "size", t: "止损定量", g: "P∓D", x: 650, y: 420, w: 120, h: 80, ins: ["D", "P"], outs: ["触发价"], v: (c: Ctx) => c.f.sp ? fx(c.f.sp, 2) : "—" },
+      { id: "fD", k: "from", t: "[指令 D]", src: "初始止损指令里的距离 D", x: 570, y: 435, w: 70, h: 24 },
+      { id: "out1", k: "out", n: 1, t: "目标数量", x: 1090, y: 352, v: (c: Ctx) => fx(c.f.tg, 2) },
+      { id: "out2", k: "out", n: 2, t: "止损计划", x: 1090, y: 447, v: (c: Ctx) => c.f.sp ? fx(c.f.sp, 2) : "—" },
+    ], wires: [
+      { a: "in1.0", b: "adj.0", l: "池" },
+      { a: "in3.0", b: "core.0", l: "基线" },
+      { a: "adj.0", b: "comb.0", l: "A", v: (c: Ctx) => fx(c.f.ad, 3), mx: 350 },
+      { a: "core.0", b: "comb.1", l: "C", v: (c: Ctx) => fx(c.f.co, 3), mx: 340 },
+      { a: "comb.0", b: "level.0", l: "|X|", v: (c: Ctx) => fx(Math.abs(c.f.cb), 3) },
+      { a: "level.0", b: "ratio.0", l: "L", v: (c: Ctx) => String(c.f.lv) },
+      { a: "ratio.0", b: "target.0", l: "比例", v: (c: Ctx) => fx(c.ratio, 2), mx: 875 },
+      { a: "comb.0", b: "target.1", l: "方向 sign(X)", v: (c: Ctx) => dirName(c.dir), mx: 530 },
+      { a: "in4.0", b: "target.2", l: "退出请求", mx: 880 },
+      { a: "q.0", b: "target.3", l: "Q", v: (c: Ctx) => c.Q === null ? "—" : fx(c.Q, 2), mx: 840 },
+      { a: "in2.0", b: "q.0", l: "f", v: (c: Ctx) => c.f.p3 ? pct(c.f.p3.rf, 3) : "—", mx: 300 },
+      { a: "in2.0", b: "q.1", l: "D", mx: 300 },
+      { a: "in5.0", b: "q.2", l: "E", mx: 350 },
+      { a: "in6.0", b: "q.3", l: "P", mx: 340 },
+      { a: "target.0", b: "band.0", l: "目标", v: (c: Ctx) => fx(c.f.tg, 2), fb: [[1045, null], [1045, 290], [880, 290], [880, null]] },
+      { a: "fAct.0", b: "band.1", v: (c: Ctx) => fx(c.f.ac, 2) },
+      { a: "band.0", b: "out1.0", l: "目标", v: (c: Ctx) => fx(c.f.tg, 2) },
+      { a: "fD.0", b: "size.0" },
+      { a: "in6.0", b: "size.1", l: "P", mx: 620 },
+      { a: "size.0", b: "out2.0", l: "止损计划", mx: 1060 },
+    ] },
+  riskunit: { title: "风险单位 Q", w: 1180, h: 520, blocks: [
+      { id: "i1", k: "in", n: 1, t: "风险比例 f", x: 20, y: 52, v: (c: Ctx) => pct(c.fz.rf, 4) },
+      { id: "i3", k: "in", n: 3, t: "权益 E", x: 20, y: 152, v: (c: Ctx) => fx(c.fz.E, 2) },
+      { id: "i2", k: "in", n: 2, t: "初始距离 D", x: 20, y: 322, v: (c: Ctx) => fx(c.fz.D, 4) },
+      { id: "i4", k: "in", n: 4, t: "价格 P", x: 20, y: 452, v: (c: Ctx) => fx(c.fz.P, 4) },
+      { id: "kmax", k: "const", t: "max_risk_fraction", x: 160, y: 92, w: 90, h: 30, v: (c: Ctx) => fx(c.sz.maxRF, 4) },
+      { id: "kbud", k: "const", t: "object_loss_budget", x: 470, y: 185, w: 90, h: 30, v: (c: Ctx) => fx(c.sz.lossBudget, 2) },
+      { id: "kfee", k: "const", lp: "left", t: "fee", x: 160, y: 382, w: 70, h: 26, v: (c: Ctx) => fx(c.sz.fee, 4) },
+      { id: "kslp", k: "const", lp: "left", t: "slippage", x: 160, y: 418, w: 70, h: 26, v: (c: Ctx) => fx(c.sz.slip, 4) },
+      { id: "kgap", k: "const", lp: "left", t: "gap", x: 160, y: 454, w: 70, h: 26, v: (c: Ctx) => fx(c.sz.gap, 4) },
+      { id: "kO", k: "const", lp: "left", t: "超出余量 O", x: 470, y: 352, w: 70, h: 26, val: "0" },
+      { id: "min1", k: "fn", leaf: "minf", t: "上限", g: "min", x: 300, y: 50, w: 80, h: 60, ins: ["", ""], outs: [""], v: (c: Ctx) => pct(Math.min(c.fz.rf, c.sz.maxRF), 3) },
+      { id: "mul1", k: "fn", leaf: "mulEf", t: "E × f′", g: "×", x: 440, y: 70, w: 70, h: 70, ins: ["", ""], outs: [""], v: (c: Ctx) => fx(c.fz.E * Math.min(c.fz.rf, c.sz.maxRF), 3) },
+      { id: "min2", k: "fn", leaf: "minB", t: "预算 B", g: "min", x: 600, y: 90, w: 80, h: 60, ins: ["", ""], outs: [""], v: (c: Ctx) => fx(Math.min(c.fz.E * Math.min(c.fz.rf, c.sz.maxRF), c.sz.lossBudget), 3) },
+      { id: "sumc", k: "fn", leaf: "sumCost", t: "成本率", g: "Σ", x: 300, y: 390, w: 60, h: 80, ins: ["", "", ""], outs: [""], v: (c: Ctx) => fx(c.sz.cost, 4) },
+      { id: "mulc", k: "fn", leaf: "mulCost", t: "成本准备", g: "×", x: 440, y: 400, w: 70, h: 70, ins: ["", ""], outs: [""], v: (c: Ctx) => fx(c.fz.P * c.sz.cost, 4) },
+      { id: "sumu", k: "fn", leaf: "sumUnit", t: "D+O+成本", g: "Σ", x: 600, y: 320, w: 70, h: 90, ins: ["", "", ""], outs: [""], v: (c: Ctx) => fx(c.fz.D + c.fz.P * c.sz.cost, 4) },
+      { id: "mulu", k: "fn", leaf: "mulUnit", t: "每单位亏损 U", g: "×1", x: 770, y: 320, w: 70, h: 60, ins: [""], outs: [""], v: (c: Ctx) => fx(c.fz.D + c.fz.P * c.sz.cost, 4) },
+      { id: "div", k: "fn", leaf: "divQ", t: "B ÷ U", g: "÷", x: 880, y: 100, w: 70, h: 80, ins: ["", ""], outs: [""], v: (c: Ctx) => fx(Math.min(c.fz.E * Math.min(c.fz.rf, c.sz.maxRF), c.sz.lossBudget) / (c.fz.D + c.fz.P * c.sz.cost), 4) },
+      { id: "stp", k: "fn", leaf: "stepQ", t: "取整 0.01", g: "⌊ ⌋", x: 990, y: 90, w: 70, h: 60, ins: [""], outs: [""], v: (c: Ctx) => fx(Math.floor(Math.min(c.fz.E * Math.min(c.fz.rf, c.sz.maxRF), c.sz.lossBudget) / (c.fz.D + c.fz.P * c.sz.cost) * 100) / 100, 2) },
+      { id: "o2", k: "out", n: 2, t: "预算 B", x: 1100, y: 20, v: (c: Ctx) => fx(c.o.budget, 2) },
+      { id: "o1", k: "out", n: 1, t: "Q", x: 1100, y: 107, v: (c: Ctx) => fx(c.o.q, 2) },
+    ], wires: [
+      { a: "i1.0", b: "min1.0", l: "f" }, { a: "kmax.0", b: "min1.1", mx: 275 }, { a: "min1.0", b: "mul1.0", l: "f′", mx: 410 }, { a: "i3.0", b: "mul1.1", l: "E", mx: 420 },
+      { a: "mul1.0", b: "min2.0", mx: 555 }, { a: "kbud.0", b: "min2.1", mx: 580 }, { a: "min2.0", b: "div.0", l: "B", mx: 840 }, { a: "min2.0", b: "o2.0", l: "B", mx: 700 },
+      { a: "kfee.0", b: "sumc.0", mx: 265 }, { a: "kslp.0", b: "sumc.1", mx: 270 }, { a: "kgap.0", b: "sumc.2", mx: 275 }, { a: "sumc.0", b: "mulc.0", mx: 400 },
+      { a: "i4.0", b: "mulc.1", l: "P", fb: [[140, null], [140, 500], [420, 500], [420, null]] },
+      { a: "i2.0", b: "sumu.0", l: "D", mx: 560 }, { a: "kO.0", b: "sumu.1" }, { a: "mulc.0", b: "sumu.2", mx: 570 },
+      { a: "sumu.0", b: "mulu.0", mx: 720 },
+      { a: "mulu.0", b: "div.1", l: "U", mx: 860 }, { a: "div.0", b: "stp.0", mx: 970 }, { a: "stp.0", b: "o1.0", l: "Q" },
+    ] },
+  stop: { title: "止损与阶梯", w: 1180, h: 540, blocks: [
+      { id: "i1", k: "in", n: 1, t: "研判", x: 20, y: 62, v: V.judg },
+      { id: "i2", k: "in", n: 2, t: "最新决策", x: 20, y: 132, v: (c: Ctx) => "X " + fx(c.f.cb, 3) },
+      { id: "i3", k: "in", n: 3, t: "权益", x: 20, y: 262, v: (c: Ctx) => fx(c.f.p3 && c.f.p3.E, 2) },
+      { id: "i4", k: "in", n: 4, t: "已平批次", x: 20, y: 332, v: (c: Ctx) => c.closedBefore + " 批" },
+      { id: "i5", k: "in", n: 5, t: "行情", x: 20, y: 452, v: (c: Ctx) => fx(c.f.p3 && c.f.p3.P, 4) },
+      { id: "view", k: "fn", leaf: "view", t: "方向与信心", g: "view()", x: 190, y: 50, w: 150, h: 110, ins: ["研判", "决策"], outs: ["方向", "时长", "信心"], v: (c: Ctx) => c.f.p3 ? `${dirName(c.f.p3.dir)} · 信心 ${c.f.p3.conf || "无"}` : "—" },
+      { id: "gate", k: "fn", leaf: "gate", t: "价格状态闸门", g: "gate", x: 430, y: 40, w: 140, h: 70, ins: ["方向"], outs: ["放行"], v: () => "未启用" },
+      { id: "plan", k: "fn", leaf: "planStop", t: "止损几何", g: "PlanStop", x: 430, y: 170, w: 170, h: 100, ins: ["方向", "时长"], outs: ["R", "buffer"], v: (c: Ctx) => c.f.p3 ? `R ${pct(c.f.p3.r, 2)} · 缓冲 ${pct(c.f.p3.buf, 2)}` : "—" },
+      { id: "rf", k: "sub", sub: "riskfrac", t: "风险比例", st: "RiskFraction", x: 430, y: 300, w: 170, h: 140, ins: ["信心", "权益", "已平批次"], outs: ["f"], v: (c: Ctx) => c.f.p3 ? pct(c.f.p3.rf, 3) : "—" },
+      { id: "compose", k: "fn", leaf: "compose", t: "初始指令", g: "(R+b)·P", x: 720, y: 230, w: 170, h: 150, ins: ["放行", "R", "buffer", "f", "P"], outs: ["指令"], v: V.rfD },
+      { id: "batch", k: "fn", leaf: "batchStop", t: "批次止损", g: "trail", x: 720, y: 420, w: 170, h: 100, ins: ["行情"], outs: ["基线", "收盘止损"], v: (c: Ctx) => c.f.bt ? fx(c.f.bt.cs, 2) + (c.f.bt.trailing ? " · 跟踪中" : "") : "无持仓" },
+      { id: "o1", k: "out", n: 1, t: "初始止损指令", x: 1080, y: 292, v: V.rfD },
+      { id: "o2", k: "out", n: 2, t: "基线因子", x: 1080, y: 432, v: (c: Ctx) => fx(c.f.b, 2) },
+      { id: "o3", k: "out", n: 3, t: "收盘止损退出", x: 1080, y: 492, v: (c: Ctx) => c.f.bt ? fx(c.f.bt.cs, 2) : "—" },
+    ], wires: [
+      { a: "i1.0", b: "view.0", l: "研判", mx: 135 }, { a: "i2.0", b: "view.1", l: "X", mx: 135 },
+      { a: "view.0", b: "gate.0", l: "方向", mx: 385 }, { a: "view.0", b: "plan.0", mx: 390 }, { a: "view.1", b: "plan.1", l: "时长", mx: 380 },
+      { a: "view.2", b: "rf.0", l: "信心", v: (c: Ctx) => c.f.p3 ? String(c.f.p3.conf || "无") : "—", mx: 370 },
+      { a: "i3.0", b: "rf.1", l: "E", mx: 355 }, { a: "i4.0", b: "rf.2", l: "n", mx: 345 },
+      { a: "gate.0", b: "compose.0", l: "放行", mx: 690 },
+      { a: "plan.0", b: "compose.1", l: "R", mx: 660 }, { a: "plan.1", b: "compose.2", l: "buffer", mx: 650 },
+      { a: "rf.0", b: "compose.3", l: "f", v: (c: Ctx) => c.f.p3 ? pct(c.f.p3.rf, 3) : "—", mx: 640 },
+      { a: "i5.0", b: "compose.4", l: "P", mx: 700 },
+      { a: "i5.0", b: "batch.0", mx: 690 },
+      { a: "compose.0", b: "o1.0", l: "INITIAL_DISTANCE", v: V.rfD },
+      { a: "batch.0", b: "o2.0", l: "基线", mx: 980 }, { a: "batch.1", b: "o3.0", l: "收盘止损", mx: 1000 },
+    ] },
+  riskfrac: { title: "风险比例", w: 1100, h: 460, blocks: [
+      { id: "i1", k: "in", n: 1, t: "已平批次 n", x: 20, y: 52, v: (c: Ctx) => String(c.closedBefore) },
+      { id: "i2", k: "in", n: 2, t: "信心", x: 20, y: 162, v: (c: Ctx) => c.f.p3 ? String(c.f.p3.conf || "无同向") : "—" },
+      { id: "i3", k: "in", n: 3, t: "权益 E", x: 20, y: 282, v: (c: Ctx) => fx(c.f.p3 && c.f.p3.E, 2) },
+      { id: "i4", k: "in", n: 4, t: "权益峰值", x: 20, y: 372, v: (c: Ctx) => fx(c.peak, 2) },
+      { id: "base", k: "fn", leaf: "base", t: "基础比例", g: "1% | ¼K", x: 230, y: 30, w: 130, h: 70, ins: ["n"], outs: [""], v: (c: Ctx) => c.closedBefore < 30 ? "1%" : "¼ 凯利" },
+      { id: "cf", k: "fn", leaf: "cf", t: "信心系数", g: "lut", x: 230, y: 140, w: 130, h: 70, ins: ["信心"], outs: [""], v: (c: Ctx) => fx(c.cf, 2) },
+      { id: "dd", k: "fn", leaf: "dd", t: "回撤", g: "dd", x: 230, y: 290, w: 130, h: 90, ins: ["E", "峰值"], outs: [""], v: (c: Ctx) => pct(c.dd, 3) },
+      { id: "ddf", k: "fn", leaf: "ddf", t: "回撤系数", g: "max", x: 440, y: 300, w: 120, h: 70, ins: [""], outs: [""], v: (c: Ctx) => fx((c.ddf ?? NaN), 4) },
+      { id: "prod", k: "fn", leaf: "prod", t: "相乘", g: "×", x: 660, y: 130, w: 80, h: 110, ins: ["", "", ""], outs: [""], v: (c: Ctx) => pct(0.01 * c.cf * (c.ddf ?? NaN), 4) },
+      { id: "cap", k: "fn", leaf: "cap", t: "上限 2%", g: "min", x: 820, y: 155, w: 90, h: 60, ins: [""], outs: [""], v: (c: Ctx) => c.f.p3 ? pct(c.f.p3.rf, 4) : "—" },
+      { id: "o1", k: "out", n: 1, t: "风险比例 f", x: 990, y: 172, v: (c: Ctx) => c.f.p3 ? pct(c.f.p3.rf, 4) : "—" },
+    ], wires: [
+      { a: "i1.0", b: "base.0" }, { a: "i2.0", b: "cf.0" }, { a: "i3.0", b: "dd.0", mx: 150 }, { a: "i4.0", b: "dd.1", mx: 160 },
+      { a: "base.0", b: "prod.0", l: "基础", mx: 600 }, { a: "cf.0", b: "prod.1", l: "信心系数", mx: 620 }, { a: "dd.0", b: "ddf.0", l: "回撤" }, { a: "ddf.0", b: "prod.2", l: "回撤系数", mx: 610 },
+      { a: "prod.0", b: "cap.0" }, { a: "cap.0", b: "o1.0", l: "f" },
+    ] },
+};
+const DESC: Record<string, string> = {
+  "strategy.adj": "按信心池算调整幅度", "strategy.core": "把基线变成核心方向", "strategy.comb": "合并核心与调整", "strategy.level": "按强度定档位", "strategy.ratio": "档位换成仓位比例", "strategy.q": "算单位数量 Q|开仓那一轮冻结", "strategy.target": "算本轮目标数量", "strategy.band": "差额太小就不下单", "strategy.size": "算交易所止损价",
+  "riskunit.min1": "比例不超过登记上限", "riskunit.mul1": "权益乘比例", "riskunit.min2": "预算不超过对象亏损预算", "riskunit.sumc": "三项成本率相加", "riskunit.mulc": "价格乘成本率", "riskunit.sumu": "每张亏损相加", "riskunit.mulu": "乘合约乘数", "riskunit.div": "预算除以每张亏损", "riskunit.stp": "向零取整到 0.01",
+  "stop.view": "定方向和信心", "stop.gate": "看价格状态放不放行", "stop.plan": "查历史噪声定止损距离", "stop.rf": "算风险比例|这批最多亏权益的多少", "stop.compose": "生成初始止损指令", "stop.batch": "管理持仓批次的止损",
+  "riskfrac.base": "按已平批次定基础比例", "riskfrac.cf": "信心换成系数", "riskfrac.dd": "算离权益峰值的回撤", "riskfrac.ddf": "回撤换成系数", "riskfrac.prod": "三项相乘", "riskfrac.cap": "封顶 2%",
+};
+for (const [k, d] of Object.entries(DESC)) { const [s, id] = k.split("."); const b = SYS[s].blocks.find((x) => x.id === id); if (b) { const [t, sub] = d.split("|"); b.t = t; if (b.k === "sub") b.st = sub || ""; } }
+export const titleOf = (key: string) => (key.startsWith("leaf:") ? LEAF[key.slice(5)]?.title ?? key : SYS[key]?.title ?? key);
