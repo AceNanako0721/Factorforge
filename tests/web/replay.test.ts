@@ -20,7 +20,7 @@ const decision = (at: string, o: { lv: number; cb: string; tg: string; ac: strin
 const plan = (at: string) => ({ plan_id: "p-" + at, at, kind: "INITIAL", direction: "LONG", confidence: 3, risk_fraction: "0.005", distance: "5", close_distance: "4.5", price: "50", equity: "5000", tier: 4, requested_tier: 24, session: "OVERNIGHT", r: "0.09", buffer: "0.01", trail: "0.04" });
 const batches = [
   { batch_id: "batch-2d257f18aaaa", object_id: object, direction: 1, unit_quantity: "4.85", budget: "25", opened_at: "2026-11-10T06:45:37Z", closed_at: "2026-11-10T15:32:00Z", exit_kind: "TARGET", net_pnl: "11.2", r: "-0.45" },
-  { batch_id: "batch-76958bfebbbb", object_id: object, direction: -1, unit_quantity: "1.5", budget: "24", opened_at: "2026-11-11T18:35:00Z", closed_at: "0001-01-01T00:00:00Z", exit_kind: "", net_pnl: "0", r: "0" },
+  { batch_id: "batch-76958bfebbbb", object_id: object, direction: -1, unit_quantity: "1.5", budget: "24", opened_at: "2026-11-11T18:35:00Z", closed_at: null, exit_kind: "", net_pnl: "0", r: "0" },
 ];
 const inputs = {
   sizing,

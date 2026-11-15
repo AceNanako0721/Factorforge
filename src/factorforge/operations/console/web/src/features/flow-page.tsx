@@ -129,7 +129,7 @@ export function FlowPage() {
   };
 
   return (
-    <div className="page">
+    <div className="page page-wide">
       <Space className="flow-summary" wrap>
         {loading ? (
           <Typography.Text type="secondary">正在读取各模块状态…</Typography.Text>

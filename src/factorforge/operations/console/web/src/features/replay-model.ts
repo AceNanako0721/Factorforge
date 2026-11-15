@@ -72,7 +72,6 @@ export function sizingOf(v: Json): Sizing | null {
   return { maxRF: n(s.max_risk_fraction) ?? 1, lossBudget: z(s.object_loss_budget), fee, slip, gap, cost: fee + slip + gap, band: n(s.band_ratio_of_unit), levels: s.levels.map(record).map((l) => ({ enter: z(l.enter), exit: z(l.exit), x: z(l.exposure) })) };
 }
 
-export const ZERO_TIME = "0001-01-01T00:00:00Z";
 export const NO_PLAN: Plan = { t: "", dir: 0, conf: 0, rf: NaN, D: NaN, Dc: NaN, P: NaN, E: NaN, r: NaN, buf: NaN, tier: NaN, rtier: NaN, ses: "—", trail: NaN };
 const n = (v: Json | undefined): number | null => {
   const x = typeof v === "string" ? Number(v) : typeof v === "number" ? v : NaN;
@@ -87,7 +86,7 @@ export function buildOrders(batches: Json[]): Order[] {
     .map(record)
     .filter((b) => typeof b.batch_id === "string")
     .map((b) => {
-      const closed = typeof b.closed_at === "string" && !b.closed_at.startsWith("0001") ? iso(b.closed_at) : null;
+      const closed = typeof b.closed_at === "string" ? iso(b.closed_at) : null;
       return {
         id: String(b.batch_id).replace(/^batch-/, "").slice(0, 8),
         batchId: String(b.batch_id),

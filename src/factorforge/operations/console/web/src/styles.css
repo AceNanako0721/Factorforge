@@ -402,6 +402,9 @@ body {
 }
 
 /* S4-022 module diagrams, function pages, timeline and orders */
+.page-wide { max-width: none; }
+.page-wide .bd-stage { min-height: max(430px, calc(100vh - 470px)); }
+.page-wide .rp-insp { max-height: calc(100vh - 200px); }
 .rp-model {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;

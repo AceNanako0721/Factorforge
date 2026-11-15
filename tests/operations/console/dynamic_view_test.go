@@ -13,6 +13,7 @@ import (
 	"github.com/AceNanako0721/Factorforge/src/factorforge/operations/console/api"
 	app "github.com/AceNanako0721/Factorforge/src/factorforge/operations/console/application"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/operations/console/config"
+	d "github.com/AceNanako0721/Factorforge/src/factorforge/operations/console/domain"
 )
 
 // T4-15 / S4-017: the dynamic page reads P3 dynamic, P1 and P2 together and
@@ -158,5 +159,17 @@ func TestReplayViewPanelsAndRange(t *testing.T) {
 	// The replay recomputes Q from the object's sizing view.
 	if raw, _ := json.Marshal(panels["decision-history"].Data); !strings.Contains(string(raw), "object_loss_budget") {
 		t.Fatal("decision history without sizing", string(raw))
+	}
+}
+
+// S4-024: the order list shows the open batch; its closed_at is null.
+func TestReplayBatchesKeepOpenBatch(t *testing.T) {
+	open := `[{"batch_id":"batch-a","object_id":"obj","direction":-1,"unit_quantity":"2","budget":"20","opened_at":"2026-01-04T10:00:00Z","closed_at":null,"exit_kind":"","case_id":"","net_pnl":"0","r":"0","truncated":false}]`
+	if _, e := d.ProjectBound("strategy", d.Routes["batches"].Path, []byte(open), "obj"); e != nil {
+		t.Fatal("open batch refused", e)
+	}
+	zero := strings.Replace(open, "null", `"0001-01-01T00:00:00Z"`, 1)
+	if _, e := d.ProjectBound("strategy", d.Routes["batches"].Path, []byte(zero), "obj"); e == nil {
+		t.Fatal("zero closed_at accepted")
 	}
 }

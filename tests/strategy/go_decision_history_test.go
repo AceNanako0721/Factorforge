@@ -48,8 +48,9 @@ func TestDecisionHistoryAndBatchesRoutes(t *testing.T) {
 		}
 		return res.Code
 	}
-	var batches []sd.BatchRecord
-	if code := get("/batches", &batches); code != 200 || len(batches) != 2 || batches[0].BatchID != "batch-early" || batches[1].BatchID != "batch-late" || !batches[1].ClosedAt.IsZero() {
+	// An open batch publishes a null closed_at, never the zero time.
+	var batches []sd.BatchView
+	if code := get("/batches", &batches); code != 200 || len(batches) != 2 || batches[0].BatchID != "batch-early" || batches[0].ClosedAt == nil || !batches[0].ClosedAt.Equal(at.Add(30*time.Minute)) || batches[1].BatchID != "batch-late" || batches[1].ClosedAt != nil {
 		t.Fatal("batches", code, batches)
 	}
 	type page struct {

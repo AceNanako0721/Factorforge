@@ -55,11 +55,11 @@ func DecisionHistory(ctx context.Context, state *d.StrategyState, store any, obj
 }
 
 // ObjectBatches lists one object's risk batches by opening time (S2-024).
-func ObjectBatches(state *d.StrategyState, object string) []*d.BatchRecord {
-	rows := []*d.BatchRecord{}
+func ObjectBatches(state *d.StrategyState, object string) []d.BatchView {
+	rows := []d.BatchView{}
 	for _, b := range state.Batches.Values() {
 		if b != nil && b.ObjectID == object {
-			rows = append(rows, d.Clone(b))
+			rows = append(rows, d.NewBatchView(b))
 		}
 	}
 	sort.Slice(rows, func(i, j int) bool { return rows[i].OpenedAt.Before(rows[j].OpenedAt) })
