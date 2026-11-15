@@ -250,11 +250,11 @@ func TestT328DynamicReadAPI(t *testing.T) {
 	}
 	state := plans.Items[0].(operations.DynamicPlanView)
 	plan := plans.Items[1].(operations.DynamicPlanView)
-	if state.Kind != "PRICE_STATE" || state.State == nil || *state.State != "DOWNTREND" || state.Probabilities["DOWNTREND"] != "0.67" || state.Distance != nil {
+	if state.Kind != "PRICE_STATE" || state.State == nil || *state.State != "DOWNTREND" || state.Probabilities == nil || (*state.Probabilities)["DOWNTREND"] != "0.67" || state.Distance != nil {
 		t.Fatalf("price state %+v", state)
 	}
 	if plan.Kind != "INITIAL" || plan.Direction == nil || *plan.Direction != "SHORT" || plan.Confidence == nil || *plan.Confidence != 3 || plan.RiskFraction == nil || *plan.RiskFraction != "0.0075" ||
-		plan.Distance == nil || *plan.Distance != "19.07" || plan.Tier == nil || *plan.Tier != 72 || plan.R == nil || *plan.R != "0.1612" || plan.State != nil {
+		plan.Distance == nil || *plan.Distance != "19.07" || plan.Tier == nil || *plan.Tier != 72 || plan.R == nil || *plan.R != "0.1612" || plan.State != nil || plan.Probabilities != nil {
 		t.Fatalf("initial plan %+v", plan)
 	}
 	if _, err = q.Plans(ctx, principal, operations.Filter{Cursor: *page.Cursor}); err == nil {

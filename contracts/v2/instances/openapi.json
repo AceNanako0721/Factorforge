@@ -572,10 +572,17 @@
             ]
           },
           "probabilities": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "type": "object"
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "r": {
             "anyOf": [

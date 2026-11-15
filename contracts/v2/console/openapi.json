@@ -4259,7 +4259,14 @@
                                     ]
                                   },
                                   "probabilities": {
-                                    "type": "null"
+                                    "anyOf": [
+                                      {
+                                        "type": "null"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
                                   },
                                   "r": {
                                     "anyOf": [
