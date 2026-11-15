@@ -5,7 +5,7 @@ import { BlockDiagram, FunctionPage, formulaHtml } from "./block-diagram";
 import { poolView } from "./confidence";
 import { shortTime, useDisplay } from "./display-settings";
 import { flowNodes, type FlowNode, type Health } from "./flow-model";
-import { directionText, dynamicRange, text } from "./market-model";
+import { directionText, dynamicRange, num, text } from "./market-model";
 import { useReplay } from "./replay-data";
 import { buildOrders, ctxAt, startFrame, type Ctx, type Order } from "./replay-model";
 import { GO, LEAF, SYS, dirName, fx, hm, jName, titleOf, type Block } from "./replay-systems";
@@ -45,11 +45,12 @@ export function FlowPage() {
   // Until the first read lands, no module is judged: an empty answer would
   // otherwise read as "not enabled" or "flat".
   const loading = dynamic.pending || overview.pending || operations.pending;
+  const account = objectOf(panelOf(dynamic.panels, "account"));
   const judged = flowNodes({
     now: Date.now(),
     status,
     judgments,
-    account: objectOf(panelOf(dynamic.panels, "account")),
+    account,
     position: listOf(panelOf(dynamic.panels, "positions")).find((p) => record(p.instrument_key).instrument_id === s.instrument_key.instrument_id && p.owner_id === s.owner_id),
     protections,
     object,
@@ -198,7 +199,7 @@ export function FlowPage() {
           live={isLive}
         />
       )}
-      <OrdersTable orders={orders} current={order} onSelect={(o) => setOrderId(o.batchId)} />
+      <OrdersTable orders={orders} current={order} floating={num(account.unrealized_pnl ?? null)} onSelect={(o) => setOrderId(o.batchId)} />
     </div>
   );
 }
@@ -406,7 +407,11 @@ function FrameSummary({ ctx }: { ctx: Ctx | null }) {
   );
 }
 
-function OrdersTable({ orders, current, onSelect }: { orders: Order[]; current: Order | null; onSelect: (o: Order) => void }) {
+// The open order shows the account's floating P&L (one instrument per
+// account) and the R it makes of the batch budget.
+function OrdersTable({ orders, current, floating, onSelect }: { orders: Order[]; current: Order | null; floating: number | null; onSelect: (o: Order) => void }) {
+  const signed = (v: number, unit = "") => <span className={v >= 0 ? "pos" : "neg"}>{(v >= 0 ? "+" : "") + fx(v, 2) + unit}</span>;
+  const open = (o: Order) => !o.closed && floating !== null;
   return (
     <section className="rp-orders">
       <div className="rp-orders-head">
@@ -430,8 +435,8 @@ function OrdersTable({ orders, current, onSelect }: { orders: Order[]; current: 
           { title: "平仓（UTC）", dataIndex: "closed", render: (v: string | null) => (v ? <span className="mono">{hm(v)}</span> : <Tag color="green">持仓中</Tag>) },
           { title: "单位数量 Q", dataIndex: "q", align: "right", render: (v: number) => fx(v, 2) },
           { title: "风险预算", dataIndex: "budget", align: "right", render: (v: number) => fx(v, 2) },
-          { title: "净盈亏", dataIndex: "pnl", align: "right", render: (v: number | null) => (v === null ? "—" : <span className={v >= 0 ? "pos" : "neg"}>{(v >= 0 ? "+" : "") + fx(v, 2)}</span>) },
-          { title: "收益（R）", dataIndex: "r", align: "right", render: (v: number | null) => (v === null ? "—" : <span className={-v >= 0 ? "pos" : "neg"}>{(-v >= 0 ? "+" : "") + fx(-v, 2)}R</span>) },
+          { title: "净盈亏", dataIndex: "pnl", align: "right", render: (v: number | null, o: Order) => (open(o) ? <Tooltip title="持仓中：账户浮动盈亏">{signed(floating as number)} <Tag className="rp-float">浮动</Tag></Tooltip> : v === null ? "—" : signed(v)) },
+          { title: "收益（R）", dataIndex: "r", align: "right", render: (v: number | null, o: Order) => (open(o) && o.budget > 0 ? signed((floating as number) / o.budget, "R") : v === null ? "—" : signed(-v, "R")) },
           { title: "退出方式", dataIndex: "exit", render: (v: string | null) => (v ? (exitText[v] ?? v) : "—") },
         ]}
       />

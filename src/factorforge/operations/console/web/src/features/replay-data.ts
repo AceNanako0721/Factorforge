@@ -6,7 +6,8 @@ import { useSession } from "./session";
 
 // S4-024: one source of the replay view over the order's window, following the
 // console cursor. The first page's data also carries the source's extras (the
-// decision history's sizing view).
+// decision history's sizing view). A page over the console's response budget
+// is asked again with half the limit.
 async function readSource(s: Selection, source: string, from: string, to: string, limit: number, signal?: AbortSignal) {
   const items: Json[] = [];
   let first: Json = null;
@@ -16,6 +17,11 @@ async function readSource(s: Selection, source: string, from: string, to: string
     if (cursor) filters.cursor = cursor;
     const value = checkResponse(await request<Response>(query("/replay", s, filters), signal), s);
     const panel = value.panels.find((p) => p.source === source);
+    if (panel?.code === "LOWER_RESPONSE_BUDGET" && limit > MIN_LIMIT) {
+      limit = Math.max(MIN_LIMIT, Math.floor(limit / 2));
+      page--;
+      continue;
+    }
     if (!panel || (panel.state !== "AVAILABLE" && panel.state !== "EMPTY")) throw new Error(panel?.code ?? "READ_UNAVAILABLE");
     if (page === 0) first = panel.data;
     items.push(...rows(panel.data));
@@ -24,6 +30,11 @@ async function readSource(s: Selection, source: string, from: string, to: string
   }
   return { items, first, truncated: true };
 }
+
+// Decisions carry their input snapshot (tens of kB each), so they start at a
+// smaller page than the other sources.
+const DECISION_LIMIT = 200;
+const MIN_LIMIT = 10;
 
 export function useReplay(order: Order | null) {
   const { session, selection, capabilities } = useSession();
@@ -39,7 +50,7 @@ export function useReplay(order: Order | null) {
       const o = order as Order;
       const { from, to } = replayWindow(o, Date.now());
       const [decisions, plans, actions, judgments, fills] = await Promise.all(
-        ["decision-history", "dynamic.plans", "dynamic.actions", "dynamic.judgments", "fills"].map((src) => readSource(s, src, from, to, limit, signal)),
+        ["decision-history", "dynamic.plans", "dynamic.actions", "dynamic.judgments", "fills"].map((src) => readSource(s, src, from, to, src === "decision-history" ? Math.min(limit, DECISION_LIMIT) : limit, signal)),
       );
       const sizing = (decisions.first && typeof decisions.first === "object" && !Array.isArray(decisions.first) ? decisions.first.sizing : null) ?? null;
       const replay = buildReplay(o, { decisions: decisions.items, plans: plans.items, actions: actions.items, judgments: judgments.items, fills: fills.items, sizing }, s.object_id);

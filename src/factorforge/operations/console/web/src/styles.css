@@ -403,6 +403,7 @@ body {
 
 /* S4-022 module diagrams, function pages, timeline and orders */
 .page-wide { max-width: none; }
+.rp-float { margin: 0 0 0 4px; font-size: 11px; line-height: 16px; padding: 0 4px; }
 .page-wide .bd-stage { min-height: max(430px, calc(100vh - 470px)); }
 .page-wide .rp-insp { max-height: calc(100vh - 200px); }
 .rp-model {
