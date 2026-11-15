@@ -142,6 +142,7 @@ export function buildReplay(order: Order, input: ReplayInputs, objectId: string)
     states.push({ t: a.t, s: run });
   }
   // one decision per five-minute cycle, the delivered one first
+  let opening: (Record<string, Json> & { inputs: Record<string, Json> }) | null = null;
   const cycles = new Map<string, Record<string, Json> & { delivery: string | null; inputs: Record<string, Json> }>();
   for (const item of input.decisions.map(record)) {
     const d = record(item.decision);
@@ -151,6 +152,7 @@ export function buildReplay(order: Order, input: ReplayInputs, objectId: string)
     const key = at.toISOString();
     const delivery = typeof item.delivery_state === "string" ? item.delivery_state : null;
     const prev = cycles.get(key);
+    if (iso(d.available_cutoff) === order.opened) opening = { ...d, delivery, inputs: record(item.inputs) };
     if (!prev || delivery === "ACK" || prev.delivery !== "ACK") cycles.set(key, { ...d, delivery, inputs: record(item.inputs) });
   }
   const byDirective = new Map(plans.filter((p) => p.id).map((p) => [p.id, p]));
@@ -192,8 +194,16 @@ export function buildReplay(order: Order, input: ReplayInputs, objectId: string)
       };
     });
   let freeze: Freeze | null = null;
+  // P2 opens the batch at the decision that sizes it: that decision gives the
+  // equity, price and directive even when another one shows for its cycle.
+  const o = opening as (Record<string, Json> & { inputs: Record<string, Json> }) | null;
+  if (o && Array.isArray(o.reason_codes) && o.reason_codes.includes("STOP_DIRECTIVE_SIZED")) {
+    const E = n(o.inputs.equity), P = n(o.inputs.price);
+    const p = (typeof o.stop_directive_id === "string" && byDirective.get(o.stop_directive_id)) || latest(plans.filter((x) => x.dir === order.dir), order.opened);
+    if (E !== null && P !== null && p && p.dir === order.dir) freeze = { t: order.opened, E, P, rf: p.rf, D: p.D, conf: p.conf, r: p.r, trail: p.trail, gap: null };
+  }
   const fz = frames.find((f) => f.rc.includes("STOP_DIRECTIVE_SIZED") && Math.sign(f.tg) === order.dir);
-  if (fz && fz.eq !== null && fz.px !== null) {
+  if (!freeze && fz && fz.eq !== null && fz.px !== null) {
     // P2 sizes from the verified directive the decision names, which can be
     // older than the latest plan P3 has sent.
     const p = fz.p3 && fz.p3.dir === order.dir ? fz.p3 : latest(plans.filter((x) => x.dir === order.dir), fz.t);

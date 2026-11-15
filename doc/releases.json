@@ -563,7 +563,7 @@
    "version": "3.15.1",
    "change_kind": "design",
    "date": "2026-11-15",
-   "summary": "Console: the order replay recomputes the unit quantity from the initial plan of the stop directive the sizing decision names, which can be older than the latest plan sent; the recomputed quantity now matches the batch record (S4-024)."
+   "summary": "Console: the order replay recomputes the unit quantity from the decision at the batch opening time, where P2 sized it, and from the initial plan of the stop directive that decision names, which can be older than the latest plan sent; the recomputed quantity matches the batch record (S4-024)."
   }
  ]
 }
