@@ -281,7 +281,7 @@ func New(o Options) (http.Handler, error) {
 		defer sub.Close()
 		serveLive(w, r, o, sub, s.ID)
 	})
-	routes := map[string]string{"overview": "overview", "market": "market", "events": "events", "events/{event_id}": "event", "sentiment": "sentiment", "decisions": "decisions", "execution": "execution", "cases": "cases", "cases/{case_id}": "case", "learning": "learning", "operations": "operations", "audit": "audit", "dynamic": "dynamic"}
+	routes := map[string]string{"overview": "overview", "market": "market", "events": "events", "events/{event_id}": "event", "sentiment": "sentiment", "decisions": "decisions", "execution": "execution", "cases": "cases", "cases/{case_id}": "case", "learning": "learning", "operations": "operations", "audit": "audit", "dynamic": "dynamic", "replay": "replay"}
 	for path, view := range routes {
 		mux.HandleFunc("GET "+Prefix+"/"+path, func(w http.ResponseWriter, r *http.Request) {
 			u, ok := authorize(w, r)
@@ -321,7 +321,7 @@ func New(o Options) (http.Handler, error) {
 			return
 		}
 		view := r.URL.Query().Get("view")
-		if !d.Has([]string{"overview", "market", "events", "sentiment", "decisions", "execution", "cases", "learning", "operations", "audit", "dynamic"}, view) {
+		if !d.Has([]string{"overview", "market", "events", "sentiment", "decisions", "execution", "cases", "learning", "operations", "audit", "dynamic", "replay"}, view) {
 			reject(w, d.Fail("EXPORT_VIEW_INVALID", 422))
 			return
 		}
@@ -543,6 +543,8 @@ func filter(r *http.Request, view string, export bool) (string, app.Filter, erro
 		keys = append(keys, "interval", "start", "end")
 	case "dynamic":
 		keys = append(keys, "interval", "start", "end", "from", "to")
+	case "replay":
+		keys = append(keys, "from", "to")
 	case "events", "audit", "learning":
 		keys = append(keys, "from", "to")
 	case "event":

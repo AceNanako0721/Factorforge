@@ -9,6 +9,7 @@ import (
 	"time"
 
 	pg "github.com/AceNanako0721/Factorforge/src/factorforge/strategy/adapters/postgres"
+	app "github.com/AceNanako0721/Factorforge/src/factorforge/strategy/application"
 	sd "github.com/AceNanako0721/Factorforge/src/factorforge/strategy/domain"
 	tradingpg "github.com/AceNanako0721/Factorforge/src/factorforge/trading/adapters/postgres"
 	"github.com/jackc/pgx/v5"
@@ -383,6 +384,28 @@ func TestNativeP2DecisionArchiveIsTransactional(t *testing.T) {
 	if err = adminConn.QueryRow(ctx, "SELECT payload FROM strategy_sim.decision_archive WHERE instance_id=$1 AND decision_id='decision-old'", id).Scan(&payload); err != nil ||
 		sd.Text(sd.Object(payload["decision"])["decision_id"]) != "decision-old" || sd.Text(sd.Object(payload["outbox"])["state"]) != "ACK" {
 		t.Fatal("archive payload", err, payload)
+	}
+	// S2-024: the history reads the archive and the retained decisions as one
+	// time-ordered list through the public role, paged by cutoff.
+	object := template.ObjectID
+	all, next, err := app.DecisionHistory(ctx, state, public, object, t0.Add(-time.Hour), t0.Add(72*time.Hour), "", 500)
+	if err != nil || len(all) != 2 || next != "" || all[0].Decision.DecisionID != "decision-old" || all[1].Decision.DecisionID != "decision-new" ||
+		all[0].DeliveryState == nil || *all[0].DeliveryState != "ACK" || all[1].DeliveryState == nil {
+		t.Fatal("decision history", err, all, next)
+	}
+	first, next, err := app.DecisionHistory(ctx, state, public, object, t0.Add(-time.Hour), t0.Add(72*time.Hour), "", 1)
+	if err != nil || len(first) != 1 || first[0].Decision.DecisionID != "decision-old" || next == "" {
+		t.Fatal("first history page", err, first, next)
+	}
+	second, next, err := app.DecisionHistory(ctx, state, public, object, t0.Add(-time.Hour), t0.Add(72*time.Hour), next, 1)
+	if err != nil || len(second) != 1 || second[0].Decision.DecisionID != "decision-new" || next != "" {
+		t.Fatal("second history page", err, second, next)
+	}
+	if late, _, err := app.DecisionHistory(ctx, state, public, object, t0.Add(time.Hour), t0.Add(72*time.Hour), "", 500); err != nil || len(late) != 1 || late[0].Decision.DecisionID != "decision-new" {
+		t.Fatal("history range", err, late)
+	}
+	if _, _, err = app.DecisionHistory(ctx, state, public, object, t0, t0.Add(time.Hour), "not-a-cursor", 10); err == nil {
+		t.Fatal("malformed cursor accepted")
 	}
 	reenter := worker.Transaction(ctx, id, func(s *sd.StrategyState) error {
 		addDecision(s, template, outbox, "decision-old", t0, "ACK")

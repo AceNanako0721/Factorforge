@@ -1,6 +1,6 @@
 # Web 管理台设计书
 
-版本：3.9.0
+版本：3.10.0
 
 对应式样书：[04_Web管理台式样书](04_Web管理台式样书.md)。本书说明 `src/factorforge/operations/console` 的实现。
 
@@ -238,6 +238,7 @@ max_retries = 3
 | `events` / `events/{event_id}` | `events` / `event` `scores` |
 | `sentiment` | `pool` `ledger` |
 | `decisions` | `decisions` `strategy.targets` `trading.targets` `positions` |
+| `replay` | `batches` `decision-history` `dynamic.plans` `dynamic.actions` `dynamic.judgments` `fills`；必须带 `from`（`QUERY_RANGE_REQUIRED`），`from`/`to`/`limit` 转给接受它们的下层路由 |
 | `execution` | `positions` `orders` `fills` `protections` `income` `owners` `external-facts` |
 | `cases` / `cases/{case_id}` | `cases` / `cases` `attributions` `counterfactuals` |
 | `learning` | `parameters` `learning` `activations` `validation` |
@@ -481,6 +482,7 @@ max_retries = 3
 | T4-02、T4-10、T4-14 | 下层各服务独立失败、未配置、夹具模式限制、本地配置文件 |
 | T4-04～T4-09 | 实例级列表的对象范围、案例有限形状、报告范围 |
 | T4-15、T4-19 | 研判与止损视图的区块与时间范围、旧版实例接口缺少阶梯字段时的兼容 |
+| T4-24 | 订单回放视图的来源与起点 |
 | T4-16 | 登记隧道主机、主机名检查、跨站导航只取静态页面 |
 | T4-17 | 推送解析、共享与过期、重连与空闲关闭、推送的授权与会话结束 |
 | T4-18 | 盈亏块的投影 |

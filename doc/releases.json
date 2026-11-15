@@ -516,6 +516,12 @@
    "change_kind": "specification",
    "date": "2026-11-14",
    "summary": "SOXLUSDT instance: the price-state entry gate (S3-035) can be registered for reversals only (scope = REVERSAL): a new batch on the side of the last batch held opens without it, while the first batch and every reversal still need the state to agree. Under either scope the gate now also decides a view that turned against the batch held, whose initial-distance directive would otherwise open the reversal ungated once the batch closed."
+  },
+  {
+   "version": "3.10.0",
+   "change_kind": "specification",
+   "date": "2026-11-15",
+   "summary": "Read access for replaying an order. Strategy framework: an object's risk batches and its decision history by time range, archived decisions included, each with the delivery state of its target (S2-024). SOXLUSDT instance: plan records list every initial stop plan sent and every hourly price state, which action records leave out (S3-032). Console: an order replay view reads these with the instance's actions, judgments and the trading fills (S4-024)."
   }
  ]
 }

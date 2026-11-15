@@ -27,6 +27,8 @@ var Views = map[string][]string{
 	"audit":      {"trading.audit", "strategy.audit"},
 	// S4-017: judgment, stop and baseline page.
 	"dynamic": {"dynamic.status", "dynamic.judgments", "dynamic.actions", "account", "positions", "protections", "object", "candles"},
+	// S4-024: order replay inputs.
+	"replay": {"batches", "decision-history", "dynamic.plans", "dynamic.actions", "dynamic.judgments", "fills"},
 }
 
 type Filter struct {
@@ -119,6 +121,9 @@ func (q ReadQuery) Read(ctx context.Context, u d.User, selection, view, id strin
 		return Response{}, d.Fail("QUERY_LIMIT_INVALID", 422)
 	}
 	if (view == "market" || view == "dynamic") && (f.Interval == "" || f.Start == "" || f.End == "") {
+		return Response{}, d.Fail("QUERY_RANGE_REQUIRED", 422)
+	}
+	if view == "replay" && f.From == "" {
 		return Response{}, d.Fail("QUERY_RANGE_REQUIRED", 422)
 	}
 	out := Response{SchemaVersion: d.SchemaVersion, Selection: s, GeneratedAt: q.Now().UTC(), Panels: []Panel{}}

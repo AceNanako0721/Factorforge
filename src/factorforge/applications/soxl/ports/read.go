@@ -16,6 +16,6 @@ type Clock interface{ Now() time.Time }
 type DynamicReadStore interface {
 	Binding() d.Binding
 	StateWithVersion(ctx context.Context, key string) (json.RawMessage, int64, time.Time, error)
-	RecordPage(ctx context.Context, kinds []string, since, until time.Time, before *d.DynamicRecordKey, skipInitial bool, limit int) ([]d.DynamicRecord, error)
+	RecordPage(ctx context.Context, kinds []string, since, until time.Time, before *d.DynamicRecordKey, filter d.StopEventFilter, limit int) ([]d.DynamicRecord, error)
 	RecordsByID(ctx context.Context, kind string, ids []string) (map[string]json.RawMessage, error)
 }

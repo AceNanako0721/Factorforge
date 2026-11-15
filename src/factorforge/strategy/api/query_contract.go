@@ -140,6 +140,7 @@ func OpenAPI(internal bool) []byte {
 	addCompositionContract(paths, schemas)
 	addStopContract(paths, schemas)
 	addDynamicContract(paths, schemas)
+	addHistoryContract(paths, schemas)
 	raw, err := json.MarshalIndent(document, "", "  ")
 	if err != nil {
 		panic("strategy contract serialization failed")

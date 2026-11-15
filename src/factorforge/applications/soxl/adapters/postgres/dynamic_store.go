@@ -153,8 +153,8 @@ func sameJSON(a, b []byte) bool {
 // RecordPage returns records of the given kinds in [since, until), newest
 // first, strictly after before when given. STOP_EVENT rows of kind INITIAL
 // (routine renewals) and PRICE_STATE (hourly gate input, S3-035) are left
-// out when skipInitial is set (S3-032).
-func (s *Store) RecordPage(ctx context.Context, kinds []string, since, until time.Time, before *d.DynamicRecordKey, skipInitial bool, limit int) ([]d.DynamicRecord, error) {
+// out of action records and are the only rows of plan records (S3-032).
+func (s *Store) RecordPage(ctx context.Context, kinds []string, since, until time.Time, before *d.DynamicRecordKey, filter d.StopEventFilter, limit int) ([]d.DynamicRecord, error) {
 	if err := s.dynamicRead(ctx); err != nil {
 		return nil, err
 	}
@@ -163,8 +163,11 @@ func (s *Store) RecordPage(ctx context.Context, kinds []string, since, until tim
 	}
 	sql := "SELECT recorded_at,record_kind,record_id,payload FROM " + s.schema + ".dynamic_record WHERE instance_id=$1 AND record_kind=ANY($2) AND recorded_at>=$3 AND recorded_at<$4"
 	args := []any{s.binding.InstanceID, kinds, since, until}
-	if skipInitial {
+	switch filter {
+	case d.StopEventsActions:
 		sql += " AND NOT (record_kind='STOP_EVENT' AND payload->>'kind' IN ('INITIAL','PRICE_STATE'))"
+	case d.StopEventsPlans:
+		sql += " AND record_kind='STOP_EVENT' AND payload->>'kind' IN ('INITIAL','PRICE_STATE')"
 	}
 	if before != nil {
 		sql += " AND (recorded_at,record_kind,record_id)<($5,$6,$7)"

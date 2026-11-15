@@ -314,7 +314,7 @@ func (s *dynamicStore) StateWithVersion(_ context.Context, key string) (json.Raw
 	}
 	return nil, 0, time.Time{}, nil
 }
-func (s *dynamicStore) RecordPage(_ context.Context, kinds []string, since, until time.Time, before *id.DynamicRecordKey, _ bool, limit int) ([]id.DynamicRecord, error) {
+func (s *dynamicStore) RecordPage(_ context.Context, kinds []string, since, until time.Time, before *id.DynamicRecordKey, _ id.StopEventFilter, limit int) ([]id.DynamicRecord, error) {
 	out := []id.DynamicRecord{}
 	for _, r := range s.records {
 		if id.Has(kinds, r.Kind) && !r.At.Before(since) && r.At.Before(until) && (before == nil || r.At.Before(before.At)) && len(out) < limit {

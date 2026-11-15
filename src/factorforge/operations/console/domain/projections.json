@@ -456,6 +456,235 @@
           ],
           "type": "object"
         },
+        "DynamicPlanView": {
+          "additionalProperties": false,
+          "properties": {
+            "at": {
+              "format": "date-time",
+              "pattern": "Z$",
+              "type": "string"
+            },
+            "buffer": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "close_distance": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "confidence": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "direction": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "directive_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "distance": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "equity": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "hour_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "pattern": "Z$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "kind": {
+              "type": "string"
+            },
+            "model": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "plan_id": {
+              "type": "string"
+            },
+            "price": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "probabilities": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "r": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "requested_tier": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "risk_fraction": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "session": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "state": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "strength": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "tier": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "trail": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "plan_id",
+            "at",
+            "kind",
+            "directive_id",
+            "direction",
+            "confidence",
+            "risk_fraction",
+            "distance",
+            "close_distance",
+            "price",
+            "equity",
+            "tier",
+            "requested_tier",
+            "session",
+            "r",
+            "buffer",
+            "trail",
+            "state",
+            "hour_at",
+            "probabilities",
+            "strength",
+            "model"
+          ],
+          "type": "object"
+        },
         "DynamicStatusView": {
           "additionalProperties": false,
           "properties": {
@@ -1105,6 +1334,70 @@
           "items": {
             "items": {
               "$ref": "#/components/schemas/DynamicJudgmentView"
+            },
+            "type": "array"
+          },
+          "observed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "pattern": "Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "schema_version": {
+            "const": "instance-2.0",
+            "type": "string"
+          },
+          "snapshot_version": {
+            "type": "string"
+          },
+          "source_version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "environment",
+          "instance_id",
+          "source_version",
+          "observed_at",
+          "snapshot_version",
+          "items",
+          "cursor"
+        ],
+        "type": "object"
+      },
+      "/api/v2/instances/{instance_id}/dynamic/plans": {
+        "additionalProperties": false,
+        "properties": {
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "environment": {
+            "enum": [
+              "SIM",
+              "LIVE"
+            ],
+            "type": "string"
+          },
+          "instance_id": {
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DynamicPlanView"
             },
             "type": "array"
           },
@@ -3034,6 +3327,74 @@
             "scheduled",
             "shadow",
             "trigger_layer"
+          ],
+          "type": "object"
+        },
+        "DecisionHistoryItem": {
+          "additionalProperties": false,
+          "properties": {
+            "decision": {
+              "$ref": "#/components/schemas/DecisionView"
+            },
+            "delivery_reason": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "delivery_state": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "decision",
+            "delivery_state",
+            "delivery_reason"
+          ],
+          "type": "object"
+        },
+        "DecisionHistoryPage": {
+          "additionalProperties": false,
+          "properties": {
+            "cursor": {
+              "type": "string"
+            },
+            "items": {
+              "items": {
+                "$ref": "#/components/schemas/DecisionHistoryItem"
+              },
+              "type": "array"
+            },
+            "sizing": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/SizingView"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "snapshot_version": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "items",
+            "cursor",
+            "snapshot_version",
+            "sizing"
           ],
           "type": "object"
         },
@@ -6976,6 +7337,76 @@
           ],
           "type": "object"
         },
+        "SizingView": {
+          "additionalProperties": false,
+          "properties": {
+            "band_ratio_of_unit": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "fee_rate": {
+              "type": "string"
+            },
+            "gap_fraction": {
+              "type": "string"
+            },
+            "levels": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "enter": {
+                    "type": "string"
+                  },
+                  "exit": {
+                    "type": "string"
+                  },
+                  "exposure": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "exposure",
+                  "enter",
+                  "exit"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "max_risk_fraction": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "object_loss_budget": {
+              "type": "string"
+            },
+            "slippage_fraction": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "max_risk_fraction",
+            "object_loss_budget",
+            "fee_rate",
+            "slippage_fraction",
+            "gap_fraction",
+            "band_ratio_of_unit",
+            "levels"
+          ],
+          "type": "object"
+        },
         "StateCommand": {
           "additionalProperties": false,
           "properties": {
@@ -8070,12 +8501,21 @@
       "/api/v2/strategy/objects/{object_id}": {
         "$ref": "#/components/schemas/ObservedObject"
       },
+      "/api/v2/strategy/objects/{object_id}/batches": {
+        "items": {
+          "$ref": "#/components/schemas/BatchRecord"
+        },
+        "type": "array"
+      },
       "/api/v2/strategy/objects/{object_id}/cases": {
         "items": {
           "$ref": "#/components/schemas/CaseRecord"
         },
         "title": "Response Cases Api V2 Strategy Objects  Object Id  Cases Get",
         "type": "array"
+      },
+      "/api/v2/strategy/objects/{object_id}/decision-history": {
+        "$ref": "#/components/schemas/DecisionHistoryPage"
       },
       "/api/v2/strategy/objects/{object_id}/decisions": {
         "items": {
