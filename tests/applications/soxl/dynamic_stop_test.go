@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -174,21 +175,21 @@ func TestT323StopGeometryTierInsuranceAndRiskFraction(t *testing.T) {
 	if d.HoldTier(1) != 4 || d.HoldTier(5) != 24 || d.HoldTier(500) != 72 {
 		t.Fatal("hold tier")
 	}
-	if f := d.RiskFraction(nil, 0, 4); f != 0.01 {
+	if f := d.RiskFraction(nil, 0, 4, 0.02); f != 0.01 {
 		t.Fatal("first batches", f)
 	}
-	if f := d.RiskFraction(nil, 0.05, 4); math.Abs(f-0.005) > 1e-12 {
+	if f := d.RiskFraction(nil, 0.05, 4, 0.02); math.Abs(f-0.005) > 1e-12 {
 		t.Fatal("drawdown scaling", f)
 	}
-	if f := d.RiskFraction(nil, 0.5, 4); math.Abs(f-0.0025) > 1e-12 {
+	if f := d.RiskFraction(nil, 0.5, 4, 0.02); math.Abs(f-0.0025) > 1e-12 {
 		t.Fatal("drawdown floor", f)
 	}
 	for c, want := range map[int]float64{0: 0.0025, 1: 0.0025, 2: 0.005, 3: 0.0075, 4: 0.01, 5: 0.01, 6: 0.0025} {
-		if f := d.RiskFraction(nil, 0, c); math.Abs(f-want) > 1e-12 {
+		if f := d.RiskFraction(nil, 0, c, 0.02); math.Abs(f-want) > 1e-12 {
 			t.Fatal("confidence factor", c, f)
 		}
 	}
-	if f := d.RiskFraction(nil, 0.05, 3); math.Abs(f-0.00375) > 1e-12 {
+	if f := d.RiskFraction(nil, 0.05, 3, 0.02); math.Abs(f-0.00375) > 1e-12 {
 		t.Fatal("confidence × drawdown", f)
 	}
 	losing := []d.BatchOutcome{}
@@ -199,7 +200,7 @@ func TestT323StopGeometryTierInsuranceAndRiskFraction(t *testing.T) {
 		}
 		losing = append(losing, d.BatchOutcome{R: r})
 	}
-	if d.RiskFraction(losing, 0, 4) != 0 {
+	if d.RiskFraction(losing, 0, 4, 0.02) != 0 {
 		t.Fatal("negative kelly must stop opening")
 	}
 	winning := []d.BatchOutcome{}
@@ -210,8 +211,16 @@ func TestT323StopGeometryTierInsuranceAndRiskFraction(t *testing.T) {
 		}
 		winning = append(winning, d.BatchOutcome{R: r})
 	}
-	if f := d.RiskFraction(winning, 0, 4); f <= 0 || f > 0.02 {
+	if f := d.RiskFraction(winning, 0, 4, 0.02); f <= 0 || f > 0.02 {
 		t.Fatal("kelly cap", f)
+	}
+	// A registered higher cap lets the same quarter Kelly through: p = 0.5,
+	// b = 2, base = 0.25 × (0.5 − 0.5/2) = 6.25%.
+	if f := d.RiskFraction(winning, 0, 4, 1); math.Abs(f-0.0625) > 1e-12 {
+		t.Fatal("registered cap", f)
+	}
+	if f := d.RiskFraction(winning, 0, 4, 0.03); f != 0.03 {
+		t.Fatal("registered cap binds", f)
 	}
 }
 
@@ -1033,6 +1042,38 @@ func TestT323WithdrawInitialWhenNoRisk(t *testing.T) {
 	m.Clock = func() time.Time { return at.Add(4 * time.Minute) }
 	if err := m.Run(context.Background()); err != nil || len(fw.directives) != 3 || fw.directives[2].RiskFraction == nil || fw.directives[2].Version <= w.Version {
 		t.Fatal("directive after recovery", len(fw.directives), err)
+	}
+}
+
+// The registered cap replaces 2% in the directive's risk fraction: winning
+// history gives quarter Kelly 6.25%, times confidence 3 (0.75) = 4.6875%.
+func TestT323RegisteredRiskCap(t *testing.T) {
+	for _, c := range []struct {
+		limit, want float64
+	}{{0, 0.02}, {1, 0.046875}} {
+		at := time.Date(2026, 10, 15, 15, 0, 5, 0, time.UTC)
+		m, store, fw, tr, _ := positionManager(at)
+		m.Settings.MaxRiskFraction = c.limit
+		tr.bars = []submission.CandleRead{bar(at.Truncate(time.Minute), "100")}
+		_ = store.AppendRecord(context.Background(), "JUDGMENT", "j1", at.Add(-time.Minute), judgment("j1", at.Add(-time.Minute), "SHORT", 3, []string{"n1"}, false))
+		var st workers.PositionState
+		v, _ := store.LoadState(context.Background(), "POSITION", &st)
+		for i := 0; i < 40; i++ {
+			r := -2.0
+			if i%2 == 0 {
+				r = 1
+			}
+			st.Outcomes = append(st.Outcomes, d.BatchOutcome{R: r, ClosedAt: "2026-10-01T00:00:00Z"})
+		}
+		if err := store.SaveState(context.Background(), "POSITION", v, at, st); err != nil {
+			t.Fatal(err)
+		}
+		if err := m.Run(context.Background()); err != nil || len(fw.directives) != 1 || fw.directives[0].RiskFraction == nil {
+			t.Fatal("initial directive", c.limit, len(fw.directives), err)
+		}
+		if f, _ := strconv.ParseFloat(fw.directives[0].RiskFraction.String(), 64); math.Abs(f-c.want) > 1e-9 {
+			t.Fatal("risk fraction under cap", c.limit, f)
+		}
 	}
 }
 

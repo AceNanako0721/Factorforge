@@ -156,10 +156,13 @@ func ConfidenceFactor(confidence int) float64 {
 	return 0.25
 }
 
+// DefaultMaxRiskFraction is the S3-027 cap of an instance that registers none.
+const DefaultMaxRiskFraction = 0.02
+
 // RiskFraction implements S3-027: 1% for the first 30 batches, then quarter
 // Kelly over the last 60; scaled by confidence and drawdown (floor 0.25) and
-// capped at 2%. Zero means stop opening.
-func RiskFraction(history []BatchOutcome, drawdown float64, confidence int) float64 {
+// capped at limit. Zero means stop opening.
+func RiskFraction(history []BatchOutcome, drawdown float64, confidence int, limit float64) float64 {
 	base := 0.01
 	if len(history) >= 30 {
 		recent := history
@@ -195,7 +198,7 @@ func RiskFraction(history []BatchOutcome, drawdown float64, confidence int) floa
 		return 0
 	}
 	dd := math.Max(0.25, 1-drawdown/0.10)
-	return math.Min(0.02, base*ConfidenceFactor(confidence)*dd)
+	return math.Min(limit, base*ConfidenceFactor(confidence)*dd)
 }
 
 // Trailing implements S3-028 on completed 5-minute closes. It returns the new
