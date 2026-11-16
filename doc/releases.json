@@ -576,6 +576,12 @@
    "change_kind": "specification",
    "date": "2026-11-16",
    "summary": "SOXLUSDT application: the risk-fraction cap of S3-027 is a registered value (max_risk_fraction, 0 to 1) instead of a fixed 2%; an instance that registers none keeps 2%."
+  },
+  {
+   "version": "3.16.1",
+   "change_kind": "design",
+   "date": "2026-11-16",
+   "summary": "Strategy framework: when a position stop not yet applied by the trading layer goes out together with an add, its exchange stop covers the whole target instead of the current position, so the trading layer no longer refuses the add and the stop update for a cover below the opening."
   }
  ]
 }
