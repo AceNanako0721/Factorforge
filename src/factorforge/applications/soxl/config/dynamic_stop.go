@@ -94,7 +94,8 @@ type DynamicProfile struct {
 		BaselineRenewMin    int      `toml:"baseline_renew_minutes"`
 		RoundTripCost       float64  `toml:"round_trip_cost"`
 		PriceTick           float64  `toml:"price_tick"`
-		LadderStep          float64  `toml:"ladder_step"` // S3-033; 0 or absent = off
+		LadderStep          float64  `toml:"ladder_step"`       // S3-033; 0 or absent = off
+		MaxRiskFraction     float64  `toml:"max_risk_fraction"` // S3-027 cap; 0 or absent = 2%
 		NoiseMaxAgeHours    int      `toml:"noise_max_age_hours"`
 		NoiseLookbackDays   int      `toml:"noise_lookback_days"`
 		NoiseSymbol         string   `toml:"noise_symbol"`
@@ -149,7 +150,7 @@ func (p DynamicProfile) Validate() error {
 		bad = bad || f.SourceID == "" || f.LicenseScope == "SIM_ONLY" && p.Environment == "LIVE"
 	}
 	pos := p.Position
-	bad = bad || pos.CloseMinutes != 5 && pos.CloseMinutes != 15 || pos.InsuranceFraction <= 0 || pos.InsuranceFraction >= 1 || pos.WickMultiplier <= 0 || pos.BaselineMaxShare <= 0 || pos.BaselineMaxShare > 1 || pos.DirectiveTTLMinutes <= 0 || pos.NoiseLookbackDays <= 0 || pos.PriceTick <= 0 || pos.LadderStep < 0 || pos.LadderStep >= 1
+	bad = bad || pos.CloseMinutes != 5 && pos.CloseMinutes != 15 || pos.InsuranceFraction <= 0 || pos.InsuranceFraction >= 1 || pos.WickMultiplier <= 0 || pos.BaselineMaxShare <= 0 || pos.BaselineMaxShare > 1 || pos.DirectiveTTLMinutes <= 0 || pos.NoiseLookbackDays <= 0 || pos.PriceTick <= 0 || pos.LadderStep < 0 || pos.LadderStep >= 1 || pos.MaxRiskFraction < 0 || pos.MaxRiskFraction > 1
 	if ps := pos.PriceState; ps.URL != "" {
 		parsed, err := url.Parse(ps.URL)
 		bad = bad || err != nil || parsed.Scheme != "https" || parsed.Host == "" || ps.APIKey == "" || ps.Model == "" || ps.TimeoutSeconds <= 0 || ps.MaxAgeMinutes <= 0 || !d.Has([]string{d.PriceStateBlock, d.PriceStateIgnore}, ps.OnUnavailable) || !d.Has([]string{"", d.PriceStateScopeAll, d.PriceStateScopeReversal}, ps.Scope)

@@ -1,6 +1,6 @@
 # SOXLUSDT 应用实例设计书
 
-版本：3.15.2
+版本：3.16.0
 
 对应式样书：[03_SOXLUSDT应用实例式样书](03_SOXLUSDT应用实例式样书.md)。源码在 `src/factorforge/applications/soxl`，测试在 `tests/applications/soxl`。文中出现的数值，凡是代码里写死的照实写出；其余都是登记值，这里只说明作用，不给实际取值。
 
@@ -99,6 +99,7 @@
 - `wick_multiplier`、`directive_ttl_minutes`、`noise_lookback_days`、`price_tick` 为正。
 - `baseline_max_share` 在 (0, 1] 内。
 - `ladder_step` 在 [0, 1) 内。
+- `max_risk_fraction` 在 [0, 1] 内（0 表示默认 2%）。
 - 启用价格状态闸门时：`url` 为 https 地址，`api_key`、`model` 不为空，`timeout_seconds`、`max_age_minutes` 为正，`on_unavailable` 只能是 `BLOCK` 或 `IGNORE`，`scope` 只能为空、`ALL` 或 `REVERSAL`。
 
 不合格时返回 `DYNAMIC_PROFILE_INVALID`。
@@ -224,7 +225,7 @@
 - **基础比例**：最初 30 笔为 1%。之后取最近最多 60 笔，胜率 p，盈亏比 b = 平均盈利 R / 平均亏损 R，基础比例 = ¼ ×（p −（1 − p）/ b）；还没有亏损时为 ¼ × p。没有盈利，或结果不大于 0 时，告警 `RISK_FRACTION_ZERO`，并撤回初始止损指令（见下文“撤回”）。
 - **信心系数（`ConfidenceFactor`）**：取最近 12 次研判中与当前方向一致的最近一次的信心，4～5 分为 1，3 分为 0.75，2 分为 0.5，其余为 0.25。
 - **回撤系数**：max（0.25，1 − 回撤 / 10%），回撤按权益峰值计算。
-- **风险比例** = min（2%，基础 × 信心 × 回撤）。
+- **风险比例** = min（风险上限，基础 × 信心 × 回撤）。风险上限为 `max_risk_fraction`，未登记或为 0 时取 2%（`DefaultMaxRiskFraction`）。
 
 **方向（`view`）**：P2 最新决策的合成方向；没有决策、合成值为零或没有分量时，取最新有效研判的方向。时长取最新研判的时长。
 

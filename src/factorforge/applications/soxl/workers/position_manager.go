@@ -68,6 +68,7 @@ type PositionSettings struct {
 	EventTypes                             []string
 	PriceTick                              float64
 	LadderStep                             float64 // S3-033; 0 keeps S3-028 only
+	MaxRiskFraction                        float64 // S3-027 cap; 0 keeps the 2% default
 	PriceState                             PriceStateSettings
 }
 
@@ -393,7 +394,11 @@ func (m *PositionManager) initial(ctx context.Context, st *PositionState, price,
 	if st.EquityPeak > 0 {
 		drawdown = (st.EquityPeak - equity) / st.EquityPeak
 	}
-	fraction := d.RiskFraction(st.Outcomes, drawdown, confidence)
+	limit := s.MaxRiskFraction
+	if limit == 0 {
+		limit = d.DefaultMaxRiskFraction
+	}
+	fraction := d.RiskFraction(st.Outcomes, drawdown, confidence, limit)
 	if fraction <= 0 {
 		m.alert(ctx, "RISK_FRACTION_ZERO", "")
 		return m.withdraw(ctx, st, now, "RISK_FRACTION_ZERO")

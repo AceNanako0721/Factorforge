@@ -161,12 +161,19 @@ func TestT330FollowerProfileValidation(t *testing.T) {
 	if err := base().Validate(); err != nil {
 		t.Fatal("follower needs no models or judge minutes", err)
 	}
+	uncapped := base()
+	uncapped.Position.MaxRiskFraction = 1
+	if err := uncapped.Validate(); err != nil {
+		t.Fatal("a risk cap of 1 is a registered value", err)
+	}
 	for name, change := range map[string]func(*config.DynamicProfile){
-		"self":     func(p *config.DynamicProfile) { p.Follow.SourceInstanceID = p.InstanceID },
-		"token":    func(p *config.DynamicProfile) { p.Follow.SourceToken = "" },
-		"since":    func(p *config.DynamicProfile) { p.Follow.Since = time.Time{} },
-		"ladder":   func(p *config.DynamicProfile) { p.Position.LadderStep = 1 },
-		"generate": func(p *config.DynamicProfile) { p.Follow.SourceURL = "" },
+		"self":         func(p *config.DynamicProfile) { p.Follow.SourceInstanceID = p.InstanceID },
+		"token":        func(p *config.DynamicProfile) { p.Follow.SourceToken = "" },
+		"since":        func(p *config.DynamicProfile) { p.Follow.Since = time.Time{} },
+		"ladder":       func(p *config.DynamicProfile) { p.Position.LadderStep = 1 },
+		"risk cap":     func(p *config.DynamicProfile) { p.Position.MaxRiskFraction = 1.5 },
+		"negative cap": func(p *config.DynamicProfile) { p.Position.MaxRiskFraction = -0.01 },
+		"generate":     func(p *config.DynamicProfile) { p.Follow.SourceURL = "" },
 	} {
 		p := base()
 		change(&p)
