@@ -762,3 +762,38 @@ func TestT228WithdrawnInitialDirectiveOpensNoBatch(t *testing.T) {
 		t.Fatal("opened from a withdrawn directive", d.TargetQuantity, d.ReasonCodes)
 	}
 }
+
+// A position stop that P1 has not applied yet rides along with a level-up add
+// and covers the whole target: P1 refuses a cover below the opening, which
+// left both the add and the stop update undelivered.
+func TestT224PositionStopCoversAdd(t *testing.T) {
+	s, o, _, snap, id, at := riskUnitFixture(t)
+	store, clock := adapters.NewMemory(s), adapters.NewReplay(at)
+	service := app.Service{Store: store, Clock: clock, Trading: &compositionTrading{snap: snap}}
+	submitInitial(t, service, s, o, id, clock.Now(), "LONG", 1, nil)
+	d := tick(t, store, clock, snap, id)
+	if d.TargetQuantity.Cmp(compDecimal("16.66")) != 0 {
+		t.Fatal("first level", d.TargetQuantity, d.ReasonCodes)
+	}
+	settle(t, store, s.InstanceID)
+	snap.Actual[o.ObjectID] = d.TargetQuantity
+	snap.AverageEntries[o.ObjectID] = sd.Ptr(sd.Int(100))
+	snap.Fills = []map[string]any{{"external_fill_id": "fixture-first", "owner_id": o.OwnerID, "instrument_key": sd.Map(o.InstrumentKey), "quantity": "16.66", "side": "BUY", "price": "100", "fee": "0", "fee_currency": "USDT", "source_decision_id": d.DecisionID, "happened_at": sd.ISO(snap.At)}}
+	snap.Protections[o.ObjectID] = []map[string]any{{"role": "STRATEGY", "state": "ACTIVE_VERIFIED", "position_direction": "LONG", "position_cycle_id": "cycle-fixture", "plan": map[string]any{"trigger_price": "97", "trigger_kind": "MARK", "covered_quantity": "16.66"}}}
+	current, _ := store.Read(context.Background(), s.InstanceID)
+	r := directiveCommand(current, o, clock.Now(), "POSITION_STOP", "VENUE", 2)
+	r.TriggerPrice = sd.Ptr(sd.Int(98))
+	if _, err := service.SubmitStopDirective(context.Background(), id, r); err != nil {
+		t.Fatal(err)
+	}
+	current, _ = store.Read(context.Background(), s.InstanceID)
+	current.FactorSeries.Value("daily").Observations = append(current.FactorSeries.Value("daily").Observations, sd.FactorObservation{ObservationID: "day-2", AvailableAt: clock.Now(), Value: sd.One(), InputsHash: "fixture-input", EvidenceRef: "fixture-observation"})
+	store = adapters.NewMemory(current)
+	clock.Advance(clock.Now().Add(5 * time.Minute))
+	move(snap, o, clock.Now())
+	settle(t, store, s.InstanceID)
+	d = tick(t, store, clock, snap, id)
+	if d.TargetQuantity.Cmp(compDecimal("33.33")) != 0 || d.StopPlan == nil || d.StopPlan.TriggerPrice.Cmp(sd.Int(98)) != 0 || d.StopPlan.CoveredQuantity.Cmp(compDecimal("33.33")) != 0 {
+		t.Fatal("add with position stop", d.TargetQuantity, d.ReasonCodes, d.StopPlan)
+	}
+}

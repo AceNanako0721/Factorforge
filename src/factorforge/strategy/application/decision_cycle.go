@@ -596,6 +596,9 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 									target = d.Amount(t["target_quantity"])
 								}
 								protectionOnly = true
+							} else if proposed.StrategyProtectionMode != "UPPER_MANAGED" && target.Abs().Cmp(actual.Abs()) > 0 {
+								// An add carries the new stop over the whole target: P1 refuses a cover below the opening.
+								proposed.CoveredQuantity = target.Abs()
 							}
 							stop = proposed
 						} else {
