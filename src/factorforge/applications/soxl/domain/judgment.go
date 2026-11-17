@@ -150,7 +150,8 @@ type InjectionAction struct {
 }
 
 // DecideInjection returns the next state and actions. The caller persists the
-// new state only after every action was accepted, so a failed write retries.
+// new state only after every action was accepted, so a failed write retries;
+// retractions already written are kept and skipped on the retry.
 func DecideInjection(state InjectionState, j Judgment) (InjectionState, []InjectionAction) {
 	next := InjectionState{Seen: append([]string(nil), state.Seen...), LastDirection: state.LastDirection, Sequence: state.Sequence, Events: map[string]InjectedEvent{}, LastJudgment: j.JudgmentID}
 	for k, v := range state.Events {

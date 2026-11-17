@@ -287,10 +287,33 @@ func (w *JudgmentWorker) apply(ctx context.Context, state *d.InjectionState, ver
 			err = w.revise(ctx, &next, j, a)
 		}
 		if err != nil {
+			w.keepRetractions(ctx, *state, version, next, j.At)
 			return err
 		}
 	}
 	return w.Store.SaveState(ctx, "INJECTION", version, j.At, next)
+}
+
+// keepRetractions saves the retractions an interrupted apply already wrote
+// into the otherwise unchanged state, so the retry continues after them
+// instead of rewriting every event; a long chain on a large framework state
+// otherwise never finishes within one round (B70). The save outlives a
+// cancelled round.
+func (w *JudgmentWorker) keepRetractions(ctx context.Context, state d.InjectionState, version int64, next d.InjectionState, at time.Time) {
+	events, kept := map[string]d.InjectedEvent{}, false
+	for k, v := range state.Events {
+		if n, ok := next.Events[k]; ok && n.Retracted && !v.Retracted {
+			v.Retracted, kept = true, true
+		}
+		events[k] = v
+	}
+	if !kept {
+		return
+	}
+	state.Events = events
+	save, done := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+	defer done()
+	_ = w.Store.SaveState(save, "INJECTION", version, at, state)
 }
 
 func (w *JudgmentWorker) inject(ctx context.Context, state *d.InjectionState, j d.Judgment, a d.InjectionAction, items map[string]d.NewsItem) error {

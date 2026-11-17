@@ -588,6 +588,12 @@
    "change_kind": "design",
    "date": "2026-11-18",
    "summary": "Strategy framework: a close-stop exit already delivered but not yet filled keeps the zero target on later cycles while its batch is open and the request is valid, instead of the next cycle resizing the batch over it and the exit lapsing unexecuted."
+  },
+  {
+   "version": "3.16.3",
+   "change_kind": "design",
+   "date": "2026-11-18",
+   "summary": "SOXL application: when a judgment's framework writes are interrupted part-way, the retractions already written are kept, so the retry continues after them instead of rewriting the whole chain; a long invalidation on a large framework state no longer times out every round and stalls judgment processing."
   }
  ]
 }
