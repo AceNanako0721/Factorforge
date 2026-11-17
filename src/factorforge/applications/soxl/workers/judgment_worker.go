@@ -144,6 +144,7 @@ func (w *JudgmentWorker) Follow(ctx context.Context) error {
 			if err = w.apply(ctx, &state, version, j, recent, older); err != nil {
 				return err
 			}
+			state = d.InjectionState{}
 			if version, err = w.Store.LoadState(ctx, "INJECTION", &state); err != nil {
 				return err
 			}
@@ -263,6 +264,9 @@ func (w *JudgmentWorker) resume(ctx context.Context, state *d.InjectionState, ve
 	if err = w.apply(ctx, state, *version, *last, recent, older); err != nil {
 		return err
 	}
+	// Decode into a fresh value: an omitted field (Active after an
+	// invalidation) must not keep the stale one.
+	*state = d.InjectionState{}
 	*version, err = w.Store.LoadState(ctx, "INJECTION", state)
 	return err
 }

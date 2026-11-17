@@ -544,8 +544,10 @@ func TestT320InvalidationKeepsRetractionsWrittenBeforeFailure(t *testing.T) {
 	if kept.LastJudgment != before.LastJudgment || kept.Active == nil || !kept.Events[first].Retracted || kept.Events[second].Retracted {
 		t.Fatal("progress not kept", kept.LastJudgment, kept.Events[first], kept.Events[second])
 	}
-	// The next round resumes the flip, writing only the rest once each.
-	if j, err := round(4, flip); err != nil || !j.OK {
+	// The next round resumes the flip, writing only the rest once each; its
+	// own FLAT answer then starts from the cleared chain, not the stale one.
+	flat := `{"direction":"FLAT","confidence":2,"horizon_hours":24,"thesis":"t","key_item_ids":["itemD0000001"],"counter_points":"c","invalidation":"i","previous_invalidated":false,"invalidation_item_ids":[]}`
+	if j, err := round(4, flat); err != nil || !j.OK {
 		t.Fatal("resume", j, err)
 	}
 	written := map[string]int{}
@@ -560,7 +562,7 @@ func TestT320InvalidationKeepsRetractionsWrittenBeforeFailure(t *testing.T) {
 		}
 	}
 	var after d.InjectionState
-	if _, err := store.LoadState(ctx, "INJECTION", &after); err != nil || after.LastJudgment <= before.LastJudgment || after.Active == nil || after.Active.Direction != "LONG" {
+	if _, err := store.LoadState(ctx, "INJECTION", &after); err != nil || after.LastJudgment <= before.LastJudgment || after.Active != nil || after.LastDirection != "FLAT" {
 		t.Fatal("flip applied", after.LastJudgment, after.Active, err)
 	}
 }
