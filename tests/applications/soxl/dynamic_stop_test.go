@@ -378,10 +378,20 @@ type fakeFramework struct {
 	// heads, when set, applies P2's version rule: a new directive needs a
 	// version above the head of its kind, and accepted ones are listed.
 	heads map[string]int
+	// failRetracts makes that many retractions in a row fail once
+	// failRetractsAfter more have been accepted (delivery lost or timed out).
+	failRetracts, failRetractsAfter int
 }
 
 func (f *fakeFramework) Version(context.Context, string) (int, error) { return 7, nil }
-func (f *fakeFramework) RegisterEvent(_ context.Context, r dto.EventCommand, _ bool) (dto.Event, error) {
+func (f *fakeFramework) RegisterEvent(_ context.Context, r dto.EventCommand, retraction bool) (dto.Event, error) {
+	if retraction && f.failRetracts > 0 {
+		if f.failRetractsAfter == 0 {
+			f.failRetracts--
+			return dto.Event{}, d.Fail("FRAMEWORK_DELIVERY_UNKNOWN", 503)
+		}
+		f.failRetractsAfter--
+	}
 	f.events = append(f.events, r)
 	return r.Event, nil
 }
@@ -490,6 +500,69 @@ func TestT320JudgmentWorkerFreshnessFallbackAndInjection(t *testing.T) {
 		t.Fatal("all failed", j, err)
 	}
 	_ = store
+}
+
+// B70: an invalidation interrupted part-way keeps the retractions already
+// written, so the retry continues after them instead of rewriting the chain.
+func TestT320InvalidationKeepsRetractionsWrittenBeforeFailure(t *testing.T) {
+	at := time.Date(2026, 10, 16, 3, 1, 0, 0, time.UTC)
+	ctx := context.Background()
+	items := []d.NewsItem{}
+	for _, id := range []string{"itemA0000001", "itemB0000001", "itemC0000001", "itemD0000001"} {
+		items = append(items, d.NewsItem{ItemID: id, Source: "fixture-rss", Title: "Headline " + id, Summary: "summary " + id, PublishedAt: at.Add(-20 * time.Minute), ReceivedAt: at.Add(-15 * time.Minute), LicenseScope: "PUBLIC"})
+	}
+	w, store, fw, _ := judgmentWorker(at, nil, []monitoring.FeedResult{{SourceID: "fixture-rss", Items: items}})
+	if err := w.Collect(ctx); err != nil {
+		t.Fatal(err)
+	}
+	round := func(minute int, answer string) (d.Judgment, error) {
+		w.Clock = func() time.Time { return at.Add(time.Duration(minute) * time.Minute) }
+		w.Models[0].Generator = fakeModel{text: answer}
+		return w.Judge(ctx)
+	}
+	short := `{"direction":"SHORT","confidence":3,"horizon_hours":24,"thesis":"t","key_item_ids":["%s"],"counter_points":"c","invalidation":"i","previous_invalidated":false,"invalidation_item_ids":[]}`
+	for n, id := range []string{"itemA0000001", "itemB0000001", "itemC0000001"} {
+		if j, err := round(n, fmt.Sprintf(short, id)); err != nil || !j.OK {
+			t.Fatal("chain", n, j, err)
+		}
+	}
+	var before d.InjectionState
+	if _, err := store.LoadState(ctx, "INJECTION", &before); err != nil || before.Active == nil || len(before.Active.EventIDs) != 3 {
+		t.Fatal("chain of three", before.Active, err)
+	}
+	// The flip retracts the first event, then the second times out.
+	fw.failRetracts, fw.failRetractsAfter = 1, 1
+	flip := `{"direction":"LONG","confidence":3,"horizon_hours":24,"thesis":"t","key_item_ids":["itemD0000001"],"counter_points":"c","invalidation":"i","previous_invalidated":true,"invalidation_item_ids":["itemD0000001"]}`
+	if _, err := round(3, flip); err == nil {
+		t.Fatal("interrupted invalidation must fail the round")
+	}
+	var kept d.InjectionState
+	if _, err := store.LoadState(ctx, "INJECTION", &kept); err != nil {
+		t.Fatal(err)
+	}
+	first, second := before.Active.EventIDs[0], before.Active.EventIDs[1]
+	if kept.LastJudgment != before.LastJudgment || kept.Active == nil || !kept.Events[first].Retracted || kept.Events[second].Retracted {
+		t.Fatal("progress not kept", kept.LastJudgment, kept.Events[first], kept.Events[second])
+	}
+	// The next round resumes the flip, writing only the rest once each.
+	if j, err := round(4, flip); err != nil || !j.OK {
+		t.Fatal("resume", j, err)
+	}
+	written := map[string]int{}
+	for _, e := range fw.events {
+		if e.Event.Relation == "RETRACTION" {
+			written[e.Event.EventID]++
+		}
+	}
+	for _, id := range before.Active.EventIDs {
+		if written[id] != 1 {
+			t.Fatal("retraction count", id, written)
+		}
+	}
+	var after d.InjectionState
+	if _, err := store.LoadState(ctx, "INJECTION", &after); err != nil || after.LastJudgment <= before.LastJudgment || after.Active == nil || after.Active.Direction != "LONG" {
+		t.Fatal("flip applied", after.LastJudgment, after.Active, err)
+	}
 }
 
 func positionManager(at time.Time) (*workers.PositionManager, *memDynamic, *fakeFramework, *fakeTrading, *fakeAlerts) {
