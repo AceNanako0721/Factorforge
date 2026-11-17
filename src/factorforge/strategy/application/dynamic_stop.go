@@ -112,6 +112,14 @@ func (c DecisionCycle) DynamicTarget(ctx context.Context, state *d.StrategyState
 			state.AppendAudit(map[string]any{"action": "CLOSE_EXIT_EXPIRED", "request_id": key, "object_id": obj.ObjectID, "decision_id": r.DecisionID, "at": d.ISO(at)})
 			continue
 		}
+		// Delivered but not yet filled: the cycle keeps the zero target rather
+		// than resizing the batch over it, until the batch closes or the
+		// request expires.
+		if r.State == "APPLIED" && open && r.BatchID != "" {
+			out.target, out.force, out.exitID = d.Zero(), true, key
+			out.reasons = append(out.reasons, "CLOSE_STOP_EXIT")
+			return out, nil
+		}
 		if r.State != "ACCEPTED" {
 			continue
 		}
