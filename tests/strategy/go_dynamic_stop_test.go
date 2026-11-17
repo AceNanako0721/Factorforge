@@ -402,6 +402,41 @@ func TestT229PendingCloseExitExpiresAppliedClosedKept(t *testing.T) {
 	}
 }
 
+// An acknowledged exit not yet filled holds the zero target on the next
+// cycle instead of being resized away, and lapses at its validity.
+func TestT229AppliedCloseExitHoldsUntilFilled(t *testing.T) {
+	store, clock, service, snap, o, id, at, barAt := exitFixture(t)
+	if _, err := service.SubmitCloseExit(context.Background(), id, exitCommand(store, o, "exit-hold", barAt, nil)); err != nil {
+		t.Fatal(err)
+	}
+	clock.Advance(at.Add(time.Second))
+	snap.At = clock.Now()
+	first := tick(t, store, clock, snap, id)
+	if first.TargetQuantity.Sign() != 0 || !sd.Has(first.ReasonCodes, "CLOSE_STOP_EXIT") {
+		t.Fatal("close exit", first.TargetQuantity, first.ReasonCodes)
+	}
+	settle(t, store, o.InstanceID)
+	// Acknowledged, the batch still open: the next cycle keeps zero.
+	clock.Advance(at.Add(5 * time.Minute))
+	move(snap, o, clock.Now())
+	second := tick(t, store, clock, snap, id)
+	if second.TargetQuantity.Sign() != 0 || !sd.Has(second.ReasonCodes, "CLOSE_STOP_EXIT") {
+		t.Fatal("pending exit resized away", second.TargetQuantity, second.ReasonCodes)
+	}
+	state, _ := store.Read(context.Background(), o.InstanceID)
+	if r := state.ExitRequests.Value("exit-hold"); r.State != "APPLIED" || r.DecisionID != second.DecisionID || r.BatchID != "batch-fixture" {
+		t.Fatal("held exit", r.State, r.DecisionID, r.BatchID)
+	}
+	settle(t, store, o.InstanceID)
+	clock.Advance(barAt.Add(sd.ExitRequestValidity + 5*time.Minute))
+	move(snap, o, clock.Now())
+	third := tick(t, store, clock, snap, id)
+	state, _ = store.Read(context.Background(), o.InstanceID)
+	if sd.Has(third.ReasonCodes, "CLOSE_STOP_EXIT") || state.ExitRequests.Value("exit-hold").State != "EXPIRED" {
+		t.Fatal("held past validity", third.ReasonCodes, state.ExitRequests.Value("exit-hold").State)
+	}
+}
+
 func TestT229ClosedBatchRecordsKindChainAndReentry(t *testing.T) {
 	_, _, _, snap, o, _, at, _ := exitFixture(t)
 	s, _, _, _, _, _ := riskUnitFixture(t)

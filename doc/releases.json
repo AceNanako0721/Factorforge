@@ -582,6 +582,12 @@
    "change_kind": "design",
    "date": "2026-11-16",
    "summary": "Strategy framework: when a position stop not yet applied by the trading layer goes out together with an add, its exchange stop covers the whole target instead of the current position, so the trading layer no longer refuses the add and the stop update for a cover below the opening."
+  },
+  {
+   "version": "3.16.2",
+   "change_kind": "design",
+   "date": "2026-11-18",
+   "summary": "Strategy framework: a close-stop exit already delivered but not yet filled keeps the zero target on later cycles while its batch is open and the request is valid, instead of the next cycle resizing the batch over it and the exit lapsing unexecuted."
   }
  ]
 }
