@@ -27,6 +27,41 @@ export function nativeArguments(provider: NativeProvider, action: "login" | "log
   return action === "login" ? ["auth", "login", "--claudeai"] :
     action === "logout" ? ["auth", "logout"] : ["auth", "status", "--json"];
 }
+// Generation runs the signed-in official program once, headless: no tools, no
+// MCP servers, no CLAUDE.md or other customizations, no saved session.
+export const claudeCLIProvider = "claude-cli";
+export const claudeModel = /^claude-[a-z0-9][a-z0-9.-]{0,120}$/;
+const neutralSystemPrompt = "Follow the user's instructions exactly.";
+const promptArgumentBytes = 100000;
+export function claudeGenerateArguments(model: string, prompt: string) {
+  if (Buffer.byteLength(prompt) > promptArgumentBytes) fail("INPUT_LIMIT_EXCEEDED");
+  return ["-p", "--model", model, "--output-format", "json", "--safe-mode", "--tools", "",
+    "--strict-mcp-config", "--no-session-persistence", "--system-prompt", prompt || neutralSystemPrompt];
+}
+export function claudeResult(raw: string, model: string, maxOutputBytes: number) {
+  let r: Record<string, any>;
+  try { r = JSON.parse(raw); } catch { fail("OFFICIAL_CLI_OUTPUT_INVALID", true); }
+  if (!r || typeof r !== "object" || r.type !== "result") fail("OFFICIAL_CLI_OUTPUT_INVALID", true);
+  if (r.is_error !== false || r.subtype !== "success") {
+    const status = r.api_error_status;
+    if (status === 401) fail("AUTH_REJECTED");
+    if (status === 403) fail("PERMISSION_DENIED");
+    if (status === 429) fail("RATE_LIMITED");
+    if (typeof status === "number" && status >= 400 && status < 500) fail("REQUEST_REJECTED");
+    fail("INCOMPLETE_RESPONSE", true);
+  }
+  if (r.stop_reason === "refusal") fail("RESPONSE_REFUSED");
+  if (r.stop_reason !== "end_turn") fail("INCOMPLETE_RESPONSE", true);
+  // The answer must come from the requested model alone, not a fallback.
+  const models = r.modelUsage && typeof r.modelUsage === "object" ? Object.keys(r.modelUsage) : [];
+  if (models.length !== 1 || models[0] !== model) fail("MODEL_NOT_AVAILABLE", true);
+  if (typeof r.result !== "string" || !r.result.trim()) fail("EMPTY_RESPONSE", true);
+  if (Buffer.byteLength(r.result) > maxOutputBytes) fail("OUTPUT_LIMIT_EXCEEDED", true);
+  const u = r.usage ?? {}, count = (v: unknown) => typeof v === "number" && Number.isSafeInteger(v) && v >= 0 ? v : 0;
+  const input = count(u.input_tokens) + count(u.cache_creation_input_tokens) + count(u.cache_read_input_tokens);
+  const output = count(u.output_tokens);
+  return { text: r.result as string, usage: { input, output, totalTokens: input + output } };
+}
 export function claudeStatus(raw: string) {
   let result: Record<string, unknown>;
   try { result = JSON.parse(raw); } catch { fail("OFFICIAL_CLI_STATUS_INVALID"); }
@@ -88,18 +123,19 @@ export class OfficialCLI {
     }
     return dir;
   }
-  private async capture(file: string, args: string[], cwd: string, signal?: AbortSignal) {
+  private async capture(file: string, args: string[], cwd: string, signal?: AbortSignal, input?: string) {
     const limits = this.limits();
     return new Promise<{ code: number | null; output: string }>((resolve, reject) => {
       let output = Buffer.alloc(0), failure: string | undefined;
       const child = spawn(file, args, { cwd, env: nativeEnvironment(process.env), shell: false,
-        windowsHide: true, stdio: ["ignore", "pipe", "ignore"] });
+        windowsHide: true, stdio: [input === undefined ? "ignore" : "pipe", "pipe", "ignore"] });
+      if (input !== undefined) { child.stdin!.on("error", () => {}); child.stdin!.end(input); }
       const stop = (code: string) => { failure ??= code; child.kill("SIGKILL"); };
       const abort = () => stop("OFFICIAL_CLI_CANCELLED");
       signal?.addEventListener("abort", abort, { once: true });
       if (signal?.aborted) abort();
       const timer = setTimeout(() => stop("OFFICIAL_CLI_TIMEOUT"), limits.timeout);
-      child.stdout.on("data", (chunk: Buffer) => {
+      child.stdout!.on("data", (chunk: Buffer) => {
         if (output.length + chunk.length > limits.bytes) stop("OFFICIAL_CLI_OUTPUT_LIMIT");
         else output = Buffer.concat([output, chunk]);
       });
@@ -127,6 +163,18 @@ export class OfficialCLI {
     // Claude status exits 1 when signed out; valid JSON remains authoritative.
     if (![0, 1].includes(result.code ?? -1)) fail("OFFICIAL_CLI_FAILED");
     return claudeStatus(result.output);
+  }
+  // Started once; any failure after start may have reached the vendor.
+  async generate(model: string, input: string, prompt: string, signal?: AbortSignal) {
+    if (!claudeModel.test(model)) fail("MODEL_NOT_AVAILABLE");
+    const args = claudeGenerateArguments(model, prompt);
+    const { file, cwd } = await this.prepare("claude", signal);
+    let result: { code: number | null; output: string };
+    try { result = await this.capture(file, args, cwd, signal, input); }
+    catch (e) { fail(e instanceof ModelError ? e.code : "DELIVERY_UNKNOWN", !(e instanceof ModelError && e.code === "OFFICIAL_CLI_START_FAILED")); }
+    const answer = claudeResult(result.output, model, this.store.settings.max_output_bytes);
+    if (result.code !== 0) fail("OFFICIAL_CLI_FAILED", true);
+    return { provider: claudeCLIProvider, account_id: 1, model, ...answer };
   }
   async handoff(provider: NativeProvider, action: "login" | "logout", signal?: AbortSignal) {
     if (!process.stdin.isTTY || !process.stdout.isTTY) fail("TTY_REQUIRED");

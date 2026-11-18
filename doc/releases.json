@@ -594,6 +594,12 @@
    "change_kind": "design",
    "date": "2026-11-18",
    "summary": "SOXL application: when a judgment's framework writes are interrupted part-way, the retractions already written are kept, so the retry continues after them instead of rewriting the whole chain; a long invalidation on a large framework state no longer times out every round and stalls judgment processing."
+  },
+  {
+   "version": "3.17.0",
+   "change_kind": "specification",
+   "date": "2026-11-18",
+   "summary": "Model access: a new claude-cli provider generates text through the operator's signed-in official Claude program, run once headless with no tools, customizations or saved session; the answer must come from the requested model alone, and failures after start are delivery-unknown."
   }
  ]
 }
