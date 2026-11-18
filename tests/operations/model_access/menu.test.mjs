@@ -96,7 +96,7 @@ test("official environment filters credentials, billing and endpoint overrides; 
 });
 test("original native process adapter validates path/version, isolates cwd/env and reports Antigravity unknown", async t => {
   const x = await config(t);
-  const binary = path.join(x.temp, process.platform === "win32" ? "claude.exe" : "claude");
+  const binary = path.join(x.temp, "claude");
   execFileSync("go", ["build", "-o", binary, "./tests/operations/model_access/fixtures/native_cli"], { cwd: root, stdio: "pipe" });
   x.store.settings.claude_cli_path = binary;
   const adapter = new OfficialCLI(x.store);
@@ -105,7 +105,7 @@ test("original native process adapter validates path/version, isolates cwd/env a
   try { assert.equal((await adapter.status("claude")).logged_in, true); }
   finally { if (prior === undefined) delete process.env.ANTHROPIC_API_KEY; else process.env.ANTHROPIC_API_KEY = prior; }
   assert.deepEqual(await fs.readFile(x.file), before);
-  const agy = path.join(x.temp, process.platform === "win32" ? "agy.exe" : "agy");
+  const agy = path.join(x.temp, "agy");
   await fs.copyFile(binary, agy); x.store.settings.antigravity_cli_path = agy;
   assert.equal((await adapter.status("antigravity")).logged_in, null);
   x.store.settings.claude_cli_path = process.execPath;

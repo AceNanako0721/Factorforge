@@ -75,7 +75,7 @@ test("original login dialog masks key and original model picker chooses actual c
 test("OMP credentials persist only in canonical TOML, restore and logout one account", async () => {
   const x = await fixture(); const first = await x.key("deepseek"); const second = await x.key("anthropic");
   const raw = await fs.readFile(x.file, "utf8"); expect(raw.startsWith(x.prefix)).toBe(true); expect(raw).toContain("fixture-key");
-  if (process.platform !== "win32") expect((await fs.stat(x.file)).mode & 0o777).toBe(0o600);
+  expect((await fs.stat(x.file)).mode & 0o777).toBe(0o600);
   await x.reopen(); expect(x.access.accounts("deepseek")[0]?.account_id).toBe(first);
   const status = JSON.stringify(x.service.status()); expect(status).not.toContain("fixture-key"); expect(status).not.toContain("fixture-account");
   await x.access.logout("deepseek", first); expect(x.access.accounts("deepseek")).toEqual([]); expect(x.access.accounts("anthropic")[0]?.account_id).toBe(second);
@@ -304,7 +304,6 @@ test("timeout and broken body do not retry or return partial text", async () => 
   }
 });
 test("idle JSONL SIGTERM releases configuration lock", async () => {
-  if (process.platform === "win32") return; // Windows termination does not deliver POSIX SIGTERM.
   const x = await fixture(); await x.store.close();
   const child = spawn(process.execPath, [path.join(root, "runtime/model-access-build/entrypoints/omp-cli.js"), "serve", "--config", x.file]);
   const exited = new Promise(resolve => child.on("close", resolve));
@@ -334,7 +333,7 @@ test("real PTY menu cancels original selector and restores terminal on Ctrl+C", 
 });
 test("T5-14 claude-cli generation runs the signed-in official program once, headless, and checks the answer", async () => {
   const x = await fixture({ omp_max_requests: 0 });
-  const binary = path.join(x.temp, process.platform === "win32" ? "claude.exe" : "claude");
+  const binary = path.join(x.temp, "claude");
   await new Promise((resolve, reject) => spawn("go", ["build", "-o", binary, "./tests/operations/model_access/fixtures/native_cli"], { cwd: root, stdio: "ignore" })
     .once("close", code => code === 0 ? resolve(code) : reject(code)));
   x.store.settings.claude_cli_path = binary;

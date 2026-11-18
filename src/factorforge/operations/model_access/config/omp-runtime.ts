@@ -8,9 +8,7 @@ export async function privateRuntime(configFile: string) {
     if ((await fs.lstat(cursor)).isSymbolicLink()) fail("PRIVATE_PATH_INVALID");
     if (cursor === path.dirname(cursor)) break;
   }
-  if (process.platform !== "win32") {
-    if ((await fs.stat(dir)).uid !== process.getuid?.()) fail("PRIVATE_PATH_INVALID");
-    await fs.chmod(dir, 0o700);
-  }
+  if ((await fs.stat(dir)).uid !== process.getuid?.()) fail("PRIVATE_PATH_INVALID");
+  await fs.chmod(dir, 0o700);
   return dir;
 }

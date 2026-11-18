@@ -600,6 +600,12 @@
    "change_kind": "specification",
    "date": "2026-11-18",
    "summary": "Model access: a new claude-cli provider generates text through the operator's signed-in official Claude program, run once headless with no tools, customizations or saved session; the answer must come from the requested model alone, and failures after start are delivery-unknown."
+  },
+  {
+   "version": "3.17.1",
+   "change_kind": "design",
+   "date": "2026-11-18",
+   "summary": "Model access supports Linux and macOS only: Windows code paths, Windows environment variables and the Windows CI job are removed; behavior on Linux is unchanged."
   }
  ]
 }
