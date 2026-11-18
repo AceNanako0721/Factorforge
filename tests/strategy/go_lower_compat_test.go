@@ -498,3 +498,47 @@ func TestT224PublicStopDirectiveStaysResearchOnly(t *testing.T) {
 		t.Fatal("public write acquired signal qualification")
 	}
 }
+
+func TestT225RevokedUnknownSettlesAfterExpiry(t *testing.T) {
+	state, obj, _, snap, id, at := stopFixture(t)
+	store := adapters.NewMemory(state)
+	clock := adapters.NewReplay(at)
+	trading := &retryPlanTrading{compositionTrading: compositionTrading{snap: snap}}
+	service := app.Service{Store: store, Clock: clock, Trading: trading}
+	request := directiveCommand(state, obj, at, "INITIAL_DISTANCE", "UPPER_MANAGED", 1)
+	if _, err := service.SubmitStopDirective(context.Background(), id, request); err != nil {
+		t.Fatal(err)
+	}
+	cycle := app.DecisionCycle{Store: store, Clock: clock, Trading: trading}
+	decisions, err := cycle.Tick(context.Background(), id, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := decisions[0].DecisionID
+	if err = cycle.Dispatch(context.Background(), id); err != nil {
+		t.Fatal(err)
+	}
+	snap.RiskLocks = []string{"lock-fixture"} // the new risk is revoked after an ambiguous delivery
+	if err = cycle.Dispatch(context.Background(), id); err != nil {
+		t.Fatal(err)
+	}
+	after, _ := store.Read(context.Background(), state.InstanceID)
+	row := after.Outbox.Value(key)
+	if row.State != "DELIVERY_UNKNOWN" || row.Reason == nil || *row.Reason != "RISK_REVOKED_BEFORE_DELIVERY" {
+		t.Fatalf("revoked unknown before expiry: %s", row.State)
+	}
+	if err = clock.Advance(row.ExpiresAt); err != nil {
+		t.Fatal(err)
+	}
+	if err = cycle.Dispatch(context.Background(), id); err != nil {
+		t.Fatal(err)
+	}
+	after, _ = store.Read(context.Background(), state.InstanceID)
+	row = after.Outbox.Value(key)
+	if row.State != "EXPIRED" || row.Reason == nil || *row.Reason != "RISK_REVOKED_BEFORE_DELIVERY" {
+		t.Fatalf("revoked unknown past expiry: %s", row.State)
+	}
+	if len(trading.payloads) != 1 {
+		t.Fatal("revoked target delivered again")
+	}
+}

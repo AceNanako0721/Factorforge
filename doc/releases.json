@@ -606,6 +606,12 @@
    "change_kind": "design",
    "date": "2026-11-18",
    "summary": "Model access supports Linux and macOS only: Windows code paths, Windows environment variables and the Windows CI job are removed; behavior on Linux is unchanged."
+  },
+  {
+   "version": "3.17.2",
+   "change_kind": "design",
+   "date": "2026-11-18",
+   "summary": "A delivery-unknown target whose new risk was revoked is settled as expired once past its expiry, instead of blocking new risk on the object indefinitely."
   }
  ]
 }
