@@ -69,7 +69,7 @@ func generate(args []string) {
 		os.Exit(1)
 	}
 	json.NewEncoder(os.Stdout).Encode(reply)
-	if reply["is_error"] == true {
+	if reply["is_error"] == true || model == "claude-fixture-exit" {
 		os.Exit(1)
 	}
 }
