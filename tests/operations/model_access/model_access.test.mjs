@@ -186,8 +186,7 @@ test("configuration saves preserve unrelated bytes and enforce one writer", asyn
   f.store.state.oauth = fixtureOAuth();
   await f.store.save();
   assert.equal((await f.reopen()).state.oauth.refresh_token, "fixture-refresh");
-  if (process.platform !== "win32")
-    assert.equal((await fs.stat(f.file)).mode & 0o777, 0o600);
+  assert.equal((await fs.stat(f.file)).mode & 0o777, 0o600);
 });
 test("external editing conflicts and poisons future use instead of overwriting config", async (t) => {
   const f = await fixture(t);
@@ -199,19 +198,12 @@ test("external editing conflicts and poisons future use instead of overwriting c
 test("invalid private permissions and symbolic links fail before loading credentials", async (t) => {
   const f = await fixture(t);
   await f.store.close();
-  if (process.platform !== "win32") {
-    await fs.chmod(f.file, 0o644);
-    await assert.rejects(ConfigStore.open(f.file), /PRIVATE_FILE_INVALID/);
-    await fs.chmod(f.file, 0o600);
-  }
+  await fs.chmod(f.file, 0o644);
+  await assert.rejects(ConfigStore.open(f.file), /PRIVATE_FILE_INVALID/);
+  await fs.chmod(f.file, 0o600);
   const original = f.file + ".original";
   await fs.rename(f.file, original);
-  try {
-    await fs.symlink(original, f.file);
-  } catch (e) {
-    if (process.platform === "win32" && e.code === "EPERM") return;
-    throw e;
-  }
+  await fs.symlink(original, f.file);
   await assert.rejects(ConfigStore.open(f.file), /PRIVATE_PATH_INVALID/);
 });
 test("stale lock can be explicitly removed only after same-host process exits", async (t) => {

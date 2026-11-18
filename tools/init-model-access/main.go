@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"runtime"
 
 	"github.com/pelletier/go-toml/v2"
 )
@@ -46,7 +45,7 @@ func initialize() error {
 		}
 	}
 	info, err := os.Lstat("config/config.toml")
-	if err != nil || !info.Mode().IsRegular() || runtime.GOOS != "windows" && info.Mode().Perm()&0077 != 0 {
+	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0077 != 0 {
 		return fmt.Errorf("private file")
 	}
 	lockName := filepath.Join(filepath.Dir(fileName), ".model-access.lock")
@@ -147,15 +146,13 @@ func initialize() error {
 	if err = os.Rename(file.Name(), fileName); err != nil {
 		return err
 	}
-	if runtime.GOOS != "windows" {
-		directory, e := os.Open(filepath.Dir(fileName))
-		if e != nil {
-			return e
-		}
-		defer directory.Close()
-		if e = directory.Sync(); e != nil {
-			return e
-		}
+	directory, e := os.Open(filepath.Dir(fileName))
+	if e != nil {
+		return e
+	}
+	defer directory.Close()
+	if e = directory.Sync(); e != nil {
+		return e
 	}
 	fmt.Println("Appended empty model access block; no accounts or services started")
 	return nil

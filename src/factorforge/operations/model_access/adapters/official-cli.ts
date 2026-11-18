@@ -9,9 +9,7 @@ import { fail, ModelError } from "../api/protocol.js";
 export type NativeProvider = "claude" | "antigravity";
 export const supportedVersions = { claude: "2.1.296", antigravity: "1.3.3" };
 const environmentKeys = new Set([
-  "HOME", "USER", "LOGNAME", "USERPROFILE", "APPDATA", "LOCALAPPDATA",
-  "HOMEDRIVE", "HOMEPATH", "SYSTEMROOT", "WINDIR", "COMSPEC", "PATH",
-  "PATHEXT", "TEMP", "TMP", "TMPDIR", "TERM", "COLORTERM", "LANG",
+  "HOME", "USER", "LOGNAME", "PATH", "TEMP", "TMP", "TMPDIR", "TERM", "COLORTERM", "LANG",
   "LC_ALL", "LC_CTYPE", "TZ", "HTTPS_PROXY", "HTTP_PROXY", "ALL_PROXY",
   "NO_PROXY", "SSL_CERT_FILE", "SSL_CERT_DIR", "XDG_CONFIG_HOME",
   "XDG_DATA_HOME", "XDG_CACHE_HOME", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS",
@@ -88,7 +86,7 @@ export class OfficialCLI {
     const file = provider === "claude" ? this.store.settings.claude_cli_path :
       this.store.settings.antigravity_cli_path;
     if (!file) fail("OFFICIAL_CLI_NOT_CONFIGURED");
-    if (!path.isAbsolute(file) || /\.(?:bat|cmd|ps1|sh)$/i.test(file)) fail("OFFICIAL_CLI_PATH_INVALID");
+    if (!path.isAbsolute(file) || /\.sh$/i.test(file)) fail("OFFICIAL_CLI_PATH_INVALID");
     try {
       for (let cursor = file; ; cursor = path.dirname(cursor)) {
         const stat = await fs.lstat(cursor);
@@ -100,8 +98,7 @@ export class OfficialCLI {
       try {
         const magic = Buffer.alloc(4);
         await handle.read(magic, 0, 4, 0);
-        const native = process.platform === "win32" ? magic.subarray(0, 2).equals(Buffer.from("MZ")) :
-          process.platform === "linux" ? magic.equals(Buffer.from([127, 69, 76, 70])) :
+        const native = process.platform === "linux" ? magic.equals(Buffer.from([127, 69, 76, 70])) :
           ["cffaedfe", "cefaedfe", "cafebabe", "bebafeca"].includes(magic.toString("hex"));
         if (!native) fail("OFFICIAL_CLI_PATH_INVALID");
       } finally { await handle.close(); }
@@ -128,7 +125,7 @@ export class OfficialCLI {
     return new Promise<{ code: number | null; output: string }>((resolve, reject) => {
       let output = Buffer.alloc(0), failure: string | undefined;
       const child = spawn(file, args, { cwd, env: nativeEnvironment(process.env), shell: false,
-        windowsHide: true, stdio: [input === undefined ? "ignore" : "pipe", "pipe", "ignore"] });
+        stdio: [input === undefined ? "ignore" : "pipe", "pipe", "ignore"] });
       if (input !== undefined) { child.stdin!.on("error", () => {}); child.stdin!.end(input); }
       const stop = (code: string) => { failure ??= code; child.kill("SIGKILL"); };
       const abort = () => stop("OFFICIAL_CLI_CANCELLED");

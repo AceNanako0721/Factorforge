@@ -57,7 +57,7 @@ async function main() {
     }
     if (legacy) {
       await new Promise<void>((resolve, reject) => {
-        const child = spawn("node", [path.join(import.meta.dirname, "cli.js"), "legacy-menu", "--config", file], { stdio: "inherit", windowsHide: true });
+        const child = spawn("node", [path.join(import.meta.dirname, "cli.js"), "legacy-menu", "--config", file], { stdio: "inherit" });
         child.once("error", () => reject(new ModelError("NODE_RUNTIME_REQUIRED")));
         child.once("exit", () => resolve());
       });

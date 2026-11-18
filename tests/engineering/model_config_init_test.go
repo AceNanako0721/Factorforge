@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 )
@@ -23,9 +22,6 @@ func TestPublicGuardIncludesOAuthCredentialAssignments(t *testing.T) {
 func TestModelConfigInitializationPreservesPrivateBytesAndRespectsLock(t *testing.T) {
 	root := repoRoot(t)
 	binary := filepath.Join(t.TempDir(), "init-model-access")
-	if runtime.GOOS == "windows" {
-		binary += ".exe"
-	}
 	build := exec.Command("go", "build", "-o", binary, "./tools/init-model-access")
 	build.Dir = root
 	if output, err := build.CombinedOutput(); err != nil {

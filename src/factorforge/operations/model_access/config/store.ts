@@ -73,8 +73,8 @@ async function readPrivate(file: string, max: number) {
     if (
       !s.isFile() ||
       s.size > max ||
-      (process.platform !== "win32" &&
-        ((s.mode & 0o077) !== 0 || s.uid !== process.getuid?.()))
+      (s.mode & 0o077) !== 0 ||
+      s.uid !== process.getuid?.()
     )
       fail("PRIVATE_FILE_INVALID");
     return await h.readFile("utf8");
@@ -188,8 +188,7 @@ function readPrivateSync(file: string, max: number) {
   const fd = sync.openSync(file, constants.O_RDONLY | constants.O_NOFOLLOW);
   try {
     const s = sync.fstatSync(fd);
-    if (!s.isFile() || s.size > max || (process.platform !== "win32" &&
-        ((s.mode & 0o077) !== 0 || s.uid !== process.getuid?.()))) fail("PRIVATE_FILE_INVALID");
+    if (!s.isFile() || s.size > max || (s.mode & 0o077) !== 0 || s.uid !== process.getuid?.()) fail("PRIVATE_FILE_INVALID");
     return sync.readFileSync(fd, "utf8");
   } finally { sync.closeSync(fd); }
 }
@@ -295,13 +294,11 @@ export class ConfigStore {
       )
         fail("CONFIG_WRITE_CONFLICT");
       sync.renameSync(temp, this.file);
-      if (process.platform !== "win32") {
-        const d = sync.openSync(path.dirname(this.file), "r");
-        try {
-          sync.fsyncSync(d);
-        } finally {
-          sync.closeSync(d);
-        }
+      const d = sync.openSync(path.dirname(this.file), "r");
+      try {
+        sync.fsyncSync(d);
+      } finally {
+        sync.closeSync(d);
       }
       this.raw = next;
       this.settings.state_json = m.state_json;

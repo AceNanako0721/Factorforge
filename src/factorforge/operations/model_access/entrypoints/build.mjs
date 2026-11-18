@@ -16,5 +16,5 @@ await rm(link, { recursive: true, force: true });
 await symlink(
   path.join(base, "node_modules"),
   link,
-  process.platform === "win32" ? "junction" : "dir",
+  "dir",
 );

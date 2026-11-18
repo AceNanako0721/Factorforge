@@ -35,9 +35,8 @@ function operatorFailure(error: unknown) {
 export function openAuthURL(url: string) {
   if (new URL(url).protocol !== "https:") return;
   // The URL is visible only to the operator, never to the JSONL/log streams.
-  const command = process.platform === "win32" ? "rundll32.exe" : process.platform === "darwin" ? "open" : "xdg-open";
-  const args = process.platform === "win32" ? ["url.dll,FileProtocolHandler", url] : [url];
-  const child = spawn(command, args, { stdio: "ignore", windowsHide: true });
+  const command = process.platform === "darwin" ? "open" : "xdg-open";
+  const child = spawn(command, [url], { stdio: "ignore" });
   child.on("error", () => {}); child.unref();
 }
 export async function runOMPMenu(store: ConfigStore, access: OMPAccess, service: OMPService, parent?: AbortSignal): Promise<"legacy" | undefined> {
