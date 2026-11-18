@@ -334,7 +334,7 @@ test("real PTY menu cancels original selector and restores terminal on Ctrl+C", 
 });
 test("T5-14 claude-cli generation runs the signed-in official program once, headless, and checks the answer", async () => {
   const x = await fixture({ omp_max_requests: 0 });
-  const binary = path.join(x.temp, "claude");
+  const binary = path.join(x.temp, process.platform === "win32" ? "claude.exe" : "claude");
   await new Promise((resolve, reject) => spawn("go", ["build", "-o", binary, "./tests/operations/model_access/fixtures/native_cli"], { cwd: root, stdio: "ignore" })
     .once("close", code => code === 0 ? resolve(code) : reject(code)));
   x.store.settings.claude_cli_path = binary;
