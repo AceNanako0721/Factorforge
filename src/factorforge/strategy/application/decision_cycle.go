@@ -911,8 +911,11 @@ items:
 			if d.Has(snapshot.SourceDecisions, key) {
 				status = "ACK"
 			} else if (increase || item.Decision.ProtectionOnly) && revoked {
+				// An unknown delivery stays unknown while the trading layer could
+				// still accept it; past expires_at it refuses the request, so the
+				// target is settled instead of blocking new risk forever.
 				status = "DELIVERY_UNKNOWN"
-				if item.State == "PENDING" {
+				if item.State == "PENDING" || !now.Before(item.ExpiresAt) {
 					status = "EXPIRED"
 				}
 				reason = d.Ptr("RISK_REVOKED_BEFORE_DELIVERY")
