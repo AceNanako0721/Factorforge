@@ -2,11 +2,12 @@ import { createHash, randomUUID } from "node:crypto";
 import { decodeOMP } from "../api/omp-protocol.js";
 import { fail, ModelError, safeFailure } from "../api/protocol.js";
 import { OMPAccess } from "../adapters/omp-access.js";
+import { OfficialCLI, claudeCLIProvider, claudeModel } from "../adapters/official-cli.js";
 import { ConfigStore } from "../config/store.js";
 import { budgetStatus, recentRequest, reserveBudget, validateBudget } from "./request-budget.js";
 export class OMPService {
   private readonly paused = new Set<string>();
-  constructor(readonly store: ConfigStore, readonly access: OMPAccess) {}
+  constructor(readonly store: ConfigStore, readonly access: OMPAccess, readonly native = new OfficialCLI(store)) {}
   status() {
     this.store.assertUsable();
     return { enabled: this.store.settings.enabled, omp_max_requests: this.store.settings.omp_max_requests,
@@ -50,18 +51,28 @@ export class OMPService {
           models: result.models.map(m => ({ id: m.id, name: m.name, provider: m.provider })) } };
       }
       this.limits();
-      const provider = this.access.provider(r.provider!);
+      // The official Claude program owns its single sign-in, numbered 1.
+      const native = r.provider === claudeCLIProvider;
+      if (native && r.account_id !== 1) fail("AUTH_REQUIRED");
+      const provider = native ? claudeCLIProvider : this.access.provider(r.provider!);
       budgetKey = `${provider}:${r.account_id}`;
       if (this.paused.has(budgetKey)) fail("RATE_LIMITED");
       // Reject a duplicate before OAuth refresh or discovery as well as send.
       if (recentRequest(this.store.state.omp!.budgets[budgetKey], r.id, this.store.settings.budget_window_seconds)) fail("DUPLICATE_REQUEST");
       const prompt = await this.store.prompt();
       if (Buffer.byteLength(r.input!) + Buffer.byteLength(prompt) > this.store.settings.max_input_bytes) fail("INPUT_LIMIT_EXCEEDED");
-      const catalog = await this.access.catalog(provider, r.account_id!, signal);
-      const model = catalog.models.find(m => m.id === r.model);
-      if (!model) fail("MODEL_NOT_AVAILABLE");
-      signal.throwIfAborted(); this.reserve(budgetKey, id);
-      const result = await this.access.generate(provider, r.account_id!, model, r.input!, prompt, signal);
+      let result;
+      if (native) {
+        if (!claudeModel.test(r.model!)) fail("MODEL_NOT_AVAILABLE");
+        signal.throwIfAborted(); this.reserve(budgetKey, id);
+        result = await this.native.generate(r.model!, r.input!, prompt, signal);
+      } else {
+        const catalog = await this.access.catalog(provider, r.account_id!, signal);
+        const model = catalog.models.find(m => m.id === r.model);
+        if (!model) fail("MODEL_NOT_AVAILABLE");
+        signal.throwIfAborted(); this.reserve(budgetKey, id);
+        result = await this.access.generate(provider, r.account_id!, model, r.input!, prompt, signal);
+      }
       const reply = { v: 2, id, ok: true, result: { ...result, prompt_hash: createHash("sha256").update(prompt, "utf8").digest("hex") } };
       if (Buffer.byteLength(JSON.stringify(reply)) > this.store.settings.max_line_bytes) fail("OUTPUT_LIMIT_EXCEEDED", true);
       return reply;

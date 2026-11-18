@@ -332,3 +332,26 @@ test("real PTY menu cancels original selector and restores terminal on Ctrl+C", 
     expect(await fs.access(path.join(path.dirname(x.file), ".model-access.lock")).then(() => true, () => false)).toBe(false);
   } finally { child.kill("SIGKILL"); }
 });
+test("T5-14 claude-cli generation runs the signed-in official program once, headless, and checks the answer", async () => {
+  const x = await fixture({ omp_max_requests: 0 });
+  const binary = path.join(x.temp, process.platform === "win32" ? "claude.exe" : "claude");
+  await new Promise((resolve, reject) => spawn("go", ["build", "-o", binary, "./tests/operations/model_access/fixtures/native_cli"], { cwd: root, stdio: "ignore" })
+    .once("close", code => code === 0 ? resolve(code) : reject(code)));
+  x.store.settings.claude_cli_path = binary;
+  const service = x.service;
+  const ask = (id: string, model: string, account_id = 1) => service.handle({ v: 2, id, op: "generate", provider: "claude-cli", account_id, model, input: "fixture input" });
+  const ok = await ask("cli-ok", "claude-fixture-ok");
+  expect(ok.error).toBeUndefined();
+  expect(ok.result).toMatchObject({ provider: "claude-cli", account_id: 1, model: "claude-fixture-ok",
+    text: "system=Follow the user's instructions exactly. input=fixture input", usage: { input: 10, output: 4, totalTokens: 14 } });
+  expect(ok.result?.prompt_hash).toBe(createHash("sha256").update("", "utf8").digest("hex"));
+  expect((await ask("cli-ok", "claude-fixture-ok")).error).toMatchObject({ code: "DUPLICATE_REQUEST", delivery_unknown: false });
+  expect((await ask("cli-account", "claude-fixture-ok", 2)).error).toMatchObject({ code: "AUTH_REQUIRED", delivery_unknown: false });
+  expect((await ask("cli-name", "gpt-4o-mini")).error).toMatchObject({ code: "MODEL_NOT_AVAILABLE", delivery_unknown: false });
+  expect((await ask("cli-fallback", "claude-fixture-fallback")).error).toMatchObject({ code: "MODEL_NOT_AVAILABLE", delivery_unknown: true });
+  expect((await ask("cli-cut", "claude-fixture-cut")).error).toMatchObject({ code: "INCOMPLETE_RESPONSE", delivery_unknown: true });
+  expect((await ask("cli-garbled", "claude-fixture-garbled")).error).toMatchObject({ code: "OFFICIAL_CLI_OUTPUT_INVALID", delivery_unknown: true });
+  expect((await ask("cli-exit", "claude-fixture-exit")).error).toMatchObject({ code: "OFFICIAL_CLI_FAILED", delivery_unknown: true });
+  expect((await ask("cli-limited", "claude-fixture-limited")).error).toMatchObject({ code: "RATE_LIMITED", delivery_unknown: false });
+  expect((await ask("cli-paused", "claude-fixture-ok")).error).toMatchObject({ code: "RATE_LIMITED" });
+});
