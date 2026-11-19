@@ -648,6 +648,12 @@
    "change_kind": "design",
    "date": "2026-11-20",
    "summary": "An initial distance's close stop is measured from the position's average entry (entry ∓ close distance), the price the upper layer freezes its own close stop at, and stays frozen for the position cycle; the trigger-based form remains the fallback. Exit requests are checked against the same close stop the writer uses."
+  },
+  {
+   "version": "3.18.2",
+   "change_kind": "design",
+   "date": "2026-11-20",
+   "summary": "A request refused for unverified operational health records the health issues found when the refusal is written (health_issues), so the refusal can be explained afterwards."
   }
  ]
 }
