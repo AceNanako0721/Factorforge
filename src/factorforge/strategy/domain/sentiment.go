@@ -58,7 +58,10 @@ func verifiedPrefix(ledger []LedgerEntry, tolerance Decimal) (int, map[string]De
 	}
 	for i := range rows {
 		if rows[i] != ledger[i] {
-			return 0, map[string]Decimal{}
+			if !sameEntry(rows[i], ledger[i]) {
+				return 0, map[string]Decimal{}
+			}
+			rows[i] = ledger[i] // equal values; later calls match without comparing them
 		}
 	}
 	balances := make(map[string]Decimal, len(verifiedLedger.balances))
@@ -66,6 +69,21 @@ func verifiedPrefix(ledger []LedgerEntry, tolerance Decimal) (int, map[string]De
 		balances[k] = v
 	}
 	return len(rows), balances
+}
+
+// sameEntry compares ledger rows by value. A row appended in this process and
+// the same row decoded from storage later hold equal decimals in different
+// objects; the check depends only on the values, so either verifies alike.
+func sameEntry(a, b LedgerEntry) bool {
+	if a.Sequence != b.Sequence || a.ContributionID != b.ContributionID || a.Reason != b.Reason || !a.At.Equal(b.At) {
+		return false
+	}
+	for _, pair := range [][2]Decimal{{a.Start, b.Start}, {a.Injection, b.Injection}, {a.RevisionDelta, b.RevisionDelta}, {a.TimeConsumption, b.TimeConsumption}, {a.PriceConsumption, b.PriceConsumption}, {a.Invalidation, b.Invalidation}, {a.RejectedAmount, b.RejectedAmount}, {a.End, b.End}, {a.Budget, b.Budget}, {a.DeltaHighWater, b.DeltaHighWater}} {
+		if pair[0] != pair[1] && pair[0].Cmp(pair[1]) != 0 {
+			return false
+		}
+	}
+	return true
 }
 
 func rememberVerified(ledger []LedgerEntry, from int, tolerance Decimal, balances map[string]Decimal) {

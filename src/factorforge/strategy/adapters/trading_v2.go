@@ -375,18 +375,24 @@ func (t *TradingV2) Snapshot(ctx context.Context, objects []*d.ObservedObject) (
 				roles[d.Text(p["exit_order_id"])] = d.Text(p["role"])
 			}
 		}
+		// The first TARGET_SET audit row for each instrument and target
+		// version, indexed once instead of scanned for every fill.
+		origins := map[[2]string]any{}
+		for _, a := range d.Rows(pages["audit"]["items"]) {
+			detail := d.Object(a["detail"])
+			if d.Text(a["action"]) != "TARGET_SET" {
+				continue
+			}
+			key := [2]string{d.Text(detail["resource_id"]), d.Digest(detail["target_version"])}
+			if _, seen := origins[key]; !seen {
+				origins[key] = a["request_id"]
+			}
+		}
 		for _, fact := range d.Rows(pages["fills"]["items"]) {
 			order := orders[d.Text(fact["external_order_id"])]
 			instrument := d.Object(fact["instrument_key"])
 			code := d.Text(instrument["venue"]) + ":" + d.Text(instrument["product"]) + ":" + d.Text(instrument["instrument_id"])
-			var origin any
-			for _, a := range d.Rows(pages["audit"]["items"]) {
-				detail := d.Object(a["detail"])
-				if d.Text(a["action"]) == "TARGET_SET" && d.Text(detail["resource_id"]) == code && dg.of(detail["target_version"]) == dg.of(order["target_version"]) {
-					origin = a["request_id"]
-					break
-				}
-			}
+			origin := origins[[2]string{code, d.Digest(order["target_version"])}]
 			copy := d.Clone(fact)
 			copy["owner_id"] = order["owner_id"]
 			copy["protection_exit"] = d.Has(exits, d.Text(order["order_id"]))

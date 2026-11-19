@@ -91,3 +91,31 @@ func TestVerifyLedgerRechecksChangedRows(t *testing.T) {
 		t.Fatal("contribution balance mismatch accepted")
 	}
 }
+
+// A verified row decoded again (equal values in new decimal objects) still
+// counts as verified, and a row whose value changed does not.
+func TestVerifyLedgerMatchesRowsByValue(t *testing.T) {
+	row := func(seq int, start, injection, end string) sd.LedgerEntry {
+		z := sd.Int(0)
+		dec := func(s string) sd.Decimal {
+			v, err := sd.Parse(s)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return v
+		}
+		return sd.LedgerEntry{Sequence: seq, ContributionID: "v", Start: dec(start), Injection: dec(injection), RevisionDelta: z, TimeConsumption: z, PriceConsumption: z, Invalidation: z, RejectedAmount: z, End: dec(end), Budget: z, DeltaHighWater: z}
+	}
+	tolerance := sd.Int(0)
+	if err := sd.VerifyLedger(sd.SentimentState{Ledger: []sd.LedgerEntry{row(1, "0", "2", "2"), row(2, "2", "1", "3")}}, tolerance); err != nil {
+		t.Fatal(err)
+	}
+	again := []sd.LedgerEntry{row(1, "0", "2.0", "2"), row(2, "2", "1", "3"), row(3, "3", "1", "4")}
+	if err := sd.VerifyLedger(sd.SentimentState{Ledger: again}, tolerance); err != nil {
+		t.Fatal(err)
+	}
+	changed := []sd.LedgerEntry{row(1, "0", "2", "2"), row(2, "2", "1", "3.5"), row(3, "3", "1", "4")}
+	if err := sd.VerifyLedger(sd.SentimentState{Ledger: changed}, tolerance); err == nil {
+		t.Fatal("row changed by value accepted")
+	}
+}
