@@ -372,8 +372,11 @@ func (e *Engine) AccountView() AccountView {
 	}
 	unrealized := e.Math.Sub(value, run.Cash)
 	used := e.InitialMargin()
+	// A view never writes into the run: an empty balance list is shown as the
+	// cash in the run currency through a new collection.
 	balances := run.CashBalances
 	if balances.Len() == 0 {
+		balances = Ordered[decimal.Value]{}
 		balances.Set(run.Currency, run.Cash)
 	}
 	realized := e.Math.Sub(e.Math.Sub(e.Math.Sub(e.Math.Add(e.Math.Sub(run.Cash, run.InitialCash), fees), funding), flows), run.FXRevaluation)

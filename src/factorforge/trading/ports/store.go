@@ -14,6 +14,8 @@ type Store interface {
 	Read(context.Context, d.RunKey) (*d.Aggregate, error)
 	BoundRun(context.Context, string) (*d.RunKey, error)
 	Transaction(context.Context, d.RunKey, func(*d.Aggregate) error) error
+	// View's callback must not modify the run: stores may share one decoded
+	// run between concurrent views of an unchanged account row.
 	View(context.Context, d.RunKey, func(*d.Aggregate, History) error) error
 }
 

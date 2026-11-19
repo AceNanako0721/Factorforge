@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/trading/domain"
-	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/ports"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -39,6 +38,9 @@ type snapshot struct {
 	tuple   string
 	data    []byte
 	ordered bool
+	// view is the decoded run that View hands to read-only callers while the
+	// tuple is unchanged; it is shared and never modified.
+	view *d.Aggregate
 }
 
 func failure(code string, status int) error { return &d.Error{Code: code, Status: status} }
@@ -249,10 +251,61 @@ func (s *Store) rememberSnapshot(account string, value snapshot) {
 	defer s.snapshotMu.Unlock()
 	s.snapshots[account] = value
 }
+// Read returns a private copy the caller may change; it never shares the
+// decoded run View reuses.
 func (s *Store) Read(ctx context.Context, key d.RunKey) (*d.Aggregate, error) {
-	var run *d.Aggregate
-	err := s.View(ctx, key, func(value *d.Aggregate, _ ports.History) error { run = value; return nil })
-	return run, err
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
+	if err != nil {
+		return nil, sqlError(err)
+	}
+	defer tx.Rollback(ctx)
+	run, _, err := s.load(ctx, tx, key, false)
+	if err != nil {
+		return nil, err
+	}
+	return run, sqlError(tx.Commit(ctx))
+}
+
+// loadView returns the run for a read-only caller. While the row keeps its
+// tuple and the audit count is unchanged, every view shares one decoded run
+// instead of decoding the whole snapshot again.
+func (s *Store) loadView(ctx context.Context, tx pgx.Tx, key d.RunKey) (*d.Aggregate, error) {
+	if err := s.key(key); err != nil {
+		return nil, err
+	}
+	var tuple string
+	if err := tx.QueryRow(ctx, "SELECT "+tupleIdentity+" FROM "+s.table("trading_run")+" WHERE account_id=$1 AND run_id=$2", key.AccountID, key.RunID).Scan(&tuple); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, failure("RUN_NOT_FOUND", 404)
+		}
+		return nil, sqlError(err)
+	}
+	if cached, hit := s.cachedSnapshot(key.AccountID, tuple); hit && cached.view != nil && cached.view.RunKey == key {
+		if err := loginAllowed(ctx, tx); err != nil {
+			return nil, err
+		}
+		var count, last int64
+		if err := tx.QueryRow(ctx, "SELECT count(*),COALESCE(max(sequence),0) FROM "+s.table("audit_event")+" WHERE account_id=$1", key.AccountID).Scan(&count, &last); err != nil {
+			return nil, sqlError(err)
+		}
+		if count != last {
+			return nil, failure("AUDIT_MUTATION_FORBIDDEN", 503)
+		}
+		if count == cached.view.AuditCount {
+			return cached.view, nil
+		}
+	}
+	run, _, err := s.load(ctx, tx, key, false)
+	if err != nil {
+		return nil, err
+	}
+	s.snapshotMu.Lock()
+	if cached, ok := s.snapshots[key.AccountID]; ok && cached.tuple == tuple {
+		cached.view = run
+		s.snapshots[key.AccountID] = cached
+	}
+	s.snapshotMu.Unlock()
+	return run, nil
 }
 func (s *Store) BoundRun(ctx context.Context, account string) (*d.RunKey, error) {
 	if err := loginAllowed(ctx, s.pool); err != nil {
