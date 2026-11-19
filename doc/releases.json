@@ -630,6 +630,12 @@
    "change_kind": "design",
    "date": "2026-11-19",
    "summary": "The strategy store decodes state only from the database's text, so the per-field decode memo keeps hitting after this process writes; ledger verification matches its verified prefix by value; the trading snapshot indexes target audit rows once instead of scanning them for every fill."
+  },
+  {
+   "version": "3.17.6",
+   "change_kind": "design",
+   "date": "2026-11-19",
+   "summary": "Read-only trading views of an unchanged run share one decoded aggregate instead of decoding the whole snapshot for every query; View callbacks must not modify the run, and Read returns a private copy."
   }
  ]
 }

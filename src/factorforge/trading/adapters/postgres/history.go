@@ -9,13 +9,15 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// View passes read a run it must not modify: concurrent views of an unchanged
+// row share the same decoded run.
 func (s *Store) View(ctx context.Context, key d.RunKey, read func(*d.Aggregate, ports.History) error) error {
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
 	if err != nil {
 		return sqlError(err)
 	}
 	defer tx.Rollback(ctx)
-	run, _, err := s.load(ctx, tx, key, false)
+	run, err := s.loadView(ctx, tx, key)
 	if err != nil {
 		return err
 	}
