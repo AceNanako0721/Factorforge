@@ -28,6 +28,50 @@ type Store struct {
 
 	mu      sync.Mutex
 	ledgers map[string]ledgerRows
+	states  map[string]stateRows
+}
+
+// stateRows is the last state this process read or wrote for one instance,
+// keyed by the tuple identities of its public and internal rows. Any update
+// of either row, from any writer, creates a new tuple, so a match means the
+// stored rows are what was cached: their payloads need not be fetched, and a
+// transaction that encodes the same bytes again has nothing to write.
+// public and internal are this encoder's form of the rows; they are nil until
+// a transaction computes them for rows another writer stored.
+type stateRows struct {
+	publicTuple, internalTuple string
+	merged                     []byte
+	public, internal           []byte
+}
+
+const tupleIdentity = "xmin::text||':'||ctid::text"
+
+func (s *Store) cachedState(key string) stateRows {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.states[key]
+}
+func (s *Store) rememberState(key string, rows stateRows) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.states == nil {
+		s.states = map[string]stateRows{}
+	}
+	s.states[key] = rows
+}
+
+// mergeObjects joins two encoded JSON objects with disjoint keys.
+func mergeObjects(public, internal []byte) []byte {
+	if len(public) <= 2 {
+		return append([]byte(nil), internal...)
+	}
+	if len(internal) <= 2 {
+		return append([]byte(nil), public...)
+	}
+	merged := make([]byte, 0, len(public)+len(internal))
+	merged = append(merged, public[:len(public)-1]...)
+	merged = append(merged, ',')
+	return append(merged, internal[1:]...)
 }
 
 // ledgerRows caches the decoded prefix of one instance's append-only
@@ -191,21 +235,20 @@ func (s *Store) GrantWorkload(ctx context.Context, w d.WorkloadIdentity) error {
 	return nil
 }
 func partition(state *d.StrategyState) ([]byte, []byte, error) {
-	data := d.Map(state)
-	public, internal := map[string]any{}, map[string]any{}
-	for k, v := range data {
+	// The audit rows and the ledger live in their own append-only tables.
+	fields, err := d.EncodeFields(state, "audit", "ledger")
+	if err != nil {
+		return nil, nil, err
+	}
+	public, internal := map[string][]byte{}, map[string][]byte{}
+	for k, v := range fields {
 		if d.Has(publicFields, k) {
 			public[k] = v
-		} else if k != "audit" && k != "ledger" {
+		} else {
 			internal[k] = v
 		}
 	}
-	p, e := json.Marshal(public)
-	if e != nil {
-		return nil, nil, e
-	}
-	i, e := json.Marshal(internal)
-	return p, i, e
+	return d.EncodeObject(public), d.EncodeObject(internal), nil
 }
 func (s *Store) binding(ctx context.Context, tx pgx.Tx, state *d.StrategyState, persist bool) error {
 	for _, obj := range state.Objects.Values() {
@@ -232,35 +275,62 @@ func (s *Store) binding(ctx context.Context, tx pgx.Tx, state *d.StrategyState, 
 	return nil
 }
 func (s *Store) load(ctx context.Context, tx pgx.Tx, id string, lock bool) (*d.StrategyState, error) {
+	state, _, err := s.loadRows(ctx, tx, id, lock)
+	return state, err
+}
+
+// loadRows reads the state and reports the rows it came from. Payloads are
+// fetched only when a row changed since this process last read or wrote it.
+func (s *Store) loadRows(ctx context.Context, tx pgx.Tx, id string, lock bool) (*d.StrategyState, stateRows, error) {
 	suffix := ""
 	if lock {
 		suffix = " FOR UPDATE"
 	}
-	var public, internal []byte
-	if err := tx.QueryRow(ctx, "SELECT payload FROM "+s.table("public_state")+" WHERE instance_id=$1"+suffix, id).Scan(&public); err != nil {
+	var rows stateRows
+	if err := tx.QueryRow(ctx, "SELECT "+tupleIdentity+" FROM "+s.table("public_state")+" WHERE instance_id=$1"+suffix, id).Scan(&rows.publicTuple); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, failure("INSTANCE_NOT_FOUND", 404)
+			return nil, rows, failure("INSTANCE_NOT_FOUND", 404)
 		}
-		return nil, err
+		return nil, rows, err
 	}
-	if err := tx.QueryRow(ctx, "SELECT payload FROM "+s.table("internal_state")+" WHERE instance_id=$1", id).Scan(&internal); err != nil {
-		return nil, err
+	if err := tx.QueryRow(ctx, "SELECT "+tupleIdentity+" FROM "+s.table("internal_state")+" WHERE instance_id=$1", id).Scan(&rows.internalTuple); err != nil {
+		return nil, rows, err
 	}
-	data := map[string]json.RawMessage{}
-	if json.Unmarshal(public, &data) != nil {
-		return nil, failure("STORE_STATE_INVALID", 503)
+	key := s.table("public_state") + "/" + id
+	if cached := s.cachedState(key); cached.merged != nil && cached.publicTuple == rows.publicTuple && cached.internalTuple == rows.internalTuple {
+		rows = cached
+	} else {
+		var public, internal []byte
+		if err := tx.QueryRow(ctx, "SELECT "+tupleIdentity+", payload FROM "+s.table("public_state")+" WHERE instance_id=$1", id).Scan(&rows.publicTuple, &public); err != nil {
+			return nil, rows, err
+		}
+		if err := tx.QueryRow(ctx, "SELECT "+tupleIdentity+", payload FROM "+s.table("internal_state")+" WHERE instance_id=$1", id).Scan(&rows.internalTuple, &internal); err != nil {
+			return nil, rows, err
+		}
+		data := map[string]json.RawMessage{}
+		if json.Unmarshal(public, &data) != nil {
+			return nil, rows, failure("STORE_STATE_INVALID", 503)
+		}
+		other := map[string]json.RawMessage{}
+		if json.Unmarshal(internal, &other) != nil {
+			return nil, rows, failure("STORE_STATE_INVALID", 503)
+		}
+		for k, v := range other {
+			data[k] = v
+		}
+		merged, err := json.Marshal(data)
+		if err != nil {
+			return nil, rows, err
+		}
+		rows.merged = merged
+		s.rememberState(key, rows)
 	}
-	other := map[string]json.RawMessage{}
-	if json.Unmarshal(internal, &other) != nil {
-		return nil, failure("STORE_STATE_INVALID", 503)
-	}
-	for k, v := range other {
-		data[k] = v
-	}
-	raw, err := json.Marshal(data)
-	if err != nil {
-		return nil, err
-	}
+	state, err := s.decodeRows(ctx, tx, id, rows.merged)
+	return state, rows, err
+}
+
+func (s *Store) decodeRows(ctx context.Context, tx pgx.Tx, id string, raw []byte) (*d.StrategyState, error) {
+	var err error
 	state := &d.StrategyState{}
 	if d.DecodeState(raw, state) != nil {
 		return nil, failure("STORE_STATE_INVALID", 503)
@@ -506,11 +576,18 @@ func (s *Store) Transaction(ctx context.Context, id string, fn func(*d.StrategyS
 		return dbError(err)
 	}
 	defer tx.Rollback(ctx)
-	state, err := s.load(ctx, tx, id, true)
+	state, rows, err := s.loadRows(ctx, tx, id, true)
 	if err != nil {
 		return dbError(err)
 	}
 	before := d.CloneState(state)
+	if rows.public == nil || rows.internal == nil {
+		// Rows another writer stored: compare against this encoder's form of
+		// the state as loaded, so an unchanged state is not written back.
+		if rows.public, rows.internal, err = partition(before); err != nil {
+			return dbError(err)
+		}
+	}
 	if err = d.Guard(func() error { return fn(state) }); err != nil {
 		return err
 	}
@@ -536,12 +613,19 @@ func (s *Store) Transaction(ctx context.Context, id string, fn func(*d.StrategyS
 		if err = s.archiveDecisions(ctx, tx, id, before, state); err != nil {
 			return err
 		}
-		if _, err = tx.Exec(ctx, "UPDATE "+s.table("internal_state")+" SET payload=$1 WHERE instance_id=$2", internal, id); err != nil {
-			return dbError(err)
+		// A row whose encoding did not change is not rewritten.
+		if !bytes.Equal(internal, rows.internal) {
+			if err = tx.QueryRow(ctx, "UPDATE "+s.table("internal_state")+" SET payload=$1 WHERE instance_id=$2 RETURNING "+tupleIdentity, internal, id).Scan(&rows.internalTuple); err != nil {
+				return dbError(err)
+			}
+			rows.internal = internal
 		}
 	}
-	if _, err = tx.Exec(ctx, "UPDATE "+s.table("public_state")+" SET payload=$1 WHERE instance_id=$2", public, id); err != nil {
-		return dbError(err)
+	if !bytes.Equal(public, rows.public) {
+		if err = tx.QueryRow(ctx, "UPDATE "+s.table("public_state")+" SET payload=$1 WHERE instance_id=$2 RETURNING "+tupleIdentity, public, id).Scan(&rows.publicTuple); err != nil {
+			return dbError(err)
+		}
+		rows.public = public
 	}
 	if err = d.PreserveWindowPlans(before, state); err != nil {
 		return err
@@ -561,7 +645,12 @@ func (s *Store) Transaction(ctx context.Context, id string, fn func(*d.StrategyS
 	if err = s.appendRows(ctx, tx, id, before, state); err != nil {
 		return dbError(err)
 	}
-	return dbError(tx.Commit(ctx))
+	if err = tx.Commit(ctx); err != nil {
+		return dbError(err)
+	}
+	rows.merged = mergeObjects(rows.public, rows.internal)
+	s.rememberState(s.table("public_state")+"/"+id, rows)
+	return nil
 }
 
 // DefaultMaxConns caps each pool when the DSN does not set pool_max_conns.

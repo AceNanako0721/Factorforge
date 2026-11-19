@@ -4,6 +4,7 @@ import (
 	"github.com/AceNanako0721/Factorforge/src/factorforge/trading/api/dto"
 	"sort"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -36,15 +37,69 @@ func AppendEntry(state *SentimentState, contribution *Contribution, entry Ledger
 	return entry, nil
 }
 
+// verifiedLedger remembers the longest ledger VerifyLedger accepted and the
+// balances it ended with. The ledger is append-only and its entries are never
+// modified once appended, so a ledger that starts with exactly these entries
+// (compared by value) needs only its new rows checked. The rows are a private
+// copy, so a caller changing its own slice cannot change what was verified.
+var verifiedLedger struct {
+	sync.Mutex
+	tolerance Decimal
+	rows      []LedgerEntry
+	balances  map[string]Decimal
+}
+
+func verifiedPrefix(ledger []LedgerEntry, tolerance Decimal) (int, map[string]Decimal) {
+	verifiedLedger.Lock()
+	defer verifiedLedger.Unlock()
+	rows := verifiedLedger.rows
+	if len(rows) == 0 || len(rows) > len(ledger) || verifiedLedger.tolerance != tolerance && verifiedLedger.tolerance.Cmp(tolerance) != 0 {
+		return 0, map[string]Decimal{}
+	}
+	for i := range rows {
+		if rows[i] != ledger[i] {
+			return 0, map[string]Decimal{}
+		}
+	}
+	balances := make(map[string]Decimal, len(verifiedLedger.balances))
+	for k, v := range verifiedLedger.balances {
+		balances[k] = v
+	}
+	return len(rows), balances
+}
+
+func rememberVerified(ledger []LedgerEntry, from int, tolerance Decimal, balances map[string]Decimal) {
+	verifiedLedger.Lock()
+	defer verifiedLedger.Unlock()
+	rows := verifiedLedger.rows
+	if from == 0 || len(rows) != from {
+		rows = nil
+		from = 0
+	}
+	verifiedLedger.rows = append(rows, ledger[from:]...)
+	verifiedLedger.tolerance = tolerance
+	verifiedLedger.balances = balances
+}
+
 func VerifyLedger(state SentimentState, tolerance Decimal) error {
 	m := dto.NewMath(28)
-	balances := map[string]Decimal{}
-	for _, row := range state.Ledger {
+	start, balances := verifiedPrefix(state.Ledger, tolerance)
+	for _, row := range state.Ledger[start:] {
 		computed := m.Sub(m.Sub(m.Sub(m.Add(m.Add(row.Start, row.Injection), row.RevisionDelta), row.TimeConsumption), row.PriceConsumption), row.Invalidation)
 		if m.Abs(m.Sub(balances[row.ContributionID], row.Start)).Cmp(tolerance) > 0 || m.Abs(m.Sub(computed, row.End)).Cmp(tolerance) > 0 || row.End.Sign() < 0 {
 			return &Error{"MODEL_LEDGER_BROKEN", 423}
 		}
 		balances[row.ContributionID] = row.End
+	}
+	if m.Err() != nil {
+		return m.Err()
+	}
+	if len(state.Ledger) > start {
+		kept := make(map[string]Decimal, len(balances))
+		for k, v := range balances {
+			kept[k] = v
+		}
+		rememberVerified(state.Ledger, start, tolerance, kept)
 	}
 	for _, c := range state.Contributions {
 		if m.Abs(m.Sub(balances[c.ContributionID], c.RemainingAmount)).Cmp(tolerance) > 0 {
