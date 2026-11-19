@@ -624,6 +624,12 @@
    "change_kind": "design",
    "date": "2026-11-19",
    "summary": "The strategy store encodes state without intermediate maps and without the ledger, writes only the state row that changed, and reuses the state it last read or wrote while both rows keep their version; ledger verification checks only rows after the prefix it last accepted; the trading snapshot memoizes instrument-key digests; the internal-matching executor renews its lease in the tick's fence instead of a separate transaction."
+  },
+  {
+   "version": "3.17.5",
+   "change_kind": "design",
+   "date": "2026-11-19",
+   "summary": "The strategy store decodes state only from the database's text, so the per-field decode memo keeps hitting after this process writes; ledger verification matches its verified prefix by value; the trading snapshot indexes target audit rows once instead of scanning them for every fill."
   }
  ]
 }

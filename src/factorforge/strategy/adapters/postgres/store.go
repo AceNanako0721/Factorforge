@@ -36,8 +36,12 @@ type Store struct {
 // of either row, from any writer, creates a new tuple, so a match means the
 // stored rows are what was cached: their payloads need not be fetched, and a
 // transaction that encodes the same bytes again has nothing to write.
-// public and internal are this encoder's form of the rows; they are nil until
-// a transaction computes them for rows another writer stored.
+// merged is the stored text of both rows as the database returns it, and is
+// nil after this process wrote them: decoding keeps a per-field memo of the
+// previous decode keyed by the raw bytes, so it must always see the same
+// format. public and internal are this encoder's form of the rows, used only
+// to decide whether a transaction has anything to write; they are nil until a
+// transaction computes them for rows another writer stored.
 type stateRows struct {
 	publicTuple, internalTuple string
 	merged                     []byte
@@ -60,19 +64,6 @@ func (s *Store) rememberState(key string, rows stateRows) {
 	s.states[key] = rows
 }
 
-// mergeObjects joins two encoded JSON objects with disjoint keys.
-func mergeObjects(public, internal []byte) []byte {
-	if len(public) <= 2 {
-		return append([]byte(nil), internal...)
-	}
-	if len(internal) <= 2 {
-		return append([]byte(nil), public...)
-	}
-	merged := make([]byte, 0, len(public)+len(internal))
-	merged = append(merged, public[:len(public)-1]...)
-	merged = append(merged, ',')
-	return append(merged, internal[1:]...)
-}
 
 // ledgerRows caches the decoded prefix of one instance's append-only
 // sentiment_entry rows; last is the stored payload of the final cached row,
@@ -297,9 +288,14 @@ func (s *Store) loadRows(ctx context.Context, tx pgx.Tx, id string, lock bool) (
 		return nil, rows, err
 	}
 	key := s.table("public_state") + "/" + id
-	if cached := s.cachedState(key); cached.merged != nil && cached.publicTuple == rows.publicTuple && cached.internalTuple == rows.internalTuple {
+	cached := s.cachedState(key)
+	same := cached.publicTuple == rows.publicTuple && cached.internalTuple == rows.internalTuple
+	if same && cached.merged != nil {
 		rows = cached
 	} else {
+		if same {
+			rows.public, rows.internal = cached.public, cached.internal
+		}
 		var public, internal []byte
 		if err := tx.QueryRow(ctx, "SELECT "+tupleIdentity+", payload FROM "+s.table("public_state")+" WHERE instance_id=$1", id).Scan(&rows.publicTuple, &public); err != nil {
 			return nil, rows, err
@@ -581,6 +577,7 @@ func (s *Store) Transaction(ctx context.Context, id string, fn func(*d.StrategyS
 		return dbError(err)
 	}
 	before := d.CloneState(state)
+	wrote := false
 	if rows.public == nil || rows.internal == nil {
 		// Rows another writer stored: compare against this encoder's form of
 		// the state as loaded, so an unchanged state is not written back.
@@ -615,6 +612,7 @@ func (s *Store) Transaction(ctx context.Context, id string, fn func(*d.StrategyS
 		}
 		// A row whose encoding did not change is not rewritten.
 		if !bytes.Equal(internal, rows.internal) {
+			wrote = true
 			if err = tx.QueryRow(ctx, "UPDATE "+s.table("internal_state")+" SET payload=$1 WHERE instance_id=$2 RETURNING "+tupleIdentity, internal, id).Scan(&rows.internalTuple); err != nil {
 				return dbError(err)
 			}
@@ -622,6 +620,7 @@ func (s *Store) Transaction(ctx context.Context, id string, fn func(*d.StrategyS
 		}
 	}
 	if !bytes.Equal(public, rows.public) {
+		wrote = true
 		if err = tx.QueryRow(ctx, "UPDATE "+s.table("public_state")+" SET payload=$1 WHERE instance_id=$2 RETURNING "+tupleIdentity, public, id).Scan(&rows.publicTuple); err != nil {
 			return dbError(err)
 		}
@@ -648,7 +647,9 @@ func (s *Store) Transaction(ctx context.Context, id string, fn func(*d.StrategyS
 	if err = tx.Commit(ctx); err != nil {
 		return dbError(err)
 	}
-	rows.merged = mergeObjects(rows.public, rows.internal)
+	if wrote {
+		rows.merged = nil
+	}
 	s.rememberState(s.table("public_state")+"/"+id, rows)
 	return nil
 }
