@@ -654,6 +654,12 @@
    "change_kind": "design",
    "date": "2026-11-20",
    "summary": "A request refused for unverified operational health records the health issues found when the refusal is written (health_issues), so the refusal can be explained afterwards."
+  },
+  {
+   "version": "3.18.3",
+   "change_kind": "design",
+   "date": "2026-11-20",
+   "summary": "Venue account reconciliation counts a wallet difference once: the equity side starts from the run's cash, so a wallet difference within tolerance no longer adds to the position valuation difference and raises EXTERNAL_ACCOUNT_DIFFERENCE."
   }
  ]
 }
