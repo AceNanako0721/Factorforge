@@ -534,3 +534,36 @@ func TestCapacityPendingAuditAndLongRunRetention(t *testing.T) {
 	expected, _ := json.Marshal(accepted)
 	executionEqual(t, expected, replay)
 }
+
+type issueHealth struct{ issues []string }
+
+func (h issueHealth) Check(context.Context, *d.Aggregate) ([]string, error) { return h.issues, nil }
+
+// T1-12: a refusal for unverified operational health records which health
+// issues failed, so the refusal can be explained afterwards.
+func TestRejectionNamesHealthIssues(t *testing.T) {
+	ctx := context.Background()
+	run, p, _, _ := serviceBase(t)
+	store := memory.New("SIM")
+	if err := store.Create(ctx, run); err != nil {
+		t.Fatal(err)
+	}
+	service := &a.Service{Store: store, Health: issueHealth{issues: []string{"HOST_HEALTH_UNAVAILABLE"}}}
+	if err := service.RecordRejection(ctx, p, "OPERATIONAL_HEALTH_NOT_VERIFIED", "PUT"); err != nil {
+		t.Fatal(err)
+	}
+	if err := service.RecordRejection(ctx, p, "VERSION_CONFLICT", "PUT"); err != nil {
+		t.Fatal(err)
+	}
+	after, _ := store.Read(ctx, run.RunKey)
+	if len(after.RejectedRequests) != 2 {
+		t.Fatal("rejections not recorded", len(after.RejectedRequests))
+	}
+	health, _ := json.Marshal(after.RejectedRequests[0]["health_issues"])
+	if string(health) != `["HOST_HEALTH_UNAVAILABLE"]` {
+		t.Fatal("health issues missing", string(health))
+	}
+	if _, ok := after.RejectedRequests[1]["health_issues"]; ok {
+		t.Fatal("health issues on an unrelated refusal")
+	}
+}

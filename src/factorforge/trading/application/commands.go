@@ -337,6 +337,13 @@ func (s *Service) RecordRejection(ctx context.Context, p d.Principal, code, acti
 	}
 	return s.Store.Transaction(ctx, *key, func(run *d.Aggregate) error {
 		detail := Response{"code": code, "action": action}
+		// The refused transaction rolled back its health check; check again
+		// so the record names what failed, not only that health did.
+		if code == "OPERATIONAL_HEALTH_NOT_VERIFIED" && s.Health != nil {
+			if issues, err := s.Health.Check(ctx, run); err == nil {
+				detail["health_issues"] = issues
+			}
+		}
 		data, _ := json.Marshal(detail)
 		var object d.Object
 		json.Unmarshal(data, &object)
