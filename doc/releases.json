@@ -642,6 +642,12 @@
    "change_kind": "specification",
    "date": "2026-11-19",
    "summary": "A judgment's confirmed invalidation clears the active judgment chain, and the baseline, only when the previous judgment the model was shown held the same direction; the conditions of a FLAT or opposite previous judgment say when to turn and no longer clear the chain."
+  },
+  {
+   "version": "3.18.1",
+   "change_kind": "design",
+   "date": "2026-11-20",
+   "summary": "An initial distance's close stop is measured from the position's average entry (entry ∓ close distance), the price the upper layer freezes its own close stop at, and stays frozen for the position cycle; the trigger-based form remains the fallback. Exit requests are checked against the same close stop the writer uses."
   }
  ]
 }

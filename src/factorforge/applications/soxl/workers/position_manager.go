@@ -770,6 +770,13 @@ func (m *PositionManager) effectiveStop(ctx context.Context, p *submission.Posit
 					sign = -1
 				}
 				out.close = trigger + sign*(dist-cd)
+				// The framework measures the close stop from the average
+				// entry (S2-034 InitialCloseStop); the trigger form is its fallback.
+				if p.AverageEntry != nil {
+					if entry, err := strconv.ParseFloat(*p.AverageEntry, 64); err == nil && entry > 0 && sign*(entry-sign*cd-trigger) > 0 {
+						out.close = entry - sign*cd
+					}
+				}
 			}
 		}
 	}
