@@ -307,12 +307,14 @@ func AdvanceBaseline(b BaselineState, recent []JudgmentView, now time.Time, reen
 		return b, false
 	}
 	last := recent[len(recent)-1]
-	if last.Invalidated {
-		b.Phase, b.Value = "CLEARED", 0
-		return b, false
-	}
 	if len(recent) >= 2 {
 		prev := recent[len(recent)-2]
+		// The latest judgment's invalidation refers to the one before it;
+		// only a judgment in the baseline's direction can end the baseline.
+		if last.Invalidated && prev.Direction == b.Direction {
+			b.Phase, b.Value = "CLEARED", 0
+			return b, false
+		}
 		if last.Direction == -b.Direction && prev.Direction == -b.Direction {
 			b.Phase, b.Value = "CLEARED", 0
 			return b, false

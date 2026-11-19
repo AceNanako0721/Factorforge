@@ -125,6 +125,20 @@ func TestT321InjectionDecisionTable(t *testing.T) {
 	if s9, a := d.DecideInjection(s, judgment("j9", at, "SHORT", 3, []string{"n1"}, true)); kinds(a) != "INVALIDATE" || s9.Active != nil {
 		t.Fatal("invalidation", kinds(a))
 	}
+	// After a FLAT judgment the model is shown that FLAT view; its conditions
+	// (when to turn) do not clear the SHORT chain, whichever way they point.
+	sf, _ := d.DecideInjection(s, judgment("j11", at, "FLAT", 2, []string{"n1"}, false))
+	if s12, a := d.DecideInjection(sf, judgment("j12", at, "FLAT", 2, []string{"n1"}, true)); len(a) != 0 || s12.Active == nil || len(s12.Active.EventIDs) != 1 {
+		t.Fatal("flat judgment's conditions cleared the chain", kinds(a))
+	}
+	if s13, a := d.DecideInjection(sf, judgment("j13", at, "SHORT", 3, []string{"n1"}, true)); len(a) != 0 || s13.Active == nil {
+		t.Fatal("flat judgment's conditions cleared the chain on a same-direction run", kinds(a))
+	}
+	// After a single opposite view the model is shown that view; its
+	// conditions do not clear the SHORT chain either.
+	if s14, a := d.DecideInjection(s7, judgment("j14", at, "FLAT", 2, []string{"n3"}, true)); len(a) != 0 || s14.Active.Direction != "SHORT" {
+		t.Fatal("opposite judgment's conditions cleared the chain", kinds(a))
+	}
 	// Failed runs change nothing.
 	if s10, a := d.DecideInjection(s, d.Judgment{JudgmentID: "j10", At: at}); len(a) != 0 || s10.Active.Direction != "SHORT" {
 		t.Fatal("failed run")
@@ -267,8 +281,15 @@ func TestT325BaselineSuspendReopenClear(t *testing.T) {
 	if next, _ = d.AdvanceBaseline(active, []d.JudgmentView{{Direction: -1}, {Direction: 1}}, t0, 0); next.Phase != "ACTIVE" {
 		t.Fatal("one opposite must not clear")
 	}
-	if next, _ = d.AdvanceBaseline(active, []d.JudgmentView{{Direction: -1, Invalidated: true}}, t0, 0); next.Phase != "CLEARED" {
+	if next, _ = d.AdvanceBaseline(active, []d.JudgmentView{{Direction: -1}, {Direction: -1, Invalidated: true}}, t0, 0); next.Phase != "CLEARED" {
 		t.Fatal("invalidation clears")
+	}
+	// The conditions of a FLAT judgment are not the baseline's.
+	if next, _ = d.AdvanceBaseline(active, []d.JudgmentView{{Direction: 0}, {Direction: 0, Invalidated: true}}, t0, 0); next.Phase != "ACTIVE" {
+		t.Fatal("flat judgment's conditions cleared the baseline")
+	}
+	if next, _ = d.AdvanceBaseline(active, []d.JudgmentView{{Direction: -1, Invalidated: true}}, t0, 0); next.Phase != "ACTIVE" {
+		t.Fatal("invalidation without the judgment it refers to cleared the baseline")
 	}
 }
 
