@@ -360,7 +360,9 @@ func TrackStopReceipts(state *d.StrategyState, obj *d.ObservedObject, snap *d.Tr
 		}
 		receipt.ApplicationState = applicationState
 		out.StopDirective = d.Clone(r)
-		state.LastEffectiveStrategyStop.Set(obj.ObjectID, &d.EffectiveStrategyStop{DirectiveID: r.Directive.DirectiveID, TargetVersion: out.TargetVersion, PositionDirection: d.DirectionName(snap.Actual[obj.ObjectID]), PositionCycleID: d.Text(pos["position_cycle_id"]), ProtectionID: receipt.ProtectionID, Plan: plan, VerifiedAt: at, CloseStop: CloseStopFor(r.Directive, plan, snap.Actual[obj.ObjectID].Sign()), DirectiveVersion: r.Directive.Version})
+		cycle, direction := d.Text(pos["position_cycle_id"]), snap.Actual[obj.ObjectID].Sign()
+		closeStop := InitialCloseStop(state.LastEffectiveStrategyStop.Value(obj.ObjectID), r.Directive, plan, snap.AverageEntries[obj.ObjectID], cycle, direction)
+		state.LastEffectiveStrategyStop.Set(obj.ObjectID, &d.EffectiveStrategyStop{DirectiveID: r.Directive.DirectiveID, TargetVersion: out.TargetVersion, PositionDirection: d.DirectionName(snap.Actual[obj.ObjectID]), PositionCycleID: cycle, ProtectionID: receipt.ProtectionID, Plan: plan, VerifiedAt: at, CloseStop: closeStop, DirectiveVersion: r.Directive.Version})
 	}
 	expireStopIndex(state, obj.ObjectID, at)
 }
@@ -498,6 +500,32 @@ func CloseStopFor(v d.StopDirective, plan d.StopPlan, direction int) *d.Decimal 
 	value := m.Add(plan.TriggerPrice, m.Mul(d.Int(direction), m.Sub(*v.InitialStopDistance, *v.CloseStopDistance)))
 	if m.Err() != nil {
 		return nil
+	}
+	return &value
+}
+
+// InitialCloseStop is the close stop of a verified plan (S2-034). An initial
+// distance's close stop sits the close distance from the position's average
+// entry, the same price the writer measured its risk unit from, and stays
+// frozen for the position cycle once set: later verified plans of the same
+// cycle (adds, refreshed distances) keep it. Without an entry, or when the
+// entry-based price would not be tighter than the trigger, it falls back to
+// trigger ± (initial distance − close distance). Other plans use CloseStopFor.
+func InitialCloseStop(previous *d.EffectiveStrategyStop, v d.StopDirective, plan d.StopPlan, entry *d.Decimal, cycle string, direction int) *d.Decimal {
+	derived := CloseStopFor(v, plan, direction)
+	if v.Kind != "INITIAL_DISTANCE" || plan.StrategyProtectionMode == "UPPER_MANAGED" || derived == nil {
+		return derived
+	}
+	if previous != nil && previous.PositionCycleID == cycle && cycle != "" && previous.CloseStop != nil {
+		return d.Clone(previous.CloseStop)
+	}
+	if entry == nil || entry.Sign() <= 0 {
+		return derived
+	}
+	m := d.Math()
+	value := m.Sub(*entry, m.Mul(d.Int(direction), *v.CloseStopDistance))
+	if m.Err() != nil || value.Sign() <= 0 || m.Mul(d.Int(direction), m.Sub(value, plan.TriggerPrice)).Sign() <= 0 {
+		return derived
 	}
 	return &value
 }
