@@ -209,7 +209,11 @@ func DecideInjection(state InjectionState, j Judgment) (InjectionState, []Inject
 	}
 	directional := DirectionSign(o.Direction) != 0
 	confirmed := state.LastDirection == o.Direction
-	if next.Active != nil && o.PreviousInvalidated && len(o.InvalidationItemIDs) > 0 {
+	// The model judges the conditions of the judgment it was shown, which is
+	// the latest successful one. They clear the active chain only when that
+	// judgment held the chain's direction: a FLAT or opposite judgment's
+	// conditions say when to turn, not when the chain's thesis failed.
+	if next.Active != nil && o.PreviousInvalidated && len(o.InvalidationItemIDs) > 0 && state.LastDirection == next.Active.Direction {
 		invalidate("INVALIDATED")
 	}
 	switch {
