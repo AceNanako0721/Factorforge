@@ -331,8 +331,10 @@ func Synchronize(ctx context.Context, store ports.Store, key d.RunKey, broker po
 		// The venue marks its equity at its own mark price, which differs from
 		// the run's collected mark by a few ticks. Equity is compared with the
 		// venue's positions revalued at the run's mark, so only wallet balance,
-		// quantity and entry price have to agree.
-		venueEquity, priced := cash, true
+		// quantity and entry price have to agree. The wallet balance is compared
+		// on its own below; the equity side starts from the run's cash so a
+		// wallet difference within tolerance is not counted a second time.
+		venueEquity, priced := run.Cash, true
 		for _, code := range codes {
 			p := remote[code]
 			if p == nil || p.Quantity.Sign() == 0 {

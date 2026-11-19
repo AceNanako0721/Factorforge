@@ -79,3 +79,11 @@ func TestT121VenueAccountFactsStillStrict(t *testing.T) {
 		})
 	}
 }
+
+func TestT121WalletDifferenceCountedOnce(t *testing.T) {
+	// The wallet differs by exactly the tolerance and the venue rounds the
+	// entry price; neither alone, nor both together, is an account difference.
+	if issues := venueIssues(t, "10000.00000001", "100.000000000002", "10000.00000001"); len(issues) != 0 {
+		t.Fatal("wallet difference within tolerance counted twice", issues)
+	}
+}
