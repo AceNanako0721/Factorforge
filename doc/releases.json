@@ -612,6 +612,12 @@
    "change_kind": "design",
    "date": "2026-11-18",
    "summary": "A delivery-unknown target whose new risk was revoked is settled as expired once past its expiry, instead of blocking new risk on the object indefinitely."
+  },
+  {
+   "version": "3.17.3",
+   "change_kind": "design",
+   "date": "2026-11-19",
+   "summary": "The trading store reuses the run snapshot it last read or wrote while the stored row version is unchanged, and checks and rebuilds projections only when a transaction writes; idle polls no longer reparse the whole snapshot in the database."
   }
  ]
 }
