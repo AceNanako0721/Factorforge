@@ -66,13 +66,9 @@ func run() error {
 	}
 	pause := 250 * time.Millisecond
 	for {
-		if epoch > 0 {
-			if err = store.Transaction(ctx, key, func(run *d.Aggregate) error {
-				return run.RenewLease(*holder, epoch, time.Now().UTC(), time.Duration(run.Policy.Operational.LeaseSeconds)*time.Second)
-			}); err != nil {
-				return err
-			}
-		}
+		// Tick's first transaction passes the lease fence (HoldLease), which
+		// renews the lease under the run's policy before anything else, so the
+		// loop needs no transaction of its own for the renewal.
 		worked, err := worker.Tick(ctx, key)
 		if err != nil {
 			return err

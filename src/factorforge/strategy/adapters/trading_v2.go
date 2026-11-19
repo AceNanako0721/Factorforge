@@ -161,6 +161,7 @@ func queryBinding(b d.RunBinding) url.Values {
 }
 func (t *TradingV2) Snapshot(ctx context.Context, objects []*d.ObservedObject) (snapshot *d.TradingSnapshot, err error) {
 	err = d.Guard(func() error {
+		dg := digests{}
 		if len(objects) == 0 {
 			return &d.Error{Code: "MIXED_ACCOUNT_SNAPSHOT", Status: 422}
 		}
@@ -223,11 +224,11 @@ func (t *TradingV2) Snapshot(ctx context.Context, objects []*d.ObservedObject) (
 		}
 		managed := []string{}
 		for _, obj := range objects {
-			identity := d.Digest(obj.InstrumentKey)
+			identity := dg.of(obj.InstrumentKey)
 			managed = append(managed, identity)
 			var spec map[string]any
 			for _, s := range d.Rows(pages["instruments"]["items"]) {
-				if d.Digest(s["key"]) == identity {
+				if dg.of(s["key"]) == identity {
 					spec = s
 					break
 				}
@@ -260,7 +261,7 @@ func (t *TradingV2) Snapshot(ctx context.Context, objects []*d.ObservedObject) (
 			actual, pending := d.Zero(), d.Zero()
 			snap.AverageEntries[id] = nil
 			for _, p := range d.Rows(pages["positions"]["items"]) {
-				if d.Digest(p["instrument_key"]) != identity {
+				if dg.of(p["instrument_key"]) != identity {
 					continue
 				}
 				q := d.Amount(p["quantity"])
@@ -276,7 +277,7 @@ func (t *TradingV2) Snapshot(ctx context.Context, objects []*d.ObservedObject) (
 				}
 			}
 			for _, o := range d.Rows(pages["orders"]["items"]) {
-				if d.Digest(o["instrument_key"]) == identity && d.Text(o["owner_id"]) == obj.OwnerID && !d.Has(terminal, d.Text(o["state"])) {
+				if dg.of(o["instrument_key"]) == identity && d.Text(o["owner_id"]) == obj.OwnerID && !d.Has(terminal, d.Text(o["state"])) {
 					q := d.Amount(o["remaining_quantity"])
 					if d.Text(o["side"]) != "BUY" {
 						q = q.Neg()
@@ -288,7 +289,7 @@ func (t *TradingV2) Snapshot(ctx context.Context, objects []*d.ObservedObject) (
 			snap.Pending[id] = pending
 			ownerFound := false
 			for _, owner := range d.Rows(pages["owners"]["items"]) {
-				if d.Digest(owner["instrument_key"]) == identity {
+				if dg.of(owner["instrument_key"]) == identity {
 					if owner["owner_id"] != nil && d.Text(owner["owner_id"]) != obj.OwnerID {
 						return &d.Error{Code: "OWNER_CONFLICT", Status: 409}
 					}
@@ -302,20 +303,20 @@ func (t *TradingV2) Snapshot(ctx context.Context, objects []*d.ObservedObject) (
 			}
 			snap.TargetVersions[id] = 0
 			for _, target := range d.Rows(pages["targets"]["items"]) {
-				if d.Digest(target["instrument_key"]) == identity && d.Number(target["target_version"]) > snap.TargetVersions[id] {
+				if dg.of(target["instrument_key"]) == identity && d.Number(target["target_version"]) > snap.TargetVersions[id] {
 					snap.TargetVersions[id] = d.Number(target["target_version"])
 					snap.Targets[id] = target
 				}
 			}
 			snap.Protections[id] = []map[string]any{}
 			for _, p := range d.Rows(pages["protections"]["items"]) {
-				if d.Digest(p["instrument_key"]) == identity && d.Text(p["owner_id"]) == obj.OwnerID {
+				if dg.of(p["instrument_key"]) == identity && d.Text(p["owner_id"]) == obj.OwnerID {
 					snap.Protections[id] = append(snap.Protections[id], p)
 				}
 			}
 			snap.TriggerPrices[id] = map[string]d.MarketSample{}
 			for _, p := range d.Rows(pages["market/points"]["items"]) {
-				if d.Digest(p["instrument_key"]) == identity && !d.At(p["available_at"]).After(at) {
+				if dg.of(p["instrument_key"]) == identity && !d.At(p["available_at"]).After(at) {
 					kind := d.Text(p["kind"])
 					old, ok := snap.TriggerPrices[id][kind]
 					if !ok || d.At(p["available_at"]).After(old.AvailableAt) {
@@ -335,7 +336,7 @@ func (t *TradingV2) Snapshot(ctx context.Context, objects []*d.ObservedObject) (
 			}
 			prices := []map[string]any{}
 			for _, p := range d.Rows(pages["market/points"]["items"]) {
-				if d.Digest(p["instrument_key"]) == identity && d.Text(p["kind"]) == "MARK" && !d.At(p["available_at"]).After(at) {
+				if dg.of(p["instrument_key"]) == identity && d.Text(p["kind"]) == "MARK" && !d.At(p["available_at"]).After(at) {
 					prices = append(prices, p)
 				}
 			}
@@ -381,7 +382,7 @@ func (t *TradingV2) Snapshot(ctx context.Context, objects []*d.ObservedObject) (
 			var origin any
 			for _, a := range d.Rows(pages["audit"]["items"]) {
 				detail := d.Object(a["detail"])
-				if d.Text(a["action"]) == "TARGET_SET" && d.Text(detail["resource_id"]) == code && d.Digest(detail["target_version"]) == d.Digest(order["target_version"]) {
+				if d.Text(a["action"]) == "TARGET_SET" && d.Text(detail["resource_id"]) == code && dg.of(detail["target_version"]) == dg.of(order["target_version"]) {
 					origin = a["request_id"]
 					break
 				}
@@ -402,19 +403,19 @@ func (t *TradingV2) Snapshot(ctx context.Context, objects []*d.ObservedObject) (
 			snap.Fills = append(snap.Fills, copy)
 		}
 		for _, spec := range d.Rows(pages["instruments"]["items"]) {
-			identity := d.Digest(spec["key"])
+			identity := dg.of(spec["key"])
 			if d.Has(managed, identity) {
 				continue
 			}
 			held := d.Zero()
 			queued := []d.Decimal{}
 			for _, p := range d.Rows(pages["positions"]["items"]) {
-				if d.Digest(p["instrument_key"]) == identity {
+				if dg.of(p["instrument_key"]) == identity {
 					held = m.Add(held, d.Amount(p["quantity"]))
 				}
 			}
 			for _, o := range d.Rows(pages["orders"]["items"]) {
-				if d.Digest(o["instrument_key"]) == identity && !d.Has(terminal, d.Text(o["state"])) {
+				if dg.of(o["instrument_key"]) == identity && !d.Has(terminal, d.Text(o["state"])) {
 					q := d.Amount(o["remaining_quantity"])
 					if d.Text(o["side"]) != "BUY" {
 						q = q.Neg()
@@ -424,7 +425,7 @@ func (t *TradingV2) Snapshot(ctx context.Context, objects []*d.ObservedObject) (
 			}
 			var price *d.Decimal
 			for _, p := range d.Rows(pages["market/points"]["items"]) {
-				if d.Digest(p["instrument_key"]) == identity && d.Text(p["kind"]) == "MARK" && d.Text(p["quality"]) == "VALID" {
+				if dg.of(p["instrument_key"]) == identity && d.Text(p["kind"]) == "MARK" && d.Text(p["quality"]) == "VALID" {
 					price = d.Ptr(d.Amount(p["value"]))
 					break
 				}
@@ -554,4 +555,49 @@ func (t *TradingV2) Simulate(ctx context.Context, scenario map[string]any) (map[
 		return nil, err
 	}
 	return map[string]any{"run": binding, "last_receipt": result, "equity": account["equity"], "fees": account["fees"], "realized_pnl": account["realized_pnl"], "risk_locks": account["risk_locks"]}, nil
+}
+
+// digests memoizes d.Digest for flat string maps (instrument keys), which the
+// snapshot compares for every row of every page. Other values are digested
+// directly.
+type digests map[string]string
+
+func (m digests) of(v any) string {
+	key, ok := flatKey(v)
+	if !ok {
+		return d.Digest(v)
+	}
+	if h, ok := m[key]; ok {
+		return h
+	}
+	h := d.Digest(v)
+	m[key] = h
+	return h
+}
+
+// flatKey is an unambiguous text of a map whose values are all strings.
+func flatKey(v any) (string, bool) {
+	x, ok := v.(map[string]any)
+	if !ok {
+		return "", false
+	}
+	keys := make([]string, 0, len(x))
+	for k := range x {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	var b strings.Builder
+	for _, k := range keys {
+		s, ok := x[k].(string)
+		if !ok {
+			return "", false
+		}
+		b.WriteString(strconv.Itoa(len(k)))
+		b.WriteByte(':')
+		b.WriteString(k)
+		b.WriteString(strconv.Itoa(len(s)))
+		b.WriteByte(':')
+		b.WriteString(s)
+	}
+	return b.String(), true
 }

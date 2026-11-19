@@ -618,6 +618,12 @@
    "change_kind": "design",
    "date": "2026-11-19",
    "summary": "The trading store reuses the run snapshot it last read or wrote while the stored row version is unchanged, and checks and rebuilds projections only when a transaction writes; idle polls no longer reparse the whole snapshot in the database."
+  },
+  {
+   "version": "3.17.4",
+   "change_kind": "design",
+   "date": "2026-11-19",
+   "summary": "The strategy store encodes state without intermediate maps and without the ledger, writes only the state row that changed, and reuses the state it last read or wrote while both rows keep their version; ledger verification checks only rows after the prefix it last accepted; the trading snapshot memoizes instrument-key digests; the internal-matching executor renews its lease in the tick's fence instead of a separate transaction."
   }
  ]
 }

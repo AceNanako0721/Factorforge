@@ -215,7 +215,7 @@ func jsonValue(v reflect.Value) any {
 		return v.Interface()
 	}
 }
-func Marshal(value any) ([]byte, error)        { return json.Marshal(JSONValue(value)) }
+func Marshal(value any) ([]byte, error)        { return appendValue(nil, reflect.ValueOf(value)) }
 func DecodeJSON(data []byte, target any) error { return Decode(bytes.NewReader(data), target) }
 func Clone[T any](v T) T {
 	b, e := json.Marshal(v)
