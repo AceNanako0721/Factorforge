@@ -113,3 +113,83 @@ func TestNativePostgresIncrementalProjection(t *testing.T) {
 		t.Fatal("legacy payload projection not rewritten")
 	}
 }
+
+// Each store keeps the last run row it read or wrote and reuses it while the
+// row's tuple is unchanged. A write from another store or from outside the
+// application is a new tuple, so it is always read back.
+func TestNativePostgresSnapshotReuseFollowsRowVersion(t *testing.T) {
+	ctx := context.Background()
+	server, err := postgres.StartTemporary(ctx, t.TempDir(), nativePostgresBin(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.Close()
+	first, err := postgres.Open(ctx, server.SIMDSN, "SIM")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer first.Close()
+	second, err := postgres.Open(ctx, server.SIMDSN, "SIM")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer second.Close()
+	admin, err := pgx.Connect(ctx, server.AdminDSN)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer admin.Close(ctx)
+	run, _, _, _ := serviceBase(t)
+	if err = first.Create(ctx, run); err != nil {
+		t.Fatal(err)
+	}
+	rowVersion := func() string {
+		t.Helper()
+		var v string
+		if err := admin.QueryRow(ctx, "SELECT xmin::text FROM trading_sim.trading_run").Scan(&v); err != nil {
+			t.Fatal(err)
+		}
+		return v
+	}
+	health := func(store *postgres.Store) []string {
+		t.Helper()
+		got, err := store.Read(ctx, run.RunKey)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got.HealthIssues
+	}
+	health(first)
+	health(second)
+	idle := rowVersion()
+	for _, store := range []*postgres.Store{first, second, first} {
+		if err = store.Transaction(ctx, run.RunKey, func(*d.Aggregate) error { return nil }); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if rowVersion() != idle {
+		t.Fatal("idle transaction rewrote the run row")
+	}
+	if err = second.Transaction(ctx, run.RunKey, func(r *d.Aggregate) error { r.HealthIssues = []string{"SECOND"}; return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if got := health(first); len(got) != 1 || got[0] != "SECOND" {
+		t.Fatal("write from another store not read back", got)
+	}
+	if _, err = admin.Exec(ctx, `UPDATE trading_sim.trading_run SET payload=jsonb_set(payload,'{health_issues}','["OUTSIDE"]'::jsonb)`); err != nil {
+		t.Fatal(err)
+	}
+	for _, store := range []*postgres.Store{first, second} {
+		if got := health(store); len(got) != 1 || got[0] != "OUTSIDE" {
+			t.Fatal("outside edit not read back", got)
+		}
+	}
+	// A stored snapshot that cannot be read is still refused after the row
+	// was cached valid.
+	if _, err = admin.Exec(ctx, `UPDATE trading_sim.trading_run SET payload=jsonb_set(payload,'{state}','5'::jsonb), snapshot_text=NULL`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = first.Read(ctx, run.RunKey); err == nil {
+		t.Fatal("invalid snapshot accepted after caching")
+	}
+}

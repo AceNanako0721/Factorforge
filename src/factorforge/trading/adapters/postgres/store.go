@@ -27,6 +27,18 @@ type Store struct {
 	environment, schema string
 	candleMu            sync.Mutex
 	candleBackfilled    map[string]bool
+	snapshotMu          sync.Mutex
+	snapshots           map[string]snapshot
+}
+
+// snapshot is the last validated run row this process read or wrote, keyed by
+// its tuple identity. Any update of the row, from this process or outside the
+// application, creates a new tuple, so a matching identity means the stored
+// row is byte-for-byte what was cached and its parse and checks can be skipped.
+type snapshot struct {
+	tuple   string
+	data    []byte
+	ordered bool
 }
 
 func failure(code string, status int) error { return &d.Error{Code: code, Status: status} }
@@ -45,7 +57,7 @@ func Open(ctx context.Context, dsn, environment string) (*Store, error) {
 	if err != nil {
 		return nil, failure("STORE_UNAVAILABLE", 503)
 	}
-	return &Store{pool: pool, environment: environment, schema: schema, candleBackfilled: map[string]bool{}}, nil
+	return &Store{pool: pool, environment: environment, schema: schema, candleBackfilled: map[string]bool{}, snapshots: map[string]snapshot{}}, nil
 }
 func (s *Store) Close()              { s.pool.Close() }
 func (s *Store) Environment() string { return s.environment }
@@ -159,21 +171,38 @@ func (s *Store) load(ctx context.Context, connection reader, key d.RunKey, lock 
 	if err := loginAllowed(ctx, connection); err != nil {
 		return nil, false, err
 	}
-	query := "SELECT snapshot_text IS NOT NULL AND snapshot_text::jsonb=payload, CASE WHEN snapshot_text IS NOT NULL AND snapshot_text::jsonb=payload THEN snapshot_text ELSE payload::text END FROM " + s.table("trading_run") + " WHERE account_id=$1 AND run_id=$2"
+	// The row identity is read first (and locked when asked); comparing the
+	// stored text with the payload means parsing the whole snapshot inside the
+	// database, so it runs only when the row changed since this process last
+	// saw it.
+	identity := "SELECT " + tupleIdentity + " FROM " + s.table("trading_run") + " WHERE account_id=$1 AND run_id=$2"
 	if lock {
-		query += " FOR UPDATE"
+		identity += " FOR UPDATE"
 	}
-	var ordered bool
-	var data []byte
-	if err := connection.QueryRow(ctx, query, key.AccountID, key.RunID).Scan(&ordered, &data); err != nil {
+	var tuple string
+	if err := connection.QueryRow(ctx, identity, key.AccountID, key.RunID).Scan(&tuple); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, false, failure("RUN_NOT_FOUND", 404)
 		}
 		return nil, false, sqlError(err)
 	}
+	cached, hit := s.cachedSnapshot(key.AccountID, tuple)
+	data, ordered := cached.data, cached.ordered
+	if !hit {
+		query := "SELECT " + tupleIdentity + ", snapshot_text IS NOT NULL AND snapshot_text::jsonb=payload, CASE WHEN snapshot_text IS NOT NULL AND snapshot_text::jsonb=payload THEN snapshot_text ELSE payload::text END FROM " + s.table("trading_run") + " WHERE account_id=$1 AND run_id=$2"
+		if err := connection.QueryRow(ctx, query, key.AccountID, key.RunID).Scan(&tuple, &ordered, &data); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil, false, failure("RUN_NOT_FOUND", 404)
+			}
+			return nil, false, sqlError(err)
+		}
+	}
 	var run d.Aggregate
-	if json.Unmarshal(data, &run) != nil || d.Validate(run) != nil {
+	if json.Unmarshal(data, &run) != nil || (!hit && d.Validate(run) != nil) {
 		return nil, false, failure("STORE_SNAPSHOT_INVALID", 503)
+	}
+	if !hit {
+		s.rememberSnapshot(key.AccountID, snapshot{tuple: tuple, data: data, ordered: ordered})
 	}
 	var count, last int64
 	if err := connection.QueryRow(ctx, "SELECT count(*),COALESCE(max(sequence),0) FROM "+s.table("audit_event")+" WHERE account_id=$1", key.AccountID).Scan(&count, &last); err != nil {
@@ -202,6 +231,23 @@ func (s *Store) load(ctx context.Context, connection reader, key d.RunKey, lock 
 	run.Audit = []d.Object{}
 	run.AuditCount = count
 	return &run, ordered, nil
+}
+
+// tupleIdentity names one stored version of a row: an update writes a new
+// tuple with a new xmin, and ctid tells apart versions a single transaction
+// wrote.
+const tupleIdentity = "xmin::text||':'||ctid::text"
+
+func (s *Store) cachedSnapshot(account, tuple string) (snapshot, bool) {
+	s.snapshotMu.Lock()
+	defer s.snapshotMu.Unlock()
+	cached, ok := s.snapshots[account]
+	return cached, ok && cached.tuple == tuple
+}
+func (s *Store) rememberSnapshot(account string, value snapshot) {
+	s.snapshotMu.Lock()
+	defer s.snapshotMu.Unlock()
+	s.snapshots[account] = value
 }
 func (s *Store) Read(ctx context.Context, key d.RunKey) (*d.Aggregate, error) {
 	var run *d.Aggregate
@@ -277,17 +323,12 @@ func (s *Store) Transaction(ctx context.Context, key d.RunKey, apply func(*d.Agg
 	if !ordered || s.needsCandleBackfill(key.AccountID) {
 		candles = append(candles, run.Candles...)
 	}
-	var prior *state
 	var before []byte
 	if ordered {
-		prior = capture(run)
 		before, _ = json.Marshal(run)
 	}
 	if err = apply(run); err != nil {
 		return err
-	}
-	if d.Validate(run) != nil {
-		return failure("STORE_SNAPSHOT_INVALID", 503)
 	}
 	data, err := json.Marshal(run)
 	if err != nil {
@@ -296,13 +337,28 @@ func (s *Store) Transaction(ctx context.Context, key d.RunKey, apply func(*d.Agg
 	// a transaction that changed nothing (an idle executor tick, a
 	// lease that needs no renewal) writes nothing; rewriting the whole run row
 	// every poll cost about 160 MB of WAL a minute across four shadow runs.
+	// The unchanged run is the one load validated, so it is not checked again.
 	if before != nil && len(run.Audit) == 0 && len(candles) == 0 && len(run.CandleWrites) == 0 && run.AuditCount == auditCount && bytes.Equal(before, data) {
 		return nil
+	}
+	if d.Validate(run) != nil {
+		return failure("STORE_SNAPSHOT_INVALID", 503)
+	}
+	// The projections as loaded are rebuilt from the bytes taken before
+	// apply, only now that something is written.
+	var prior *state
+	if before != nil {
+		var loaded d.Aggregate
+		if json.Unmarshal(before, &loaded) != nil {
+			return failure("STORE_SNAPSHOT_INVALID", 503)
+		}
+		prior = capture(&loaded)
 	}
 	if err = s.persist(ctx, tx, run, prior, auditCount, candles); err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, "UPDATE "+s.table("trading_run")+" SET version=$1,payload=$2::jsonb,snapshot_text=$3 WHERE account_id=$4", run.Version, data, string(data), key.AccountID)
+	var tuple string
+	err = tx.QueryRow(ctx, "UPDATE "+s.table("trading_run")+" SET version=$1,payload=$2::jsonb,snapshot_text=$3 WHERE account_id=$4 RETURNING "+tupleIdentity, run.Version, data, string(data), key.AccountID).Scan(&tuple)
 	if err != nil {
 		return sqlError(err)
 	}
@@ -310,6 +366,7 @@ func (s *Store) Transaction(ctx context.Context, key d.RunKey, apply func(*d.Agg
 		return sqlError(err)
 	}
 	s.markCandlesBackfilled(key.AccountID)
+	s.rememberSnapshot(key.AccountID, snapshot{tuple: tuple, data: data, ordered: true})
 	return nil
 }
 
