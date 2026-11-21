@@ -27,6 +27,8 @@ var Views = map[string][]string{
 	"audit":      {"trading.audit", "strategy.audit"},
 	// S4-017: judgment, stop and baseline page.
 	"dynamic": {"dynamic.status", "dynamic.judgments", "dynamic.actions", "account", "positions", "protections", "object", "candles"},
+	// S4-025: what each instance is registered with.
+	"settings": {"dynamic.status", "run", "account", "policy"},
 	// S4-024: order replay inputs.
 	"replay": {"batches", "decision-history", "dynamic.plans", "dynamic.actions", "dynamic.judgments", "fills"},
 }

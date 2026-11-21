@@ -6,11 +6,13 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl/config"
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl/domain"
+	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl/entrypoints/assembly"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl/submission"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl/workers"
 	dto "github.com/AceNanako0721/Factorforge/src/factorforge/strategy/api/dto"
@@ -161,6 +163,35 @@ func TestT330FollowerProfileValidation(t *testing.T) {
 	if err := base().Validate(); err != nil {
 		t.Fatal("follower needs no models or judge minutes", err)
 	}
+	described := base()
+	described.Purpose = strings.Repeat("长", config.PurposeMaxRunes)
+	if err := described.Validate(); err != nil {
+		t.Fatal("a purpose of the maximum length is valid", err)
+	}
+	// S3-032: the recorded settings name the judgment source and the
+	// effective risk cap, never an address or a token.
+	rec := assembly.RecordedSettings(base())
+	raw, _ := json.Marshal(rec)
+	if rec.Judgment.Mode != "FOLLOW" || rec.Judgment.SourceInstanceID != "soxl-example" || rec.MaxRiskFraction != 0.02 || rec.LadderStep != 0.04 || rec.PriceState.Enabled || strings.Contains(string(raw), "127.0.0.1") || strings.Contains(string(raw), `"read"`) {
+		t.Fatalf("recorded %s", raw)
+	}
+	self := base()
+	self.Follow.SourceURL = ""
+	self.Models = append(self.Models, struct {
+		Name      string `toml:"name"`
+		BunPath   string `toml:"bun_path"`
+		Provider  string `toml:"provider"`
+		AccountID int64  `toml:"account_id"`
+		Model     string `toml:"model"`
+		Timeout   int64  `toml:"timeout_seconds"`
+	}{Name: "haiku", Provider: "claude-cli", Model: "claude-haiku-5-5"})
+	self.News.JudgeMinutes = []int{1, 31}
+	self.Position.PriceState.URL, self.Position.PriceState.APIKey, self.Position.PriceState.Model, self.Position.PriceState.MaxAgeMinutes = "https://jev.example", "secret-key", "jev-latest", 120
+	rec = assembly.RecordedSettings(self)
+	raw, _ = json.Marshal(rec)
+	if rec.Judgment.Mode != "MODELS" || len(rec.Judgment.Models) != 1 || rec.Judgment.Models[0] != "claude-haiku-5-5" || len(rec.Judgment.JudgeMinutes) != 2 || !rec.PriceState.Enabled || rec.PriceState.Scope != "ALL" || strings.Contains(string(raw), "secret-key") || strings.Contains(string(raw), "jev.example") {
+		t.Fatalf("recorded %s", raw)
+	}
 	uncapped := base()
 	uncapped.Position.MaxRiskFraction = 1
 	if err := uncapped.Validate(); err != nil {
@@ -174,6 +205,8 @@ func TestT330FollowerProfileValidation(t *testing.T) {
 		"risk cap":     func(p *config.DynamicProfile) { p.Position.MaxRiskFraction = 1.5 },
 		"negative cap": func(p *config.DynamicProfile) { p.Position.MaxRiskFraction = -0.01 },
 		"generate":     func(p *config.DynamicProfile) { p.Follow.SourceURL = "" },
+		"purpose long": func(p *config.DynamicProfile) { p.Purpose = strings.Repeat("长", config.PurposeMaxRunes+1) },
+		"purpose ctrl": func(p *config.DynamicProfile) { p.Purpose = "line\nbreak" },
 	} {
 		p := base()
 		change(&p)

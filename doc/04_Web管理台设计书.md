@@ -1,6 +1,6 @@
 # Web 管理台设计书
 
-版本：3.18.3
+版本：3.19.0
 
 对应式样书：[04_Web管理台式样书](04_Web管理台式样书.md)。本书说明 `src/factorforge/operations/console` 的实现。
 
@@ -244,6 +244,7 @@ max_retries = 3
 | `learning` | `parameters` `learning` `activations` `validation` |
 | `operations` | `trading.operations` `alerts` `object` |
 | `audit` | `trading.audit` `strategy.audit` |
+| `settings` | `dynamic.status` `run` `account` `policy`（P2 的 `/objects/{object_id}/policy`） |
 
 每个路由登记了所属服务、路径模板和允许的下层查询参数。路由表是固定的，浏览器不能指定任意下层路径。
 
@@ -374,7 +375,7 @@ max_retries = 3
 | 文件 | 内容 |
 |---|---|
 | `api/client.ts` | 请求封装、响应的绑定核对、数据取值工具 |
-| `components/shell.tsx` | 顶栏：左上角实例切换、两页导航、显示时区、主题、退出 |
+| `components/shell.tsx` | 顶栏：左上角实例切换、三页导航、显示时区、主题、退出 |
 | `features/session.tsx` | 会话状态与页面可见性 |
 | `features/login.tsx` | 登录页 |
 | `features/use-view.ts` | 读取一个视图（`useView`）、刷新与陈旧值合并（`merge`）、读完全部保护（`useProtections`） |
@@ -394,8 +395,10 @@ max_retries = 3
 | `features/live-market.ts` | 实时参考推送 |
 | `features/display-settings.tsx` | 显示时区 |
 | `features/theme.tsx` | 浅色与深色、Ant Design 中文配置 |
+| `features/settings-model.ts` | 实例配置的行：每项设置的取值、文字与标色（`settingsRows`） |
+| `features/settings-page.tsx` | 实例配置页 |
 
-界面组件用 Ant Design，模块图用 SVG 自绘，路由用 TanStack Router，数据读取用 TanStack Query。路由只有 `/flow` 与 `/market`；旧页面地址（`/overview`、`/dynamic` 等）在浏览器内转到这两页，服务端对 `/flow` 也返回页面。
+界面组件用 Ant Design，模块图用 SVG 自绘，路由用 TanStack Router，数据读取用 TanStack Query。路由只有 `/flow`、`/market` 与 `/settings`；旧页面地址（`/overview`、`/dynamic` 等）在浏览器内转到前两页，服务端对 `/flow`、`/market`、`/settings` 也返回页面。
 
 ### 8.2 请求与会话
 
@@ -485,6 +488,15 @@ max_retries = 3
 - **页面（`MarketPage`）**：范围按钮在图卡片右上角；选 24 小时用页面已有的数据，其他范围用 `useQuery` 读取，5 分钟内不重读，每 5 分钟刷新一次。切换范围时图重建一次。正在形成的 K 线只在 24 小时范围里画。止损线按当前持仓画，不随范围改变；没有持仓时页面写明无止损线。研判箭头与开平仓方块随范围：24 小时以外的范围用 `readTimelines` 读 `dynamic` 视图的 `dynamic.judgments` 与 `dynamic.actions`（`from`/`to` 取图的范围，`limit` 同上，沿游标最多 60 页），5 分钟内不重读；读取失败时仍用页面已有的 72 小时记录，并在页面上说明。
 - **不改写**：只读 `market` 视图，没有写入。
 
+### 8.11 实例配置页（`SettingsPage`、`settingsRows`）
+
+对应式样 S4-025。对用户可看的每个查看范围各读一次 `settings` 视图（`useQueries`，每个范围一条查询，按 `checkResponse` 核对绑定；设置只在重新部署时变化，刷新间隔取 60 秒与 `refresh_seconds` 中的较大值）。每个范围是一列，列名同实例切换（`instanceName`）。
+
+- **行**：`settingsRows` 把每项设置写成文字：测试目的（P3 `settings.purpose`）；下单方式（P1 运行的 `execution_mode`，`LIVE` 为交易所下单）；初始资金（权益减盈亏块 `total.trading`）；研判来源、跟随起点与研判时刻（`settings.judgment`）；两层的单笔风险上限（P3 `max_risk_fraction` 与 P2 合成规则 `sizing.max_risk_fraction`）；价格状态闸门的范围、不可用时的处理和有效期（`price_state_gate`）；止损后重入的冷却与条件（P2 `reentry`）；无交易带（P2 `rebalance` 的 `band_floor` 与 `band_ratio_of_unit`）；仓位档位（合成规则的 `levels`，没有时用政策的 `levels`）；止损移动方式（`ladder_step`，null 为连续移动）、收盘止损周期、三个分位数、保险止损比例和往返成本；基线最大占比与重开等待；手续费率与滑点（P2 政策）。行按“实例、研判、开仓、止损、基线、成本”分组，每组一张表，行名旁的问号提示一句说明。
+- **标色**：一行里与多数实例相同的值不标色；其余值加底色，并给读屏软件附“与多数实例不同”。最多的值不止一个时，该行所有值都标色。测试目的不参与比较。读不到的格子写“—”，不参与比较。
+- **缺数**：某个范围的视图失败或某个来源 `UNAVAILABLE` 时，页首列出“实例（来源）”；应用实例还没有记录设置（`settings` 为 null）时另行说明，对应格子写“—”。
+- **窄屏**：表格在自身容器内横向滚动，行名列固定在左侧。
+
 ## 9 验证
 
 | 验收 | 主要测试 |
@@ -494,6 +506,7 @@ max_retries = 3
 | T4-04～T4-09 | 实例级列表的对象范围、案例有限形状、报告范围 |
 | T4-15、T4-19 | 研判与止损视图的区块与时间范围、旧版实例接口缺少阶梯字段时的兼容 |
 | T4-24 | 订单回放视图的来源与起点 |
+| T4-25 | 实例配置视图的四个来源；P3 状态的设置与 P2 政策经投影后保留（`tests/operations/console`、`tests/strategy/go_policy_read_test.go`）；`tests/web/settings.test.ts` 的文字与标色 |
 | T4-16 | 登记隧道主机、主机名检查、跨站导航只取静态页面 |
 | T4-17 | 推送解析、共享与过期、重连与空闲关闭、推送的授权与会话结束 |
 | T4-18 | 盈亏块的投影 |

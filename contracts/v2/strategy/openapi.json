@@ -4248,6 +4248,33 @@
         "title": "Policy",
         "type": "object"
       },
+      "PolicyRead": {
+        "additionalProperties": false,
+        "properties": {
+          "object_id": {
+            "pattern": "^[A-Za-z0-9_.-]{1,160}$",
+            "type": "string"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/Policy"
+          },
+          "policy_version": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "snapshot_version": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "object_id",
+          "snapshot_version",
+          "policy_version",
+          "policy"
+        ],
+        "type": "object"
+      },
       "PolicyWindow": {
         "additionalProperties": false,
         "properties": {
@@ -10144,6 +10171,90 @@
           }
         ],
         "summary": "Read persisted contribution ledger"
+      }
+    },
+    "/api/v2/strategy/objects/{object_id}/policy": {
+      "get": {
+        "operationId": "read_object_policy",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "object_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[A-Za-z0-9_.-]{1,160}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyRead"
+                }
+              }
+            },
+            "description": "Registered policy with effective composition"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Query rejected"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Query rejected"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Query rejected"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Query rejected"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Query rejected"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Read the object's registered policy without side effects"
       }
     },
     "/api/v2/strategy/objects/{object_id}/pool": {

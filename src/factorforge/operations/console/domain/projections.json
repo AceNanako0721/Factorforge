@@ -1180,6 +1180,174 @@
                 }
               ]
             },
+            "settings": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "baseline_max_share": {
+                      "type": "string"
+                    },
+                    "baseline_renew_minutes": {
+                      "type": "integer"
+                    },
+                    "close_minutes": {
+                      "type": "integer"
+                    },
+                    "close_quantile": {
+                      "type": "string"
+                    },
+                    "directive_ttl_minutes": {
+                      "type": "integer"
+                    },
+                    "event_types": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "insurance_fraction": {
+                      "type": "string"
+                    },
+                    "judgment": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "judge_minutes": {
+                          "items": {
+                            "type": "integer"
+                          },
+                          "type": "array"
+                        },
+                        "mode": {
+                          "type": "string"
+                        },
+                        "models": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "since": {
+                          "anyOf": [
+                            {
+                              "format": "date-time",
+                              "pattern": "Z$",
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "source_instance_id": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "mode",
+                        "models",
+                        "judge_minutes",
+                        "source_instance_id",
+                        "since"
+                      ],
+                      "type": "object"
+                    },
+                    "ladder_step": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "max_risk_fraction": {
+                      "type": "string"
+                    },
+                    "price_state_gate": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "max_age_minutes": {
+                              "type": "integer"
+                            },
+                            "model": {
+                              "type": "string"
+                            },
+                            "on_unavailable": {
+                              "type": "string"
+                            },
+                            "scope": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "model",
+                            "scope",
+                            "on_unavailable",
+                            "max_age_minutes"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "purpose": {
+                      "type": "string"
+                    },
+                    "reentry_wait_minutes": {
+                      "type": "integer"
+                    },
+                    "round_trip_cost": {
+                      "type": "string"
+                    },
+                    "trail_quantile": {
+                      "type": "string"
+                    },
+                    "wick_multiplier": {
+                      "type": "string"
+                    },
+                    "wick_quantile": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "purpose",
+                    "judgment",
+                    "close_minutes",
+                    "close_quantile",
+                    "wick_quantile",
+                    "wick_multiplier",
+                    "trail_quantile",
+                    "insurance_fraction",
+                    "ladder_step",
+                    "round_trip_cost",
+                    "max_risk_fraction",
+                    "reentry_wait_minutes",
+                    "directive_ttl_minutes",
+                    "baseline_max_share",
+                    "baseline_renew_minutes",
+                    "event_types",
+                    "price_state_gate"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "sources": {
               "items": {
                 "additionalProperties": false,
@@ -1224,7 +1392,8 @@
             "sources",
             "outcomes",
             "last_judgment_id",
-            "equity_peak"
+            "equity_peak",
+            "settings"
           ],
           "type": "object"
         },
@@ -5745,6 +5914,33 @@
           "title": "Policy",
           "type": "object"
         },
+        "PolicyRead": {
+          "additionalProperties": false,
+          "properties": {
+            "object_id": {
+              "pattern": "^[A-Za-z0-9_.-]{1,160}$",
+              "type": "string"
+            },
+            "policy": {
+              "$ref": "#/components/schemas/Policy"
+            },
+            "policy_version": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "snapshot_version": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "object_id",
+            "snapshot_version",
+            "policy_version",
+            "policy"
+          ],
+          "type": "object"
+        },
         "PolicyWindow": {
           "additionalProperties": false,
           "properties": {
@@ -8652,6 +8848,9 @@
       },
       "/api/v2/strategy/objects/{object_id}/ledger": {
         "$ref": "#/components/schemas/ReadPage_LedgerEntry"
+      },
+      "/api/v2/strategy/objects/{object_id}/policy": {
+        "$ref": "#/components/schemas/PolicyRead"
       },
       "/api/v2/strategy/objects/{object_id}/pool": {
         "$ref": "#/components/schemas/PoolView"

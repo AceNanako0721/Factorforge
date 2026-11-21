@@ -281,7 +281,7 @@ func New(o Options) (http.Handler, error) {
 		defer sub.Close()
 		serveLive(w, r, o, sub, s.ID)
 	})
-	routes := map[string]string{"overview": "overview", "market": "market", "events": "events", "events/{event_id}": "event", "sentiment": "sentiment", "decisions": "decisions", "execution": "execution", "cases": "cases", "cases/{case_id}": "case", "learning": "learning", "operations": "operations", "audit": "audit", "dynamic": "dynamic", "replay": "replay"}
+	routes := map[string]string{"overview": "overview", "market": "market", "events": "events", "events/{event_id}": "event", "sentiment": "sentiment", "decisions": "decisions", "execution": "execution", "cases": "cases", "cases/{case_id}": "case", "learning": "learning", "operations": "operations", "audit": "audit", "dynamic": "dynamic", "replay": "replay", "settings": "settings"}
 	for path, view := range routes {
 		mux.HandleFunc("GET "+Prefix+"/"+path, func(w http.ResponseWriter, r *http.Request) {
 			u, ok := authorize(w, r)
@@ -321,7 +321,7 @@ func New(o Options) (http.Handler, error) {
 			return
 		}
 		view := r.URL.Query().Get("view")
-		if !d.Has([]string{"overview", "market", "events", "sentiment", "decisions", "execution", "cases", "learning", "operations", "audit", "dynamic", "replay"}, view) {
+		if !d.Has([]string{"overview", "market", "events", "sentiment", "decisions", "execution", "cases", "learning", "operations", "audit", "dynamic", "replay", "settings"}, view) {
 			reject(w, d.Fail("EXPORT_VIEW_INVALID", 422))
 			return
 		}
@@ -602,7 +602,7 @@ func serveStatic(w http.ResponseWriter, r *http.Request, root string) {
 	}
 	path := r.URL.Path
 	name := ""
-	if d.Has([]string{"/", "/login", "/flow", "/overview", "/market", "/events", "/sentiment", "/decisions", "/execution", "/cases", "/learning", "/operations", "/audit", "/dynamic"}, path) {
+	if d.Has([]string{"/", "/login", "/flow", "/overview", "/market", "/events", "/sentiment", "/decisions", "/execution", "/cases", "/learning", "/operations", "/audit", "/dynamic", "/settings"}, path) {
 		name = "index.html"
 	} else if strings.HasPrefix(path, "/assets/") {
 		name = strings.TrimPrefix(path, "/")

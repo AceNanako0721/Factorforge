@@ -660,6 +660,12 @@
    "change_kind": "design",
    "date": "2026-11-20",
    "summary": "Venue account reconciliation counts a wallet difference once: the equity side starts from the run's cash, so a wallet difference within tolerance no longer adds to the position valuation difference and raises EXTERNAL_ACCOUNT_DIFFERENCE."
+  },
+  {
+   "version": "3.19.0",
+   "change_kind": "specification",
+   "date": "2026-11-21",
+   "summary": "The console gains an instance settings page: every viewable instance side by side with its purpose, judgment source and registered settings, values that differ from most instances marked. The P3 status carries the registered settings (new purpose field), and P2 publishes the object's policy with its effective composition."
   }
  ]
 }

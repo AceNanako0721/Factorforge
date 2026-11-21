@@ -599,3 +599,26 @@ func RebalanceReason(obj *ObservedObject, at time.Time, current, target, funding
 	}
 	return "", m.Err()
 }
+
+// PolicyRead is the S2-024 read of an object's registered policy: the policy
+// the object's decisions use, with the composition the parameters resolve to.
+type PolicyRead struct {
+	ObjectID        string  `json:"object_id"`
+	SnapshotVersion int     `json:"snapshot_version"`
+	PolicyVersion   string  `json:"policy_version"`
+	Policy          *Policy `json:"policy"`
+}
+
+func PolicyReadOf(s *StrategyState, objectID string) (PolicyRead, error) {
+	obj := s.Objects.Value(objectID)
+	if obj == nil {
+		return PolicyRead{}, &Error{Code: "OBJECT_NOT_FOUND", Status: 404}
+	}
+	p := s.Policies.Value(obj.TimePolicyVersion)
+	if p == nil {
+		return PolicyRead{}, &Error{Code: "POLICY_NOT_FOUND", Status: 404}
+	}
+	out := Clone(p)
+	out.Composition = EffectiveComposition(s, obj, p)
+	return PolicyRead{ObjectID: objectID, SnapshotVersion: s.Version, PolicyVersion: obj.TimePolicyVersion, Policy: out}, nil
+}

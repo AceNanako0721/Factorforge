@@ -140,6 +140,42 @@ type DynamicStatusView struct {
 	Outcomes       []DynamicOutcomeView   `json:"outcomes"`
 	LastJudgmentID *string                `json:"last_judgment_id"`
 	EquityPeak     string                 `json:"equity_peak"`
+	Settings       *DynamicSettingsView   `json:"settings"`
+}
+
+// DynamicSettingsView is the registered configuration the position manager
+// last recorded (S3-032): purpose, judgment source and position settings.
+type DynamicSettingsView struct {
+	Purpose              string                    `json:"purpose"`
+	Judgment             DynamicJudgmentSourceView `json:"judgment"`
+	CloseMinutes         int                       `json:"close_minutes"`
+	CloseQuantile        string                    `json:"close_quantile"`
+	WickQuantile         string                    `json:"wick_quantile"`
+	WickMultiplier       string                    `json:"wick_multiplier"`
+	TrailQuantile        string                    `json:"trail_quantile"`
+	InsuranceFraction    string                    `json:"insurance_fraction"`
+	LadderStep           *string                   `json:"ladder_step"`
+	RoundTripCost        string                    `json:"round_trip_cost"`
+	MaxRiskFraction      string                    `json:"max_risk_fraction"`
+	ReentryWaitMinutes   int                       `json:"reentry_wait_minutes"`
+	DirectiveTTLMinutes  int                       `json:"directive_ttl_minutes"`
+	BaselineMaxShare     string                    `json:"baseline_max_share"`
+	BaselineRenewMinutes int                       `json:"baseline_renew_minutes"`
+	EventTypes           []string                  `json:"event_types"`
+	PriceStateGate       *DynamicGateSettingView   `json:"price_state_gate"`
+}
+type DynamicJudgmentSourceView struct {
+	Mode             string     `json:"mode"`
+	Models           []string   `json:"models"`
+	JudgeMinutes     []int      `json:"judge_minutes"`
+	SourceInstanceID *string    `json:"source_instance_id"`
+	Since            *time.Time `json:"since"`
+}
+type DynamicGateSettingView struct {
+	Model         string `json:"model"`
+	Scope         string `json:"scope"`
+	OnUnavailable string `json:"on_unavailable"`
+	MaxAgeMinutes int    `json:"max_age_minutes"`
 }
 type DynamicNewsRefView struct {
 	ItemID       string     `json:"item_id"`
@@ -226,6 +262,56 @@ type storedPlan struct {
 	DirectiveID string         `json:"directive_id"`
 	Withdrawn   bool           `json:"withdrawn"`
 }
+type storedSettings struct {
+	Purpose  string `json:"purpose"`
+	Judgment struct {
+		Mode             string    `json:"mode"`
+		Models           []string  `json:"models"`
+		JudgeMinutes     []int     `json:"judge_minutes"`
+		SourceInstanceID string    `json:"source_instance_id"`
+		Since            time.Time `json:"since"`
+	} `json:"judgment"`
+	CloseMinutes         int      `json:"close_minutes"`
+	CloseQuantile        string   `json:"close_quantile"`
+	WickQuantile         string   `json:"wick_quantile"`
+	WickMultiplier       float64  `json:"wick_multiplier"`
+	TrailQuantile        string   `json:"trail_quantile"`
+	InsuranceFraction    float64  `json:"insurance_fraction"`
+	LadderStep           float64  `json:"ladder_step"`
+	RoundTripCost        float64  `json:"round_trip_cost"`
+	MaxRiskFraction      float64  `json:"max_risk_fraction"`
+	ReentryWaitMinutes   int      `json:"reentry_wait_minutes"`
+	DirectiveTTLMinutes  int      `json:"directive_ttl_minutes"`
+	BaselineMaxShare     float64  `json:"baseline_max_share"`
+	BaselineRenewMinutes int      `json:"baseline_renew_minutes"`
+	EventTypes           []string `json:"event_types"`
+	PriceState           struct {
+		Enabled       bool   `json:"enabled"`
+		Model         string `json:"model"`
+		Scope         string `json:"scope"`
+		OnUnavailable string `json:"on_unavailable"`
+		MaxAgeMinutes int    `json:"max_age_minutes"`
+	} `json:"price_state"`
+}
+
+// settingsView projects the recorded settings; nil before the first record.
+func settingsView(r *storedSettings) *DynamicSettingsView {
+	if r == nil {
+		return nil
+	}
+	v := &DynamicSettingsView{Purpose: r.Purpose, CloseMinutes: r.CloseMinutes, CloseQuantile: r.CloseQuantile, WickQuantile: r.WickQuantile, WickMultiplier: decimal(r.WickMultiplier), TrailQuantile: r.TrailQuantile, InsuranceFraction: decimal(r.InsuranceFraction),
+		RoundTripCost: decimal(r.RoundTripCost), MaxRiskFraction: decimal(r.MaxRiskFraction), ReentryWaitMinutes: r.ReentryWaitMinutes, DirectiveTTLMinutes: r.DirectiveTTLMinutes, BaselineMaxShare: decimal(r.BaselineMaxShare), BaselineRenewMinutes: r.BaselineRenewMinutes, EventTypes: append([]string{}, r.EventTypes...)}
+	v.Judgment = DynamicJudgmentSourceView{Mode: r.Judgment.Mode, Models: append([]string{}, r.Judgment.Models...), JudgeMinutes: append([]int{}, r.Judgment.JudgeMinutes...), SourceInstanceID: optionalString(r.Judgment.SourceInstanceID), Since: optionalTime(r.Judgment.Since)}
+	if r.LadderStep > 0 {
+		step := decimal(r.LadderStep)
+		v.LadderStep = &step
+	}
+	if ps := r.PriceState; ps.Enabled {
+		v.PriceStateGate = &DynamicGateSettingView{Model: ps.Model, Scope: ps.Scope, OnUnavailable: ps.OnUnavailable, MaxAgeMinutes: ps.MaxAgeMinutes}
+	}
+	return v
+}
+
 type storedPosition struct {
 	NoiseID  string       `json:"noise_id"`
 	NoiseAt  time.Time    `json:"noise_at"`
@@ -244,6 +330,7 @@ type storedPosition struct {
 		Step          float64 `json:"step"`
 		RoundTripCost float64 `json:"round_trip_cost"`
 	} `json:"ladder"`
+	Settings *storedSettings `json:"settings"`
 	Outcomes []struct {
 		R        float64 `json:"r"`
 		ClosedAt string  `json:"closed_at"`
@@ -370,7 +457,7 @@ func (q DynamicQuery) Status(ctx context.Context, p d.ReadPrincipal) (Record, er
 	if err = strictDecode(raws["POSITION"], &pos); err != nil {
 		return Record{}, err
 	}
-	v := DynamicStatusView{Sources: []DynamicSourceView{}, Outcomes: []DynamicOutcomeView{}, EquityPeak: decimal(pos.EquityPeak)}
+	v := DynamicStatusView{Sources: []DynamicSourceView{}, Outcomes: []DynamicOutcomeView{}, EquityPeak: decimal(pos.EquityPeak), Settings: settingsView(pos.Settings)}
 	if b := pos.Batch; b != nil {
 		dir := float64(b.Direction)
 		v.Batch = &DynamicBatchView{CycleID: b.CycleID, Direction: direction(b.Direction), Entry: decimal(b.Entry), OpenedAt: b.OpenedAt.UTC(), TierHours: b.Geometry.Tier, RequestedTierHours: b.Geometry.RequestedTier, Session: b.Geometry.Session,
