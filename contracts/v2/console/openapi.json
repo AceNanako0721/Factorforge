@@ -5057,6 +5057,174 @@
                                     }
                                   ]
                                 },
+                                "settings": {
+                                  "anyOf": [
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "baseline_max_share": {
+                                          "type": "string"
+                                        },
+                                        "baseline_renew_minutes": {
+                                          "type": "integer"
+                                        },
+                                        "close_minutes": {
+                                          "type": "integer"
+                                        },
+                                        "close_quantile": {
+                                          "type": "string"
+                                        },
+                                        "directive_ttl_minutes": {
+                                          "type": "integer"
+                                        },
+                                        "event_types": {
+                                          "items": {
+                                            "type": "string"
+                                          },
+                                          "type": "array"
+                                        },
+                                        "insurance_fraction": {
+                                          "type": "string"
+                                        },
+                                        "judgment": {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "judge_minutes": {
+                                              "items": {
+                                                "type": "integer"
+                                              },
+                                              "type": "array"
+                                            },
+                                            "mode": {
+                                              "type": "string"
+                                            },
+                                            "models": {
+                                              "items": {
+                                                "type": "string"
+                                              },
+                                              "type": "array"
+                                            },
+                                            "since": {
+                                              "anyOf": [
+                                                {
+                                                  "format": "date-time",
+                                                  "pattern": "Z$",
+                                                  "type": "string"
+                                                },
+                                                {
+                                                  "type": "null"
+                                                }
+                                              ]
+                                            },
+                                            "source_instance_id": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "string"
+                                                },
+                                                {
+                                                  "type": "null"
+                                                }
+                                              ]
+                                            }
+                                          },
+                                          "required": [
+                                            "mode",
+                                            "models",
+                                            "judge_minutes",
+                                            "source_instance_id",
+                                            "since"
+                                          ],
+                                          "type": "object"
+                                        },
+                                        "ladder_step": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "max_risk_fraction": {
+                                          "type": "string"
+                                        },
+                                        "price_state_gate": {
+                                          "anyOf": [
+                                            {
+                                              "additionalProperties": false,
+                                              "properties": {
+                                                "max_age_minutes": {
+                                                  "type": "integer"
+                                                },
+                                                "model": {
+                                                  "type": "string"
+                                                },
+                                                "on_unavailable": {
+                                                  "type": "string"
+                                                },
+                                                "scope": {
+                                                  "type": "string"
+                                                }
+                                              },
+                                              "required": [
+                                                "model",
+                                                "scope",
+                                                "on_unavailable",
+                                                "max_age_minutes"
+                                              ],
+                                              "type": "object"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "purpose": {
+                                          "type": "string"
+                                        },
+                                        "reentry_wait_minutes": {
+                                          "type": "integer"
+                                        },
+                                        "round_trip_cost": {
+                                          "type": "string"
+                                        },
+                                        "trail_quantile": {
+                                          "type": "string"
+                                        },
+                                        "wick_multiplier": {
+                                          "type": "string"
+                                        },
+                                        "wick_quantile": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "purpose",
+                                        "judgment",
+                                        "close_minutes",
+                                        "close_quantile",
+                                        "wick_quantile",
+                                        "wick_multiplier",
+                                        "trail_quantile",
+                                        "insurance_fraction",
+                                        "ladder_step",
+                                        "round_trip_cost",
+                                        "max_risk_fraction",
+                                        "reentry_wait_minutes",
+                                        "directive_ttl_minutes",
+                                        "baseline_max_share",
+                                        "baseline_renew_minutes",
+                                        "event_types",
+                                        "price_state_gate"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
                                 "sources": {
                                   "items": {
                                     "additionalProperties": false,
@@ -5101,7 +5269,8 @@
                                 "sources",
                                 "outcomes",
                                 "last_judgment_id",
-                                "equity_peak"
+                                "equity_peak",
+                                "settings"
                               ],
                               "type": "object"
                             },
@@ -9316,6 +9485,931 @@
                         {
                           "additionalProperties": false,
                           "properties": {
+                            "object_id": {
+                              "pattern": "^[A-Za-z0-9_.-]{1,160}$",
+                              "type": "string"
+                            },
+                            "policy": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "absolute_price_proxy_validated": {
+                                  "title": "Absolute Price Proxy Validated",
+                                  "type": "boolean"
+                                },
+                                "beta": {
+                                  "title": "Beta",
+                                  "type": "string"
+                                },
+                                "calibrations": {
+                                  "items": {
+                                    "maxLength": 160,
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "title": "Calibrations",
+                                  "type": "array",
+                                  "uniqueItems": true
+                                },
+                                "claim_weights": {
+                                  "type": "null"
+                                },
+                                "cleanup_fraction_of_initial": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "cleanup_threshold": {
+                                  "title": "Cleanup Threshold",
+                                  "type": "string"
+                                },
+                                "composition": {
+                                  "anyOf": [
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "adjustment": {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "cap": {
+                                              "type": "string"
+                                            },
+                                            "event_only_cap": {
+                                              "type": "string"
+                                            },
+                                            "scale": {
+                                              "type": "string"
+                                            },
+                                            "state": {
+                                              "enum": [
+                                                "ENABLED",
+                                                "SHADOW",
+                                                "DISABLED"
+                                              ],
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "cap",
+                                            "event_only_cap",
+                                            "scale",
+                                            "state"
+                                          ],
+                                          "type": "object"
+                                        },
+                                        "allow_short_baseline": {
+                                          "type": "boolean"
+                                        },
+                                        "assessment": {
+                                          "anyOf": [
+                                            {
+                                              "additionalProperties": false,
+                                              "properties": {
+                                                "evidence_ref": {
+                                                  "type": "string"
+                                                },
+                                                "factor_id": {
+                                                  "maxLength": 160,
+                                                  "minLength": 1,
+                                                  "type": "string"
+                                                },
+                                                "force_reduce": {
+                                                  "type": "boolean"
+                                                },
+                                                "max_age_seconds": {
+                                                  "minimum": 1,
+                                                  "type": "integer"
+                                                },
+                                                "state": {
+                                                  "enum": [
+                                                    "ENABLED",
+                                                    "SHADOW",
+                                                    "DISABLED"
+                                                  ],
+                                                  "type": "string"
+                                                }
+                                              },
+                                              "required": [
+                                                "evidence_ref",
+                                                "factor_id",
+                                                "force_reduce",
+                                                "max_age_seconds",
+                                                "state"
+                                              ],
+                                              "type": "object"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "baseline": {
+                                          "items": {
+                                            "additionalProperties": false,
+                                            "properties": {
+                                              "evidence_ref": {
+                                                "type": "string"
+                                              },
+                                              "factor_id": {
+                                                "maxLength": 160,
+                                                "minLength": 1,
+                                                "type": "string"
+                                              },
+                                              "max_age_seconds": {
+                                                "minimum": 1,
+                                                "type": "integer"
+                                              },
+                                              "state": {
+                                                "enum": [
+                                                  "ENABLED",
+                                                  "SHADOW",
+                                                  "DISABLED"
+                                                ],
+                                                "type": "string"
+                                              },
+                                              "weight": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "evidence_ref",
+                                              "factor_id",
+                                              "max_age_seconds",
+                                              "state",
+                                              "weight"
+                                            ],
+                                            "type": "object"
+                                          },
+                                          "type": "array"
+                                        },
+                                        "chain_loss": {
+                                          "anyOf": [
+                                            {
+                                              "additionalProperties": false,
+                                              "properties": {
+                                                "max_loss_r": {
+                                                  "type": "string"
+                                                },
+                                                "profit_offsets": {
+                                                  "type": "boolean"
+                                                }
+                                              },
+                                              "required": [
+                                                "max_loss_r",
+                                                "profit_offsets"
+                                              ],
+                                              "type": "object"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "levels": {
+                                          "items": {
+                                            "additionalProperties": false,
+                                            "properties": {
+                                              "enter": {
+                                                "title": "Enter",
+                                                "type": "string"
+                                              },
+                                              "exit": {
+                                                "title": "Exit",
+                                                "type": "string"
+                                              },
+                                              "exposure": {
+                                                "title": "Exposure",
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "exposure",
+                                              "enter",
+                                              "exit"
+                                            ],
+                                            "title": "Level",
+                                            "type": "object"
+                                          },
+                                          "type": "array"
+                                        },
+                                        "missing_policy": {
+                                          "enum": [
+                                            "ZERO",
+                                            "HOLD_REDUCE_ONLY"
+                                          ],
+                                          "type": "string"
+                                        },
+                                        "pre_event": {
+                                          "items": {
+                                            "additionalProperties": false,
+                                            "properties": {
+                                              "after_seconds": {
+                                                "type": "integer"
+                                              },
+                                              "before_seconds": {
+                                                "type": "integer"
+                                              },
+                                              "certainty_required": {
+                                                "enum": [
+                                                  "CONFIRMED",
+                                                  "ESTIMATED"
+                                                ],
+                                                "type": "string"
+                                              },
+                                              "event_type": {
+                                                "type": "string"
+                                              },
+                                              "reduce_factor": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "after_seconds",
+                                              "before_seconds",
+                                              "certainty_required",
+                                              "event_type",
+                                              "reduce_factor"
+                                            ],
+                                            "type": "object"
+                                          },
+                                          "type": "array"
+                                        },
+                                        "rebalance": {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "adjust_interval_seconds": {
+                                              "minimum": 0,
+                                              "type": "integer"
+                                            },
+                                            "band_floor": {
+                                              "type": "string"
+                                            },
+                                            "band_ratio_of_unit": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "string"
+                                                },
+                                                {
+                                                  "type": "null"
+                                                }
+                                              ]
+                                            },
+                                            "expected_hold_seconds": {
+                                              "minimum": 1,
+                                              "type": "integer"
+                                            },
+                                            "funding_fallback_annual": {
+                                              "type": "string"
+                                            },
+                                            "reverse_confirm_seconds": {
+                                              "minimum": 0,
+                                              "type": "integer"
+                                            }
+                                          },
+                                          "required": [
+                                            "adjust_interval_seconds",
+                                            "band_floor",
+                                            "expected_hold_seconds",
+                                            "funding_fallback_annual",
+                                            "reverse_confirm_seconds"
+                                          ],
+                                          "type": "object"
+                                        },
+                                        "reentry": {
+                                          "anyOf": [
+                                            {
+                                              "additionalProperties": false,
+                                              "properties": {
+                                                "cooldown_seconds": {
+                                                  "type": "integer"
+                                                },
+                                                "qualifying_inputs": {
+                                                  "items": {
+                                                    "type": "string"
+                                                  },
+                                                  "type": "array"
+                                                }
+                                              },
+                                              "required": [
+                                                "cooldown_seconds",
+                                                "qualifying_inputs"
+                                              ],
+                                              "type": "object"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "scheduled": {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "cap": {
+                                              "type": "string"
+                                            },
+                                            "state": {
+                                              "enum": [
+                                                "ENABLED",
+                                                "SHADOW",
+                                                "DISABLED"
+                                              ],
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "cap",
+                                            "state"
+                                          ],
+                                          "type": "object"
+                                        },
+                                        "sizing": {
+                                          "anyOf": [
+                                            {
+                                              "additionalProperties": false,
+                                              "properties": {
+                                                "max_risk_fraction": {
+                                                  "type": "string"
+                                                },
+                                                "mode": {
+                                                  "enum": [
+                                                    "RISK_UNIT"
+                                                  ],
+                                                  "type": "string"
+                                                },
+                                                "require_initial_distance": {
+                                                  "type": "boolean"
+                                                }
+                                              },
+                                              "required": [
+                                                "max_risk_fraction",
+                                                "mode",
+                                                "require_initial_distance"
+                                              ],
+                                              "type": "object"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "transfer": {
+                                          "anyOf": [
+                                            {
+                                              "additionalProperties": false,
+                                              "properties": {
+                                                "combined_tolerance": {
+                                                  "type": "string"
+                                                },
+                                                "factor_id": {
+                                                  "type": "string"
+                                                }
+                                              },
+                                              "required": [
+                                                "combined_tolerance",
+                                                "factor_id"
+                                              ],
+                                              "type": "object"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "adjustment",
+                                        "allow_short_baseline",
+                                        "assessment",
+                                        "baseline",
+                                        "levels",
+                                        "missing_policy",
+                                        "rebalance",
+                                        "scheduled"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "cooldown_seconds": {
+                                  "minimum": 0,
+                                  "title": "Cooldown Seconds",
+                                  "type": "integer"
+                                },
+                                "cycle_seconds": {
+                                  "exclusiveMinimum": 0,
+                                  "title": "Cycle Seconds",
+                                  "type": "integer"
+                                },
+                                "epsilon": {
+                                  "title": "Epsilon",
+                                  "type": "string"
+                                },
+                                "event_cap": {
+                                  "title": "Event Cap",
+                                  "type": "string"
+                                },
+                                "event_half_life_approved": {
+                                  "title": "Event Half Life Approved",
+                                  "type": "boolean"
+                                },
+                                "event_ttl_seconds": {
+                                  "exclusiveMinimum": 0,
+                                  "title": "Event Ttl Seconds",
+                                  "type": "integer"
+                                },
+                                "experiment_calibrations": {
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "type": "array"
+                                },
+                                "family_cap": {
+                                  "title": "Family Cap",
+                                  "type": "string"
+                                },
+                                "fee_rate": {
+                                  "title": "Fee Rate",
+                                  "type": "string"
+                                },
+                                "gamma": {
+                                  "title": "Gamma",
+                                  "type": "string"
+                                },
+                                "gap_fraction": {
+                                  "title": "Gap Fraction",
+                                  "type": "string"
+                                },
+                                "group_limits": {
+                                  "type": "null"
+                                },
+                                "half_life_bounds": {
+                                  "maxItems": 2,
+                                  "minItems": 2,
+                                  "prefixItems": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "string"
+                                    }
+                                  ],
+                                  "title": "Half Life Bounds",
+                                  "type": "array"
+                                },
+                                "judgment_event_types": {
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "type": "array"
+                                },
+                                "label_cost_band": {
+                                  "title": "Label Cost Band",
+                                  "type": "string"
+                                },
+                                "label_noise_band": {
+                                  "title": "Label Noise Band",
+                                  "type": "string"
+                                },
+                                "label_seconds": {
+                                  "exclusiveMinimum": 0,
+                                  "title": "Label Seconds",
+                                  "type": "integer"
+                                },
+                                "learning_mode": {
+                                  "enum": [
+                                    "ACTIVE",
+                                    "FROZEN"
+                                  ],
+                                  "type": "string"
+                                },
+                                "levels": {
+                                  "items": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "enter": {
+                                        "title": "Enter",
+                                        "type": "string"
+                                      },
+                                      "exit": {
+                                        "title": "Exit",
+                                        "type": "string"
+                                      },
+                                      "exposure": {
+                                        "title": "Exposure",
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "exposure",
+                                      "enter",
+                                      "exit"
+                                    ],
+                                    "title": "Level",
+                                    "type": "object"
+                                  },
+                                  "minItems": 1,
+                                  "title": "Levels",
+                                  "type": "array"
+                                },
+                                "lifecycle_fraction": {
+                                  "title": "Lifecycle Fraction",
+                                  "type": "string"
+                                },
+                                "liquidity_budget": {
+                                  "title": "Liquidity Budget",
+                                  "type": "string"
+                                },
+                                "max_bar_gap_seconds": {
+                                  "exclusiveMinimum": 0,
+                                  "title": "Max Bar Gap Seconds",
+                                  "type": "integer"
+                                },
+                                "max_loss_cases": {
+                                  "minimum": 0,
+                                  "title": "Max Loss Cases",
+                                  "type": "integer"
+                                },
+                                "max_new_risk": {
+                                  "minimum": 0,
+                                  "title": "Max New Risk",
+                                  "type": "integer"
+                                },
+                                "max_noise_fraction": {
+                                  "title": "Max Noise Fraction",
+                                  "type": "string"
+                                },
+                                "max_price_age_seconds": {
+                                  "exclusiveMinimum": 0,
+                                  "title": "Max Price Age Seconds",
+                                  "type": "integer"
+                                },
+                                "max_stop_fraction": {
+                                  "title": "Max Stop Fraction",
+                                  "type": "string"
+                                },
+                                "micro_distance": {
+                                  "title": "Micro Distance",
+                                  "type": "string"
+                                },
+                                "min_adjustment": {
+                                  "title": "Min Adjustment",
+                                  "type": "string"
+                                },
+                                "noise_quantile": {
+                                  "title": "Noise Quantile",
+                                  "type": "string"
+                                },
+                                "noise_window": {
+                                  "minimum": 2,
+                                  "title": "Noise Window",
+                                  "type": "integer"
+                                },
+                                "numerical_tolerance": {
+                                  "title": "Numerical Tolerance",
+                                  "type": "string"
+                                },
+                                "object_cap": {
+                                  "title": "Object Cap",
+                                  "type": "string"
+                                },
+                                "object_loss_budget": {
+                                  "title": "Object Loss Budget",
+                                  "type": "string"
+                                },
+                                "observation_max_seconds": {
+                                  "exclusiveMinimum": 0,
+                                  "title": "Observation Max Seconds",
+                                  "type": "integer"
+                                },
+                                "observation_min_seconds": {
+                                  "exclusiveMinimum": 0,
+                                  "title": "Observation Min Seconds",
+                                  "type": "integer"
+                                },
+                                "observation_multiplier": {
+                                  "title": "Observation Multiplier",
+                                  "type": "string"
+                                },
+                                "portfolio_gross_limit": {
+                                  "title": "Portfolio Gross Limit",
+                                  "type": "string"
+                                },
+                                "portfolio_net_limit": {
+                                  "title": "Portfolio Net Limit",
+                                  "type": "string"
+                                },
+                                "portfolio_stress_limit": {
+                                  "title": "Portfolio Stress Limit",
+                                  "type": "string"
+                                },
+                                "prepricing_modes": {
+                                  "type": "null"
+                                },
+                                "quality_state": {
+                                  "enum": [
+                                    "VALIDATED",
+                                    "REQUIRED_UNSET",
+                                    "EXPERIMENT_ONLY"
+                                  ],
+                                  "title": "Quality State",
+                                  "type": "string"
+                                },
+                                "realization_disabled_types": {
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "type": "array"
+                                },
+                                "regime_confirmations": {
+                                  "exclusiveMinimum": 0,
+                                  "title": "Regime Confirmations",
+                                  "type": "integer"
+                                },
+                                "regime_dwell_seconds": {
+                                  "minimum": 0,
+                                  "title": "Regime Dwell Seconds",
+                                  "type": "integer"
+                                },
+                                "regime_enter": {
+                                  "title": "Regime Enter",
+                                  "type": "string"
+                                },
+                                "regime_exit": {
+                                  "title": "Regime Exit",
+                                  "type": "string"
+                                },
+                                "reverse_confirm_seconds": {
+                                  "anyOf": [
+                                    {
+                                      "minimum": 0,
+                                      "type": "integer"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "rubrics": {
+                                  "items": {
+                                    "maxLength": 160,
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "title": "Rubrics",
+                                  "type": "array",
+                                  "uniqueItems": true
+                                },
+                                "sigma_ref": {
+                                  "title": "Sigma Ref",
+                                  "type": "string"
+                                },
+                                "slippage_fraction": {
+                                  "title": "Slippage Fraction",
+                                  "type": "string"
+                                },
+                                "source_manifest": {
+                                  "maxLength": 160,
+                                  "minLength": 1,
+                                  "title": "Source Manifest",
+                                  "type": "string"
+                                },
+                                "target_ttl_seconds": {
+                                  "exclusiveMinimum": 0,
+                                  "title": "Target Ttl Seconds",
+                                  "type": "integer"
+                                },
+                                "trend_window_seconds": {
+                                  "maximum": 604800,
+                                  "minimum": 1,
+                                  "type": "integer"
+                                },
+                                "unknown_regime_multiplier": {
+                                  "title": "Unknown Regime Multiplier",
+                                  "type": "string"
+                                },
+                                "verification_manifests": {
+                                  "items": {
+                                    "maxLength": 160,
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "title": "Verification Manifests",
+                                  "type": "array",
+                                  "uniqueItems": true
+                                },
+                                "version": {
+                                  "maxLength": 160,
+                                  "minLength": 1,
+                                  "title": "Version",
+                                  "type": "string"
+                                },
+                                "window_anchor": {
+                                  "format": "date-time",
+                                  "title": "Window Anchor",
+                                  "type": "string"
+                                },
+                                "window_seconds": {
+                                  "exclusiveMinimum": 0,
+                                  "title": "Window Seconds",
+                                  "type": "integer"
+                                }
+                              },
+                              "required": [
+                                "version",
+                                "quality_state",
+                                "source_manifest",
+                                "calibrations",
+                                "rubrics",
+                                "claim_weights",
+                                "verification_manifests",
+                                "levels",
+                                "cycle_seconds",
+                                "max_price_age_seconds",
+                                "target_ttl_seconds",
+                                "event_cap",
+                                "family_cap",
+                                "object_cap",
+                                "cleanup_threshold",
+                                "event_ttl_seconds",
+                                "numerical_tolerance",
+                                "epsilon",
+                                "sigma_ref",
+                                "liquidity_budget",
+                                "object_loss_budget",
+                                "portfolio_gross_limit",
+                                "portfolio_net_limit",
+                                "portfolio_stress_limit",
+                                "group_limits",
+                                "micro_distance",
+                                "max_stop_fraction",
+                                "fee_rate",
+                                "slippage_fraction",
+                                "gap_fraction",
+                                "noise_window",
+                                "noise_quantile",
+                                "max_bar_gap_seconds",
+                                "max_noise_fraction",
+                                "cooldown_seconds",
+                                "min_adjustment",
+                                "window_seconds",
+                                "window_anchor",
+                                "max_new_risk",
+                                "max_loss_cases",
+                                "observation_multiplier",
+                                "observation_min_seconds",
+                                "observation_max_seconds",
+                                "label_seconds",
+                                "label_cost_band",
+                                "label_noise_band",
+                                "gamma",
+                                "lifecycle_fraction",
+                                "regime_confirmations",
+                                "regime_dwell_seconds",
+                                "regime_enter",
+                                "regime_exit",
+                                "unknown_regime_multiplier",
+                                "beta",
+                                "absolute_price_proxy_validated",
+                                "half_life_bounds",
+                                "event_half_life_approved"
+                              ],
+                              "title": "Policy",
+                              "type": "object"
+                            },
+                            "policy_version": {
+                              "maxLength": 160,
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "snapshot_version": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "object_id",
+                            "snapshot_version",
+                            "policy_version",
+                            "policy"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "fetched_at": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "observed_at": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "retry_at": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "snapshot_version": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "source": {
+                      "const": "policy",
+                      "type": "string"
+                    },
+                    "source_version": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "state": {
+                      "enum": [
+                        "AVAILABLE",
+                        "EMPTY",
+                        "UNAVAILABLE",
+                        "NOT_CONFIGURED",
+                        "NOT_APPLICABLE",
+                        "FORBIDDEN",
+                        "MISSING"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "source",
+                    "state",
+                    "code",
+                    "fetched_at",
+                    "observed_at",
+                    "source_version",
+                    "snapshot_version",
+                    "data",
+                    "cursor",
+                    "retry_at"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "cursor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "data": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
                             "contributions": {
                               "items": {
                                 "additionalProperties": false,
@@ -13330,6 +14424,9 @@
                         },
                         "sentiment": {
                           "type": "string"
+                        },
+                        "settings": {
+                          "type": "string"
                         }
                       },
                       "required": [],
@@ -16149,6 +17246,134 @@
             "description": "Successful read"
           }
         }
+      }
+    },
+    "/api/v2/console/settings": {
+      "get": {
+        "operationId": "get__settings",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "selection_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[A-Za-z0-9_.-]{1,128}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleResponse"
+                }
+              }
+            },
+            "description": "Successful read"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Successful read"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Successful read"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Successful read"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Successful read"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Successful read"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Successful read"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Successful read"
+          }
+        },
+        "security": [
+          {
+            "consoleCookie": []
+          }
+        ]
       }
     }
   }

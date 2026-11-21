@@ -70,6 +70,43 @@ type PositionSettings struct {
 	LadderStep                             float64 // S3-033; 0 keeps S3-028 only
 	MaxRiskFraction                        float64 // S3-027 cap; 0 keeps the 2% default
 	PriceState                             PriceStateSettings
+	// Recorded is the registered configuration copied into the state for
+	// the read view (S3-032); it does not steer the manager.
+	Recorded *RecordedSettings
+}
+
+// RecordedSettings is the S3-032 record of what an instance is registered
+// with: its purpose, where its judgments come from and the position settings.
+type RecordedSettings struct {
+	Purpose  string `json:"purpose"`
+	Judgment struct {
+		Mode             string    `json:"mode"` // MODELS or FOLLOW
+		Models           []string  `json:"models"`
+		JudgeMinutes     []int     `json:"judge_minutes"`
+		SourceInstanceID string    `json:"source_instance_id,omitempty"`
+		Since            time.Time `json:"since,omitempty"`
+	} `json:"judgment"`
+	CloseMinutes         int      `json:"close_minutes"`
+	CloseQuantile        string   `json:"close_quantile"`
+	WickQuantile         string   `json:"wick_quantile"`
+	WickMultiplier       float64  `json:"wick_multiplier"`
+	TrailQuantile        string   `json:"trail_quantile"`
+	InsuranceFraction    float64  `json:"insurance_fraction"`
+	LadderStep           float64  `json:"ladder_step"`
+	RoundTripCost        float64  `json:"round_trip_cost"`
+	MaxRiskFraction      float64  `json:"max_risk_fraction"`
+	ReentryWaitMinutes   int      `json:"reentry_wait_minutes"`
+	DirectiveTTLMinutes  int      `json:"directive_ttl_minutes"`
+	BaselineMaxShare     float64  `json:"baseline_max_share"`
+	BaselineRenewMinutes int      `json:"baseline_renew_minutes"`
+	EventTypes           []string `json:"event_types"`
+	PriceState           struct {
+		Enabled       bool   `json:"enabled"`
+		Model         string `json:"model,omitempty"`
+		Scope         string `json:"scope,omitempty"`
+		OnUnavailable string `json:"on_unavailable,omitempty"`
+		MaxAgeMinutes int    `json:"max_age_minutes,omitempty"`
+	} `json:"price_state"`
 }
 
 // BatchState is the instance view of one position cycle (S3-027～029).
@@ -122,6 +159,8 @@ type PositionState struct {
 	SeenCases  []string         `json:"seen_cases"`
 	// S3-032: the registered ladder, recorded for the read view.
 	Ladder *LadderSetting `json:"ladder,omitempty"`
+	// S3-032: the registered settings, recorded for the read view.
+	Settings *RecordedSettings `json:"settings,omitempty"`
 	// S3-035: the latest price state and the gate's last decision while flat.
 	PriceState *d.PriceState `json:"price_state,omitempty"`
 	Gate       *EntryGate    `json:"gate,omitempty"`
@@ -172,6 +211,7 @@ func (m *PositionManager) Run(ctx context.Context) error {
 	if s.LadderStep > 0 {
 		st.Ladder = &LadderSetting{Step: s.LadderStep, RoundTripCost: s.RoundTripCost}
 	}
+	st.Settings = s.Recorded
 	if err = m.refreshNoise(ctx, &st, now); err != nil {
 		m.alert(ctx, "NOISE_TABLE_UNAVAILABLE", errCode(err))
 	}

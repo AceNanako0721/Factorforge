@@ -518,3 +518,13 @@ body {
 .rp-row.sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
 .pos { color: var(--ok); }
 .neg { color: var(--error); }
+
+/* S4-025 instance settings */
+.settings-intro { margin-bottom: 12px; }
+.settings-group { margin-top: 16px; }
+.settings-group h5 { margin-bottom: 8px; }
+.settings-label { white-space: nowrap; }
+.settings-help { color: var(--muted, #8c8c8c); cursor: help; }
+.settings-diff, .settings-diff-tag { background: rgba(208, 138, 29, 0.16); border-radius: 3px; padding: 0 4px; font-weight: 600; }
+.settings-diff-tag { border-color: var(--warn); margin-inline: 2px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }

@@ -97,6 +97,7 @@ func RunDynamic(role string) error {
 		pos := p.Position
 		klines := monitoring.MinuteKlines{Fetcher: fetcher, BaseURL: "https://" + pos.NoiseHost, Symbol: pos.NoiseSymbol}
 		m := &workers.PositionManager{Store: store, Framework: framework, Trading: trading, Minutes: klines, Hours: klines, Clock: now, Alerts: alerts, Settings: workers.PositionSettings{ObjectID: p.ObjectID, OwnerID: pos.OwnerID, Venue: pos.Venue, InstrumentID: pos.InstrumentID, SourceModule: pos.SourceModule, TriggerKind: pos.TriggerKind, BaselineFactorID: pos.BaselineFactorID, Stop: d.StopSettings{CloseMinutes: pos.CloseMinutes, CloseQuantile: pos.CloseQuantile, WickQuantile: pos.WickQuantile, WickMultiplier: pos.WickMultiplier, TrailQuantile: pos.TrailQuantile, InsuranceFraction: pos.InsuranceFraction, InsuranceMargin: pos.InsuranceMargin}, DirectiveTTL: time.Duration(pos.DirectiveTTLMinutes) * time.Minute, ReentryWait: time.Duration(pos.ReentryWaitMinutes) * time.Minute, BaselineMaxShare: pos.BaselineMaxShare, RoundTripCost: pos.RoundTripCost, BaselineRenew: time.Duration(pos.BaselineRenewMin) * time.Minute, NoiseMaxAge: time.Duration(pos.NoiseMaxAgeHours) * time.Hour, NoiseConfig: d.NoiseConfig{Symbol: pos.NoiseSymbol, LookbackDays: pos.NoiseLookbackDays, EventPadSeconds: 3600, Hours: []int{1, 4, 24, 72}}, EventTypes: pos.EventTypes, PriceTick: pos.PriceTick, LadderStep: pos.LadderStep, MaxRiskFraction: pos.MaxRiskFraction}}
+		m.Settings.Recorded = RecordedSettings(p)
 		if ps := pos.PriceState; ps.URL != "" {
 			m.Settings.PriceState = workers.PriceStateSettings{Enabled: true, MaxAge: time.Duration(ps.MaxAgeMinutes) * time.Minute, OnUnavailable: ps.OnUnavailable, Scope: ps.Scope}
 			m.States = jev.Client{URL: ps.URL, Key: ps.APIKey, Model: ps.Model, Timeout: time.Duration(ps.TimeoutSeconds) * time.Second}
@@ -104,6 +105,39 @@ func RunDynamic(role string) error {
 		return loopPosition(ctx, m, p, *once, alerts)
 	}
 	return d.Fail("DYNAMIC_ROLE_INVALID", 422)
+}
+
+// RecordedSettings copies the registered configuration the read view shows
+// (S3-032). Only registered values are copied: no address, token or key.
+func RecordedSettings(p config.DynamicProfile) *workers.RecordedSettings {
+	pos := p.Position
+	r := &workers.RecordedSettings{Purpose: p.Purpose, CloseMinutes: pos.CloseMinutes, CloseQuantile: pos.CloseQuantile, WickQuantile: pos.WickQuantile, WickMultiplier: pos.WickMultiplier, TrailQuantile: pos.TrailQuantile, InsuranceFraction: pos.InsuranceFraction,
+		LadderStep: pos.LadderStep, RoundTripCost: pos.RoundTripCost, MaxRiskFraction: pos.MaxRiskFraction, ReentryWaitMinutes: pos.ReentryWaitMinutes, DirectiveTTLMinutes: pos.DirectiveTTLMinutes, BaselineMaxShare: pos.BaselineMaxShare, BaselineRenewMinutes: pos.BaselineRenewMin, EventTypes: append([]string{}, pos.EventTypes...)}
+	if r.MaxRiskFraction == 0 {
+		r.MaxRiskFraction = d.DefaultMaxRiskFraction
+	}
+	r.Judgment.Models = []string{}
+	r.Judgment.JudgeMinutes = []int{}
+	if p.Following() {
+		r.Judgment.Mode = "FOLLOW"
+		r.Judgment.SourceInstanceID = p.Follow.SourceInstanceID
+		r.Judgment.Since = p.Follow.Since.UTC()
+	} else {
+		r.Judgment.Mode = "MODELS"
+		for _, m := range p.Models {
+			r.Judgment.Models = append(r.Judgment.Models, m.Model)
+		}
+		r.Judgment.JudgeMinutes = append(r.Judgment.JudgeMinutes, p.News.JudgeMinutes...)
+	}
+	if ps := pos.PriceState; ps.URL != "" {
+		r.PriceState.Enabled = true
+		r.PriceState.Model, r.PriceState.OnUnavailable, r.PriceState.MaxAgeMinutes = ps.Model, ps.OnUnavailable, ps.MaxAgeMinutes
+		r.PriceState.Scope = ps.Scope
+		if r.PriceState.Scope == "" {
+			r.PriceState.Scope = d.PriceStateScopeAll
+		}
+	}
+	return r
 }
 
 func loopJudgment(ctx context.Context, w *workers.JudgmentWorker, p config.DynamicProfile, once bool, alerts logAlerts) error {

@@ -173,6 +173,25 @@ func New(options Options) (http.Handler, error) {
 		sort.Slice(plans, func(i, j int) bool { return plans[i].PlanID < plans[j].PlanID })
 		return map[string]any{"object_id": id, "snapshot_version": s.Version, "plans": plans}, 200, nil
 	}, false)
+	// S2-024: the object's registered policy with its effective composition,
+	// so a reader sees the parameters the decisions are computed with.
+	registerWithAudit("GET", "/objects/{object_id}/policy", func(_ http.ResponseWriter, r *http.Request, p d.Identity) (any, int, error) {
+		id := r.PathValue("object_id")
+		if len(r.URL.Query()) != 0 {
+			return nil, 0, &d.Error{Code: "INVALID_QUERY_PARAMETER", Status: 422}
+		}
+		s, e := query(r, p, id)
+		if e != nil {
+			return nil, 0, e
+		}
+		if worker := p.Worker(); worker != nil {
+			if e = options.Store.CheckWorkload(r.Context(), *worker, id); e != nil {
+				return nil, 0, e
+			}
+		}
+		view, e := d.PolicyReadOf(s, id)
+		return view, 200, e
+	}, false)
 	if options.Internal {
 		register("POST", "/objects/{object_id}/time-windows", func(_ http.ResponseWriter, r *http.Request, p d.Identity) (any, int, error) {
 			var body d.WindowCommand

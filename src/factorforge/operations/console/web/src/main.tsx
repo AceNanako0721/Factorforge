@@ -4,6 +4,7 @@ import { createRootRoute, createRoute, createRouter, RouterProvider, redirect } 
 import { Shell } from "./components/shell";
 import { FlowPage } from "./features/flow-page";
 import { MarketPage } from "./features/market-page";
+import { SettingsPage } from "./features/settings-page";
 import { SessionProvider } from "./features/session";
 import { DisplayProvider } from "./features/display-settings";
 import { ThemeProvider } from "./features/theme";
@@ -16,6 +17,7 @@ const index = createRoute({ getParentRoute: () => rootRoute, path: "/", beforeLo
 const login = createRoute({ getParentRoute: () => rootRoute, path: "/login", beforeLoad: home });
 const flow = createRoute({ getParentRoute: () => rootRoute, path: "/flow", component: FlowPage });
 const market = createRoute({ getParentRoute: () => rootRoute, path: "/market", component: MarketPage });
+const settings = createRoute({ getParentRoute: () => rootRoute, path: "/settings", component: SettingsPage });
 // Old page addresses land on the two pages that replaced them.
 const old = ["overview", "dynamic", "events", "sentiment", "decisions", "execution", "cases", "learning", "operations", "audit"].map((path) =>
   createRoute({
@@ -26,7 +28,7 @@ const old = ["overview", "dynamic", "events", "sentiment", "decisions", "executi
     },
   }),
 );
-const router = createRouter({ routeTree: rootRoute.addChildren([index, login, flow, market, ...old]), defaultPreload: "intent" });
+const router = createRouter({ routeTree: rootRoute.addChildren([index, login, flow, market, settings, ...old]), defaultPreload: "intent" });
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false, refetchOnReconnect: false, retry: false } },
 });

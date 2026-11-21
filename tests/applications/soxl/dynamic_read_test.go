@@ -15,6 +15,7 @@ import (
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl/api"
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl/domain"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl/operations"
+	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl/workers"
 	tradingpg "github.com/AceNanako0721/Factorforge/src/factorforge/trading/adapters/postgres"
 	"github.com/jackc/pgx/v5"
 )
@@ -142,10 +143,15 @@ func TestT328DynamicReadAPI(t *testing.T) {
 	if err = writer.AppendRecord(ctx, "STOP_EVENT", "price-state-20261016T08", at.Add(2*time.Hour), map[string]any{"kind": "PRICE_STATE", "state": priceState}); err != nil {
 		t.Fatal(err)
 	}
+	// S3-032: the settings the position manager records each cycle.
+	recorded := &workers.RecordedSettings{Purpose: "ladder comparison", CloseMinutes: 5, CloseQuantile: "0.995", WickQuantile: "0.999", WickMultiplier: 1.2, TrailQuantile: "0.99", InsuranceFraction: 0.25, LadderStep: 0.03, RoundTripCost: 0.0018, MaxRiskFraction: 0.02, ReentryWaitMinutes: 30, DirectiveTTLMinutes: 20, BaselineMaxShare: 0.5, BaselineRenewMinutes: 30, EventTypes: []string{"FOMC"}}
+	recorded.Judgment.Mode, recorded.Judgment.SourceInstanceID, recorded.Judgment.Since = "FOLLOW", "soxl-source", at.Add(-24*time.Hour)
+	recorded.Judgment.Models, recorded.Judgment.JudgeMinutes = []string{}, []int{}
+	recorded.PriceState.Enabled, recorded.PriceState.Model, recorded.PriceState.Scope, recorded.PriceState.OnUnavailable, recorded.PriceState.MaxAgeMinutes = true, "jev-latest", "REVERSAL", "BLOCK", 120
 	position := map[string]any{"noise_id": "noise-1", "noise_at": at.Add(-time.Hour), "versions": map[string]int{}, "batch": pending,
 		"initial":  map[string]any{"direction": -1, "geometry": map[string]any{"tier": 72, "session": "OVERNIGHT", "r": 0.16}, "price": 107.26, "distance": 19.11, "close_distance": 17.2, "risk_fraction": 0.01, "equity": 4001.03, "directive_id": "initial-20261016T072005Z"},
 		"baseline": map[string]any{"phase": "", "value": 0, "direction": 0, "started_at": "0001-01-01T00:00:00Z", "source_chain": "", "suspended_at": "0001-01-01T00:00:00Z"}, "baseline_at": at, "equity_peak": 4003.7, "outcomes": nil, "seen_cases": nil, "ladder": map[string]any{"step": 0.01, "round_trip_cost": 0.001},
-		"price_state": priceState, "gate": map[string]any{"open": false, "reason": "PRICE_STATE_DISAGREES", "direction": 1, "at": at.Add(2 * time.Hour)}}
+		"price_state": priceState, "gate": map[string]any{"open": false, "reason": "PRICE_STATE_DISAGREES", "direction": 1, "at": at.Add(2 * time.Hour)}, "settings": recorded}
 	for key, value := range map[string]any{"POSITION": position, "INJECTION": map[string]any{"seen": []string{"news-a"}, "active": map[string]any{"direction": "SHORT", "confidence": 3, "event_ids": []string{"e1", "e2"}, "chain_id": "chain-1", "since": at}, "sequence": 2, "last_judgment": "j-3"}, "NEWS_SOURCES": map[string]any{"wscn-us": map[string]any{"failing": false, "last_success": at}, "cnbc-tech": map[string]any{"failing": true, "last_success": at.Add(-time.Hour)}},
 		// S3-034: the follower cursor is stored under FOLLOW (migration 009).
 		"FOLLOW": map[string]any{"last_at": at, "last_id": "j-3"}} {
@@ -175,6 +181,9 @@ func TestT328DynamicReadAPI(t *testing.T) {
 	}
 	if ps := v.PriceState; ps == nil || ps.State != "DOWNTREND" || ps.Probabilities.Downtrend != "0.67" || ps.Probabilities.Range != "0.26" || ps.Strength != "2.78" || ps.Model != "jev-1.14.0" || !ps.HourAt.Equal(at.Add(time.Hour)) {
 		t.Fatalf("price state %+v", v.PriceState)
+	}
+	if c := v.Settings; c == nil || c.Purpose != "ladder comparison" || c.LadderStep == nil || *c.LadderStep != "0.03" || c.MaxRiskFraction != "0.02" || c.ReentryWaitMinutes != 30 || c.Judgment.Mode != "FOLLOW" || c.Judgment.SourceInstanceID == nil || *c.Judgment.SourceInstanceID != "soxl-source" || c.Judgment.Since == nil || !c.Judgment.Since.Equal(at.Add(-24*time.Hour)) || c.PriceStateGate == nil || c.PriceStateGate.Scope != "REVERSAL" || c.PriceStateGate.MaxAgeMinutes != 120 || c.WickMultiplier != "1.2" {
+		t.Fatalf("settings %+v", v.Settings)
 	}
 	if g := v.EntryGate; g == nil || g.Open || g.Reason != "PRICE_STATE_DISAGREES" || g.Direction != "LONG" {
 		t.Fatalf("entry gate %+v", v.EntryGate)

@@ -1,6 +1,6 @@
 # SOXLUSDT 应用实例设计书
 
-版本：3.18.3
+版本：3.19.0
 
 对应式样书：[03_SOXLUSDT应用实例式样书](03_SOXLUSDT应用实例式样书.md)。源码在 `src/factorforge/applications/soxl`，测试在 `tests/applications/soxl`。文中出现的数值，凡是代码里写死的照实写出；其余都是登记值，这里只说明作用，不给实际取值。
 
@@ -60,6 +60,7 @@
 研判工作器和仓位管理器读同一份本地配置 `DynamicProfile`。仓库提供空模板 `dynamic_stop.example.toml`。
 
 - **身份**：`instance_id`、`environment`、`object_id`。
+- **`purpose`**：一句话写明这个实例在测试什么，最多 200 个字符（`PurposeMaxRunes`），不含控制字符；可以为空。只用于只读查询的设置显示（第 5 章），不影响任何计算。
 - **`access` 节**：
   - P3 数据库：`database_url`。
   - P2 接口：`framework_url`、`framework_token`。
@@ -100,6 +101,7 @@
 - `baseline_max_share` 在 (0, 1] 内。
 - `ladder_step` 在 [0, 1) 内。
 - `max_risk_fraction` 在 [0, 1] 内（0 表示默认 2%）。
+- `purpose` 不超过 200 个字符、是合法 UTF-8、不含控制字符。
 - 启用价格状态闸门时：`url` 为 https 地址，`api_key`、`model` 不为空，`timeout_seconds`、`max_age_minutes` 为正，`on_unavailable` 只能是 `BLOCK` 或 `IGNORE`，`scope` 只能为空、`ALL` 或 `REVERSAL`。
 
 不合格时返回 `DYNAMIC_PROFILE_INVALID`。
@@ -398,7 +400,15 @@ P2 用这条指令冻结批次数量（P2 设计 6.1）。
 - **阶梯**：登记了阶梯时给出 `ladder`，包括步长、当前级数、锁定价、下一级所需的最有利收盘和锁定价，由 `LadderNext` 计算，与 `Ladder` 同一公式。
 - **待执行的退出**：`exit_pending`，给出 K 线时刻与截止时刻。
 
-另外给出：下一次开仓的初始计划、基线状态、判断链、波动表版本、各新闻源的健康。启用价格状态闸门时另有 `price_state`（所属小时、状态、`uptrend`/`downtrend`/`range` 三个概率、强度、模型版本、判断时刻）和 `entry_gate`（是否放行、理由码、方向、时刻）；没有记录时为 `null`。
+另外给出：下一次开仓的初始计划、基线状态、判断链、波动表版本、各新闻源的健康。
+
+`settings`（`DynamicSettingsView`）是实例登记的设置，仓位管理器每轮把它写进 `POSITION` 状态（`PositionState.Settings`，由 `assembly.RecordedSettings` 从 `DynamicProfile` 复制，只复制登记值，不含任何地址、令牌或密钥），只读接口原样投影；升级后第一轮之前为 `null`。内容：
+
+- `purpose`。
+- `judgment`：`mode` 为 `MODELS`（自己研判，给出 `models` 的模型名和 `judge_minutes`）或 `FOLLOW`（跟随，给出 `source_instance_id` 与 `since`，另两项为空数组）。
+- 止损与开仓：`close_minutes`、`close_quantile`、`wick_quantile`、`wick_multiplier`、`trail_quantile`、`insurance_fraction`、`ladder_step`（没有阶梯为 null）、`round_trip_cost`、`max_risk_fraction`（未登记时写生效的 2%）、`directive_ttl_minutes`、`event_types`。
+- 基线：`reentry_wait_minutes`、`baseline_max_share`、`baseline_renew_minutes`。
+- `price_state_gate`：启用价格状态闸门时给出 `model`、`scope`（空写成 `ALL`）、`on_unavailable`、`max_age_minutes`，否则为 null。启用价格状态闸门时另有 `price_state`（所属小时、状态、`uptrend`/`downtrend`/`range` 三个概率、强度、模型版本、判断时刻）和 `entry_gate`（是否放行、理由码、方向、时刻）；没有记录时为 `null`。
 
 研判记录不含提示词、原始回答、用量和新闻正文。实盘绑定下，许可为 `SIM_ONLY` 的来源只返回来源与编号，不返回标题。游标签名并绑定查询范围，篡改时拒绝。查询不触发任何搜索、模型或写入。
 

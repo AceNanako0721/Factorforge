@@ -3,7 +3,10 @@ package config
 import (
 	"bytes"
 	"net/url"
+	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	d "github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl/domain"
 	"github.com/AceNanako0721/Factorforge/src/factorforge/applications/soxl/monitoring"
@@ -16,7 +19,10 @@ type DynamicProfile struct {
 	InstanceID  string `toml:"instance_id"`
 	Environment string `toml:"environment"`
 	ObjectID    string `toml:"object_id"`
-	Access      struct {
+	// Purpose says in one sentence what this instance is run to test; the
+	// read view shows it next to the settings (S3-032).
+	Purpose string `toml:"purpose"`
+	Access  struct {
 		DatabaseURL      string `toml:"database_url"`
 		FrameworkURL     string `toml:"framework_url"`
 		FrameworkToken   string `toml:"framework_token"`
@@ -115,6 +121,9 @@ type DynamicProfile struct {
 	} `toml:"position"`
 }
 
+// PurposeMaxRunes bounds the instance purpose sentence.
+const PurposeMaxRunes = 200
+
 func (p DynamicProfile) Binding() d.Binding {
 	return d.Binding{InstanceID: p.InstanceID, Environment: p.Environment}
 }
@@ -149,6 +158,7 @@ func (p DynamicProfile) Validate() error {
 		// Chinese live news is licensed for SIM/shadow only (S3-023).
 		bad = bad || f.SourceID == "" || f.LicenseScope == "SIM_ONLY" && p.Environment == "LIVE"
 	}
+	bad = bad || utf8.RuneCountInString(p.Purpose) > PurposeMaxRunes || !utf8.ValidString(p.Purpose) || strings.IndexFunc(p.Purpose, unicode.IsControl) >= 0
 	pos := p.Position
 	bad = bad || pos.CloseMinutes != 5 && pos.CloseMinutes != 15 || pos.InsuranceFraction <= 0 || pos.InsuranceFraction >= 1 || pos.WickMultiplier <= 0 || pos.BaselineMaxShare <= 0 || pos.BaselineMaxShare > 1 || pos.DirectiveTTLMinutes <= 0 || pos.NoiseLookbackDays <= 0 || pos.PriceTick <= 0 || pos.LadderStep < 0 || pos.LadderStep >= 1 || pos.MaxRiskFraction < 0 || pos.MaxRiskFraction > 1
 	if ps := pos.PriceState; ps.URL != "" {

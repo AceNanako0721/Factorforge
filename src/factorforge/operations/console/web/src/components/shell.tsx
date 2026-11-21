@@ -13,6 +13,7 @@ import { useTheme } from "../features/theme";
 export const pages = [
   ["flow", "实时流程"],
   ["market", "行情与交易"],
+  ["settings", "实例配置"],
 ] as const;
 
 export function instanceName(s: Selection): string {
