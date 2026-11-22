@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"math/rand/v2"
 	"net/url"
 	"time"
 
@@ -28,7 +29,7 @@ func (c *HTTPClient) command(ctx context.Context, path, key, reason string, payl
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
-			case <-time.After(time.Duration(attempt) * commandBackoff):
+			case <-time.After(commandPause(attempt)):
 			}
 		}
 		var version int
@@ -47,10 +48,24 @@ func (c *HTTPClient) command(ctx context.Context, path, key, reason string, payl
 
 // a command competes with P2's decision cycle
 // and P1's collector at the same 5-minute boundary, so one retry was not
-// always enough; three attempts with a short growing pause clear the burst.
-const commandAttempts = 3
+// always enough. Three attempts with a fixed growing pause still lost an
+// occasional round when the competing writers kept landing on the same
+// beat, so five attempts are allowed and each pause carries random jitter
+// to break that alignment. The worst-case total wait stays well inside one
+// 5-minute cycle.
+const commandAttempts = 5
 
 var commandBackoff = 500 * time.Millisecond
+
+// commandPause grows linearly with the attempt number and adds up to one
+// backoff unit of jitter.
+func commandPause(attempt int) time.Duration {
+	base := time.Duration(attempt) * commandBackoff
+	if commandBackoff <= 0 {
+		return base
+	}
+	return base + rand.N(commandBackoff)
+}
 
 func (c *HTTPClient) SubmitStopDirective(ctx context.Context, v dto.StopDirective) (dto.StopDirectiveReceipt, error) {
 	var receipt dto.StopDirectiveReceipt
