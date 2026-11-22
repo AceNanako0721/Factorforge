@@ -53,6 +53,9 @@ func TestStopDirectiveRetriesConflictBurst(t *testing.T) {
 		{"two-cas", []string{"AGGREGATE_VERSION_CONFLICT", "AGGREGATE_VERSION_CONFLICT"}},
 		{"trading-snapshot", []string{"TRADING_SNAPSHOT_CONFLICT"}},
 		{"mixed", []string{"TRADING_SNAPSHOT_CONFLICT", "AGGREGATE_VERSION_CONFLICT"}},
+		// writers that keep landing on the same beat: four conflicts in a row
+		// are still absorbed within the round.
+		{"four-cas", []string{"AGGREGATE_VERSION_CONFLICT", "AGGREGATE_VERSION_CONFLICT", "AGGREGATE_VERSION_CONFLICT", "AGGREGATE_VERSION_CONFLICT"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			client, posts := commandServer(t, tc.rejections)
@@ -63,10 +66,15 @@ func TestStopDirectiveRetriesConflictBurst(t *testing.T) {
 	}
 }
 
-func TestStopDirectiveStopsAfterThreeConflictsAndOtherConflicts(t *testing.T) {
-	client, posts := commandServer(t, []string{"AGGREGATE_VERSION_CONFLICT", "AGGREGATE_VERSION_CONFLICT", "AGGREGATE_VERSION_CONFLICT"})
-	if _, err := client.SubmitStopDirective(context.Background(), dto.StopDirective{DirectiveID: "stop-1", Version: 2}); providerError(err) != "FRAMEWORK_AGGREGATE_VERSION_CONFLICT" || *posts != 3 {
+func TestStopDirectiveStopsAfterFiveConflictsAndOtherConflicts(t *testing.T) {
+	started := time.Now()
+	client, posts := commandServer(t, []string{"AGGREGATE_VERSION_CONFLICT", "AGGREGATE_VERSION_CONFLICT", "AGGREGATE_VERSION_CONFLICT", "AGGREGATE_VERSION_CONFLICT", "AGGREGATE_VERSION_CONFLICT"})
+	if _, err := client.SubmitStopDirective(context.Background(), dto.StopDirective{DirectiveID: "stop-1", Version: 2}); providerError(err) != "FRAMEWORK_AGGREGATE_VERSION_CONFLICT" || *posts != 5 {
 		t.Fatal("retry not bounded", err, *posts)
+	}
+	// the whole retry budget must stay far inside one 5-minute cycle.
+	if waited := time.Since(started); waited > 30*time.Second {
+		t.Fatal("retry budget too long", waited)
 	}
 	client, posts = commandServer(t, []string{"IDEMPOTENCY_CONFLICT"})
 	if _, err := client.SubmitStopDirective(context.Background(), dto.StopDirective{DirectiveID: "stop-1", Version: 2}); providerError(err) != "FRAMEWORK_CONFLICT" || *posts != 1 {
