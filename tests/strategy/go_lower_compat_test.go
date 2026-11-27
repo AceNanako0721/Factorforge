@@ -158,7 +158,8 @@ func TestT224InitialDistanceUsesSameBudgetWithoutNoise(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(out) != 1 || out[0].TargetQuantity.Cmp(sd.Int(2)) != 0 || out[0].StopPlan == nil || out[0].StopPlan.ManagedStopPrice.Cmp(sd.Int(96)) != 0 {
+	// 10 × (1 − SizingMargin) / (4 + 1) = 1.98.
+	if len(out) != 1 || out[0].TargetQuantity.Cmp(compDecimal("1.98")) != 0 || out[0].StopPlan == nil || out[0].StopPlan.ManagedStopPrice.Cmp(sd.Int(96)) != 0 {
 		t.Fatal("distance+allowance sizing", out[0].ReasonCodes, out[0].TargetQuantity)
 	}
 }
