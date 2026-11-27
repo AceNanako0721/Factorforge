@@ -11,6 +11,7 @@
 | L3 应用层 | P3 SOXLUSDT 应用 | `src/factorforge/applications/soxl` |
 | L4 运维层 | P4 Web 管理台 | `src/factorforge/operations/console`（Go 后端 + `web/` 前端） |
 | L4 运维层 | P5 模型接入 | `src/factorforge/operations/model_access`（TypeScript） |
+| L4 运维层 | P6 运维代理 | `src/factorforge/operations/agent` |
 
 ```text
 Factorforge/
@@ -50,7 +51,7 @@ Factorforge/
 
 ## 语言
 
-- P1、P2、P3、P4 后端使用 Go；P4 前端和 P5 使用 TypeScript。
+- P1、P2、P3、P4 后端和 P6 使用 Go；P4 前端和 P5 使用 TypeScript。
 - 不使用 Python：仓库中不能有 Python 源码，也不能依赖 Python 解释器或 Python 服务。
 - 每个非 Go 模块在自己的目录里保存 `package.json` 和唯一的锁文件，不在仓库根目录放包定义。
 

@@ -114,8 +114,8 @@ func TestLayerAllowsSeveralSpecsAndModules(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := good
-	r.Modules = append(append([]layoutguard.Module(nil), good.Modules...), layoutguard.Module{ID: "P6", Name: "归档", Layer: "L4", Path: "src/factorforge/operations/archive", Tests: "tests/operations/archive", Languages: []string{"go"}, Standard: true})
-	r.Specs = append(append([]layoutguard.Spec(nil), good.Specs...), layoutguard.Spec{ID: "S6", Name: "归档", Layer: "L4", Modules: []string{"P6"}, Spec: "doc/06_归档式样书.md", Design: "doc/06_归档设计书.md"})
+	r.Modules = append(append([]layoutguard.Module(nil), good.Modules...), layoutguard.Module{ID: "P7", Name: "归档", Layer: "L4", Path: "src/factorforge/operations/archive", Tests: "tests/operations/archive", Languages: []string{"go"}, Standard: true})
+	r.Specs = append(append([]layoutguard.Spec(nil), good.Specs...), layoutguard.Spec{ID: "S7", Name: "归档", Layer: "L4", Modules: []string{"P7"}, Spec: "doc/07_归档式样书.md", Design: "doc/07_归档设计书.md"})
 	if f := r.Validate(); len(f) > 0 {
 		t.Fatal(f)
 	}
