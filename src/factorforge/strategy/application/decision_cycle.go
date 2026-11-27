@@ -486,7 +486,7 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 						} else if saved != nil && (target.Cmp(m.Add(actual, pending)) == 0 || pending.Sign() != 0 && target.Sign() == m.Add(actual, pending).Sign()) {
 							result = d.StopResult{Quantity: target, Plan: saved, Reason: "TARGET_PLAN_PRESERVED", Fraction: PreservedStress(sample.Price, saved, p.MaxStopFraction)}
 						} else if initial != nil {
-							result, err = SizeDirective(target, sample.Price, rules, initial, p)
+							result, err = SizeDirective(target, sample.Price, OpeningQuote(snap, obj.ObjectID, target), rules, initial, p)
 							sizingDirective = initial
 						} else {
 							var noise *d.Decimal
@@ -567,15 +567,15 @@ func (c DecisionCycle) Tick(ctx context.Context, identity d.Identity, requested 
 						return e
 					}
 					if reason != "" {
-						target, stop = current, nil
+						target, stop = HeldTarget(snap, obj.ObjectID, current, at), nil
 						reasons = append(reasons, reason)
 					} else if UnitBandHold(obj, p, current, target, force || stopNow) {
-						target, stop = current, nil
+						target, stop = HeldTarget(snap, obj.ObjectID, current, at), nil
 						reasons = append(reasons, "UNIT_BAND_HOLD")
 					}
 				}
 				if d.NewRisk(actual, pending, target) && !force && (components == nil && m.Sub(target, current).Abs().Cmp(p.MinAdjustment) < 0 || obj.LastAdjustment != nil && at.Sub(*obj.LastAdjustment).Seconds() < float64(p.CooldownSeconds)) {
-					target, stop = current, nil
+					target, stop = HeldTarget(snap, obj.ObjectID, current, at), nil
 					reasons = append(reasons, "ADJUSTMENT_COOLDOWN")
 				}
 
@@ -1025,4 +1025,33 @@ items:
 		}
 	}
 	return nil
+}
+
+// HeldTarget is the target a hold (rebalance band, unit band, adjustment
+// cooldown) keeps: the canonical P1 target while it is live, so a target P1
+// accepted but has not ordered yet is not taken back; otherwise actual plus
+// pending. A target P1 blocked (for example after a protection exit), one of
+// an older owner epoch or one past its expiry is not kept.
+func HeldTarget(snap *d.TradingSnapshot, object string, current d.Decimal, at time.Time) d.Decimal {
+	t := snap.Targets[object]
+	if t == nil || !d.Has([]string{"ACTIVE", "RECONCILING"}, d.Text(t["state"])) || d.Number(t["owner_epoch"]) != snap.OwnerEpochs[object] {
+		return current
+	}
+	if t["expires_at"] != nil && !d.At(t["expires_at"]).After(at) {
+		return current
+	}
+	return d.Amount(t["target_quantity"])
+}
+
+// OpeningQuote is the valid quote an opening toward target fills at: the ask
+// to buy, the bid to sell; zero when the snapshot has none.
+func OpeningQuote(snap *d.TradingSnapshot, object string, target d.Decimal) d.Decimal {
+	kind := "ASK"
+	if target.Sign() < 0 {
+		kind = "BID"
+	}
+	if q, ok := snap.TriggerPrices[object][kind]; ok && q.Quality == "VALID" && q.Price.Sign() > 0 {
+		return q.Price
+	}
+	return d.Zero()
 }

@@ -672,6 +672,12 @@
    "change_kind": "specification",
    "date": "2026-11-27",
    "summary": "Re-entry after a stop can be registered per instance (S3-036): under SAME_DIRECTION the first judgment after the stop in the stopped direction and the current chain is injected even when S3-025 would only record it, so the framework re-entry gate opens; the price-state gate gains REENTRY and REVERSAL_REENTRY scopes so a re-entry can optionally wait for an agreeing price state."
+  },
+  {
+   "version": "3.20.1",
+   "change_kind": "design",
+   "date": "2026-11-27",
+   "summary": "A hold (no-trade band, unit band, adjustment interval or cooldown) keeps the live trading-layer target, so an opening the trading layer accepted but has not ordered yet is no longer taken back by the next cycle. A directive-sized opening measures its loss from the worse of the sample and the opening-side quote and leaves 1% of the object loss budget, so the trading layer no longer refuses it with TRADE_RISK_LIMIT for a few ticks of drift."
   }
  ]
 }

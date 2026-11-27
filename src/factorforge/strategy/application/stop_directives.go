@@ -187,7 +187,16 @@ func StopPlanForDirective(v d.StopDirective, trigger, quantity d.Decimal, rules 
 	}
 	return plan
 }
-func SizeDirective(q, price d.Decimal, rules d.ProductRules, r *d.StopDirectiveRecord, p *d.Policy) (d.StopResult, error) {
+// SizingMargin is the share of the object loss budget a directive-sized
+// opening leaves unused, so the trading layer's check of the same loss at
+// its own (later) quote does not refuse it for a few ticks of drift.
+const SizingMargin = "0.01"
+
+// SizeDirective sizes an opening from an initial-distance directive. The
+// trigger is placed from price (the sample); the loss is measured from the
+// worse of price and entry (the opening-side quote: ask to buy, bid to sell),
+// as the trading layer measures it, within the budget less SizingMargin.
+func SizeDirective(q, price, entry d.Decimal, rules d.ProductRules, r *d.StopDirectiveRecord, p *d.Policy) (d.StopResult, error) {
 	v := r.Directive
 	m := d.Math()
 	distance := *v.InitialStopDistance
@@ -216,8 +225,13 @@ func SizeDirective(q, price d.Decimal, rules d.ProductRules, r *d.StopDirectiveR
 	if v.OvershootAllowance != nil {
 		allowance = *v.OvershootAllowance
 	}
-	unit := m.Mul(rules.Multiplier, m.Add(m.Add(m.Abs(m.Sub(price, trigger)), allowance), m.Mul(price, m.Add(m.Add(p.FeeRate, p.SlippageFraction), p.GapFraction))))
-	sized := m.Mul(sign, m.Step(d.Min(q.Abs(), m.Div(p.ObjectLossBudget, unit)), rules.QuantityStep, dto.TowardZero))
+	if entry.Sign() <= 0 {
+		entry = price
+	}
+	loss := d.Max(m.Abs(m.Sub(price, trigger)), m.Abs(m.Sub(entry, trigger)))
+	unit := m.Mul(rules.Multiplier, m.Add(m.Add(loss, allowance), m.Mul(d.Max(price, entry), m.Add(m.Add(p.FeeRate, p.SlippageFraction), p.GapFraction))))
+	budget := m.Mul(p.ObjectLossBudget, m.Sub(d.One(), d.Amount(SizingMargin)))
+	sized := m.Mul(sign, m.Step(d.Min(q.Abs(), m.Div(budget, unit)), rules.QuantityStep, dto.TowardZero))
 	if m.Mul(m.Mul(sized.Abs(), price), rules.Multiplier).Cmp(rules.MinNotional) < 0 {
 		return d.StopResult{Reason: "MINIMUM_UNIT"}, nil
 	}
