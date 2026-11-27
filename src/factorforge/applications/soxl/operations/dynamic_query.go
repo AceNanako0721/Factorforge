@@ -158,6 +158,7 @@ type DynamicSettingsView struct {
 	RoundTripCost        string                    `json:"round_trip_cost"`
 	MaxRiskFraction      string                    `json:"max_risk_fraction"`
 	ReentryWaitMinutes   int                       `json:"reentry_wait_minutes"`
+	ReentryRule          string                    `json:"reentry_rule"`
 	DirectiveTTLMinutes  int                       `json:"directive_ttl_minutes"`
 	BaselineMaxShare     string                    `json:"baseline_max_share"`
 	BaselineRenewMinutes int                       `json:"baseline_renew_minutes"`
@@ -281,6 +282,7 @@ type storedSettings struct {
 	RoundTripCost        float64  `json:"round_trip_cost"`
 	MaxRiskFraction      float64  `json:"max_risk_fraction"`
 	ReentryWaitMinutes   int      `json:"reentry_wait_minutes"`
+	ReentryRule          string   `json:"reentry_rule"`
 	DirectiveTTLMinutes  int      `json:"directive_ttl_minutes"`
 	BaselineMaxShare     float64  `json:"baseline_max_share"`
 	BaselineRenewMinutes int      `json:"baseline_renew_minutes"`
@@ -305,6 +307,10 @@ func settingsView(r *storedSettings) *DynamicSettingsView {
 	if r.LadderStep > 0 {
 		step := decimal(r.LadderStep)
 		v.LadderStep = &step
+	}
+	v.ReentryRule = r.ReentryRule
+	if v.ReentryRule == "" {
+		v.ReentryRule = "CONFIDENCE"
 	}
 	if ps := r.PriceState; ps.Enabled {
 		v.PriceStateGate = &DynamicGateSettingView{Model: ps.Model, Scope: ps.Scope, OnUnavailable: ps.OnUnavailable, MaxAgeMinutes: ps.MaxAgeMinutes}

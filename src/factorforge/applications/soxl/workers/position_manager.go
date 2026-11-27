@@ -53,7 +53,7 @@ type PriceStateSettings struct {
 	Enabled       bool
 	MaxAge        time.Duration
 	OnUnavailable string // d.PriceStateBlock or d.PriceStateIgnore
-	Scope         string // d.PriceStateScopeAll or d.PriceStateScopeReversal
+	Scope         string // a d.PriceStateScope value; empty is ALL
 }
 
 type PositionSettings struct {
@@ -96,6 +96,7 @@ type RecordedSettings struct {
 	RoundTripCost        float64  `json:"round_trip_cost"`
 	MaxRiskFraction      float64  `json:"max_risk_fraction"`
 	ReentryWaitMinutes   int      `json:"reentry_wait_minutes"`
+	ReentryRule          string   `json:"reentry_rule"`
 	DirectiveTTLMinutes  int      `json:"directive_ttl_minutes"`
 	BaselineMaxShare     float64  `json:"baseline_max_share"`
 	BaselineRenewMinutes int      `json:"baseline_renew_minutes"`
@@ -167,6 +168,9 @@ type PositionState struct {
 	// LastDirection is the side of the last batch held, which a REVERSAL
 	// gate compares a new batch with (0 before the first batch).
 	LastDirection int `json:"last_direction,omitempty"`
+	// LastStopped says the last batch ended in a stop, which a REENTRY gate
+	// scope reads while flat (S3-036).
+	LastStopped bool `json:"last_stopped,omitempty"`
 }
 
 type EntryGate struct {
@@ -411,11 +415,11 @@ func (m *PositionManager) initial(ctx context.Context, st *PositionState, price,
 	}
 	st.Gate = nil
 	if s.PriceState.Enabled && direction != held {
-		last := held
+		last, stopped := held, false
 		if held == 0 {
-			last = st.LastDirection
+			last, stopped = st.LastDirection, st.LastStopped
 		}
-		if d.GateApplies(s.PriceState.Scope, last, direction) {
+		if d.GateApplies(s.PriceState.Scope, last, direction, stopped) {
 			open, reason := d.GateEntry(st.PriceState, direction, now, s.PriceState.MaxAge, s.PriceState.OnUnavailable)
 			st.Gate = &EntryGate{Open: open, Reason: reason, Direction: direction, At: now}
 			if !open {
@@ -862,7 +866,7 @@ func (m *PositionManager) closeBatch(ctx context.Context, st *PositionState, obj
 		}
 	}
 	_ = m.Store.AppendRecord(ctx, "STOP_EVENT", safeID("close-"+b.CycleID), now, map[string]any{"kind": "CLOSE", "stopped": stopped, "batch": b})
-	st.LastDirection = b.Direction
+	st.LastDirection, st.LastStopped = b.Direction, stopped
 	st.Batch = nil
 }
 

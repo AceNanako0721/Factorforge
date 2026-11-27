@@ -207,13 +207,13 @@ func TestSettingsViewPanels(t *testing.T) {
 // S4-025: the recorded settings of a status survive the console projection.
 func TestSettingsSurviveStatusProjection(t *testing.T) {
 	status := `{"schema_version":"instance-2.0","environment":"SIM","instance_id":"inst","source_version":"v1","observed_at":"2026-01-04T10:00:00Z","snapshot_version":"s1","data":{"batch":null,"next_entry":null,"price_state":null,"entry_gate":null,"baseline":{"phase":"NONE","direction":"FLAT","value":"0","started_at":null,"suspended_at":null,"source_chain":null},"chain":null,"noise":{"noise_id":null,"generated_at":null},"sources":[],"outcomes":[],"last_judgment_id":null,"equity_peak":"5000",
-"settings":{"purpose":"wide ladder","judgment":{"mode":"FOLLOW","models":[],"judge_minutes":[],"source_instance_id":"soxl-source","since":"2026-01-01T00:00:00Z"},"close_minutes":5,"close_quantile":"0.995","wick_quantile":"0.999","wick_multiplier":"1.2","trail_quantile":"0.99","insurance_fraction":"0.25","ladder_step":"0.05","round_trip_cost":"0.0018","max_risk_fraction":"0.02","reentry_wait_minutes":30,"directive_ttl_minutes":20,"baseline_max_share":"0.5","baseline_renew_minutes":30,"event_types":["FOMC"],"price_state_gate":{"model":"jev-latest","scope":"ALL","on_unavailable":"BLOCK","max_age_minutes":120}}}}`
+"settings":{"purpose":"wide ladder","judgment":{"mode":"FOLLOW","models":[],"judge_minutes":[],"source_instance_id":"soxl-source","since":"2026-01-01T00:00:00Z"},"close_minutes":5,"close_quantile":"0.995","wick_quantile":"0.999","wick_multiplier":"1.2","trail_quantile":"0.99","insurance_fraction":"0.25","ladder_step":"0.05","round_trip_cost":"0.0018","max_risk_fraction":"0.02","reentry_wait_minutes":30,"reentry_rule":"SAME_DIRECTION","directive_ttl_minutes":20,"baseline_max_share":"0.5","baseline_renew_minutes":30,"event_types":["FOMC"],"price_state_gate":{"model":"jev-latest","scope":"ALL","on_unavailable":"BLOCK","max_age_minutes":120}}}}`
 	safe, e := d.ProjectBound("dynamic", d.Routes["dynamic.status"].Path, []byte(status), "")
 	if e != nil {
 		t.Fatal("status with settings refused", e)
 	}
 	raw := string(safe.Bytes())
-	for _, want := range []string{`"purpose":"wide ladder"`, `"ladder_step":"0.05"`, `"source_instance_id":"soxl-source"`, `"scope":"ALL"`, `"max_risk_fraction":"0.02"`} {
+	for _, want := range []string{`"purpose":"wide ladder"`, `"ladder_step":"0.05"`, `"source_instance_id":"soxl-source"`, `"scope":"ALL"`, `"max_risk_fraction":"0.02"`, `"reentry_rule":"SAME_DIRECTION"`} {
 		if !strings.Contains(raw, want) {
 			t.Fatal("projection dropped", want, raw)
 		}

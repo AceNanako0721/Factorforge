@@ -1,6 +1,6 @@
 # SOXLUSDT 应用实例设计书
 
-版本：3.19.0
+版本：3.20.0
 
 对应式样书：[03_SOXLUSDT应用实例式样书](03_SOXLUSDT应用实例式样书.md)。源码在 `src/factorforge/applications/soxl`，测试在 `tests/applications/soxl`。文中出现的数值，凡是代码里写死的照实写出；其余都是登记值，这里只说明作用，不给实际取值。
 
@@ -89,9 +89,10 @@
   - `producer_id`、`producer_version`：评分者身份。
   - `licence`：证据的许可引用。
   - `min_half_life_hours`、`max_half_life_hours`：半衰期上下界。
+  - `reentry_rule`：止损后重入规则（第 2.4 节）。`CONFIDENCE` 或空为按信心，`SAME_DIRECTION` 为同向即可。
 - **`follow` 节**：跟随模式（第 2.6 节）。`source_url`、`source_token`、`source_instance_id`、起始时刻 `since`。`source_url` 不为空即为跟随模式，此时可以不配模型和研判时刻。
 - **`position` 节**：仓位管理器的设置（第 3 章）。其中 `owner_id` 是在 P1 中的持仓归属者，`venue` 与 `instrument_id` 指定交易品种；其余字段在第 3 章用到时说明。
-- **`position.price_state` 节**：价格状态闸门（第 3.7 节）。`url` 不为空即为启用；`api_key`、`model` 是判断模型的密钥与模型名，`timeout_seconds` 是单次调用超时，`max_age_minutes` 是状态可用的最长时长，`on_unavailable` 是状态不可用时的处理（`BLOCK` 或 `IGNORE`），`scope` 是闸门的范围（`ALL` 或空为每个新批次，`REVERSAL` 为只管反向开仓）。
+- **`position.price_state` 节**：价格状态闸门（第 3.7 节）。`url` 不为空即为启用；`api_key`、`model` 是判断模型的密钥与模型名，`timeout_seconds` 是单次调用超时，`max_age_minutes` 是状态可用的最长时长，`on_unavailable` 是状态不可用时的处理（`BLOCK` 或 `IGNORE`），`scope` 是闸门的范围（`ALL` 或空为每个新批次，`REVERSAL` 为只管反向开仓，`REENTRY` 为只管止损后重入，`REVERSAL_REENTRY` 为两者）。
 
 校验（`Validate`）：
 
@@ -102,7 +103,8 @@
 - `ladder_step` 在 [0, 1) 内。
 - `max_risk_fraction` 在 [0, 1] 内（0 表示默认 2%）。
 - `purpose` 不超过 200 个字符、是合法 UTF-8、不含控制字符。
-- 启用价格状态闸门时：`url` 为 https 地址，`api_key`、`model` 不为空，`timeout_seconds`、`max_age_minutes` 为正，`on_unavailable` 只能是 `BLOCK` 或 `IGNORE`，`scope` 只能为空、`ALL` 或 `REVERSAL`。
+- 启用价格状态闸门时：`url` 为 https 地址，`api_key`、`model` 不为空，`timeout_seconds`、`max_age_minutes` 为正，`on_unavailable` 只能是 `BLOCK` 或 `IGNORE`，`scope` 只能为空、`ALL`、`REVERSAL`、`REENTRY` 或 `REVERSAL_REENTRY`。
+- `reentry_rule` 只能为空、`CONFIDENCE` 或 `SAME_DIRECTION`。
 
 不合格时返回 `DYNAMIC_PROFILE_INVALID`。
 
@@ -132,13 +134,14 @@
    - 宣告上一判断失效时，必须附上依据编号。
 7. **保存与处理**：保存 `JUDGMENT` 记录（原始回答截断到 4000 字符），再按第 2.4 节处理。
 
-### 2.4 注入决策（`DecideInjection`）
+### 2.4 注入决策（`DecideInjection`、`DecideInjectionAt`）
 
 注入状态 `InjectionState` 记录：
 
 - 已见过的新闻编号：每次成功研判引用的依据编号（包括只记录的研判）。
 - 当前生效的判断：方向、信心、事件编号、判断链编号、起始时刻。
 - 上一次的方向，以及已写入的事件。
+- 最近一次止损后确认对应的止损时刻 `reentry_for`（见下文）。
 
 本次研判的处理：
 
@@ -152,6 +155,14 @@
 | 同方向，有未见过的编号，且信心不低于当前 | 追加注入（`NEW_ITEMS`），并入同一判断链 |
 | 同方向，信心比当前低 2 分或以上 | 修订（`REVISE`）全部当前事件的评分 |
 | 其他 | 只记录 |
+
+**止损后确认（`DecideInjectionAt`）**：`reentry_rule` 为 `SAME_DIRECTION` 时，研判工作器处理每条研判前经工作负载接口读取 P2 对象（`ObjectState`）的再入场门。门存在、未打开、有方向时，以方向与止损时刻作为 `ReentryWait` 交给注入决策；否则（或规则为 `CONFIDENCE`）为空，处理与上表逐位相同。上表处理完后，同时满足以下条件时：
+
+- 研判方向与门的方向相同，研判时刻晚于止损时刻；
+- 处理后仍有当前判断，且方向与研判相同；
+- 注入状态的 `reentry_for` 不是这次止损的时刻。
+
+若上表没有产生注入，就按本条研判追加注入（`REENTRY_CONFIRM`），并入当前判断链（写入内容与 `NEW_ITEMS` 相同，影响点数按本条研判的信心；没有新编号时证据取全部依据编号）。无论是否追加，都把止损时刻记入 `reentry_for`，同一次止损不再确认。规则为 `SAME_DIRECTION` 却没有对象读取器时返回 `JUDGMENT_CONFIGURATION_INVALID`。
 
 每个动作都先写一条 `ACTION` 记录，再调用 P2。全部成功后才保存新的注入状态，所以写入失败时会整轮重来。中途失败或超时时，已经写入的撤回先记进原注入状态，重来时跳过，不再逐个重写。
 
@@ -302,7 +313,7 @@ P2 用这条指令冻结批次数量（P2 设计 6.1）。
 
 ### 3.6 批次结束（`closeBatch`）
 
-持仓归零时结束批次，记一条种类为 `CLOSE` 的 `STOP_EVENT` 记录，并按第 3.5 节判断是否暂停基线。批次方向写入 `POSITION` 状态的 `last_direction`（价格状态闸门按它判断反向，第 3.7 节）。批次结果（R）在 P2 案例结案后由 `outcomes` 计入（每轮先执行，所以可能在同一轮）。
+持仓归零时结束批次，记一条种类为 `CLOSE` 的 `STOP_EVENT` 记录，并按第 3.5 节判断是否暂停基线。批次方向写入 `POSITION` 状态的 `last_direction`，是否以止损结束（P2 对象的再入场门在开仓之后被打开，与第 3.5 节同一判断）写入 `last_stopped`；价格状态闸门按它们判断反向与止损后重入（第 3.7 节）。升级前结束的批次没有 `last_stopped`，按不是止损结束处理。批次结果（R）在 P2 案例结案后由 `outcomes` 计入（每轮先执行，所以可能在同一轮）。
 
 ### 3.7 价格状态闸门（`priceState`、`GateEntry`）
 
@@ -327,7 +338,7 @@ P2 用这条指令冻结批次数量（P2 设计 6.1）。
 
 **开仓闸门（`GateEntry`）**：在第 3.3 节确定方向之后、计算风险比例之前，对会开出新批次的初始止损指令判定：没有持仓时，以及持仓方向与研判方向相反时（这条指令在当前批次结束后会开出反向批次）。持仓方向与研判方向相同时，指令只用于加仓定量，不判定。
 
-先看范围（`GateApplies`）：`scope` 为 `REVERSAL` 时，取上一批方向（持仓时为持仓方向，没有持仓时为 `last_direction`，第 3.6 节），与研判方向相同则不判定、直接放行，理由码 `PRICE_STATE_SAME_SIDE`；`last_direction` 为 0（此前没有批次）时照常判定。`scope` 为空或 `ALL` 时一律判定：
+先看范围（`GateApplies`）。取上一批方向（持仓时为持仓方向，没有持仓时为 `last_direction`，第 3.6 节）：与研判方向不同（含 `last_direction` 为 0，即此前没有批次）为反向；相同且没有持仓、`last_stopped` 为真为止损后重入。`scope` 为 `REVERSAL` 时只判定反向，`REENTRY` 时只判定止损后重入，`REVERSAL_REENTRY` 时判定两者；不判定时直接放行，理由码 `PRICE_STATE_SAME_SIDE`。`scope` 为空或 `ALL` 时一律判定：
 
 | 情形 | 结果 | 理由码 |
 |---|---|---|
@@ -408,6 +419,7 @@ P2 用这条指令冻结批次数量（P2 设计 6.1）。
 - `judgment`：`mode` 为 `MODELS`（自己研判，给出 `models` 的模型名和 `judge_minutes`）或 `FOLLOW`（跟随，给出 `source_instance_id` 与 `since`，另两项为空数组）。
 - 止损与开仓：`close_minutes`、`close_quantile`、`wick_quantile`、`wick_multiplier`、`trail_quantile`、`insurance_fraction`、`ladder_step`（没有阶梯为 null）、`round_trip_cost`、`max_risk_fraction`（未登记时写生效的 2%）、`directive_ttl_minutes`、`event_types`。
 - 基线：`reentry_wait_minutes`、`baseline_max_share`、`baseline_renew_minutes`。
+- `reentry_rule`：登记的重入规则（第 2.4 节），未登记时写 `CONFIDENCE`。
 - `price_state_gate`：启用价格状态闸门时给出 `model`、`scope`（空写成 `ALL`）、`on_unavailable`、`max_age_minutes`，否则为 null。启用价格状态闸门时另有 `price_state`（所属小时、状态、`uptrend`/`downtrend`/`range` 三个概率、强度、模型版本、判断时刻）和 `entry_gate`（是否放行、理由码、方向、时刻）；没有记录时为 `null`。
 
 研判记录不含提示词、原始回答、用量和新闻正文。实盘绑定下，许可为 `SIM_ONLY` 的来源只返回来源与编号，不返回标题。游标签名并绑定查询范围，篡改时拒绝。查询不触发任何搜索、模型或写入。

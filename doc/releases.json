@@ -666,6 +666,12 @@
    "change_kind": "specification",
    "date": "2026-11-21",
    "summary": "The console gains an instance settings page: every viewable instance side by side with its purpose, judgment source and registered settings, values that differ from most instances marked. The P3 status carries the registered settings (new purpose field), and P2 publishes the object's policy with its effective composition."
+  },
+  {
+   "version": "3.20.0",
+   "change_kind": "specification",
+   "date": "2026-11-27",
+   "summary": "Re-entry after a stop can be registered per instance (S3-036): under SAME_DIRECTION the first judgment after the stop in the stopped direction and the current chain is injected even when S3-025 would only record it, so the framework re-entry gate opens; the price-state gate gains REENTRY and REVERSAL_REENTRY scopes so a re-entry can optionally wait for an agreeing price state."
   }
  ]
 }

@@ -41,6 +41,12 @@ type JudgmentFramework interface {
 	Submit(ctx context.Context, request dto.ScoreCommand) (dto.AdmissionReceipt, error)
 }
 
+// ObjectReader reads the framework object, here only for its re-entry gate
+// (S3-036).
+type ObjectReader interface {
+	ObjectState(ctx context.Context, id string) (*dto.ObservedObject, error)
+}
+
 // JudgmentSource reads another instance's judgments in follower mode
 // (S3-034): strictly after since, oldest first.
 type JudgmentSource interface {
@@ -61,6 +67,8 @@ type JudgmentSettings struct {
 	ProducerID, ProducerVersion           string
 	MinHalfLifeHours, MaxHalfLifeHours    int
 	Licence                               string
+	// ReentryRule is the registered S3-036 rule; SAME_DIRECTION needs Objects.
+	ReentryRule string
 }
 
 type NewsSourceState struct {
@@ -82,6 +90,8 @@ type JudgmentWorker struct {
 	// replaces Collect and Judge; no feed is polled and no model is called.
 	Source      JudgmentSource
 	FollowSince time.Time
+	// Objects reads the re-entry gate under ReentryRule SAME_DIRECTION.
+	Objects ObjectReader
 }
 
 // FollowState is the follower's cursor: the newest source judgment copied.
@@ -272,7 +282,11 @@ func (w *JudgmentWorker) resume(ctx context.Context, state *d.InjectionState, ve
 }
 
 func (w *JudgmentWorker) apply(ctx context.Context, state *d.InjectionState, version int64, j d.Judgment, recent, older []d.NewsItem) error {
-	next, actions := d.DecideInjection(*state, j)
+	wait, err := w.reentryWait(ctx)
+	if err != nil {
+		return err
+	}
+	next, actions := d.DecideInjectionAt(*state, j, wait)
 	items := map[string]d.NewsItem{}
 	for _, x := range append(append([]d.NewsItem{}, recent...), older...) {
 		items[x.ItemID] = x
@@ -296,6 +310,26 @@ func (w *JudgmentWorker) apply(ctx context.Context, state *d.InjectionState, ver
 		}
 	}
 	return w.Store.SaveState(ctx, "INJECTION", version, j.At, next)
+}
+
+// reentryWait reads the framework's re-entry gate under SAME_DIRECTION: a
+// gate that a stop closed and that has not opened yet. Without the rule, or
+// without a closed gate, it is zero and injection follows S3-025 alone.
+func (w *JudgmentWorker) reentryWait(ctx context.Context) (d.ReentryWait, error) {
+	if w.Settings.ReentryRule != d.ReentrySameDirection {
+		return d.ReentryWait{}, nil
+	}
+	if w.Objects == nil {
+		return d.ReentryWait{}, d.Fail("JUDGMENT_CONFIGURATION_INVALID", 503)
+	}
+	obj, err := w.Objects.ObjectState(ctx, w.Settings.ObjectID)
+	if err != nil {
+		return d.ReentryWait{}, err
+	}
+	if obj == nil || obj.Reentry == nil || obj.Reentry.Opened || obj.Reentry.Direction == 0 {
+		return d.ReentryWait{}, nil
+	}
+	return d.ReentryWait{Direction: obj.Reentry.Direction, StoppedAt: obj.Reentry.StoppedAt}, nil
 }
 
 // keepRetractions saves the retractions an interrupted apply already wrote

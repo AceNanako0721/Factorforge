@@ -71,6 +71,9 @@ type DynamicProfile struct {
 		Licence            string    `toml:"licence"`
 		MinHalfLifeHours   int       `toml:"min_half_life_hours"`
 		MaxHalfLifeHours   int       `toml:"max_half_life_hours"`
+		// ReentryRule is the S3-036 re-entry rule: CONFIDENCE (also when
+		// empty) or SAME_DIRECTION.
+		ReentryRule string `toml:"reentry_rule"`
 	} `toml:"judgment"`
 	// Follow selects follower mode (S3-034): judgments are read from
 	// the source instance's read API instead of being generated here.
@@ -116,7 +119,7 @@ type DynamicProfile struct {
 			TimeoutSeconds int    `toml:"timeout_seconds"`
 			MaxAgeMinutes  int    `toml:"max_age_minutes"`
 			OnUnavailable  string `toml:"on_unavailable"`
-			Scope          string `toml:"scope"` // ALL (also when empty) or REVERSAL
+			Scope          string `toml:"scope"` // ALL (also when empty), REVERSAL, REENTRY or REVERSAL_REENTRY
 		} `toml:"price_state"`
 	} `toml:"position"`
 }
@@ -163,12 +166,13 @@ func (p DynamicProfile) Validate() error {
 	bad = bad || pos.CloseMinutes != 5 && pos.CloseMinutes != 15 || pos.InsuranceFraction <= 0 || pos.InsuranceFraction >= 1 || pos.WickMultiplier <= 0 || pos.BaselineMaxShare <= 0 || pos.BaselineMaxShare > 1 || pos.DirectiveTTLMinutes <= 0 || pos.NoiseLookbackDays <= 0 || pos.PriceTick <= 0 || pos.LadderStep < 0 || pos.LadderStep >= 1 || pos.MaxRiskFraction < 0 || pos.MaxRiskFraction > 1
 	if ps := pos.PriceState; ps.URL != "" {
 		parsed, err := url.Parse(ps.URL)
-		bad = bad || err != nil || parsed.Scheme != "https" || parsed.Host == "" || ps.APIKey == "" || ps.Model == "" || ps.TimeoutSeconds <= 0 || ps.MaxAgeMinutes <= 0 || !d.Has([]string{d.PriceStateBlock, d.PriceStateIgnore}, ps.OnUnavailable) || !d.Has([]string{"", d.PriceStateScopeAll, d.PriceStateScopeReversal}, ps.Scope)
+		bad = bad || err != nil || parsed.Scheme != "https" || parsed.Host == "" || ps.APIKey == "" || ps.Model == "" || ps.TimeoutSeconds <= 0 || ps.MaxAgeMinutes <= 0 || !d.Has([]string{d.PriceStateBlock, d.PriceStateIgnore}, ps.OnUnavailable) || !d.Has([]string{"", d.PriceStateScopeAll, d.PriceStateScopeReversal, d.PriceStateScopeReentry, d.PriceStateScopeReversalReentry}, ps.Scope)
 	}
 	for _, v := range p.Judgment.ImpactByConfidence {
 		bad = bad || v == ""
 	}
 	bad = bad || p.Judgment.MinHalfLifeHours < 1 || p.Judgment.MaxHalfLifeHours < p.Judgment.MinHalfLifeHours || len(p.News.JudgeMinutes) == 0 && !following
+	bad = bad || !d.Has([]string{"", d.ReentryConfidence, d.ReentrySameDirection}, p.Judgment.ReentryRule)
 	if bad {
 		return d.Fail("DYNAMIC_PROFILE_INVALID", 503)
 	}

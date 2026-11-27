@@ -280,16 +280,27 @@ func TestT333GateScope(t *testing.T) {
 	for _, c := range []struct {
 		scope           string
 		last, direction int
+		stopped         bool
 		applies         bool
 	}{
-		{"", -1, -1, true},
-		{d.PriceStateScopeAll, -1, -1, true},
-		{d.PriceStateScopeReversal, -1, -1, false},
-		{d.PriceStateScopeReversal, 1, 1, false},
-		{d.PriceStateScopeReversal, -1, 1, true},
-		{d.PriceStateScopeReversal, 0, -1, true},
+		{"", -1, -1, false, true},
+		{d.PriceStateScopeAll, -1, -1, true, true},
+		{d.PriceStateScopeReversal, -1, -1, false, false},
+		{d.PriceStateScopeReversal, -1, -1, true, false},
+		{d.PriceStateScopeReversal, 1, 1, false, false},
+		{d.PriceStateScopeReversal, -1, 1, false, true},
+		{d.PriceStateScopeReversal, 0, -1, false, true},
+		// S3-036: a re-entry is a batch on the side a stop just closed.
+		{d.PriceStateScopeReentry, -1, -1, true, true},
+		{d.PriceStateScopeReentry, -1, -1, false, false},
+		{d.PriceStateScopeReentry, -1, 1, true, false},
+		{d.PriceStateScopeReentry, 0, -1, false, false},
+		{d.PriceStateScopeReversalReentry, -1, -1, true, true},
+		{d.PriceStateScopeReversalReentry, -1, -1, false, false},
+		{d.PriceStateScopeReversalReentry, -1, 1, false, true},
+		{d.PriceStateScopeReversalReentry, 0, 1, false, true},
 	} {
-		if d.GateApplies(c.scope, c.last, c.direction) != c.applies {
+		if d.GateApplies(c.scope, c.last, c.direction, c.stopped) != c.applies {
 			t.Fatal("gate scope", c)
 		}
 	}
@@ -385,7 +396,7 @@ func TestT333PriceStateProfile(t *testing.T) {
 	if err := good.Validate(); err != nil {
 		t.Fatal("gate on", err)
 	}
-	for _, scope := range []string{"ALL", "REVERSAL"} {
+	for _, scope := range []string{"ALL", "REVERSAL", "REENTRY", "REVERSAL_REENTRY"} {
 		p := good
 		p.Position.PriceState.Scope = scope
 		if err := p.Validate(); err != nil {
