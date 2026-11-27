@@ -51,6 +51,12 @@ func TestRulesConditionsAndExceptions(t *testing.T) {
 		level d.Level
 	}{
 		{"service down", func(s *d.Snapshot) { s.Units[0].Active, s.Units[0].Sub = "failed", "failed" }, "R-002", d.Anomaly},
+		{"stuck starting", func(s *d.Snapshot) {
+			s.Units[0].Active, s.Units[0].Sub, s.Units[0].EnteredAt = "activating", "start-post", t0.Add(-4*time.Minute)
+		}, "R-002", d.Anomaly},
+		{"log alert well after start", func(s *d.Snapshot) {
+			s.Units[0].Alerts, s.Units[0].StartedAt = map[string]int{"POSITION_MANAGER_FAILED": 1}, t0.Add(-10*time.Minute)
+		}, "R-014", d.Warn},
 		{"run not normal", func(s *d.Snapshot) { s.Run.State = "RECOVERY_CHECK" }, "R-003", d.Anomaly},
 		{"risk lock", func(s *d.Snapshot) { s.Account.Locks = []string{"DAY_LOSS"} }, "R-004", d.Anomaly},
 		{"new alert", func(s *d.Snapshot) { s.Alerts = []d.Alert{{At: t0.Add(-10 * time.Second), Code: "CANDLE_GAP"}} }, "R-005", d.Anomaly},
@@ -84,16 +90,23 @@ func TestRulesConditionsAndExceptions(t *testing.T) {
 		{"service just restarting", func(s *d.Snapshot) {
 			s.Units[0].Active, s.Units[0].Sub, s.Units[0].EnteredAt = "activating", "start", t0.Add(-30*time.Second)
 		}},
+		{"log alert while starting just before the window", func(s *d.Snapshot) {
+			s.Units[0].Alerts, s.Units[0].StartedAt = map[string]int{"POSITION_MANAGER_FAILED": 1}, t0.Add(-3*time.Minute)
+		}},
+		{"executor still in its start-post step", func(s *d.Snapshot) {
+			s.Units[0].Active, s.Units[0].Sub = "activating", "start-post"
+			s.Units[0].EnteredAt, s.Units[0].StartedAt = t0.Add(-150*time.Second), t0.Add(-150*time.Second)
+		}},
 		{"disabled inactive unit", func(s *d.Snapshot) {
 			s.Units = append(s.Units, d.Unit{Name: "demo-old.service", Active: "inactive", FileState: "disabled"})
 		}},
 		{"log alert from a restart in the window", func(s *d.Snapshot) {
-			s.Units[0].Alerts, s.Units[0].EnteredAt = map[string]int{"X_FAILED": 1}, t0.Add(-20*time.Second)
+			s.Units[0].Alerts, s.Units[0].StartedAt = map[string]int{"X_FAILED": 1}, t0.Add(-20*time.Second)
 		}},
 		{"read failure right after restart", func(s *d.Snapshot) {
 			s.Unavailable["trading.account"] = "LOWER_UNAVAILABLE"
 			s.Account = nil
-			s.Units[0].EnteredAt = t0.Add(-40 * time.Second)
+			s.Units[0].StartedAt = t0.Add(-40 * time.Second)
 		}},
 		{"no lease holder", func(s *d.Snapshot) { u := t0.Add(-time.Hour); s.Lease = &d.Lease{Epoch: 0, Until: &u} }},
 		{"non-Go binary has no revision", func(s *d.Snapshot) { s.Units[0].Revision = "" }},

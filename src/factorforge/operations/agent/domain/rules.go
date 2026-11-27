@@ -10,7 +10,7 @@ import (
 
 // RulesVersion changes whenever a rule's condition, level or exception
 // changes; every check record carries it (S6-003).
-const RulesVersion = "1"
+const RulesVersion = "2"
 
 type Level string
 
@@ -56,7 +56,7 @@ const (
 	MarkStaleAfter     = 5 * time.Minute
 	DecisionStaleAfter = 15 * time.Minute
 	JudgmentStaleAfter = 70 * time.Minute
-	RestartGrace       = 120 * time.Second
+	RestartGrace       = 180 * time.Second
 	HotTemperatureC    = 90.0
 )
 
@@ -124,7 +124,7 @@ func ageMinutes(at, now time.Time) float64 {
 var registry = []Rule{
 	{ID: "R-001", Name: "下层读取失败", Scope: "INSTANCE", Level: Warn, Severity: "MEDIUM",
 		Condition:  "本次检查读不到交易层、策略层或应用层的某个公开接口",
-		Exceptions: "部署重启后 120 秒内，对应服务刚启动时的读取失败不报",
+		Exceptions: "该层服务启动后 180 秒内的读取失败不报",
 		Action:     "下一次检查仍失败时看该层服务状态（R-002）与日志",
 		instance: func(s *Snapshot) []Hit {
 			var out []Hit
@@ -138,7 +138,7 @@ var registry = []Rule{
 		}},
 	{ID: "R-002", Name: "服务未运行", Scope: "INSTANCE", Level: Anomaly, Severity: "HIGH",
 		Condition:  "登记的常驻服务不是 active/running",
-		Exceptions: "由定时器触发的一次性服务（Type=oneshot）不看运行状态；已禁用且未运行的服务不报；刚进入 activating/reloading 不满 120 秒的不报",
+		Exceptions: "由定时器触发的一次性服务（Type=oneshot）不看运行状态；已禁用且未运行的服务不报；进入 activating/reloading 不满 180 秒的不报（执行器启动后的恢复步骤会重试）",
 		Action:     "看该服务日志；执行器停止时先报告所有者",
 		instance: func(s *Snapshot) []Hit {
 			var out []Hit
@@ -365,12 +365,12 @@ var registry = []Rule{
 		}},
 	{ID: "R-014", Name: "服务日志告警", Scope: "INSTANCE", Level: Warn, Severity: "LOW",
 		Condition:  "上一次检查之后，服务日志里出现结构化告警（\"alert\" 字段）",
-		Exceptions: "服务在本窗口内重启过（部署重启时停止中打印的内容）不计；只计数，不读正文",
+		Exceptions: "服务在本窗口开始前 180 秒以内或窗口内启动过的不计（部署重启时停止与启动阶段打印的内容）；只计数，不读正文",
 		Action:     "同一告警持续出现时开单",
 		instance: func(s *Snapshot) []Hit {
 			var out []Hit
 			for _, u := range s.Units {
-				if len(u.Alerts) == 0 || !s.Since.IsZero() && u.EnteredAt.After(s.Since) {
+				if len(u.Alerts) == 0 || !s.Since.IsZero() && u.StartedAt.After(s.Since.Add(-RestartGrace)) {
 					continue
 				}
 				var parts []string
@@ -410,13 +410,13 @@ func layerOf(source string) string {
 	return source
 }
 
-// recentlyStarted reports whether a unit of the given layer entered its
-// current state within RestartGrace; unit names carry the layer's service
+// recentlyStarted reports whether a unit of the given layer started within
+// RestartGrace; unit names carry the layer's service
 // role (trading-api, strategy-public, p3-api).
 func recentlyStarted(s *Snapshot, layer string) bool {
 	marker := map[string]string{"trading": "trading", "strategy": "strategy", "instance": "p3"}[layer]
 	for _, u := range s.Units {
-		if marker != "" && strings.Contains(u.Name, marker) && !u.EnteredAt.IsZero() && s.At.Sub(u.EnteredAt) < RestartGrace {
+		if marker != "" && strings.Contains(u.Name, marker) && !u.StartedAt.IsZero() && s.At.Sub(u.StartedAt) < RestartGrace {
 			return true
 		}
 	}
