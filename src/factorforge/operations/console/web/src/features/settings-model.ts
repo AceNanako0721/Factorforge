@@ -30,7 +30,8 @@ const short = (id: string) => id.replace(/^soxl-/, "").toUpperCase();
 const day = (v: Json) => (text(v) ?? "").slice(0, 10) || MISSING;
 
 const inputName: Record<string, string> = { NEW_CONTRIBUTION: "新研判计入", BASELINE_RECONFIRM: "基线重新确认" };
-const scopeName: Record<string, string> = { ALL: "所有开仓", REVERSAL: "仅反向开仓" };
+const scopeName: Record<string, string> = { ALL: "所有开仓", REVERSAL: "仅反向开仓", REENTRY: "仅止损后重入", REVERSAL_REENTRY: "反向开仓与止损后重入" };
+const reentryRuleName: Record<string, string> = { CONFIDENCE: "信心不低于判断链最高的新研判", SAME_DIRECTION: "一条同向研判即可" };
 const unavailableName: Record<string, string> = { BLOCK: "不开仓", IGNORE: "照常开仓" };
 
 function levels(v: Json): string {
@@ -151,6 +152,12 @@ function specs(): Spec[] {
           const xs = strings(reentry(c).qualifying_inputs).map((x) => inputName[x] ?? x);
           return xs.length ? xs.join(" 或 ") : MISSING;
         }),
+    },
+    {
+      group: "开仓",
+      label: "止损后重入研判",
+      help: "止损之后，什么样的研判才算重新开仓的新依据",
+      value: (c) => p3(c, (c) => reentryRuleName[text(st(c).reentry_rule) ?? ""] ?? text(st(c).reentry_rule) ?? MISSING),
     },
     {
       group: "开仓",

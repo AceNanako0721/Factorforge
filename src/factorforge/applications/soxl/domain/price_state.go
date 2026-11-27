@@ -82,18 +82,32 @@ const (
 	PriceStateIgnore = "IGNORE"
 )
 
-// Which new batches the entry gate decides: every one, or only a reversal of
-// the side last held (and the first batch, when none was held yet).
+// Which new batches the entry gate decides: every one; only a reversal of the
+// side last held (and the first batch, when none was held yet); only a
+// re-entry on the side a stop just closed (S3-036); or both of the latter.
 const (
-	PriceStateScopeAll      = "ALL"
-	PriceStateScopeReversal = "REVERSAL"
+	PriceStateScopeAll             = "ALL"
+	PriceStateScopeReversal        = "REVERSAL"
+	PriceStateScopeReentry         = "REENTRY"
+	PriceStateScopeReversalReentry = "REVERSAL_REENTRY"
 )
 
 // GateApplies reports whether the gate decides a new batch in direction,
-// given the side last held (0 when none). Under REVERSAL a batch on the side
-// last held opens without it.
-func GateApplies(scope string, last, direction int) bool {
-	return scope != PriceStateScopeReversal || last != direction
+// given the side last held (0 when none) and whether the instance is flat
+// after that batch ended in a stop. A batch on the side last held is a
+// re-entry when stopped and a plain repeat otherwise.
+func GateApplies(scope string, last, direction int, stopped bool) bool {
+	reversal := last != direction
+	reentry := !reversal && stopped
+	switch scope {
+	case PriceStateScopeReversal:
+		return reversal
+	case PriceStateScopeReentry:
+		return reentry
+	case PriceStateScopeReversalReentry:
+		return reversal || reentry
+	}
+	return true
 }
 
 // GateEntry decides whether a new batch in direction may open: only when the

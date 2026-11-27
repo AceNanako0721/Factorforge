@@ -17,6 +17,7 @@ const status = (over: Record<string, unknown>) => ({
     round_trip_cost: "0.0018",
     max_risk_fraction: "0.02",
     reentry_wait_minutes: 30,
+    reentry_rule: "CONFIDENCE",
     directive_ttl_minutes: 20,
     baseline_max_share: "0.5",
     baseline_renew_minutes: 30,
@@ -44,13 +45,15 @@ describe("instance settings", () => {
       col("BRAVO", { ladder_step: "0.03", purpose: "ladder" }),
       col("CHARLIE", { price_state_gate: { model: "jev-latest", scope: "ALL", on_unavailable: "BLOCK", max_age_minutes: 120 } }),
       col("DELTA", { price_state_gate: { model: "jev-latest", scope: "REVERSAL", on_unavailable: "BLOCK", max_age_minutes: 120 } }),
-      col("ECHO", { max_risk_fraction: "1" }, { run: { execution_mode: "LIVE" } }),
+      col("ECHO", { max_risk_fraction: "1", reentry_rule: "SAME_DIRECTION", price_state_gate: { model: "jev-latest", scope: "REENTRY", on_unavailable: "BLOCK", max_age_minutes: 120 } }, { run: { execution_mode: "LIVE" } }),
     ]);
     expect(row(rows, "研判来源").values).toEqual(["自己研判（model-one、model-two）", "跟随 SOURCE", "跟随 SOURCE", "跟随 SOURCE", "跟随 SOURCE"]);
     expect(row(rows, "研判来源").differs).toEqual([true, false, false, false, false]);
     expect(row(rows, "止损移动方式").values).toEqual(["连续移动", "阶梯 3%", "连续移动", "连续移动", "连续移动"]);
     expect(row(rows, "止损移动方式").differs).toEqual([false, true, false, false, false]);
-    expect(row(rows, "价格状态闸门").values).toEqual(["不启用", "不启用", "所有开仓；不可用时不开仓", "仅反向开仓；不可用时不开仓", "不启用"]);
+    expect(row(rows, "价格状态闸门").values).toEqual(["不启用", "不启用", "所有开仓；不可用时不开仓", "仅反向开仓；不可用时不开仓", "仅止损后重入；不可用时不开仓"]);
+    expect(row(rows, "止损后重入研判").values).toEqual(["信心不低于判断链最高的新研判", "信心不低于判断链最高的新研判", "信心不低于判断链最高的新研判", "信心不低于判断链最高的新研判", "一条同向研判即可"]);
+    expect(row(rows, "止损后重入研判").differs).toEqual([false, false, false, false, true]);
     expect(row(rows, "单笔风险上限（应用）").values[4]).toBe("100%");
     expect(row(rows, "下单方式").values[4]).toBe("交易所下单（模拟盘）");
     expect(row(rows, "初始资金").values[0]).toBe("5000");

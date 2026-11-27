@@ -124,6 +124,24 @@ type InjectionState struct {
 	Sequence      int                      `json:"sequence"`
 	Events        map[string]InjectedEvent `json:"events,omitempty"`
 	LastJudgment  string                   `json:"last_judgment,omitempty"`
+	// ReentryFor is the stop time of the last REENTRY_CONFIRM injection, so
+	// one stop is confirmed once (S3-036).
+	ReentryFor *time.Time `json:"reentry_for,omitempty"`
+}
+
+// Reentry rules (S3-036). ReentryConfidence keeps S3-025 alone; under
+// ReentrySameDirection a stopped instance counts any judgment in the stopped
+// direction as the framework's qualifying input.
+const (
+	ReentryConfidence    = "CONFIDENCE"
+	ReentrySameDirection = "SAME_DIRECTION"
+)
+
+// ReentryWait is a closed framework re-entry gate seen before a judgment:
+// the side that was stopped and when. A zero Direction means none.
+type ReentryWait struct {
+	Direction int
+	StoppedAt time.Time
 }
 
 // InjectedEvent remembers what was written so revisions and retractions
@@ -153,7 +171,15 @@ type InjectionAction struct {
 // new state only after every action was accepted, so a failed write retries;
 // retractions already written are kept and skipped on the retry.
 func DecideInjection(state InjectionState, j Judgment) (InjectionState, []InjectionAction) {
-	next := InjectionState{Seen: append([]string(nil), state.Seen...), LastDirection: state.LastDirection, Sequence: state.Sequence, Events: map[string]InjectedEvent{}, LastJudgment: j.JudgmentID}
+	return DecideInjectionAt(state, j, ReentryWait{})
+}
+
+// DecideInjectionAt is DecideInjection with the instance's closed re-entry
+// gate: a zero wait (no stop, or rule CONFIDENCE) changes nothing; otherwise
+// a judgment after the stop in the stopped direction that S3-025 would only
+// record is injected into the current chain (REENTRY_CONFIRM, S3-036).
+func DecideInjectionAt(state InjectionState, j Judgment, wait ReentryWait) (InjectionState, []InjectionAction) {
+	next := InjectionState{Seen: append([]string(nil), state.Seen...), LastDirection: state.LastDirection, Sequence: state.Sequence, Events: map[string]InjectedEvent{}, LastJudgment: j.JudgmentID, ReentryFor: state.ReentryFor}
 	for k, v := range state.Events {
 		next.Events[k] = v
 	}
@@ -237,6 +263,18 @@ func DecideInjection(state InjectionState, j Judgment) (InjectionState, []Inject
 	case o.Confidence <= next.Active.Confidence-2:
 		actions = append(actions, InjectionAction{Kind: "REVISE", Direction: o.Direction, Confidence: o.Confidence, Targets: append([]string(nil), next.Active.EventIDs...), Reason: "CONFIDENCE_DOWN", ChainID: next.Active.ChainID})
 		next.Active.Confidence = o.Confidence
+	}
+	injected := false
+	for _, a := range actions {
+		injected = injected || a.Kind == "INJECT"
+	}
+	reconfirmed := state.ReentryFor != nil && state.ReentryFor.Equal(wait.StoppedAt)
+	if wait.Direction != 0 && DirectionSign(o.Direction) == wait.Direction && j.At.After(wait.StoppedAt) && next.Active != nil && next.Active.Direction == o.Direction && !reconfirmed {
+		if !injected {
+			inject("REENTRY_CONFIRM", next.Active.ChainID)
+		}
+		stopped := wait.StoppedAt
+		next.ReentryFor = &stopped
 	}
 	finish()
 	return next, actions

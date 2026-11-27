@@ -61,13 +61,13 @@ func RunDynamic(role string) error {
 	switch role {
 	case "JUDGMENT":
 		j := p.Judgment
-		settings := workers.JudgmentSettings{ObjectID: p.ObjectID, SubjectID: j.SubjectID, EventType: j.EventType, RecentWindow: time.Duration(p.News.RecentHours) * time.Hour, OlderWindow: time.Duration(p.News.OlderHours) * time.Hour, MaxNewsAge: time.Duration(p.News.MaxNewsAgeMinutes) * time.Minute, MaxRecent: p.News.MaxRecent, MaxOlder: p.News.MaxOlder, ImpactByConfidence: j.ImpactByConfidence, Credibility: j.Credibility, Relevance: j.Relevance, Quality: j.Quality, Rubric: j.Rubric, Calibration: j.Calibration, Verification: j.Verification, ProducerID: j.ProducerID, ProducerVersion: j.ProducerVersion, MinHalfLifeHours: j.MinHalfLifeHours, MaxHalfLifeHours: j.MaxHalfLifeHours, Licence: j.Licence}
+		settings := workers.JudgmentSettings{ObjectID: p.ObjectID, SubjectID: j.SubjectID, EventType: j.EventType, RecentWindow: time.Duration(p.News.RecentHours) * time.Hour, OlderWindow: time.Duration(p.News.OlderHours) * time.Hour, MaxNewsAge: time.Duration(p.News.MaxNewsAgeMinutes) * time.Minute, MaxRecent: p.News.MaxRecent, MaxOlder: p.News.MaxOlder, ImpactByConfidence: j.ImpactByConfidence, Credibility: j.Credibility, Relevance: j.Relevance, Quality: j.Quality, Rubric: j.Rubric, Calibration: j.Calibration, Verification: j.Verification, ProducerID: j.ProducerID, ProducerVersion: j.ProducerVersion, MinHalfLifeHours: j.MinHalfLifeHours, MaxHalfLifeHours: j.MaxHalfLifeHours, Licence: j.Licence, ReentryRule: j.ReentryRule}
 		if p.Following() {
 			source, err := submission.NewJudgmentSource(submission.JudgmentSourceOptions{BaseURL: p.Follow.SourceURL, Token: p.Follow.SourceToken, InstanceID: p.Follow.SourceInstanceID, Client: &http.Client{Timeout: timeout}, MaxResponseBytes: p.MaxBytes, MaxPages: 32})
 			if err != nil {
 				return err
 			}
-			w := &workers.JudgmentWorker{Store: store, Framework: framework, Clock: now, Alerts: alerts, Settings: settings, Source: source, FollowSince: p.Follow.Since.UTC()}
+			w := &workers.JudgmentWorker{Store: store, Framework: framework, Objects: framework, Clock: now, Alerts: alerts, Settings: settings, Source: source, FollowSince: p.Follow.Since.UTC()}
 			return loopFollow(ctx, w, *once, alerts)
 		}
 		template, err := analysis.LoadJudgmentTemplate(p.PromptPath, p.PromptVersion, p.MaxBytes)
@@ -83,7 +83,7 @@ func RunDynamic(role string) error {
 			s := config.ModelSettings{Enabled: true, BunPath: m.BunPath, Provider: m.Provider, AccountID: m.AccountID, Model: m.Model, TimeoutSeconds: m.Timeout, CleanupSeconds: 10, MaxInputBytes: p.MaxBytes, MaxOutputBytes: 64 << 10, MaxLineBytes: 256 << 10}
 			models = append(models, workers.NamedModel{Name: m.Name, Generator: modelaccess.Client{Root: p.Root, Config: p.ModelConfig, Settings: s}})
 		}
-		w := &workers.JudgmentWorker{Store: store, Framework: framework, News: monitoring.NewsCollector{Fetcher: fetcher, Feeds: p.News.Feeds, Clock: now}, Models: models, Template: template, Clock: now, Alerts: alerts, Settings: settings}
+		w := &workers.JudgmentWorker{Store: store, Framework: framework, Objects: framework, News: monitoring.NewsCollector{Fetcher: fetcher, Feeds: p.News.Feeds, Clock: now}, Models: models, Template: template, Clock: now, Alerts: alerts, Settings: settings}
 		return loopJudgment(ctx, w, p, *once, alerts)
 	case "POSITION":
 		trading, err := submission.NewTradingRead(submission.TradingReadOptions{BaseURL: p.Access.TradingReadURL, Token: p.Access.TradingReadToken, Run: tdto.RunKey{Environment: p.Environment, AccountID: p.Access.AccountID, RunID: p.Access.RunID}, Client: &http.Client{Timeout: timeout}, MaxResponseBytes: p.MaxBytes})
@@ -112,9 +112,12 @@ func RunDynamic(role string) error {
 func RecordedSettings(p config.DynamicProfile) *workers.RecordedSettings {
 	pos := p.Position
 	r := &workers.RecordedSettings{Purpose: p.Purpose, CloseMinutes: pos.CloseMinutes, CloseQuantile: pos.CloseQuantile, WickQuantile: pos.WickQuantile, WickMultiplier: pos.WickMultiplier, TrailQuantile: pos.TrailQuantile, InsuranceFraction: pos.InsuranceFraction,
-		LadderStep: pos.LadderStep, RoundTripCost: pos.RoundTripCost, MaxRiskFraction: pos.MaxRiskFraction, ReentryWaitMinutes: pos.ReentryWaitMinutes, DirectiveTTLMinutes: pos.DirectiveTTLMinutes, BaselineMaxShare: pos.BaselineMaxShare, BaselineRenewMinutes: pos.BaselineRenewMin, EventTypes: append([]string{}, pos.EventTypes...)}
+		LadderStep: pos.LadderStep, RoundTripCost: pos.RoundTripCost, MaxRiskFraction: pos.MaxRiskFraction, ReentryWaitMinutes: pos.ReentryWaitMinutes, ReentryRule: p.Judgment.ReentryRule, DirectiveTTLMinutes: pos.DirectiveTTLMinutes, BaselineMaxShare: pos.BaselineMaxShare, BaselineRenewMinutes: pos.BaselineRenewMin, EventTypes: append([]string{}, pos.EventTypes...)}
 	if r.MaxRiskFraction == 0 {
 		r.MaxRiskFraction = d.DefaultMaxRiskFraction
+	}
+	if r.ReentryRule == "" {
+		r.ReentryRule = d.ReentryConfidence
 	}
 	r.Judgment.Models = []string{}
 	r.Judgment.JudgeMinutes = []int{}

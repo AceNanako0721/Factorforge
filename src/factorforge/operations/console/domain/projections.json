@@ -1306,6 +1306,9 @@
                     "purpose": {
                       "type": "string"
                     },
+                    "reentry_rule": {
+                      "type": "string"
+                    },
                     "reentry_wait_minutes": {
                       "type": "integer"
                     },
@@ -1335,6 +1338,7 @@
                     "round_trip_cost",
                     "max_risk_fraction",
                     "reentry_wait_minutes",
+                    "reentry_rule",
                     "directive_ttl_minutes",
                     "baseline_max_share",
                     "baseline_renew_minutes",
