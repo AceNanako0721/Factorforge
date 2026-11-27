@@ -678,6 +678,12 @@
    "change_kind": "design",
    "date": "2026-11-27",
    "summary": "A hold (no-trade band, unit band, adjustment interval or cooldown) keeps the live trading-layer target, so an opening the trading layer accepted but has not ordered yet is no longer taken back by the next cycle. A directive-sized opening measures its loss from the worse of the sample and the opening-side quote and leaves 1% of the object loss budget, so the trading layer no longer refuses it with TRADE_RISK_LIMIT for a few ticks of drift."
+  },
+  {
+   "version": "4.0.0",
+   "change_kind": "framework",
+   "date": "2026-11-27",
+   "summary": "New operations-layer module P6 (operations agent, S6): a supervisor sweeps every registered instance and the host on an interval against numbered rules with written-out benign exceptions, keeps merged check records and opens one issue per rule source; a stdio MCP service offers observation tools (instance settings and differences, live status with rule hits, batches, fills, decision history, judgments, actions, judgment accuracy by horizon, direction and confidence) and record tools (issues with a manager/developer state machine where closing carries the owner's words, patrol reports, owner decisions, exclusion segments) by profile; all reads go through the lower layers' public GET routes."
   }
  ]
 }

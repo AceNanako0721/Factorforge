@@ -24,4 +24,5 @@ var Coverage = []FieldCoverage{
 	{Design: "04_Web管理台设计书.md", File: "src/factorforge/operations/console/config/config.go", Types: []string{"Profile", "Binding", "LiveMarket"}, Tag: "toml"},
 	{Design: "04_Web管理台设计书.md", File: "src/factorforge/operations/console/domain/models.go", Types: []string{"User"}, Tag: "toml"},
 	{Design: "04_Web管理台设计书.md", File: "src/factorforge/operations/console/adapters/http_read.go", Types: []string{"Service", "Services"}, Tag: "toml"},
+	{Design: "06_运维代理设计书.md", File: "src/factorforge/operations/agent/config/config.go", Types: []string{"Profile", "Host", "Instance", "Endpoint"}, Tag: "toml"},
 }

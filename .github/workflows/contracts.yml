@@ -115,6 +115,26 @@ jobs:
             go run ./tools/build-instance
           fi
 
+  ops-agent-checks:
+    name: ops-agent-checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Install native PostgreSQL test binaries
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql
+      - name: Rules, issues, scorecard, records and MCP profiles
+        run: go test ./tests/operations/agent -count=1
+      - name: Build the operations agent
+        run: go build -o /tmp/ops-agent ./src/factorforge/operations/agent/entrypoints/ops-agent
+
   console-checks:
     name: console-checks
     runs-on: ubuntu-latest
