@@ -209,6 +209,9 @@ func TestMCPProfilesAndTools(t *testing.T) {
 	if v, isErr := call(t, dev, "instance_status", map[string]any{"instance": "other"}); !isErr || v["error"] != "INSTANCE_UNKNOWN" {
 		t.Fatal("unknown instance", v)
 	}
+	if v, isErr := call(t, dev, "list_issues", map[string]any{}); isErr || mustJSON(v["issues"]) != "[]" {
+		t.Fatal("empty list is []", v)
+	}
 	v, isErr = call(t, mgr, "open_issue", map[string]any{"title": "manual", "severity": "MEDIUM", "instances": []string{"demo-1"}, "note": "seen twice"})
 	if isErr || v["id"] != "I-0001" {
 		t.Fatal("open issue", v)

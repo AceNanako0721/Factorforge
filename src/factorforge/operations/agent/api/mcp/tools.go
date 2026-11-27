@@ -13,6 +13,14 @@ import (
 
 var both = []string{d.Manager, d.Developer}
 
+// nonNil makes an empty list encode as [] rather than null.
+func nonNil[T any](xs []T) []T {
+	if xs == nil {
+		return []T{}
+	}
+	return xs
+}
+
 func obj(props map[string]any, required ...string) map[string]any {
 	s := map[string]any{"type": "object", "properties": props, "additionalProperties": false}
 	if len(required) > 0 {
@@ -239,7 +247,7 @@ func Tools(o app.Observer, store ports.Store, profile string, now func() time.Ti
 					return nil, err
 				}
 				cs, err := store.Checks(ctx, p.Instance, now().UTC().Add(-time.Duration(bound(p.SinceHours, 3, 720))*time.Hour), p.OnlyHits, bound(p.Limit, 100, 500))
-				return map[string]any{"checks": cs}, err
+				return map[string]any{"checks": nonNil(cs)}, err
 			}},
 		{Name: "list_issues", Tier: Observe, Profiles: both,
 			Schema:      obj(map[string]any{"states": strs("状态（OPEN/WATCH/FIXING/VERIFYING/CLOSED），默认未关闭的全部"), "instance": str("实例标识"), "limit": integer("最多几张", 1, 500)}),
@@ -254,7 +262,7 @@ func Tools(o app.Observer, store ports.Store, profile string, now func() time.Ti
 					return nil, err
 				}
 				is, err := store.Issues(ctx, ports.IssueFilter{States: p.States, Instance: p.Instance, Limit: p.Limit})
-				return map[string]any{"issues": is}, err
+				return map[string]any{"issues": nonNil(is)}, err
 			}},
 		{Name: "get_issue", Tier: Observe, Profiles: both, Schema: obj(map[string]any{"id": str("问题单编号")}, "id"),
 			Description: "一张问题单及其全部记录。",
@@ -278,7 +286,7 @@ func Tools(o app.Observer, store ports.Store, profile string, now func() time.Ti
 					return nil, err
 				}
 				rs, err := store.Reports(ctx, bound(p.Limit, 10, 100))
-				return map[string]any{"reports": rs}, err
+				return map[string]any{"reports": nonNil(rs)}, err
 			}},
 		{Name: "list_owner_decisions", Tier: Observe, Profiles: both, Schema: obj(map[string]any{"limit": integer("最多几条", 1, 200)}),
 			Description: "所有者决定记录（最新在前）。",
@@ -290,7 +298,7 @@ func Tools(o app.Observer, store ports.Store, profile string, now func() time.Ti
 					return nil, err
 				}
 				ds, err := store.Decisions(ctx, bound(p.Limit, 20, 200))
-				return map[string]any{"decisions": ds}, err
+				return map[string]any{"decisions": nonNil(ds)}, err
 			}},
 		{Name: "list_exclusions", Tier: Observe, Profiles: both, Schema: obj(map[string]any{"instance": str("实例标识；省略为全部")}),
 			Description: "登记的剔除段。",
@@ -302,7 +310,7 @@ func Tools(o app.Observer, store ports.Store, profile string, now func() time.Ti
 					return nil, err
 				}
 				ss, err := store.Segments(ctx, p.Instance)
-				return map[string]any{"exclusions": ss}, err
+				return map[string]any{"exclusions": nonNil(ss)}, err
 			}},
 
 		{Name: "open_issue", Tier: Record, Profiles: []string{d.Manager},

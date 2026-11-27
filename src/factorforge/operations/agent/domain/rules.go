@@ -10,7 +10,7 @@ import (
 
 // RulesVersion changes whenever a rule's condition, level or exception
 // changes; every check record carries it (S6-003).
-const RulesVersion = "2"
+const RulesVersion = "3"
 
 type Level string
 
@@ -138,7 +138,7 @@ var registry = []Rule{
 		}},
 	{ID: "R-002", Name: "服务未运行", Scope: "INSTANCE", Level: Anomaly, Severity: "HIGH",
 		Condition:  "登记的常驻服务不是 active/running",
-		Exceptions: "由定时器触发的一次性服务（Type=oneshot）不看运行状态；已禁用且未运行的服务不报；进入 activating/reloading 不满 180 秒的不报（执行器启动后的恢复步骤会重试）",
+		Exceptions: "由定时器触发的一次性服务（Type=oneshot）不看运行状态；已禁用且未运行的服务不报；进入当前状态（启动中、停止中、刚失败待自动重启等）不满 180 秒的不报（部署重启与执行器启动后的恢复步骤）",
 		Action:     "看该服务日志；执行器停止时先报告所有者",
 		instance: func(s *Snapshot) []Hit {
 			var out []Hit
@@ -153,7 +153,7 @@ var registry = []Rule{
 				if u.Active == "active" && (u.Sub == "running" || u.Sub == "") {
 					continue
 				}
-				if (u.Active == "activating" || u.Active == "reloading") && !u.EnteredAt.IsZero() && s.At.Sub(u.EnteredAt) < RestartGrace {
+				if !u.EnteredAt.IsZero() && s.At.Sub(u.EnteredAt) < RestartGrace {
 					continue
 				}
 				out = append(out, hit(u.Name, fmt.Sprintf("服务 %s 状态 %s/%s", u.Name, u.Active, u.Sub), map[string]any{"unit": u.Name, "active": u.Active, "sub": u.Sub}))
