@@ -126,8 +126,9 @@ type Unit struct {
 	Sub         string         `json:"sub"`        // SubState
 	FileState   string         `json:"file_state"` // UnitFileState
 	Type        string         `json:"type"`       // Service Type
-	EnteredAt   time.Time      `json:"entered_at"`
-	Revision    string         `json:"revision"` // vcs.revision of the binary; empty when not a Go build
+	EnteredAt   time.Time      `json:"entered_at"` // when the unit entered its current state
+	StartedAt   time.Time      `json:"started_at"` // when the unit last left the inactive state
+	Revision    string         `json:"revision"`   // vcs.revision of the binary; empty when not a Go build
 	Alerts      map[string]int `json:"alerts"`
 	ReadFailure string         `json:"read_failure"`
 }

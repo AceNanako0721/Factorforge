@@ -56,7 +56,7 @@ func (h HostProbe) Units(ctx context.Context, units []string, since time.Time) [
 			out = append(out, u)
 			continue
 		}
-		raw, err := h.run(ctx, h.Systemctl, "--user", "show", name, "--timestamp=unix", "--property=ActiveState,SubState,UnitFileState,Type,ActiveEnterTimestamp,ExecStart")
+		raw, err := h.run(ctx, h.Systemctl, "--user", "show", name, "--timestamp=unix", "--property=ActiveState,SubState,UnitFileState,Type,StateChangeTimestamp,InactiveExitTimestamp,ExecStart")
 		if err != nil {
 			u.ReadFailure = d.Code(err)
 			out = append(out, u)
@@ -69,9 +69,7 @@ func (h HostProbe) Units(ctx context.Context, units []string, since time.Time) [
 			}
 		}
 		u.Active, u.Sub, u.FileState, u.Type = props["ActiveState"], props["SubState"], props["UnitFileState"], props["Type"]
-		if n, err := strconv.ParseInt(strings.TrimPrefix(props["ActiveEnterTimestamp"], "@"), 10, 64); err == nil && n > 0 {
-			u.EnteredAt = time.Unix(n, 0).UTC()
-		}
+		u.EnteredAt, u.StartedAt = unixStamp(props["StateChangeTimestamp"]), unixStamp(props["InactiveExitTimestamp"])
 		if m := execPath.FindStringSubmatch(props["ExecStart"]); m != nil && (h.Skip == nil || !h.Skip.MatchString(m[1])) {
 			if info, err := buildinfo.ReadFile(m[1]); err == nil {
 				for _, s := range info.Settings {
@@ -98,6 +96,15 @@ func (h HostProbe) Units(ctx context.Context, units []string, since time.Time) [
 		out = append(out, u)
 	}
 	return out
+}
+
+// unixStamp parses systemd's "@<seconds>" (--timestamp=unix); empty or
+// unset stamps give the zero time.
+func unixStamp(v string) time.Time {
+	if n, err := strconv.ParseInt(strings.TrimPrefix(v, "@"), 10, 64); err == nil && n > 0 {
+		return time.Unix(n, 0).UTC()
+	}
+	return time.Time{}
 }
 
 // MainRevision reads origin/main from the repository's refs without git.

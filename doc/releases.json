@@ -684,6 +684,12 @@
    "change_kind": "framework",
    "date": "2026-11-27",
    "summary": "New operations-layer module P6 (operations agent, S6): a supervisor sweeps every registered instance and the host on an interval against numbered rules with written-out benign exceptions, keeps merged check records and opens one issue per rule source; a stdio MCP service offers observation tools (instance settings and differences, live status with rule hits, batches, fills, decision history, judgments, actions, judgment accuracy by horizon, direction and confidence) and record tools (issues with a manager/developer state machine where closing carries the owner's words, patrol reports, owner decisions, exclusion segments) by profile; all reads go through the lower layers' public GET routes."
+  },
+  {
+   "version": "4.1.0",
+   "change_kind": "specification",
+   "date": "2026-11-27",
+   "summary": "Operations agent restart grace: a unit counts as just started from the time it last left the inactive state and as just changed from its state change time, so services still running their start-up step after a deploy restart are no longer reported as down; the grace is 180 seconds (executor start-up retries) and structured log alerts from a unit started within the grace before the window are not counted. Rules version 2."
   }
  ]
 }
