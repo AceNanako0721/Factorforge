@@ -97,6 +97,9 @@ func TestRulesConditionsAndExceptions(t *testing.T) {
 			s.Units[0].Active, s.Units[0].Sub = "activating", "start-post"
 			s.Units[0].EnteredAt, s.Units[0].StartedAt = t0.Add(-150*time.Second), t0.Add(-150*time.Second)
 		}},
+		{"failed for a moment while a deploy restarts it", func(s *d.Snapshot) {
+			s.Units[0].Active, s.Units[0].Sub, s.Units[0].EnteredAt = "failed", "failed", t0.Add(-5*time.Second)
+		}},
 		{"disabled inactive unit", func(s *d.Snapshot) {
 			s.Units = append(s.Units, d.Unit{Name: "demo-old.service", Active: "inactive", FileState: "disabled"})
 		}},

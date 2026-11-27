@@ -690,6 +690,12 @@
    "change_kind": "specification",
    "date": "2026-11-27",
    "summary": "Operations agent restart grace: a unit counts as just started from the time it last left the inactive state and as just changed from its state change time, so services still running their start-up step after a deploy restart are no longer reported as down; the grace is 180 seconds (executor start-up retries) and structured log alerts from a unit started within the grace before the window are not counted. Rules version 2."
+  },
+  {
+   "version": "4.1.1",
+   "change_kind": "design",
+   "date": "2026-11-27",
+   "summary": "Operations agent: a service that entered any non-running state (starting, stopping, failed awaiting its automatic restart) less than 180 seconds ago is no longer reported as down, so a deploy restart that briefly fails a unit on stop is quiet (rules version 3); empty record lists encode as [] instead of null."
   }
  ]
 }
